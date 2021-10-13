@@ -145,10 +145,11 @@ class ParamPanel(BasePanel):
     def get_param_options(self, is_show_error=False):
         params = []
 
-        for pidx, physics_param in enumerate(self.physics_list):
-            param = physics_param.get_param_options(pidx, is_show_error)
-            if param:
-                params.append(param)
+        if self.frame.file_panel_ctrl.org_model_file_ctrl.data and self.org_model_digest == self.frame.file_panel_ctrl.org_model_file_ctrl.data.digest:
+            for pidx, physics_param in enumerate(self.physics_list):
+                param = physics_param.get_param_options(pidx, is_show_error)
+                if param:
+                    params.append(param)
         
         if len(params) == 0:
             logger.error("物理設定が1件も設定されていません。", decoration=MLogger.DECORATION_BOX)
@@ -225,6 +226,28 @@ class PhysicsParam():
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
+
+        # 材質頂点類似度
+        self.simple_similarity_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"検出度", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_txt.SetToolTip(u"材質内の頂点を検出する時の傾き等の類似度\n値を小さくすると傾きが違っていても検出しやすくなりますが、誤検知が増えます。")
+        self.simple_similarity_txt.Wrap(-1)
+        self.simple_grid_sizer.Add(self.simple_similarity_txt, 0, wx.ALL, 5)
+
+        self.simple_similarity_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"（0.93）", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_label.Wrap(-1)
+        self.simple_grid_sizer.Add(self.simple_similarity_label, 0, wx.ALL, 5)
+
+        self.simple_similarity_min_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"0.7", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_min_label.Wrap(-1)
+        self.simple_grid_sizer.Add(self.simple_similarity_min_label, 0, wx.ALL, 5)
+
+        self.simple_similarity_slider = \
+            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.93, 0.7, 1, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
+        self.simple_grid_sizer.Add(self.simple_similarity_slider, 1, wx.ALL | wx.EXPAND, 5)
+
+        self.simple_similarity_max_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"1", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_max_label.Wrap(-1)
+        self.simple_grid_sizer.Add(self.simple_similarity_max_label, 0, wx.ALL, 5)
 
         # 物理の細かさスライダー
         self.simple_fineness_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"細かさ", wx.DefaultPosition, wx.DefaultSize, 0)
@@ -1243,6 +1266,7 @@ class PhysicsParam():
 
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
+            params["similarity"] = self.simple_similarity_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
             params["air_resistance"] = self.simple_air_resistance_slider.GetValue()

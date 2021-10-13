@@ -40,6 +40,7 @@ class PmxTailorExportService():
                 service_data_txt = f"{service_data_txt}\n　【No.{pidx + 1}】 --------- "    # noqa
                 service_data_txt = f"{service_data_txt}\n　　材質: {param_option['material_name']}"    # noqa
                 service_data_txt = f"{service_data_txt}\n　　剛体グループ: {param_option['rigidbody'].collision_group + 1}"    # noqa
+                service_data_txt = f"{service_data_txt}\n　　検出度: {param_option['similarity']}"    # noqa
                 service_data_txt = f"{service_data_txt}\n　　細かさ: {param_option['fineness']}"    # noqa
                 service_data_txt = f"{service_data_txt}\n　　質量: {param_option['mass']}"    # noqa
                 service_data_txt = f"{service_data_txt}\n　　空気抵抗: {param_option['air_resistance']}"    # noqa
@@ -253,7 +254,7 @@ class PmxTailorExportService():
 
         # それぞれの出現回数から大体全部埋まってるのを抽出。その中の最大と最小を選ぶ
         xu, x_counts = np.unique(xs, return_counts=True)
-        full_x = [i for i, x in zip(xu, x_counts) if x == max(x_counts)]
+        full_x = [i for i, x in zip(xu, x_counts) if x >= max(x_counts) * 0.8]
         min_x = min(full_x)
         max_x = max(full_x)
 
@@ -341,10 +342,6 @@ class PmxTailorExportService():
                         # リストの中身が1件だとintになってしまう？
                         index_idx_list = [index_idx_list]
                     for iidx in index_idx_list:
-                        # if model.indices[index_idx][0] in vertex_axis_map and model.indices[index_idx][1] in vertex_axis_map and model.indices[index_idx][2] in vertex_axis_map:
-                        #     # 登録済みの面である場合スルー
-                        #     continue
-
                         edge_size = len(set(model.indices[iidx]) & set(vertex_axis_map.keys()))
                         if edge_size >= 2:
                             if edge_size == 2:
@@ -368,7 +365,7 @@ class PmxTailorExportService():
 
         for index_idx in vertical_iidxs:
             # 面の辺を抽出
-            vertical_vs, horizonal_vs, diagonal_vs = self.judge_index_edge(model, vertex_axis_map, index_idx)
+            vertical_vs, _, _ = self.judge_index_edge(model, vertex_axis_map, index_idx)
             if not vertical_vs:
                 continue
 
@@ -425,7 +422,6 @@ class PmxTailorExportService():
                         continue
                     
                     # # 重複辺（2点）の組み合わせ(平行のどちらかと合致するはず)
-                    # index_combs = list(itertools.product(list(horizonal_in_vs), list(set(model.indices[duplicate_index_idx]) - set(horizonal_in_vs))))
                     index_combs = list(itertools.combinations(model.indices[duplicate_index_idx], 2))
                     duplicate_dots = []
                     for (iv0_comb_idx, iv1_comb_idx) in index_combs:
@@ -453,7 +449,7 @@ class PmxTailorExportService():
                     all_index_combs.extend(index_combs)
                     all_duplicate_dots.extend(duplicate_dots)
 
-        if len(all_duplicate_dots) > 0 and np.max(all_duplicate_dots) > 0.93:
+        if len(all_duplicate_dots) > 0 and np.max(all_duplicate_dots) >= param_option['similarity']:
             full_d = [i for i, (di, d) in enumerate(zip(all_duplicate_indexs, all_duplicate_dots)) if np.round(d, decimals=5) == np.max(np.round(all_duplicate_dots, decimals=5))]
             if full_d:
                 vertical_idx = full_d[0]
@@ -562,7 +558,7 @@ class PmxTailorExportService():
                     vx = 1 if MVector3D(v0.position.x(), 0, v0.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) \
                         < MVector3D(v2.position.x(), 0, v2.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) else -1
                 else:
-                    vy = -1 if v2.position.y() < v1.position.y() else 1
+                    vy = -1 if v0.position.y() < v1.position.y() else 1
                     vx = 0
 
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': vx, 'y': vy, 'position': model.vertex_dict[vidx].position, 'duplicate': duplicate_vertices[model.vertex_dict[vidx].position.to_log()]}
