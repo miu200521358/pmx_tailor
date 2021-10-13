@@ -22,7 +22,7 @@ class LoadWorkerThread(BaseWorkerThread):
         start = time.time()
 
         # 元モデルの読み込み
-        self.result = self.frame.file_panel_ctrl.org_model_file_ctrl.load(is_sizing=False) and self.result
+        self.result = self.frame.file_panel_ctrl.org_model_file_ctrl.load(is_check=False, is_sizing=False) and self.result
 
         self.elapsed_time = time.time() - start
 

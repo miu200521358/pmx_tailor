@@ -76,12 +76,12 @@ class MainFrame(wx.Frame):
         self.note_ctrl.AddPage(self.file_panel_ctrl, u"ファイル", False)
         
         # パラ調整タブ
-        self.param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
-        self.note_ctrl.AddPage(self.param_panel_ctrl, u"パラ調整", False)
+        self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
+        self.note_ctrl.AddPage(self.simple_param_panel_ctrl, u"パラ調整", False)
         
         # パラ調整(詳細)タブ
-        self.param_advance_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
-        self.note_ctrl.AddPage(self.param_advance_panel_ctrl, u"パラ調整(詳細)", False)
+        self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
+        self.note_ctrl.AddPage(self.advance_param_panel_ctrl, u"パラ調整(詳細)", False)
         
         # ---------------------------------------------
 
@@ -114,7 +114,7 @@ class MainFrame(wx.Frame):
             event.Skip()
             return
 
-        if self.note_ctrl.GetSelection() == self.param_panel_ctrl.tab_idx:
+        if self.note_ctrl.GetSelection() == self.simple_param_panel_ctrl.tab_idx:
             # コンソールクリア
             self.file_panel_ctrl.console_ctrl.Clear()
             wx.GetApp().Yield()
@@ -128,7 +128,7 @@ class MainFrame(wx.Frame):
             # 読み込み処理実行
             self.load(event, is_param=True)
 
-        if self.note_ctrl.GetSelection() == self.param_advance_panel_ctrl.tab_idx:
+        if self.note_ctrl.GetSelection() == self.advance_param_panel_ctrl.tab_idx:
             # コンソールクリア
             self.file_panel_ctrl.console_ctrl.Clear()
             wx.GetApp().Yield()
@@ -145,8 +145,8 @@ class MainFrame(wx.Frame):
     # タブ移動可
     def release_tab(self):
         self.file_panel_ctrl.release_tab()
-        self.param_panel_ctrl.release_tab()
-        self.param_advance_panel_ctrl.release_tab()
+        self.simple_param_panel_ctrl.release_tab()
+        self.advance_param_panel_ctrl.release_tab()
 
     # フォーム入力可
     def enable(self):
@@ -210,6 +210,9 @@ class MainFrame(wx.Frame):
 
         return result
 
+    def is_loaded_valid(self):
+        return len(self.simple_param_panel_ctrl.get_param_options(is_show_error=True)) > 0
+
     # 読み込み完了処理
     def on_load_result(self, event: wx.Event):
         self.elapsed_time = event.elapsed_time
@@ -241,6 +244,17 @@ class MainFrame(wx.Frame):
         logger.info("ファイルデータ読み込みが完了しました", decoration=MLogger.DECORATION_BOX, title="OK")
 
         if event.is_exec:
+            if not self.is_loaded_valid():
+                # 終了音を鳴らす
+                self.sound_finish()
+                # タブ移動可
+                self.release_tab()
+                # フォーム有効化
+                self.enable()
+
+                event.Skip()
+                return False
+
             # そのまま実行する場合、変換実行処理に遷移
 
             # フォーム無効化
@@ -261,13 +275,13 @@ class MainFrame(wx.Frame):
 
         elif event.is_param:
             # パラ調整タブを開く場合、パラ調整タブ初期化処理実行
-            self.note_ctrl.ChangeSelection(self.param_panel_ctrl.tab_idx)
-            self.param_panel_ctrl.initialize(event)
+            self.note_ctrl.ChangeSelection(self.simple_param_panel_ctrl.tab_idx)
+            self.simple_param_panel_ctrl.initialize(event)
 
         elif event.is_param_advance:
             # パラ調整(詳細)タブを開く場合、パラ調整(詳細)タブ初期化処理実行
-            self.note_ctrl.ChangeSelection(self.param_advance_panel_ctrl.tab_idx)
-            self.param_advance_panel_ctrl.initialize(event)
+            self.note_ctrl.ChangeSelection(self.advance_param_panel_ctrl.tab_idx)
+            self.advance_param_panel_ctrl.initialize(event)
 
         else:
             # 終了音を鳴らす

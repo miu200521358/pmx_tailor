@@ -20,9 +20,3 @@ class MExportOptions:
         self.is_file = is_file
         self.outout_datetime = outout_datetime
         self.max_workers = max_workers
-
-
-class MPhysicsOptions:
-
-    def __init__(self) -> None:
-        pass

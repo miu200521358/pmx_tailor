@@ -36,6 +36,8 @@ cdef class MVector2D:
 
     cpdef np.ndarray[DTYPE_FLOAT_t, ndim=1] data(self)
 
+    cpdef MVector2D copy(self)
+
     cpdef DTYPE_FLOAT_t x(self)
 
     cpdef DTYPE_FLOAT_t y(self)
@@ -181,6 +183,8 @@ cdef double dotProduct_MVector3D(MVector3D v1, MVector3D v2)
 
 cdef class MVector4D:
     cdef np.ndarray __data
+
+    cpdef MVector4D copy(self)
 
     cpdef double length(self)
 

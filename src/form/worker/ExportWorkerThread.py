@@ -41,9 +41,9 @@ class ExportWorkerThread(BaseWorkerThread):
                 self.options = MExportOptions(\
                     version_name=self.frame.version_name, \
                     logging_level=self.frame.logging_level, \
-                    pmx_model=self.frame.file_panel_ctrl.org_model_file_ctrl.data, \
+                    pmx_model=self.frame.file_panel_ctrl.org_model_file_ctrl.data.copy(), \
                     output_path=self.frame.file_panel_ctrl.output_pmx_file_ctrl.file_ctrl.GetPath(), \
-                    param_options=self.frame.param_advance_panel_ctrl.get_param_options(), \
+                    param_options=self.frame.simple_param_panel_ctrl.get_param_options(), \
                     monitor=self.frame.file_panel_ctrl.console_ctrl, \
                     is_file=False, \
                     outout_datetime=logger.outout_datetime, \

@@ -287,6 +287,9 @@ cdef class MVector2D:
     cpdef setY(self, y):
         self.__data[1] = y
 
+    cpdef MVector2D copy(self):
+        return MVector2D(self.x(), self.y())
+
     def to_log(self):
         return "x: {0}, y: {1}".format(round(self.x(), 5), round(self.y(), 5))
 
@@ -655,6 +658,9 @@ cdef class MVector4D:
             self.__data = np.array([x[0], x[1], x[2], x[3]], dtype=np.float64)
         else:
             self.__data = np.array([x, y, z, w], dtype=np.float64)
+
+    cpdef MVector4D copy(self):
+        return MVector4D(self.x(), self.y(), self.z(), self.w())
     
     cpdef double length(self):
         return np.linalg.norm(self.data(), ord=2)
