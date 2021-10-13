@@ -225,6 +225,8 @@ class PmxTailorExportService():
         logger.info(f"{param_option['material_name']}: 絶対頂点マップの生成")
 
         for midx, (vertex_axis_map, vertex_coordinate_map) in enumerate(zip(vertex_axis_maps, vertex_coordinate_maps)):
+            logger.info(f"-- 絶対頂点マップ: {midx + 1}個目: ---------")
+
             # XYの最大と最小の抽出
             coordinate_x_key = list(sorted(vertex_coordinate_map.keys(), key=lambda x: x[0]))
             coordinate_y_key = list(sorted(vertex_coordinate_map.keys(), key=lambda x: x[1]))
@@ -235,16 +237,16 @@ class PmxTailorExportService():
 
             # 存在しない頂点INDEXで二次元配列初期化
             vertex_map = np.full((max_y - min_y + 1, max_x - min_x + 1), -1)
-            vidx_map = np.full((max_y - min_y + 1, max_x - min_x + 1), None)
+            vidx_map = np.full((max_y - min_y + 1, max_x - min_x + 1), 'None')
 
             for vmap in vertex_axis_map.values():
                 vertex_map[vmap['y'] - min_y, vmap['x'] - min_x] = vmap['vidx']
                 vidx_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
-            
-            vertex_maps[midx] = vertex_map
-            logger.info(vidx_map.tolist())
 
-            logger.info(f"-- 絶対頂点マップ: {midx + 1}個目:終了")
+            vertex_maps[midx] = vertex_map
+
+            logger.info('\n'.join([', '.join(vidx_map[vx, :]) for vx in range(vidx_map.shape[0])]))
+            logger.info(f"-- 絶対頂点マップ: {midx + 1}個目:終了 ---------")
 
         return vertex_maps
     
