@@ -2,23 +2,17 @@
 #
 import logging
 import os
-from textwrap import fill
 import traceback
 import numpy as np
 import itertools
-import copy
-
-from numpy.core.fromnumeric import diagonal, repeat
-from numpy.lib.function_base import i0
+import math
 
 from module.MOptions import MExportOptions
-from mmd.PmxData import PmxModel, Vertex # noqa
+from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, RigidBodyParam, IkLink, Ik # noqa
 from mmd.PmxWriter import PmxWriter
-from mmd.PmxReader import PmxReader
 from module.MMath import MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
 from utils.MLogger import MLogger # noqa
 from utils.MException import SizingException, MKilledException
-from utils import MFileUtils
 
 logger = MLogger(__name__, level=1)
 
@@ -81,7 +75,95 @@ class PmxTailorExportService():
 
         logger.info(f"{param_option['material_name']}: 頂点マップ生成", decoration=MLogger.DECORATION_LINE)
 
-        vertex_map = self.create_vertex_map(model, param_option)
+        vertex_maps, duplicate_vertices = self.create_vertex_map(model, param_option)
+        
+        for vidx, vertex_map in vertex_maps.items():
+            logger.info(f"{param_option['material_name']}(No.{vidx + 1}): ボーン生成", decoration=MLogger.DECORATION_LINE)
+
+            self.create_bone(model, param_option, vertex_map)
+
+
+    def create_bone(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray):
+        # 中心ボーン生成
+
+        # 略称
+        abb_name = param_option['abb_name']
+        # 材質名
+        material_name = param_option['material_name']
+
+        # 表示枠定義
+        model.display_slots[material_name] = DisplaySlot(material_name, material_name, 0, 0)
+
+        root_bone = Bone(f'{abb_name}中心', f'{abb_name}中心', model.bones[param_option['parent_bone_name']].position, \
+                         model.bones[param_option['parent_bone_name']].index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
+        root_bone.index = len(list(model.bones.keys()))
+
+        # ボーン
+        model.bones[root_bone.name] = root_bone
+        model.bone_indexes[root_bone.index] = root_bone.name
+        # 表示枠
+        model.display_slots[material_name].references.append((0, model.bones[root_bone.name].index))
+
+        # Map用INDEXリスト
+        v_yidxs = [0] + list(range(1, vertex_map.shape[0] - param_option["vertical_bone_density"] + 1, param_option["vertical_bone_density"])) + [vertex_map.shape[0] - 1]
+        v_xidxs = list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]))
+
+        tmp_all_bones = {}
+        tmp_all_bone_distances = np.zeros(vertex_map.shape)
+
+        for v_yidx in v_yidxs:
+            for v_xidx in v_xidxs:
+                if vertex_map[v_yidx, v_xidx] < 0:
+                    # 存在しない頂点はスルー
+                    continue
+
+                v = model.vertex_dict[vertex_map[v_yidx, v_xidx]]
+                v_xno = v_xidx + 1
+                v_yno = v_yidx + 1
+
+                # ボーン仮登録
+                bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
+                bone = Bone(bone_name, bone_name, v.position, -1, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
+                tmp_all_bones[bone.name] = bone
+
+        # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
+        for v_yidx in range(vertex_map.shape[0]):
+            for v_xidx in range(vertex_map.shape[1]):
+                now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
+                prev_v_vec = now_v_vec if v_xidx == 0 else model.vertex_dict[vertex_map[v_yidx, v_xidx - 1]].position
+                tmp_all_bone_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+
+        # 最下段の横幅平均値(段数単位)
+        edge_size = np.mean(tmp_all_bone_distances[-1, :]) * param_option["horizonal_bone_density"]
+
+        for v_yidx in v_yidxs:
+            prev_xidx = 0
+
+            for v_xidx in v_xidxs:
+                if v_xidx == 0 or not param_option['bone_thinning_out'] or (param_option['bone_thinning_out'] and \
+                    np.sum(tmp_all_bone_distances[v_yidx, prev_xidx:(v_xidx + 1)]) >= edge_size * 0.9 and v_xidxs[-1] - v_xidx >= param_option["horizonal_bone_density"] - 1):  # noqa
+                    # 前ボーンとの間隔が最下段の横幅平均値より開いている場合、登録対象
+                    v_xno = v_xidx + 1
+                    v_yno = v_yidx + 1
+
+                    # ボーン名
+                    bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
+
+                    # ボーン本登録
+                    bone = tmp_all_bones[bone_name]
+                    bone.index = len(list(model.bones.keys()))
+
+                    model.bones[bone.name] = bone
+                    model.bone_indexes[bone.index] = bone.name
+
+                    # 表示枠
+                    model.display_slots[material_name].references.append((0, bone.index))
+
+                    # 前ボーンとして設定
+                    prev_xidx = v_xidx
+
+    def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
+        return f'{abb_name}-{(v_yno - 1):03d}-{(v_xno):03d}'
 
     # 頂点を展開した図を作成
     def create_vertex_map(self, model: PmxModel, param_option: dict):
@@ -170,7 +252,7 @@ class PmxTailorExportService():
 
                 # 縦辺がいる場合（まずは下方向）
                 n = 0
-                while n < 100:
+                while n < 200:
                     n += 1
                     vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_vertical_iidxs \
                         = self.fill_vertical_indices(model, param_option, duplicate_indices, duplicate_vertices, \
@@ -184,7 +266,7 @@ class PmxTailorExportService():
 
                     # 下方向が終わったら上方向
                     n = 0
-                    while n < 100:
+                    while n < 200:
                         n += 1
                         vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_vertical_iidxs \
                             = self.fill_vertical_indices(model, param_option, duplicate_indices, duplicate_vertices, \
@@ -216,9 +298,9 @@ class PmxTailorExportService():
                     if iv0 in vertex_axis_maps[-1] and iv1 in vertex_axis_maps[-1] and iv2 in vertex_axis_maps[-1]:
                         registed_iidxs.append(index_idx)
 
-            if len(registed_iidxs) > 0 and len(registed_iidxs) // 100 > prev_index_cnt:
+            if len(registed_iidxs) > 0 and len(registed_iidxs) // 200 > prev_index_cnt:
                 logger.info(f"-- 面: {len(registed_iidxs)}個目:終了")
-                prev_index_cnt = len(registed_iidxs) // 100
+                prev_index_cnt = len(registed_iidxs) // 200
             
         logger.info(f"-- 面: {len(registed_iidxs)}個目:終了")
 
@@ -237,18 +319,18 @@ class PmxTailorExportService():
 
             # 存在しない頂点INDEXで二次元配列初期化
             vertex_map = np.full((max_y - min_y + 1, max_x - min_x + 1), -1)
-            vidx_map = np.full((max_y - min_y + 1, max_x - min_x + 1), 'None')
+            vertex_display_map = np.full((max_y - min_y + 1, max_x - min_x + 1), 'None')
 
             for vmap in vertex_axis_map.values():
                 vertex_map[vmap['y'] - min_y, vmap['x'] - min_x] = vmap['vidx']
-                vidx_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
+                vertex_display_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
 
             vertex_maps[midx] = vertex_map
 
-            logger.info('\n'.join([', '.join(vidx_map[vx, :]) for vx in range(vidx_map.shape[0])]))
+            logger.info('\n'.join([', '.join(vertex_display_map[vx, :]) for vx in range(vertex_display_map.shape[0])]))
             logger.info(f"-- 絶対頂点マップ: {midx + 1}個目:終了 ---------")
 
-        return vertex_maps
+        return vertex_maps, duplicate_vertices
     
     def get_axis_range(self, model: PmxModel, vertex_coordinate_map: dict, registed_iidxs: list):
         xs = [k[0] for k in vertex_coordinate_map.keys()]

@@ -152,7 +152,7 @@ class ParamPanel(BasePanel):
                     params.append(param)
         
         if len(params) == 0:
-            logger.error("物理設定が1件も設定されていません。", decoration=MLogger.DECORATION_BOX)
+            logger.error("物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
 
         return params
 
@@ -184,7 +184,7 @@ class PhysicsParam():
 
         self.simple_param_sizer.Add(self.simple_btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 0)
 
-        self.simple_header_grid_sizer = wx.FlexGridSizer(0, 4, 0, 0)
+        self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         self.simple_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理材質", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_material_txt.SetToolTip(u"物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。")
@@ -195,6 +195,16 @@ class PhysicsParam():
         self.simple_material_ctrl.SetToolTip(u"物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。")
         self.simple_material_ctrl.Bind(wx.EVT_CHOICE, self.set_material_name)
         self.simple_header_grid_sizer.Add(self.simple_material_ctrl, 0, wx.ALL, 5)
+
+        self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を5文字以内で入力してください。")
+        self.simple_abb_txt.Wrap(-1)
+        self.simple_header_grid_sizer.Add(self.simple_abb_txt, 0, wx.ALL, 5)
+
+        self.simple_abb_ctrl = wx.TextCtrl(self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1))
+        self.simple_abb_ctrl.SetToolTip(u"ボーン名などに使用する材質略称を3文字以内で入力してください。")
+        self.simple_abb_ctrl.SetMaxLength(3)
+        self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
         self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_parent_bone_txt.SetToolTip(u"材質の起点となる親ボーン")
@@ -223,13 +233,16 @@ class PhysicsParam():
         self.simple_primitive_ctrl.SetToolTip(u"物理の参考値プリセット")
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
 
+        self.simple_header_grid_sizer.Add(wx.StaticText(self.simple_window, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize, 0), 0, wx.ALL, 5)
+        self.simple_header_grid_sizer.Add(wx.StaticText(self.simple_window, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize, 0), 0, wx.ALL, 5)
+
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
 
         # 材質頂点類似度
         self.simple_similarity_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"検出度", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_similarity_txt.SetToolTip(u"材質内の頂点を検出する時の傾き等の類似度\n値を小さくすると傾きが違っていても検出しやすくなりますが、誤検知が増えます。")
+        self.simple_similarity_txt.SetToolTip(u"材質内の頂点を検出する時の傾き等の類似度\n値を小さくすると傾きが違っていても検出しやすくなりますが、誤検知が増える可能性があります。")
         self.simple_similarity_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_txt, 0, wx.ALL, 5)
 
@@ -237,12 +250,12 @@ class PhysicsParam():
         self.simple_similarity_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_label, 0, wx.ALL, 5)
 
-        self.simple_similarity_min_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"0.7", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_min_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"0.5", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_similarity_min_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_min_label, 0, wx.ALL, 5)
 
         self.simple_similarity_slider = \
-            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.93, 0.7, 1, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
+            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.93, 0.5, 1, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
         self.simple_grid_sizer.Add(self.simple_similarity_slider, 1, wx.ALL | wx.EXPAND, 5)
 
         self.simple_similarity_max_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"1", wx.DefaultPosition, wx.DefaultSize, 0)
@@ -251,7 +264,8 @@ class PhysicsParam():
 
         # 物理の細かさスライダー
         self.simple_fineness_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"細かさ", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_fineness_txt.SetToolTip(u"材質の物理の細かさ。ボーン・剛体・ジョイントの細かさ等に影響します。\n3以上になると剛体の大きさが均一になるように横方向の間引きを行います。")
+        self.simple_fineness_txt.SetToolTip(u"材質の物理の細かさ。ボーン・剛体・ジョイントの細かさ等に影響します。\nパラに応じて剛体の大きさが均一になるように横方向の間引きを行うチェックが入る場合があります。" \
+                                            "間引きを行いたくない場合、詳細タブの「間引き」チェックをOFFにしてください。")
         self.simple_fineness_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_fineness_txt, 0, wx.ALL, 5)
 
@@ -363,8 +377,8 @@ class PhysicsParam():
         self.vertical_bone_density_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_txt, 0, wx.ALL, 5)
 
-        self.vertical_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=5, initial=1)
-        self.vertical_bone_density_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
+        self.vertical_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=20, initial=1)
+        self.vertical_bone_density_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 1))
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_spin, 0, wx.ALL, 5)
 
         # 横密度
@@ -373,8 +387,8 @@ class PhysicsParam():
         self.horizonal_bone_density_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_txt, 0, wx.ALL, 5)
 
-        self.horizonal_bone_density_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2", min=1, max=5, initial=2)
-        self.horizonal_bone_density_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
+        self.horizonal_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2", min=1, max=20, initial=2)
+        self.horizonal_bone_density_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 1))
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_spin, 0, wx.ALL, 5)
 
         # 間引きオプション
@@ -1259,13 +1273,16 @@ class PhysicsParam():
     def get_param_options(self, pidx: int, is_show_error):
         params = {}
 
-        if self.simple_material_ctrl.GetStringSelection() and self.simple_parent_bone_ctrl.GetStringSelection() and self.simple_group_ctrl.GetStringSelection():
+        if self.simple_material_ctrl.GetStringSelection() and self.simple_parent_bone_ctrl.GetStringSelection() and self.simple_group_ctrl.GetStringSelection() \
+           and self.simple_abb_ctrl.GetValue():
             if self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.material_indices[self.simple_material_ctrl.GetStringSelection()] == 0:
                 logger.error("頂点のない材質が指定されています。", decoration=MLogger.DECORATION_BOX)
                 return params
 
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
+            params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
+            params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["similarity"] = self.simple_similarity_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -1273,8 +1290,8 @@ class PhysicsParam():
             params["shape_maintenance"] = self.simple_shape_maintenance_slider.GetValue()
 
             # 詳細版オプションデータ -------------
-            params["vertical_bone_density"] = self.vertical_bone_density_spin.GetValue()
-            params["horizonal_bone_density"] = self.horizonal_bone_density_spin.GetValue()
+            params["vertical_bone_density"] = int(self.vertical_bone_density_spin.GetValue())
+            params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
             params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
             
             # 1と自身を非衝突対象
@@ -1345,16 +1362,18 @@ class PhysicsParam():
                     empty_param_list.append("親ボーン名")
                 if not self.simple_group_ctrl.GetStringSelection():
                     empty_param_list.append("剛体グループ")
+                if not self.simple_abb_ctrl.GetValue():
+                    empty_param_list.append("材質略称")
 
                 logger.error(f"No.{pidx + 1}の{'・'.join(empty_param_list)}に値が設定されていません。", decoration=MLogger.DECORATION_BOX)
 
         return params
 
     def on_import(self, event: wx.Event):
-        pass
+        wx.MessageBox("未実装").ShowModal()
 
     def on_export(self, event: wx.Event):
-        pass
+        wx.MessageBox("未実装").ShowModal()
 
     def on_vertical_joint(self, event: wx.Event):
         self.vertical_joint_mov_x_min_spin.Enable(self.advance_vertical_joint_valid_check.GetValue())
@@ -1438,9 +1457,10 @@ class PhysicsParam():
     
     def set_material_name(self, event: wx.Event):
         self.advance_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
+        self.simple_abb_ctrl.SetValue(self.simple_material_ctrl.GetStringSelection()[:3])
     
     def set_fineness(self, event: wx.Event):
-        self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1))
+        self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.3))
         self.horizonal_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.5))
         self.bone_thinning_out_check.SetValue((self.simple_fineness_slider.GetValue() // 1.2) % 2 == 0)
 
