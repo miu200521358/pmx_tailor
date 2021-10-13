@@ -240,14 +240,6 @@ class PmxTailorExportService():
                 vertex_map[vmap['y'] - min_y, vmap['x'] - min_x] = vmap['vidx']
                 vidx_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
             
-            # for yidx in range(vertex_map.shape[1] - 1, -1, -1):
-            #     fill_xidx = 0
-            #     for xidx in range(vertex_map.shape[0] - 1, -1, -1):
-            #         if not vertex_map[xidx, yidx]:
-            #             fill_xidx -= 1
-            #             vertex_map[xidx, yidx] = vertex_map[fill_xidx, yidx]
-            #             vertex_map[fill_xidx, yidx] = None
-
             vertex_maps[midx] = vertex_map
             logger.info(vidx_map.tolist())
 
@@ -383,28 +375,6 @@ class PmxTailorExportService():
             if vertical_vs not in vertical_vs_list:
                 vertical_vs_list.append(vertical_vs)
 
-            # if vertical_vs and horizonal_vs and diagonal_vs:
-            #     # 四角形が生成済みの場合、ペアの辺も抽出
-            #     # ペアの横方向
-            #     remaining_hidx = tuple(set(diagonal_vs) - set(vertical_vs))[0]
-            #     remaining_hmap = vertex_axis_map[remaining_hidx]
-            #     # ペアの縦方向
-            #     remaining_vidx = tuple(set(diagonal_vs) - set(horizonal_vs))[0]
-            #     remaining_vmap = vertex_axis_map[remaining_vidx]
-            #     # 縦方向の頂点の組み合わせ
-            #     if (remaining_hmap['x'], remaining_vmap['y']) in vertex_coordinate_map:
-            #         pair_vidx = vertex_coordinate_map[(remaining_hmap['x'], remaining_vmap['y'])][0]
-            #         pair_vidx_pros = list(itertools.product(duplicate_vertices[model.vertex_dict[remaining_hidx].position.to_log()], \
-            #                                                 duplicate_vertices[model.vertex_dict[remaining_vidx].position.to_log()], \
-            #                                                 duplicate_vertices[model.vertex_dict[pair_vidx].position.to_log()]))
-            #         for pair_vidxs in pair_vidx_pros:
-            #             key = tuple(sorted(pair_vidxs))
-            #             if key in indices_by_vidx:
-            #                 pair_vertical_vs, _, _ = self.judge_index_edge(model, vertex_axis_map, indices_by_vidx[key])
-            #                 if pair_vertical_vs not in vertical_vs_list:
-            #                     vertical_vs_list.append(pair_vertical_vs)
-            #                 break
-        
         now_iidxs = []
 
         if vertical_vs_list:
@@ -444,60 +414,6 @@ class PmxTailorExportService():
                     if duplicate_index_idx in registed_iidxs + vertical_iidxs + now_iidxs:
                         # 既に登録済みの面である場合、スルー
                         continue
-                    # if duplicate_index_idx not in registed_iidxs + vertical_iidxs + now_iidxs and model.indices[duplicate_index_idx][0] in vertex_axis_map and \
-                    #    model.indices[duplicate_index_idx][1] in vertex_axis_map and model.indices[duplicate_index_idx][2] in vertex_axis_map:
-                    #     # 全ての頂点が登録済みである場合
-                    #     vertical_in_vs, _, _ = self.judge_index_edge(model, vertex_axis_map, duplicate_index_idx)
-                    #     if vertical_below_v.index in vertical_in_vs and vertical_vs != vertical_in_vs:
-                    #         if offset > 0:
-                    #             iv0 = model.vertex_dict[vertical_below_v.index]
-                    #             iv1 = model.vertex_dict[tuple(set(vertical_in_vs) - {vertical_below_v.index})[0]]
-                    #         else:
-                    #             iv0 = model.vertex_dict[tuple(set(vertical_in_vs) - {vertical_below_v.index})[0]]
-                    #             iv1 = model.vertex_dict[vertical_below_v.index]
-                    #         if MVector3D.dotProduct(vertical_vec.normalized(), (iv0.position - iv1.position).normalized()) > 0.93:
-                    #             now_iidxs.append(duplicate_index_idx)
-
-                    #             vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_iidxs = \
-                    #                 self.fill_diagonal_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, vertex_axis_map, \
-                    #                                                        vertex_coordinate_map, registed_iidxs, now_iidxs)
-
-                    #     continue
-
-
-                    # elif model.indices[duplicate_index_idx][0] in vertex_axis_map and model.indices[duplicate_index_idx][1] in vertex_axis_map \
-                    #         and model.indices[duplicate_index_idx][2] in vertex_axis_map:
-                    #     # # 既に登録済みの頂点のみで構成されている場合、スルー
-                    #     # if duplicate_index_idx not in registed_iidxs + vertical_iidxs + now_iidxs:
-                    #     #     filled_iidxs.append(duplicate_index_idx)
-
-                    #     #     # 斜めが埋められそうなら埋める
-                    #     #     _, _, diagonal_in_vs = self.judge_index_edge(model, vertex_axis_map, duplicate_index_idx)
-                    #     #     if diagonal_in_vs:
-                    #     #         vertex_axis_map, vertex_coordinate_map, diagonal_now_iidxs = \
-                    #     #             self.fill_diagonal_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, vertex_axis_map, \
-                    #     #                                                    vertex_coordinate_map, diagonal_in_vs, registed_iidxs, vertical_iidxs + now_iidxs)
-                    #     #         filled_iidxs.extend(diagonal_filled_iidxs)
-                    #     #         filled_iidxs.extend(diagonal_now_iidxs)
-                    #     continue
-
-                    # remaining_vidxs = set(model.indices[duplicate_index_idx]) - set(vertex_axis_map.keys())
-                    # if len(remaining_vidxs) > 1:
-                    #     # ２点登録済みでない場合、スルー
-                    #     # if len(remaining_vidxs) == 0 and duplicate_index_idx not in registed_iidxs + vertical_iidxs + now_iidxs:
-                    #     #     # 既に全部の頂点が登録済みの場合、面だけ設定
-                    #     #     filled_iidxs.append(duplicate_index_idx)
-
-                    #     #     # 斜めが埋められそうなら埋める
-                    #     #     _, _, diagonal_in_vs = self.judge_index_edge(model, vertex_axis_map, duplicate_index_idx)
-                    #     #     if diagonal_in_vs:
-                    #     #         vertex_axis_map, vertex_coordinate_map, registed_iidxs, diagonal_now_iidxs = \
-                    #     #             self.fill_diagonal_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, vertex_axis_map, \
-                    #     #                                                    vertex_coordinate_map, diagonal_in_vs, registed_iidxs, vertical_iidxs + now_iidxs)
-                    #     #         filled_iidxs.extend(diagonal_filled_iidxs)
-                    #     #         filled_iidxs.extend(diagonal_now_iidxs)
-
-                    #     continue
 
                     # 面の辺を抽出
                     vertical_in_vs, horizonal_in_vs, _ = self.judge_index_edge(model, vertex_axis_map, duplicate_index_idx)
@@ -580,8 +496,6 @@ class PmxTailorExportService():
                     if is_regist:
                         vertex_coordinate_map[(remaining_x, remaining_y)] = duplicate_vertices[remaining_v.position.to_log()]
 
-                # if model.indices[duplicate_index_idx][0] in vertex_axis_map and model.indices[duplicate_index_idx][1] in vertex_axis_map \
-                #    and model.indices[duplicate_index_idx][2] in vertex_axis_map:
                 # 斜めが埋められそうなら埋める
                 vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_iidxs = \
                     self.fill_diagonal_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, vertex_axis_map, \
@@ -717,37 +631,10 @@ class PmxTailorExportService():
                 remaining_y = vv0_y
                 logger.debug(f"{remaining_x}, {remaining_y}")
             else:
-                # # 重複辺がある方を採用
-                # remaining_y = None
-                # for vvv1_idx in duplicate_vertices[vv1_vec.to_log()]:
-                #     v1_key = (min(vvv1_idx, remaining_v.index), max(vvv1_idx, remaining_v.index))
-                #     if vv0_y > vv1_y and v1_key in duplicate_indices and len(duplicate_indices[v1_key]) > 1:
-                #         remaining_y = vv0_y if vv0_y > vv1_y else vv1_y
-                #         break
-                # if remaining_y is None:
-                #     remaining_y = vv1_y
-
-                # remaining_y = vv0_y if MVector3D(vv0_vec.x(), 0, vv0_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) \
-                #     < MVector3D(vv1_vec.x(), 0, vv1_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) else vv1_x
-                # logger.debug(f"{remaining_x}, {remaining_y}")
-
                 # Yのみで距離判定
                 remaining_y = vv0_y if abs(remaining_v.position.y() - vv0_vec.y()) < abs(remaining_v.position.y() - vv1_vec.y()) else vv1_y
                 logger.debug(f"{remaining_x}, {remaining_y}")
 
-            # # remaining_y = vv0_y
-            # # logger.debug(f"{remaining_x}, {remaining_y}")
-            # if ((remaining_x, vv0_y) in vertex_coordinate_map and vv0_y > vv1_y) or ((remaining_x, vv1_y) in vertex_coordinate_map and vv0_y > vv1_y) or \
-            #    ((remaining_x, vv0_y) in vertex_coordinate_map and vv0_y < vv1_y) or ((remaining_x, vv1_y) in vertex_coordinate_map and vv0_y < vv1_y):
-            #     # ↑＼↓の面が既にある場合、←
-            #     # ↑→の面が既にある場合、↓／
-            #     # ↑＼↓の面が既にある場合、→
-            #     # ←↓の面が既にある場合、／↑
-            #     remaining_y = vv0_y
-            #     logger.debug(f"{remaining_x}, {remaining_y}")
-            # else:
-            #     remaining_y = vv1_y
-            #     logger.debug(f"{remaining_x}, {remaining_y}")
         elif vv0_y == vv1_y:
             # 元が横方向に一致している場合
 
@@ -763,46 +650,10 @@ class PmxTailorExportService():
                 remaining_x = vv0_x
                 logger.debug(f"{remaining_x}, {remaining_y}")
             else:
-                # # 重複辺がある方を採用
-                # remaining_x = None
-                # # とりあえず1番目から真下/真上に移動させてみる(縦は重複辺なし)
-                # for vvv1_idx in duplicate_vertices[vv1_vec.to_log()]:
-                #     v1_key = (min(vvv1_idx, remaining_v.index), max(vvv1_idx, remaining_v.index))
-                #     if v1_key in duplicate_indices and len(duplicate_indices[v1_key]) > 1:
-                #         remaining_x = vv0_x
-                #         break
-                # if remaining_x is None:
-                #     remaining_x = vv1_x
-
-                # # Y込みで距離判定
-                # remaining_x = vv0_x if remaining_v.position.distanceToPoint(vv0_vec) < remaining_v.position.distanceToPoint(vv1_vec) else vv1_x
-                # logger.debug(f"{remaining_x}, {remaining_y}")
-
                 # Y抜きで距離判定
                 remaining_x = vv0_x if MVector3D(vv0_vec.x(), 0, vv0_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) \
                     < MVector3D(vv1_vec.x(), 0, vv1_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) else vv1_x
                 logger.debug(f"{remaining_x}, {remaining_y}")
-
-            # # remaining_x = vv0_x
-            # # logger.debug(f"{remaining_x}, {remaining_y}")
-            # if ((vv0_x, remaining_y) in vertex_coordinate_map and vv0_x < vv1_x) or ((vv1_x, remaining_y) in vertex_coordinate_map and vv0_x < vv1_x) or \
-            #    ((vv0_x, remaining_y) in vertex_coordinate_map and vv0_x > vv1_x) or ((vv1_x, remaining_y) in vertex_coordinate_map and vv0_x > vv1_x):
-            #     # →↓／の面が既にある場合、↑
-            #     # →↓の面が既にある場合、↑＼
-            #     # ／↑←の面が既にある場合、↓
-            #     # ↑←の面が既にある場合、＼↓
-            #     remaining_x = vv0_x
-            #     logger.debug(f"{remaining_x}, {remaining_y}")
-            # else:
-            #     remaining_x = vv1_x
-            #     logger.debug(f"{remaining_x}, {remaining_y}")
-
-            # if (vv0_x == remaining_x and (vv0_x, vv0_y - 1) not in vertex_coordinate_map) or (vv1_x == remaining_x and (vv1_x, vv1_y + 1) in vertex_coordinate_map):
-            #     remaining_y = vv0_y - 1
-            #     logger.debug(f"{remaining_x}, {remaining_y}")
-            # else:
-            #     remaining_y = vv0_y + 1
-            #     logger.debug(f"{remaining_x}, {remaining_y}")
         else:
             # 斜めが一致している場合
             if (vv0_x > vv1_x and vv0_y < vv1_y) or (vv0_x < vv1_x and vv0_y > vv1_y):
@@ -818,279 +669,3 @@ class PmxTailorExportService():
         
         return remaining_x, remaining_y
 
-        # # 登録済みの頂点
-        # registed_idxs = [vidx for vidx in model.indices[index_idx] if vidx in vertex_axis_map.keys()]
-
-
-        #     if cross_vec.z() >= 0:
-        #         # 表向き=時計回りで当てはめていく
-        #         if len(registed_idxs) >= 2:
-        #             # 頂点が2つ重なっている場合、回転方向が変わる
-        #             v_axis_list = [('左上', v0), ('右上', v1), ('右下', v2), ('左上', v0), ('右上', v1)]
-        #         else:
-        #             v_axis_list = [('左下', v0), ('左上', v1), ('右下', v2), ('左下', v0), ('左上', v1)]
-        #     else:
-        #         # 裏向き=反時計回り
-        #         if len(registed_idxs) >= 2:
-        #             v_axis_list = [('右上', v0), ('左上', v1), ('右下', v2), ('右上', v0), ('左上', v1)]
-        #         else:
-        #             v_axis_list = [('右下', v0), ('左上', v1), ('左下', v2), ('右下', v0), ('左上', v1)]
-
-        #     prev_axis = None
-        #     prev_v = None
-        #     for vaxis, v in v_axis_list:
-        #         if v.index in vertex_axis_map:
-        #             prev_axis = vaxis
-        #             prev_v = v
-        #             continue
-
-        #         if prev_axis and prev_v:
-        #             for vidx in list([dv for dv in duplicate_vertices.values() if v.index in dv][0]):
-        #                 xoffset = 0
-        #                 if prev_axis[0] == '左' and vaxis[0] == '右':
-        #                     xoffset = 1
-        #                 elif prev_axis[0] == '右' and vaxis[0] == '左':
-        #                     xoffset = -1
-        #                 else:
-        #                     xoffset = 0
-
-        #                 yoffset = 0
-        #                 if prev_axis[1] == '上' and vaxis[1] == '下':
-        #                     yoffset = 1
-        #                 elif prev_axis[1] == '下' and vaxis[1] == '上':
-        #                     yoffset = -1
-        #                 else:
-        #                     yoffset = 0
-
-        #                 vertex_axis_map[vidx] = {'x': vertex_axis_map[prev_v.index]['x'] + xoffset, 'y': vertex_axis_map[prev_v.index]['y'] + yoffset, \
-        #                                          'position': model.vertex_dict[vidx].position}
-
-        #             prev_axis = vaxis
-        #             prev_v = v
-
-        # if not vertex_axis_map:
-        #     # データがなければとりあえずに最初のを原点に配置
-        #     vertex_axis_map[0] = {0: vertex_idx}
-        
-        # # 重複を含む頂点一覧
-        # duplicate_vertex_list = list([dv for dv in duplicate_vertices.values() if vertex_idx in dv][0])
-
-        # # 重複頂点(2つの頂点)を持つ面(=連続面)
-        # duplicated_indexes = []
-        # for ik in model.material_indices[param_option['material_name']]:
-        #     # 重複頂点はひとつに寄せる
-        #     iv = [duplicate_vertex_list[0] if v == duplicate_vertex_list[1] else v for v in model.indices[ik]]
-        #     data = {"index_id": ik, "vertices": iv}
-        #     if len(set(duplicate_vertex_list) & set(iv)) > 0 and ik in model.material_indices[param_option['material_name']] and data not in duplicated_indexes:
-        #         duplicated_indexes.append(data)
-
-        # # 面の組み合わせ
-        # duplicated_comb_indexes = list(itertools.combinations(duplicated_indexes, 2))
-
-        # for dci1, dci2 in duplicated_comb_indexes:
-        #     dci1_vidxs = set(dci1['vertices'])
-        #     dci2_vidxs = set(dci2['vertices'])
-
-        #     if len(dci1_vidxs & dci2_vidxs) == 2:
-        #         # 2つの頂点が重なっている場合、隣接面とみなす
-        #         remaining_dci1_idxs = list(dci1_vidxs - dci2_vidxs)
-        #         remaining_dci2_idxs = list(dci2_vidxs - dci1_vidxs)
-
-        #         # 内積差を取得する
-        #         dot_vidxs = []
-        #         diff_vecs = []
-        #         dots = []
-        #         for vidx1, vidx2, vidx3 in list(itertools.permutations(dci1_vidxs)) + list(itertools.permutations(dci2_vidxs)):
-        #             if ((vidx1, vidx2), (vidx3, vidx2)) not in dot_vidxs and ((vidx3, vidx2), (vidx1, vidx2)) not in dot_vidxs:
-        #                 dot_vidxs.append(((vidx1, vidx2), (vidx3, vidx2)))
-        #                 diff_vecs.append((model.vertex_dict[vidx1].position - model.vertex_dict[vidx2].position, model.vertex_dict[vidx3].position - model.vertex_dict[vidx2].position))
-        #                 dots.append(abs(MVector3D.dotProduct(diff_vecs[-1][0].normalized(), diff_vecs[-1][1].normalized())))
-        #         edge_sord_idxs = np.argsort(dots)
-        #         # 最も垂直な角度
-        #         (vidx1, vidx2), (vidx3, vidx2) = dot_vidxs[edge_sord_idxs[0]]
-        #         vidx12_vec, vidx32_vec = diff_vecs[edge_sord_idxs[0]]
-        #         vidxs = [vidx1, vidx2, vidx3]
-        #         yidxs = np.argsort([model.vertex_dict[vi].position.y() for vi in vidxs])
-
-
-
-        #         # 接してる2点(どっちでも同じ結果)
-        #         contact_idxs = list(dci1_vidxs - {remaining_dci1_idxs[0]})
-
-        #         contact_edge_idxs = [((contact_idxs[0], remaining_dci1_idxs[0]), (contact_idxs[0], remaining_dci2_idxs[0])), \
-        #                              ((contact_idxs[0], remaining_dci1_idxs[0]), (contact_idxs[1], remaining_dci2_idxs[0])), \
-        #                              ((contact_idxs[1], remaining_dci2_idxs[0]), (contact_idxs[0], remaining_dci2_idxs[0])), \
-        #                              ((contact_idxs[1], remaining_dci2_idxs[0]), (contact_idxs[1], remaining_dci2_idxs[0]))]
-
-        #         # 接線のベクトル
-        #         concact_c0_c1_vec = model.vertex_dict[contact_idxs[0]].position - model.vertex_dict[contact_idxs[1]].position
-
-        #         # 接辺とのベクトル
-        #         concact_c0_dci1_vec = model.vertex_dict[contact_idxs[0]].position - model.vertex_dict[remaining_dci1_idxs[0]].position
-        #         concact_c1_dci1_vec = model.vertex_dict[contact_idxs[1]].position - model.vertex_dict[remaining_dci1_idxs[0]].position
-
-        #         concact_c0_dci2_vec = model.vertex_dict[contact_idxs[0]].position - model.vertex_dict[remaining_dci2_idxs[0]].position
-        #         concact_c1_dci2_vec = model.vertex_dict[contact_idxs[1]].position - model.vertex_dict[remaining_dci2_idxs[0]].position
-
-
-
-        #         contact_c0_dci1_c0_c1_dot = abs(MVector3D.dotProduct(concact_c0_dci1_vec.normalized(), concact_c0_c1_vec.normalized()))
-        #         contact_c0_dci1_c0_dci2_dot = abs(MVector3D.dotProduct(concact_c0_dci1_vec.normalized(), concact_c0_dci2_vec.normalized()))
-        #         contact_c0_dci1_c1_dci2_dot = abs(MVector3D.dotProduct(concact_c0_dci1_vec.normalized(), concact_c1_dci2_vec.normalized()))
-        #         contact_c1_dci1_c0_c1_dot = abs(MVector3D.dotProduct(concact_c1_dci1_vec.normalized(), concact_c0_c1_vec.normalized()))
-        #         contact_c1_dci1_c0_dci2_dot = abs(MVector3D.dotProduct(concact_c1_dci1_vec.normalized(), concact_c0_dci2_vec.normalized()))
-        #         contact_c1_dci1_c1_dci2_dot = abs(MVector3D.dotProduct(concact_c1_dci1_vec.normalized(), concact_c1_dci2_vec.normalized()))
-
-        #         edge_sord_idxs = np.argsort([concact_c0_c1_vec, contact_c0_dci1_c0_dci2_dot, contact_c0_dci1_c1_dci2_dot, contact_c1_dci1_c0_dci2_dot, contact_c1_dci1_c1_dci2_dot])
-        #         vertical_idxs = contact_edge_idxs[edge_sord_idxs]
-
-        #         print(horizonal_idxs)
-
-            # for var_idx, va_row in vertex_axis_map.items():
-            #     for vac_idx, iidx in va_row.items():
-            #         vdx_vidxs = set(iidx)
-            #         di_vidxs = set(di['vertices'])
-
-            #         remaining_vdx_idxs = list(vdx_vidxs - di_vidxs)
-            #         remaining_di_idxs = list(di_vidxs - vdx_vidxs)
-
-            #         # 残りの一点との位置関係で上下左右に配置する
-            #         remaining_vdx_idx = remaining_vdx_idxs[0]
-            #         remaining_di_idx = remaining_di_idxs[0]
-
-            #         # 接してる2点(どっちでも同じ結果)
-            #         contact_idxs = list(vdx_vidxs - {remaining_vdx_idx})
-
-            #         # 接辺とのベクトル
-            #         concact_vdx0_vec = model.vertex_dict[contact_idxs[0]].position - model.vertex_dict[remaining_vdx_idx].position
-            #         concact_vdx1_vec = model.vertex_dict[contact_idxs[1]].position - model.vertex_dict[remaining_vdx_idx].position
-
-            #         concact_di0_vec = model.vertex_dict[contact_idxs[0]].position - model.vertex_dict[remaining_di_idx].position
-            #         concact_di1_vec = model.vertex_dict[contact_idxs[1]].position - model.vertex_dict[remaining_di_idx].position
-
-            #         contact_vdx0_di0_dot = abs(MVector3D.dotProduct(concact_vdx0_vec.normalized(), concact_di0_vec.normalized()))
-            #         contact_vdx0_di1_dot = abs(MVector3D.dotProduct(concact_vdx0_vec.normalized(), concact_di1_vec.normalized()))
-            #         contact_vdx1_di0_dot = abs(MVector3D.dotProduct(concact_vdx1_vec.normalized(), concact_di0_vec.normalized()))
-            #         contact_vdx1_di1_dot = abs(MVector3D.dotProduct(concact_vdx1_vec.normalized(), concact_di1_vec.normalized()))
-
-            #         contact_edge_idxs = [((contact_idxs[0], remaining_vdx_idx), (contact_idxs[0], remaining_di_idx)), \
-            #                              ((contact_idxs[0], remaining_vdx_idx), (contact_idxs[1], remaining_di_idx)), \
-            #                              ((contact_idxs[1], remaining_vdx_idx), (contact_idxs[0], remaining_di_idx)), \
-            #                              ((contact_idxs[1], remaining_vdx_idx), (contact_idxs[1], remaining_di_idx))]
-            #         horizonal_idxs = contact_edge_idxs[np.argmax([contact_vdx0_di0_dot, contact_vdx0_di1_dot, contact_vdx1_di0_dot, contact_vdx1_di1_dot])]
-            #         vertical_idxs = contact_edge_idxs[np.argmin([contact_vdx0_di0_dot, contact_vdx0_di1_dot, contact_vdx1_di0_dot, contact_vdx1_di1_dot])]
-
-            #         # 残りの離れている2点のベクトル
-            #         remaining_vec = model.vertex_dict[remaining_vdx_idx].position - model.vertex_dict[remaining_di_idx].position
-
-
-
-
-        # v10_diff = (v1.position - v0.position).normalized()
-        # v20_diff = (v2.position - v0.position).normalized()
-        # v01_diff = (v0.position - v1.position).normalized()
-        # v21_diff = (v2.position - v1.position).normalized()
-        # v02_diff = (v0.position - v2.position).normalized()
-        # v12_diff = (v1.position - v2.position).normalized()
-
-        # # もっとも対角線の角度が大きいのが斜め角度とみなす
-        # diagonal_idx = np.argmax([MQuaternion.rotationTo(v10_diff, v20_diff).toDegree(), \
-        #     MQuaternion.rotationTo(v01_diff, v21_diff).toDegree(), MQuaternion.rotationTo(v02_diff, v12_diff).toDegree()])  # noqa
-                
-
-
-        # # もっとも内積が小さいのが垂直方向と見なす
-        # y_idx = np.argmin(np.abs([MVector3D.dotProduct(v10_diff, v20_diff), \
-        #     MVector3D.dotProduct(v01_diff, v21_diff), MVector3D.dotProduct(v02_diff, v12_diff)]))  # noqa
-        # # 残りが水平方向と見なす
-        # xz_idx = list({0, 1, 2} - {y_idx, diagonal_idx})[0]
-
-
-        # # v0-v1を水平とみなす
-        # horizonal_vec = (v1.position - v0.position).normalized()
-        # horizonal_qq = MQuaternion.rotationTo(MVector3D(1 * (np.sign(horizonal_vec.x()) if horizonal_vec.x() != 0 else 1), 0, 0), horizonal_vec)
-
-        # # v0を原点とみなす
-        # mat = MMatrix4x4()
-        # mat.setToIdentity()
-        # mat.translate(v0.position)
-        # mat.rotate(horizonal_qq)
-
-        # v1_local_vec = mat.inverted() * v1.position
-        # v2_local_vec = mat.inverted() * v2.position
-
-        # if not vertex_axis_map:
-        #     # データがなければとりあえずに原点に配置
-        #     vertex_axis_map[0] = {0: duplicate0_list}
-        # else:
-        #     # データがある場合、該当する
-        
-
-
-
-        # for index_idx in model.material_indices[param_option['material_name']]:
-        #     duplicate0_list = [dv for dv in duplicate_vertices.values() if model.indices[index_idx][0] in dv][0]
-        #     duplicate1_list = [dv for dv in duplicate_vertices.values() if model.indices[index_idx][1] in dv][0]
-        #     duplicate2_list = [dv for dv in duplicate_vertices.values() if model.indices[index_idx][2] in dv][0]
-
-        #     # 重複を含む頂点一覧
-        #     duplicate_vertices = set(duplicate0_list) | set(duplicate1_list) | set(duplicate2_list)
-
-            
-        #     v0 = model.vertex_dict[model.indices[index_idx][0]]
-        #     v1 = model.vertex_dict[model.indices[index_idx][1]]
-        #     v2 = model.vertex_dict[model.indices[index_idx][2]]
-
-        #     v10_diff = (v1.position - v0.position).normalized()
-        #     v20_diff = (v2.position - v0.position).normalized()
-        #     v02_diff = (v0.position - v2.position).normalized()
-        #     v12_diff = (v1.position - v2.position).normalized()
-        #     v01_diff = (v0.position - v1.position).normalized()
-        #     v21_diff = (v2.position - v1.position).normalized()
-
-        #     # もっとも内積が小さいのが斜め方向とみなす
-        #     diagonal_idx = np.argmin(np.abs([MVector3D.dotProduct(v10_diff, v20_diff), \
-        #         MVector3D.dotProduct(v01_diff, v21_diff), MVector3D.dotProduct(v02_diff, v12_diff)]))  # noqa
-        #     # もっとも内積が大きいのが垂直方向と見なす
-        #     vertical_idx = np.argmax(np.abs([MVector3D.dotProduct(v10_diff, v20_diff), \
-        #         MVector3D.dotProduct(v01_diff, v21_diff), MVector3D.dotProduct(v02_diff, v12_diff)]))  # noqa
-        #     # 残りが水平方向と見なす
-        #     horizonal_idx = list({0, 1, 2} - {vertical_idx, diagonal_idx})[0]
-
-        #     vertex_axis[index_idx] = {"h+": [], "h-": [], "v+": [], "v-": [], "d+": [], "d-": [], "duplicate": []}
-
-        #     # 自身の頂点を除いた重複頂点
-        #     duplicated_list = (set(duplicate0_list) | set(duplicate1_list) | set(duplicate2_list)) - set(model.indices[index_idx])
-            
-
-
-
-
-        #     v0_duplicated = [di for di in duplicate0_list if di != v0.index]
-        #     v0_duplicated_indexes = [(ik, iv) for (ik, iv) in model.indices.items() if v0_duplicated[0] in iv] if len(v0_duplicated) > 0 else None
-            
-        #     v1_duplicated = [di for di in duplicate1_list if di != v1.index]
-        #     v1_duplicated_indexes = [(ik, iv) for (ik, iv) in model.indices.items() if v1_duplicated[0] in iv] if len(v1_duplicated) > 0 else None
-
-        #     v2_duplicated = [di for di in duplicate2_list if di != v2.index]
-        #     v2_duplicated_indexes = [(ik, iv) for (ik, iv) in model.indices.items() if v2_duplicated[0] in iv] if len(v2_duplicated) > 0 else None
-
-        #     duplicated_vertices = {}
-
-
-
-        #     if not v0_duplicated_index:
-        #         # v0重複頂点がない場合
-        #         pass
-
-
-            
-        #     # 各頂点の辺情報
-        #     line_list = [{"start": v1, "point": v0, "end": v2}, {"start": v0, "point": v1, "end": v2}, {"start": v0, "point": v2, "end": v1}]
-
-        #     for vi in [v0.index, v1.index, v2.index]:
-        #         if vi not in vertex_axis:
-        #             vertex_axis[vi] = {"h+": [], "h-": [], "v+": [], "v-": [], "d+": [], "d-": [], "duplicate": []}
-            
-
-            
