@@ -75,15 +75,23 @@ class PmxTailorExportService():
 
         logger.info(f"{param_option['material_name']}: 頂点マップ生成", decoration=MLogger.DECORATION_LINE)
 
-        vertex_maps, duplicate_vertices = self.create_vertex_map(model, param_option)
+        vertex_maps, vertex_connecteds, duplicate_vertices = self.create_vertex_map(model, param_option)
         
-        for vidx, vertex_map in vertex_maps.items():
-            logger.info(f"{param_option['material_name']}(No.{vidx + 1}): ボーン生成", decoration=MLogger.DECORATION_LINE)
+        # 各頂点の有効INDEX数が最も多いものをベースとする
+        map_cnt = []
+        for vertex_map in vertex_maps:
+            map_cnt.append(np.count_nonzero(vertex_map >= 0))
+        
+        base_map_idx = np.argmax(map_cnt)
 
-            self.create_bone(model, param_option, vertex_map)
+        logger.info(f"{param_option['material_name']}: 基準頂点マップ = No.{base_map_idx + 1}", decoration=MLogger.DECORATION_LINE)
+
+        logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ボーン生成", decoration=MLogger.DECORATION_LINE)
+
+        registed_bone_indexs = self.create_bone(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx])
 
 
-    def create_bone(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray):
+    def create_bone(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray, vertex_connected: list):
         # 中心ボーン生成
 
         # 略称
@@ -104,15 +112,25 @@ class PmxTailorExportService():
         # 表示枠
         model.display_slots[material_name].references.append((0, model.bones[root_bone.name].index))
 
-        # Map用INDEXリスト
-        v_yidxs = [0] + list(range(1, vertex_map.shape[0] - param_option["vertical_bone_density"] + 1, param_option["vertical_bone_density"])) + [vertex_map.shape[0] - 1]
-        v_xidxs = list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]))
+        # Map用INDEXリスト(根元はボーン追従にするため、常に一段だけ)
+        v_yidxs = [0] + list(range(1, vertex_map.shape[0] - param_option["vertical_bone_density"] + 1, param_option["vertical_bone_density"]))
+        if v_yidxs[-1] < vertex_map.shape[0] - 1:
+            # 最下段は必ず登録
+            v_yidxs = v_yidxs + [vertex_map.shape[0] - 1]
+        
+        all_v_xidxs = []
+        for yi in range(vertex_map.shape[0]):
+            v_xidxs = list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]))
+            if not vertex_connected[yi] and v_xidxs[-1] < vertex_map.shape[1] - 1:
+                # 繋がってなくて、かつ端っこが登録されていない場合、登録
+                v_xidxs = v_xidxs + [vertex_map.shape[1] - 1]
+            all_v_xidxs.append(v_xidxs)
 
         tmp_all_bones = {}
         tmp_all_bone_distances = np.zeros(vertex_map.shape)
 
-        for v_yidx in v_yidxs:
-            for v_xidx in v_xidxs:
+        for yi, v_yidx in enumerate(v_yidxs):
+            for v_xidx in all_v_xidxs[yi]:
                 if vertex_map[v_yidx, v_xidx] < 0:
                     # 存在しない頂点はスルー
                     continue
@@ -123,12 +141,16 @@ class PmxTailorExportService():
 
                 # ボーン仮登録
                 bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
-                bone = Bone(bone_name, bone_name, v.position, -1, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
+                bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
                 tmp_all_bones[bone.name] = bone
 
         # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
         for v_yidx in range(vertex_map.shape[0]):
             for v_xidx in range(vertex_map.shape[1]):
+                if vertex_map[v_yidx, v_xidx] < 0 or vertex_map[v_yidx, v_xidx - 1] < 0:
+                    # 存在しない頂点はスルー
+                    continue
+
                 now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
                 prev_v_vec = now_v_vec if v_xidx == 0 else model.vertex_dict[vertex_map[v_yidx, v_xidx - 1]].position
                 tmp_all_bone_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
@@ -136,39 +158,69 @@ class PmxTailorExportService():
         # 最下段の横幅平均値(段数単位)
         edge_size = np.mean(tmp_all_bone_distances[-1, :]) * param_option["horizonal_bone_density"]
 
-        for v_yidx in v_yidxs:
-            prev_xidx = 0
+        registed_bone_indexs = {}
 
-            for v_xidx in v_xidxs:
-                if v_xidx == 0 or not param_option['bone_thinning_out'] or (param_option['bone_thinning_out'] and \
-                    np.sum(tmp_all_bone_distances[v_yidx, prev_xidx:(v_xidx + 1)]) >= edge_size * 0.9 and v_xidxs[-1] - v_xidx >= param_option["horizonal_bone_density"] - 1):  # noqa
+        for yi, v_yidx in enumerate(v_yidxs):
+            prev_xidx = 0
+            registed_bone_indexs[v_yidx] = []
+
+            for v_xidx in all_v_xidxs[yi]:
+                if v_xidx == 0 or (not vertex_connected[yi] and v_xidx == all_v_xidxs[yi][-1]) or \
+                    not param_option['bone_thinning_out'] or (param_option['bone_thinning_out'] and \
+                    np.sum(tmp_all_bone_distances[v_yidx, prev_xidx:(v_xidx + 1)]) >= edge_size * 0.9):  # noqa
+                    #  and v_xidxs[-1] - v_xidx >= param_option["horizonal_bone_density"] - 1
                     # 前ボーンとの間隔が最下段の横幅平均値より開いている場合、登録対象
                     v_xno = v_xidx + 1
                     v_yno = v_yidx + 1
 
                     # ボーン名
                     bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
+                    if bone_name not in tmp_all_bones:
+                        continue
 
                     # ボーン本登録
                     bone = tmp_all_bones[bone_name]
                     bone.index = len(list(model.bones.keys()))
 
+                    if yi > 0:
+                        parent_v_xidx_diff = np.abs(np.array(registed_bone_indexs[v_yidxs[yi - 1]]) - v_xidx)
+
+                        # 2段目以降は最も近い親段でv_xidxを探す
+                        parent_v_xidx = registed_bone_indexs[v_yidxs[yi - 1]][(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(parent_v_xidx_diff) else np.argmin(parent_v_xidx_diff))]   # noqa
+                    
+                        bone.parent_index = model.bones[self.get_bone_name(abb_name, v_yidxs[yi - 1] + 1, parent_v_xidx + 1)].index
+
                     model.bones[bone.name] = bone
                     model.bone_indexes[bone.index] = bone.name
+
+                    registed_bone_indexs[v_yidx].append(v_xidx)
 
                     # 表示枠
                     model.display_slots[material_name].references.append((0, bone.index))
 
                     # 前ボーンとして設定
                     prev_xidx = v_xidx
+        
+        # 表示先は子段の近いボーン
+        for yi, v_yidx in enumerate(list(registed_bone_indexs.keys())[:-1]):
+            for v_xidx in registed_bone_indexs[v_yidx]:
+                child_v_xidx_diff = np.abs(np.array(registed_bone_indexs[v_yidxs[yi + 1]]) - v_xidx)
+
+                # 最も近い子段でv_xidxを探す
+                child_v_xidx = registed_bone_indexs[v_yidxs[yi + 1]][(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(child_v_xidx_diff) else np.argmin(child_v_xidx_diff))]
+
+                bone = model.bones[self.get_bone_name(abb_name, v_yidx + 1, v_xidx + 1)]
+                bone.tail_index = model.bones[self.get_bone_name(abb_name, v_yidxs[yi + 1] + 1, child_v_xidx + 1)].index
+                bone.flag |= 0x0001
+            
+        return registed_bone_indexs
+
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
-        return f'{abb_name}-{(v_yno - 1):03d}-{(v_xno):03d}'
+        return f'{abb_name}-{(v_yno):03d}-{(v_xno):03d}'
 
     # 頂点を展開した図を作成
     def create_vertex_map(self, model: PmxModel, param_option: dict):
-        vertex_maps = {}
-
         logger.info(f"{param_option['material_name']}: 面の抽出")
 
         logger.info(f"{param_option['material_name']}: 重複頂点の抽出")
@@ -183,6 +235,8 @@ class PmxTailorExportService():
                 duplicate_vertices[key] = []
             if vertex.index not in duplicate_vertices[key]:
                 duplicate_vertices[key].append(vertex.index)
+            # 一旦ルートボーンにウェイトを一括置換
+            vertex.deform = Bdef1(model.bones[param_option['parent_bone_name']].index)
 
         # 面組み合わせの生成
         indices_by_vidx = {}
@@ -305,6 +359,8 @@ class PmxTailorExportService():
         logger.info(f"-- 面: {len(registed_iidxs)}個目:終了")
 
         logger.info(f"{param_option['material_name']}: 絶対頂点マップの生成")
+        vertex_maps = []
+        vertex_connecteds = []
 
         for midx, (vertex_axis_map, vertex_coordinate_map) in enumerate(zip(vertex_axis_maps, vertex_coordinate_maps)):
             logger.info(f"-- 絶対頂点マップ: {midx + 1}個目: ---------")
@@ -320,17 +376,26 @@ class PmxTailorExportService():
             # 存在しない頂点INDEXで二次元配列初期化
             vertex_map = np.full((max_y - min_y + 1, max_x - min_x + 1), -1)
             vertex_display_map = np.full((max_y - min_y + 1, max_x - min_x + 1), 'None')
+            vertex_connected = []
 
             for vmap in vertex_axis_map.values():
                 vertex_map[vmap['y'] - min_y, vmap['x'] - min_x] = vmap['vidx']
                 vertex_display_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
 
-            vertex_maps[midx] = vertex_map
+            # 左端と右端で面が連続しているかチェック
+            for yi in range(vertex_map.shape[0]):
+                if (min(vertex_map[yi, 0], vertex_map[yi, -1]), max(vertex_map[yi, 0], vertex_map[yi, -1])) in duplicate_indices:
+                    vertex_connected.append(True)
+                else:
+                    vertex_connected.append(False)
+
+            vertex_maps.append(vertex_map)
+            vertex_connecteds.append(vertex_connected)
 
             logger.info('\n'.join([', '.join(vertex_display_map[vx, :]) for vx in range(vertex_display_map.shape[0])]))
             logger.info(f"-- 絶対頂点マップ: {midx + 1}個目:終了 ---------")
 
-        return vertex_maps, duplicate_vertices
+        return vertex_maps, vertex_connecteds, duplicate_vertices
     
     def get_axis_range(self, model: PmxModel, vertex_coordinate_map: dict, registed_iidxs: list):
         xs = [k[0] for k in vertex_coordinate_map.keys()]
@@ -501,7 +566,8 @@ class PmxTailorExportService():
                     if not horizonal_in_vs:
                         # まだ横が登録されていない場合、スルー(上下であるなら、とりあえず横は登録されてるはず)
                         continue
-                    if vertical_in_vs and ((offset > 0 and vertical_below_v.index != vertical_in_vs[0]) or (offset < 0 and vertical_below_v.index != vertical_in_vs[1])):
+                    if vertical_in_vs and ((offset > 0 and vertical_in_vs[0] not in duplicate_vertices[vertical_below_v.position.to_log()]) \
+                       or (offset < 0 and vertical_in_vs[1] not in duplicate_vertices[vertical_below_v.position.to_log()])):
                         # 既に縦辺が求められていてそれに今回算出対象が含まれていない場合、スルー
                         continue
                     
@@ -514,10 +580,10 @@ class PmxTailorExportService():
 
                         iv0 = None
                         iv1 = None
-                        if iv0_comb_idx == vertical_below_v.index:
+                        if iv0_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()]:
                             iv0 = model.vertex_dict[iv0_comb_idx]
                             iv1 = model.vertex_dict[iv1_comb_idx]
-                        elif iv1_comb_idx == vertical_below_v.index:
+                        elif iv1_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()]:
                             iv0 = model.vertex_dict[iv1_comb_idx]
                             iv1 = model.vertex_dict[iv0_comb_idx]
 
@@ -639,8 +705,9 @@ class PmxTailorExportService():
                 # v1 は位置関係で当てはめる
                 if abs(v0.position.y() - v1.position.y()) < abs(v2.position.y() - v1.position.y()):
                     vy = 0
-                    vx = 1 if MVector3D(v0.position.x(), 0, v0.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) \
-                        < MVector3D(v2.position.x(), 0, v2.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) else -1
+                    vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
+                    # vx = 1 if MVector3D(v0.position.x(), 0, v0.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) \
+                    #     < MVector3D(v2.position.x(), 0, v2.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) else -1
                 else:
                     vy = -1 if v0.position.y() < v1.position.y() else 1
                     vx = 0
@@ -731,8 +798,9 @@ class PmxTailorExportService():
                 logger.debug(f"{remaining_x}, {remaining_y}")
             else:
                 # Y抜きで距離判定
-                remaining_x = vv0_x if MVector3D(vv0_vec.x(), 0, vv0_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) \
-                    < MVector3D(vv1_vec.x(), 0, vv1_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) else vv1_x
+                remaining_x = vv1_x if np.sign(MVector3D.crossProduct((vv1_vec - remaining_v.position).normalized(), (vv0_vec - remaining_v.position).normalized()).z()) else vv0_x
+                # remaining_x = vv0_x if MVector3D(vv0_vec.x(), 0, vv0_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) \
+                #     < MVector3D(vv1_vec.x(), 0, vv1_vec.z()).distanceToPoint(MVector3D(remaining_v.position.x(), 0, remaining_v.position.z())) else vv1_x
                 logger.debug(f"{remaining_x}, {remaining_y}")
         else:
             # 斜めが一致している場合
