@@ -5,7 +5,6 @@ import os
 import traceback
 import numpy as np
 import itertools
-import math
 
 from module.MOptions import MExportOptions
 from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, RigidBodyParam, IkLink, Ik # noqa
@@ -46,7 +45,8 @@ class PmxTailorExportService():
             model.comment += "\r\n\r\n物理: PmxTailor"
 
             for pidx, param_option in enumerate(self.options.param_options):
-                self.create_physics(model, param_option)
+                if not self.create_physics(model, param_option):
+                    return False
 
             # 最後に出力
             logger.info("PMX出力開始", decoration=MLogger.DECORATION_LINE)
@@ -82,15 +82,123 @@ class PmxTailorExportService():
         for vertex_map in vertex_maps:
             map_cnt.append(np.count_nonzero(vertex_map >= 0))
         
+        if len(map_cnt) == 0:
+            logger.warning("有効な頂点マップが生成されななかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
+            return False
+        
         base_map_idx = np.argmax(map_cnt)
 
         logger.info(f"{param_option['material_name']}: 基準頂点マップ = No.{base_map_idx + 1}", decoration=MLogger.DECORATION_LINE)
 
         logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ボーン生成", decoration=MLogger.DECORATION_LINE)
 
-        registed_bone_indexs = self.create_bone(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx])
+        root_bone, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances \
+            = self.create_bone(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx])
 
+        logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ウェイト分布", decoration=MLogger.DECORATION_LINE)
 
+        self.create_weight(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances)
+
+        return True
+
+    def create_weight(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, \
+                      registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict):
+        # ウェイト分布
+
+        # 略称
+        abb_name = param_option['abb_name']
+
+        v_yidxs = list(reversed(list(registed_bone_indexs.keys())))
+        for above_v_yidx, below_v_yidx in zip(v_yidxs[1:], v_yidxs[:-1]):
+            above_v_xidxs = registed_bone_indexs[above_v_yidx]
+            below_v_xidxs = registed_bone_indexs[below_v_yidx]
+            # 繋がってる場合、最後に最初のボーンを追加する
+            if vertex_connecteds[base_map_idx][above_v_yidx]:
+                above_v_xidxs += [registed_bone_indexs[above_v_yidx][0]]
+            if vertex_connecteds[base_map_idx][below_v_yidx]:
+                below_v_xidxs += [registed_bone_indexs[below_v_yidx][0]]
+
+            for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
+                prev_below_v_xno = prev_below_v_xidx + 1
+                next_below_v_xno = next_below_v_xidx + 1
+                below_v_yno = below_v_yidx + 1
+
+                prev_below_bone = model.bones[self.get_bone_name(abb_name, below_v_yno, prev_below_v_xno)]
+                next_below_bone = model.bones[self.get_bone_name(abb_name, below_v_yno, next_below_v_xno)]
+                prev_above_bone = model.bones[model.bone_indexes[prev_below_bone.parent_index]]
+                next_above_bone = model.bones[model.bone_indexes[next_below_bone.parent_index]]
+
+                _, prev_above_v_xidx = self.disassemble_bone_name(prev_above_bone.name)
+                _, next_above_v_xidx = self.disassemble_bone_name(next_above_bone.name)
+
+                if xi > 0 and (next_below_v_xidx == registed_bone_indexs[below_v_yidx][0] or next_above_v_xidx == registed_bone_indexs[above_v_yidx][0]):
+                    # nextが最初のボーンである場合、最後まで
+                    v_map = vertex_maps[base_map_idx][above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
+                    b_h_distances = bone_horizonal_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
+                    b_v_distances = bone_vertical_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
+                else:
+                    v_map = vertex_maps[base_map_idx][above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
+                    b_h_distances = bone_horizonal_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
+                    b_v_distances = bone_vertical_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
+                
+                for vi, v_vertices in enumerate(v_map):
+                    for vhi, vertex_idx in enumerate(v_vertices):
+                        horizonal_distance = np.sum(b_h_distances[vi, 1:])
+                        v_horizonal_distance = np.sum(b_h_distances[vi, 1:(vhi + 1)])
+                        vertical_distance = np.sum(b_v_distances[1:, vhi])
+                        v_vertical_distance = np.sum(b_v_distances[1:(vi + 1), vhi])
+
+                        prev_above_weight = max(0, ((horizonal_distance - v_horizonal_distance) / horizonal_distance) * ((vertical_distance - v_vertical_distance) / vertical_distance))
+                        prev_below_weight = max(0, ((horizonal_distance - v_horizonal_distance) / horizonal_distance) * ((v_vertical_distance) / vertical_distance))
+                        next_above_weight = max(0, ((v_horizonal_distance) / horizonal_distance) * ((vertical_distance - v_vertical_distance) / vertical_distance))
+                        next_below_weight = max(0, ((v_horizonal_distance) / horizonal_distance) * ((v_vertical_distance) / vertical_distance))
+
+                        if below_v_yidx == v_yidxs[0]:
+                            # 最下段は末端ボーンにウェイトを振らない
+                            # 処理対象全ボーン名
+                            weight_names = np.array([prev_above_bone.name, next_above_bone.name])
+                            # ウェイト
+                            total_weights = np.array([prev_above_weight + prev_below_weight, next_above_weight + next_below_weight])
+                        else:
+                            # 処理対象全ボーン名
+                            weight_names = np.array([prev_above_bone.name, next_above_bone.name, prev_below_bone.name, next_below_bone.name])
+                            # ウェイト
+                            total_weights = np.array([prev_above_weight, next_above_weight, prev_below_weight, next_below_weight])
+
+                        if len(np.nonzero(total_weights)[0]) > 0:
+                            weights = total_weights / total_weights.sum(axis=0, keepdims=1)
+                            weight_idxs = np.argsort(weights)
+                            v = model.vertex_dict[vertex_idx]
+
+                            for vvidx in duplicate_vertices[v.position.to_log()]:
+                                vv = model.vertex_dict[vvidx]
+                                if vv.deform.index0 == model.bones[param_option['parent_bone_name']].index:
+                                    # 重複頂点にも同じウェイトを割り当てる
+                                    if np.count_nonzero(weights) == 1:
+                                        vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                                    elif np.count_nonzero(weights) == 2:
+                                        vv.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
+                                    else:
+                                        vv.deform = Bdef4(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, \
+                                                          model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
+                                                          weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
+
+        # 基準頂点マップ以外の頂点が残っていたら、それも割り当てる
+        for vertex_index in list(set(model.material_vertices[param_option['material_name']]) - set(vertex_maps[base_map_idx].tolist())):
+            bone_names = []
+            bone_distances = []
+            for byidx in registed_bone_indexs.keys():
+                v_yno = byidx + 1
+                for bxidx in registed_bone_indexs[byidx]:
+                    v_xno = bxidx + 1
+                    bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
+                    bone_names.append(bone_name)
+                    bone_distances.append(model.vertex_dict[vertex_index].position.distanceToPoint(model.bones[bone_name].position))
+
+            for bone_name, b_distance in zip(bone_names, bone_distances):
+                logger.debug(f"({bone_name}): {b_distance}")
+                pass
+            
     def create_bone(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray, vertex_connected: list):
         # 中心ボーン生成
 
@@ -127,7 +235,8 @@ class PmxTailorExportService():
             all_v_xidxs.append(v_xidxs)
 
         tmp_all_bones = {}
-        tmp_all_bone_distances = np.zeros(vertex_map.shape)
+        bone_horizonal_distances = np.zeros(vertex_map.shape)
+        bone_vertical_distances = np.zeros(vertex_map.shape)
 
         for yi, v_yidx in enumerate(v_yidxs):
             for v_xidx in all_v_xidxs[yi]:
@@ -147,16 +256,17 @@ class PmxTailorExportService():
         # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
         for v_yidx in range(vertex_map.shape[0]):
             for v_xidx in range(vertex_map.shape[1]):
-                if vertex_map[v_yidx, v_xidx] < 0 or vertex_map[v_yidx, v_xidx - 1] < 0:
-                    # 存在しない頂点はスルー
-                    continue
-
-                now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
-                prev_v_vec = now_v_vec if v_xidx == 0 else model.vertex_dict[vertex_map[v_yidx, v_xidx - 1]].position
-                tmp_all_bone_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx, v_xidx - 1] >= 0:
+                    now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
+                    prev_v_vec = now_v_vec if v_xidx == 0 else model.vertex_dict[vertex_map[v_yidx, v_xidx - 1]].position
+                    bone_horizonal_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx - 1, v_xidx] >= 0:
+                    now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
+                    prev_v_vec = now_v_vec if v_yidx == 0 else model.vertex_dict[vertex_map[v_yidx - 1, v_xidx]].position
+                    bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
 
         # 最下段の横幅平均値(段数単位)
-        edge_size = np.mean(tmp_all_bone_distances[-1, :]) * param_option["horizonal_bone_density"]
+        edge_size = np.mean(bone_horizonal_distances[-1, :]) * param_option["horizonal_bone_density"]
 
         registed_bone_indexs = {}
 
@@ -167,7 +277,7 @@ class PmxTailorExportService():
             for v_xidx in all_v_xidxs[yi]:
                 if v_xidx == 0 or (not vertex_connected[yi] and v_xidx == all_v_xidxs[yi][-1]) or \
                     not param_option['bone_thinning_out'] or (param_option['bone_thinning_out'] and \
-                    np.sum(tmp_all_bone_distances[v_yidx, prev_xidx:(v_xidx + 1)]) >= edge_size * 0.9):  # noqa
+                    np.sum(bone_horizonal_distances[v_yidx, prev_xidx:(v_xidx + 1)]) >= edge_size * 0.9):  # noqa
                     #  and v_xidxs[-1] - v_xidx >= param_option["horizonal_bone_density"] - 1
                     # 前ボーンとの間隔が最下段の横幅平均値より開いている場合、登録対象
                     v_xno = v_xidx + 1
@@ -187,8 +297,13 @@ class PmxTailorExportService():
 
                         # 2段目以降は最も近い親段でv_xidxを探す
                         parent_v_xidx = registed_bone_indexs[v_yidxs[yi - 1]][(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(parent_v_xidx_diff) else np.argmin(parent_v_xidx_diff))]   # noqa
-                    
-                        bone.parent_index = model.bones[self.get_bone_name(abb_name, v_yidxs[yi - 1] + 1, parent_v_xidx + 1)].index
+
+                        parent_bone = model.bones[self.get_bone_name(abb_name, v_yidxs[yi - 1] + 1, parent_v_xidx + 1)]
+                        bone.parent_index = parent_bone.index
+
+                        # 親ボーンの表示先も同時設定
+                        parent_bone.tail_index = bone.index
+                        parent_bone.flag |= 0x0001
 
                     model.bones[bone.name] = bone
                     model.bone_indexes[bone.index] = bone.name
@@ -201,23 +316,15 @@ class PmxTailorExportService():
                     # 前ボーンとして設定
                     prev_xidx = v_xidx
         
-        # 表示先は子段の近いボーン
-        for yi, v_yidx in enumerate(list(registed_bone_indexs.keys())[:-1]):
-            for v_xidx in registed_bone_indexs[v_yidx]:
-                child_v_xidx_diff = np.abs(np.array(registed_bone_indexs[v_yidxs[yi + 1]]) - v_xidx)
-
-                # 最も近い子段でv_xidxを探す
-                child_v_xidx = registed_bone_indexs[v_yidxs[yi + 1]][(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(child_v_xidx_diff) else np.argmin(child_v_xidx_diff))]
-
-                bone = model.bones[self.get_bone_name(abb_name, v_yidx + 1, v_xidx + 1)]
-                bone.tail_index = model.bones[self.get_bone_name(abb_name, v_yidxs[yi + 1] + 1, child_v_xidx + 1)].index
-                bone.flag |= 0x0001
-            
-        return registed_bone_indexs
-
+        return root_bone, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
         return f'{abb_name}-{(v_yno):03d}-{(v_xno):03d}'
+
+    def disassemble_bone_name(self, bone_name: str):
+        v_xidx = int(bone_name[-3:]) - 1
+        v_yidx = int(bone_name[-7:-4]) - 1
+        return v_yidx, v_xidx
 
     # 頂点を展開した図を作成
     def create_vertex_map(self, model: PmxModel, param_option: dict):
@@ -243,18 +350,23 @@ class PmxTailorExportService():
         indices_by_vpos = {}
         index_combs_by_vpos = {}
         duplicate_indices = {}
+        below_iidx = None
+        max_below_x = 99999999
         for index_idx in model.material_indices[param_option['material_name']]:
             # 頂点の組み合わせから面INDEXを引く
             indices_by_vidx[tuple(sorted(model.indices[index_idx]))] = index_idx
             # 重複辺（2点）の組み合わせ
             index_combs = list(itertools.combinations(model.indices[index_idx], 2))
             for (iv1, iv2) in index_combs:
-                # 小さいINDEX・大きい頂点INDEXのセットでキー生成
-                key = (min(iv1, iv2), max(iv1, iv2))
-                if key not in duplicate_indices:
-                    duplicate_indices[key] = []
-                if index_idx not in duplicate_indices[key]:
-                    duplicate_indices[key].append(index_idx)
+                if abs((model.vertex_dict[iv1].position - model.vertex_dict[iv1].position).normalized().x()) < max_below_x:
+                    below_iidx = index_idx
+                for ivv1, ivv2 in list(itertools.product(duplicate_vertices[model.vertex_dict[iv1].position.to_log()], duplicate_vertices[model.vertex_dict[iv2].position.to_log()])):
+                    # 小さいINDEX・大きい頂点INDEXのセットでキー生成
+                    key = (min(ivv1, ivv2), max(ivv1, ivv2))
+                    if key not in duplicate_indices:
+                        duplicate_indices[key] = []
+                    if index_idx not in duplicate_indices[key]:
+                        duplicate_indices[key].append(index_idx)
             # 頂点別に組み合わせも登録
             for iv in model.indices[index_idx]:
                 vpkey = model.vertex_dict[iv].position.to_log()
@@ -283,8 +395,12 @@ class PmxTailorExportService():
         while len(registed_iidxs) < len(model.material_indices[param_option['material_name']]):
             if not vertical_iidxs:
                 # 切替時はとりあえず一面取り出して判定(二次元配列になる)
-                remaining_iidxs = list(set(model.material_indices[param_option['material_name']]) - set(registed_iidxs))
-                index_idx = remaining_iidxs[0]
+                if not registed_iidxs:
+                    # 初回は出来るだけ真っ直ぐの辺がある面とする
+                    index_idx = below_iidx
+                else:
+                    remaining_iidxs = list(set(model.material_indices[param_option['material_name']]) - set(registed_iidxs))
+                    index_idx = remaining_iidxs[0]
                 first_vertex_axis_map, first_vertex_coordinate_map = \
                     self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, {}, {}, index_idx)
                 vertex_axis_maps.append(first_vertex_axis_map)
@@ -301,17 +417,21 @@ class PmxTailorExportService():
                 registed_iidxs = list(set(registed_iidxs) | set(diagonal_now_iidxs))
                 vertical_iidxs = list(set(vertical_iidxs) | set(diagonal_now_iidxs))
 
+            total_vertical_iidxs = []
+
             if vertical_iidxs:
                 now_vertical_iidxs = vertical_iidxs
+                total_vertical_iidxs.extend(now_vertical_iidxs)
 
                 # 縦辺がいる場合（まずは下方向）
                 n = 0
                 while n < 200:
                     n += 1
-                    vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_vertical_iidxs \
+                    vertex_axis_maps[-1], vertex_coordinate_maps[-1], registed_iidxs, now_vertical_iidxs \
                         = self.fill_vertical_indices(model, param_option, duplicate_indices, duplicate_vertices, \
                                                      vertex_axis_maps[-1], vertex_coordinate_maps[-1], indices_by_vpos, indices_by_vidx, \
                                                      registed_iidxs, now_vertical_iidxs, 1)
+                    total_vertical_iidxs.extend(now_vertical_iidxs)
                     if not now_vertical_iidxs:
                         break
                 
@@ -322,10 +442,11 @@ class PmxTailorExportService():
                     n = 0
                     while n < 200:
                         n += 1
-                        vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_vertical_iidxs \
+                        vertex_axis_maps[-1], vertex_coordinate_maps[-1], registed_iidxs, now_vertical_iidxs \
                             = self.fill_vertical_indices(model, param_option, duplicate_indices, duplicate_vertices, \
                                                          vertex_axis_maps[-1], vertex_coordinate_maps[-1], indices_by_vpos, indices_by_vidx, \
                                                          registed_iidxs, now_vertical_iidxs, -1)
+                        total_vertical_iidxs.extend(now_vertical_iidxs)
                         if not now_vertical_iidxs:
                             break
                 
@@ -401,11 +522,11 @@ class PmxTailorExportService():
         xs = [k[0] for k in vertex_coordinate_map.keys()]
         ys = [k[1] for k in vertex_coordinate_map.keys()]
 
-        # それぞれの出現回数から大体全部埋まってるのを抽出。その中の最大と最小を選ぶ
-        xu, x_counts = np.unique(xs, return_counts=True)
-        full_x = [i for i, x in zip(xu, x_counts) if x >= max(x_counts) * 0.8]
-        min_x = min(full_x)
-        max_x = max(full_x)
+        # # それぞれの出現回数から大体全部埋まってるのを抽出。その中の最大と最小を選ぶ
+        # xu, x_counts = np.unique(xs, return_counts=True)
+        # full_x = [i for i, x in zip(xu, x_counts) if x >= max(x_counts) * 0.6]
+        min_x = min(xs)
+        max_x = max(xs)
 
         min_y = min(ys)
         max_y = max(ys)
@@ -417,7 +538,7 @@ class PmxTailorExportService():
         now_iidxs = []
         first_vidxs = None
         second_vidxs = None
-        for first_y in range(min_y, max_y + 1):
+        for first_y in range(min_y + int((max_y - min_y) / 2), max_y + 1):
             if (first_x, first_y) in vertex_coordinate_map:
                 first_vidxs = vertex_coordinate_map[(first_x, first_y)]
                 break
@@ -438,18 +559,19 @@ class PmxTailorExportService():
                             continue
                         
                         # 登録されてない残りの頂点INDEX
-                        remaining_vidx = tuple(set(model.indices[index_idx]) - set((iv1, iv2)))[0]
+                        remaining_vidx = tuple(set(model.indices[index_idx]) - set(duplicate_vertices[model.vertex_dict[iv1].position.to_log()]) \
+                            - set(duplicate_vertices[model.vertex_dict[iv2].position.to_log()]))[0]     # noqa
                         remaining_vidxs = duplicate_vertices[model.vertex_dict[remaining_vidx].position.to_log()]
-                        rkey1 = (min(iv1, remaining_vidx), max(iv1, remaining_vidx))
-                        rkey2 = (min(iv2, remaining_vidx), max(iv2, remaining_vidx))
-                        if rkey1 in duplicate_indices and len(duplicate_indices[rkey1]) > 1 and \
-                           rkey2 in duplicate_indices and len(duplicate_indices[rkey2]) > 1:
-                            # 両辺とも重複してる場合、開始の下辺であると見なす
-                            ivy = max(vertex_axis_map[iv1]['y'], vertex_axis_map[iv2]['y'])
-                        else:
-                            # 両辺のいずれかが重複してない場合、Y位置が近い方を採用する
-                            ivy = vertex_axis_map[iv1]['y'] if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) < \
-                                abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()) else vertex_axis_map[iv2]['y']
+                        # rkey1 = (min(iv1, remaining_vidx), max(iv1, remaining_vidx))
+                        # rkey2 = (min(iv2, remaining_vidx), max(iv2, remaining_vidx))
+                        # if rkey1 in duplicate_indices and len(duplicate_indices[rkey1]) > 1 and \
+                        #    rkey2 in duplicate_indices and len(duplicate_indices[rkey2]) > 1:
+                        #     # 両辺とも重複してる場合、開始の下辺であると見なす
+                        #     ivy = max(vertex_axis_map[iv1]['y'], vertex_axis_map[iv2]['y'])
+                        # else:
+                        #     # 両辺のいずれかが重複してない場合、Y位置が近い方を採用する
+                        ivy = vertex_axis_map[iv1]['y'] if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) < \
+                            abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()) else vertex_axis_map[iv2]['y']
                         
                         iv1_map = (vertex_axis_map[iv1]['x'] + offset, ivy)
                         if iv1_map not in vertex_coordinate_map:
@@ -486,22 +608,18 @@ class PmxTailorExportService():
             _, _, diagonal_vs = self.judge_index_edge(model, vertex_axis_map, index_idx)
 
             if diagonal_vs and diagonal_vs in duplicate_indices:
-                for index_idx_list in duplicate_indices[diagonal_vs]:
-                    if isinstance(index_idx_list, int):
-                        # リストの中身が1件だとintになってしまう？
-                        index_idx_list = [index_idx_list]
-                    for iidx in index_idx_list:
-                        edge_size = len(set(model.indices[iidx]) & set(vertex_axis_map.keys()))
-                        if edge_size >= 2:
-                            if edge_size == 2:
-                                # 重複頂点(2つの頂点)を持つ面(=連続面)
-                                vertex_axis_map, vertex_coordinate_map = \
-                                    self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, \
-                                                                    vertex_axis_map, vertex_coordinate_map, iidx)
-                            
-                            # 登録済みでなければ保持
-                            if iidx not in now_iidxs:
-                                now_iidxs.append(iidx)
+                for iidx in duplicate_indices[diagonal_vs]:
+                    edge_size = len(set(model.indices[iidx]) & set(vertex_axis_map.keys()))
+                    if edge_size >= 2:
+                        if edge_size == 2:
+                            # 重複頂点(2つの頂点)を持つ面(=連続面)
+                            vertex_axis_map, vertex_coordinate_map = \
+                                self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, \
+                                                                vertex_axis_map, vertex_coordinate_map, iidx)
+                        
+                        # 登録済みでなければ保持
+                        if iidx not in now_iidxs:
+                            now_iidxs.append(iidx)
 
         registed_iidxs = list(set(registed_iidxs) | set(now_iidxs))
 
@@ -564,40 +682,68 @@ class PmxTailorExportService():
                     # 面の辺を抽出
                     vertical_in_vs, horizonal_in_vs, _ = self.judge_index_edge(model, vertex_axis_map, duplicate_index_idx)
                     if not horizonal_in_vs:
-                        # まだ横が登録されていない場合、スルー(上下であるなら、とりあえず横は登録されてるはず)
+                        # まだ横が登録されていない場合、スルー
                         continue
-                    if vertical_in_vs and ((offset > 0 and vertical_in_vs[0] not in duplicate_vertices[vertical_below_v.position.to_log()]) \
-                       or (offset < 0 and vertical_in_vs[1] not in duplicate_vertices[vertical_below_v.position.to_log()])):
-                        # 既に縦辺が求められていてそれに今回算出対象が含まれていない場合、スルー
-                        continue
-                    
+
+                    #     if vertical_in_vs:
+                    #         # 縦が求められているなら、残り一点は横方向である
+                    #         pass
+                    #         # all_duplicate_indexs.append(duplicate_index_idx)
+                    #         # all_vertical_below_v.append(vertical_below_v)
+                    #         # all_index_combs.append((vertical_below_v.index, list(set(vertical_in_vs) - {vertical_below_v.index})[0]))
+                    #         # all_duplicate_dots.append(0)
+                    #     else:
+                    #         # 縦も横もまだならスルー
+                    #         continue
+
+                    if vertical_in_vs:
+                        if ((offset > 0 and vertical_in_vs[0] in duplicate_vertices[vertical_below_v.position.to_log()]) \
+                           or (offset < 0 and vertical_in_vs[1] in duplicate_vertices[vertical_below_v.position.to_log()])):
+                            # 既に縦辺が求められていてそれに今回算出対象が含まれている場合
+                            # 縦も横も求められているなら、該当面は必ず対象となる
+                            all_duplicate_indexs.append(duplicate_index_idx)
+                            all_vertical_below_v.append(vertical_below_v)
+                            if offset > 0:
+                                all_index_combs.append((vertical_in_vs[0], vertical_in_vs[1]))
+                            else:
+                                all_index_combs.append((vertical_in_vs[1], vertical_in_vs[0]))
+                            all_duplicate_dots.append(1)
+                        else:
+                            # 既に縦辺が求められていてそれに今回算出対象が含まれていない場合、スルー
+                            continue
+
                     # # 重複辺（2点）の組み合わせ(平行のどちらかと合致するはず)
+                    # index_combs = list(itertools.product(list(set(model.indices[duplicate_index_idx]) - set(horizonal_in_vs)), horizonal_in_vs))
+                    # 重複辺（2点）の組み合わせ
                     index_combs = list(itertools.combinations(model.indices[duplicate_index_idx], 2))
-                    duplicate_dots = []
                     for (iv0_comb_idx, iv1_comb_idx) in index_combs:
                         all_duplicate_indexs.append(duplicate_index_idx)
                         all_vertical_below_v.append(vertical_below_v)
 
                         iv0 = None
                         iv1 = None
-                        if iv0_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()]:
+                        if iv0_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()] and (vertical_below_v.index, iv1_comb_idx) not in all_index_combs:
                             iv0 = model.vertex_dict[iv0_comb_idx]
                             iv1 = model.vertex_dict[iv1_comb_idx]
-                        elif iv1_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()]:
+                            all_index_combs.append((vertical_below_v.index, iv1_comb_idx))
+                        elif iv1_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()] and (vertical_below_v.index, iv0_comb_idx) not in all_index_combs:
                             iv0 = model.vertex_dict[iv1_comb_idx]
                             iv1 = model.vertex_dict[iv0_comb_idx]
+                            all_index_combs.append((vertical_below_v.index, iv0_comb_idx))
+                        else:
+                            all_index_combs.append((-1, -1))
 
                         if iv0 and iv1:
-                            # v1から繋がる辺のベクトル
-                            iv0 = model.vertex_dict[iv0.index]
-                            iv1 = model.vertex_dict[iv1.index]
-                            duplicate_vec = (iv0.position - iv1.position)
-                            duplicate_dots.append(MVector3D.dotProduct(vertical_vec.normalized(), duplicate_vec.normalized()))
+                            if iv0.index in vertex_axis_map and (vertex_axis_map[iv0.index]['x'], vertex_axis_map[iv0.index]['y'] + offset) not in vertex_coordinate_map:
+                                # v1から繋がる辺のベクトル
+                                iv0 = model.vertex_dict[iv0.index]
+                                iv1 = model.vertex_dict[iv1.index]
+                                duplicate_vec = (iv0.position - iv1.position)
+                                all_duplicate_dots.append(MVector3D.dotProduct(vertical_vec.normalized(), duplicate_vec.normalized()))
+                            else:
+                                all_duplicate_dots.append(0)
                         else:
-                            duplicate_dots.append(0)
-                    
-                    all_index_combs.extend(index_combs)
-                    all_duplicate_dots.extend(duplicate_dots)
+                            all_duplicate_dots.append(0)
 
         if len(all_duplicate_dots) > 0 and np.max(all_duplicate_dots) >= param_option['similarity']:
             full_d = [i for i, (di, d) in enumerate(zip(all_duplicate_indexs, all_duplicate_dots)) if np.round(d, decimals=5) == np.max(np.round(all_duplicate_dots, decimals=5))]
@@ -616,7 +762,7 @@ class PmxTailorExportService():
                 # ほぼ同じベクトルを向いていたら、垂直頂点として登録
                 is_regist = False
                 for below_vidx in duplicate_vertices[remaining_v.position.to_log()]:
-                    if below_vidx not in vertex_axis_map:
+                    if below_vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
                         is_regist = True
                         vertex_axis_map[below_vidx] = {'vidx': below_vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[below_vidx].position}
                 if is_regist:
@@ -624,29 +770,30 @@ class PmxTailorExportService():
 
                 now_iidxs.append(duplicate_index_idx)
 
-                vertical_v0 = vertex_axis_map[vertical_vidxs[0]]
-                vertical_v1 = vertex_axis_map[vertical_vidxs[1]]
-                remaining_v = model.vertex_dict[tuple(set(model.indices[duplicate_index_idx]) - set(vertical_vidxs))[0]]
+                if vertical_vidxs[0] in vertex_axis_map and vertical_vidxs[1] in vertex_axis_map:
+                    vertical_v0 = vertex_axis_map[vertical_vidxs[0]]
+                    vertical_v1 = vertex_axis_map[vertical_vidxs[1]]
+                    remaining_v = model.vertex_dict[tuple(set(model.indices[duplicate_index_idx]) - set(vertical_vidxs))[0]]
 
-                if remaining_v.index not in vertex_axis_map:
-                    # 残り一点のマップ位置
-                    remaining_x, remaining_y = self.get_remaining_vertex_vec(vertical_v0['vidx'], vertical_v0['x'], vertical_v0['y'], vertical_v0['position'], \
-                                                                             vertical_v1['vidx'], vertical_v1['x'], vertical_v1['y'], vertical_v1['position'], \
-                                                                             remaining_v, vertex_coordinate_map, duplicate_indices, duplicate_vertices)
+                    if remaining_v.index not in vertex_axis_map:
+                        # 残り一点のマップ位置
+                        remaining_x, remaining_y = self.get_remaining_vertex_vec(vertical_v0['vidx'], vertical_v0['x'], vertical_v0['y'], vertical_v0['position'], \
+                                                                                 vertical_v1['vidx'], vertical_v1['x'], vertical_v1['y'], vertical_v1['position'], \
+                                                                                 remaining_v, vertex_coordinate_map, duplicate_indices, duplicate_vertices)
 
-                    is_regist = False
-                    for vidx in duplicate_vertices[remaining_v.position.to_log()]:
-                        if vidx not in vertex_axis_map:
-                            is_regist = True
-                            vertex_axis_map[vidx] = {'vidx': vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[vidx].position}
-                    if is_regist:
-                        vertex_coordinate_map[(remaining_x, remaining_y)] = duplicate_vertices[remaining_v.position.to_log()]
+                        is_regist = False
+                        for vidx in duplicate_vertices[remaining_v.position.to_log()]:
+                            if vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
+                                is_regist = True
+                                vertex_axis_map[vidx] = {'vidx': vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[vidx].position}
+                        if is_regist:
+                            vertex_coordinate_map[(remaining_x, remaining_y)] = duplicate_vertices[remaining_v.position.to_log()]
 
-                # 斜めが埋められそうなら埋める
-                vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_iidxs = \
-                    self.fill_diagonal_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, vertex_axis_map, \
-                                                           vertex_coordinate_map, registed_iidxs, now_iidxs)
-    
+                    # 斜めが埋められそうなら埋める
+                    vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_iidxs = \
+                        self.fill_diagonal_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, vertex_axis_map, \
+                                                               vertex_coordinate_map, registed_iidxs, now_iidxs)
+        
         registed_iidxs = list(set(registed_iidxs) | set(now_iidxs))
 
         return vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_iidxs
@@ -704,13 +851,19 @@ class PmxTailorExportService():
             for vidx in vs_duplicated[v1.index]:
                 # v1 は位置関係で当てはめる
                 if abs(v0.position.y() - v1.position.y()) < abs(v2.position.y() - v1.position.y()):
-                    vy = 0
+                    # v1は横展開とみなす
                     vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
-                    # vx = 1 if MVector3D(v0.position.x(), 0, v0.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) \
-                    #     < MVector3D(v2.position.x(), 0, v2.position.z()).distanceToPoint(MVector3D(v1.position.x(), 0, v1.position.z())) else -1
+                    vy = 0
                 else:
                     vy = -1 if v0.position.y() < v1.position.y() else 1
-                    vx = 0
+                    v1dot = MVector3D.dotProduct(MVector3D(0, -vy), (v1.position - v0.position).normalized())
+                    v2dot = MVector3D.dotProduct(MVector3D(0, -vy), (v2.position - v0.position).normalized())
+                    if v1dot > v2dot:
+                        # v1の方がv0に近い場合、xは0
+                        vx = 0
+                    else:
+                        # v2の方がv0に近い場合、斜めと見なして外積から時計回りで求める
+                        vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
 
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': vx, 'y': vy, 'position': model.vertex_dict[vidx].position, 'duplicate': duplicate_vertices[model.vertex_dict[vidx].position.to_log()]}
             vertex_coordinate_map[(vx, vy)] = vs_duplicated[v1.index]
@@ -751,7 +904,7 @@ class PmxTailorExportService():
 
             is_regist = False
             for vidx in vs_duplicated[remaining_v.index]:
-                if vidx not in vertex_axis_map:
+                if vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
                     is_regist = True
                     vertex_axis_map[vidx] = {'vidx': vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[vidx].position}
             if is_regist:
@@ -765,7 +918,6 @@ class PmxTailorExportService():
         # 時計回りと見なして位置を合わせる
         if vv0_x == vv1_x:
             # 元が縦方向に一致している場合
-            # if (vv0_y == remaining_y and (vv0_x + 1, vv0_y) not in vertex_coordinate_map) or (vv1_y == remaining_y and (vv1_x - 1, vv1_y) in vertex_coordinate_map):
             if vv0_y > vv1_y:
                 remaining_x = vv0_x + 1
             else:
@@ -810,7 +962,7 @@ class PmxTailorExportService():
                 remaining_y = vv0_y
                 logger.debug(f"{remaining_x}, {remaining_y}")
             else:
-                # ＼←の場合、→、／→の場合、←、＼→の場合、←
+                # ＼←の場合、→、／→の場合、←
                 remaining_x = vv0_x
                 remaining_y = vv1_y
                 logger.debug(f"{remaining_x}, {remaining_y}")

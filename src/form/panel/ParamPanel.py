@@ -246,7 +246,7 @@ class PhysicsParam():
         self.simple_similarity_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_txt, 0, wx.ALL, 5)
 
-        self.simple_similarity_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"（0.93）", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"（0.75）", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_similarity_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_label, 0, wx.ALL, 5)
 
@@ -255,7 +255,7 @@ class PhysicsParam():
         self.simple_grid_sizer.Add(self.simple_similarity_min_label, 0, wx.ALL, 5)
 
         self.simple_similarity_slider = \
-            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.93, 0.5, 1, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
+            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.75, 0.4, 1, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
         self.simple_grid_sizer.Add(self.simple_similarity_slider, 1, wx.ALL | wx.EXPAND, 5)
 
         self.simple_similarity_max_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"1", wx.DefaultPosition, wx.DefaultSize, 0)
