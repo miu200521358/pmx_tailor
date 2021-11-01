@@ -92,6 +92,15 @@ class ParamPanel(BasePanel):
         self.physics_list[-1].set_shape_maintenance(event)
         self.physics_list[-1].on_diagonal_joint(event)
         self.physics_list[-1].on_reverse_joint(event)
+        # 縦と横は基本ON
+        self.physics_list[-1].advance_vertical_joint_valid_check.SetValue(1)
+        self.physics_list[-1].advance_horizonal_joint_valid_check.SetValue(1)
+        self.physics_list[-1].advance_diagonal_joint_valid_check.SetValue(0)
+        self.physics_list[-1].advance_reverse_joint_valid_check.SetValue(0)
+        self.physics_list[-1].advance_vertical_joint_coefficient_spin.SetValue(1)
+        self.physics_list[-1].advance_horizonal_joint_coefficient_spin.SetValue(1)
+        self.physics_list[-1].advance_diagonal_joint_coefficient_spin.SetValue(1)
+        self.physics_list[-1].advance_reverse_joint_coefficient_spin.SetValue(1)
 
         # スクロールバーの表示のためにサイズ調整
         self.sizer.Layout()
@@ -1330,10 +1339,10 @@ class PhysicsParam():
             params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
             params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
             
-            # 1と自身を非衝突対象
+            # 自身を非衝突対象
             no_collision_group = 0
             for nc in range(16):
-                if nc not in [0, int(self.simple_group_ctrl.GetStringSelection()) - 1]:
+                if nc not in [int(self.simple_group_ctrl.GetStringSelection()) - 1]:
                     no_collision_group |= 1 << nc
 
             params["rigidbody"] = RigidBody("", "", self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.bones[self.simple_parent_bone_ctrl.GetStringSelection()].index, \
@@ -1532,9 +1541,6 @@ class PhysicsParam():
 
     def set_shape_maintenance(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        # 縦と横は基本ON
-        self.advance_vertical_joint_valid_check.SetValue(1)
-        self.advance_horizonal_joint_valid_check.SetValue(1)
 
         base_joint_val = (self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax() * 20 * \
                           self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax() * 10 * \
@@ -1555,8 +1561,6 @@ class PhysicsParam():
             horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 1.3))
         else:
             # 布はとりあえず均一
-            self.advance_vertical_joint_coefficient_spin.SetValue(1)
-            self.advance_horizonal_joint_coefficient_spin.SetValue(1)
             horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 2))
         self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot)
         self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot)
@@ -1565,26 +1569,31 @@ class PhysicsParam():
         self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
         self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
 
-        self.advance_diagonal_joint_coefficient_spin.SetValue(1)
-        self.advance_reverse_joint_coefficient_spin.SetValue(1)
+        diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 1.2))
+        self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
+        self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
+        self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_rot)
+        self.diagonal_joint_rot_y_max_spin.SetValue(diagonal_joint_rot)
+        self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
+        self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
+
+        reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 1.2))
+        self.reverse_joint_rot_x_min_spin.SetValue(-reverse_joint_rot)
+        self.reverse_joint_rot_x_max_spin.SetValue(reverse_joint_rot)
+        self.reverse_joint_rot_y_min_spin.SetValue(-reverse_joint_rot)
+        self.reverse_joint_rot_y_max_spin.SetValue(reverse_joint_rot)
+        self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
+        self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
 
         if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.7:
             # 一定以上の維持感であれば斜めと逆も張る
             if "布" in self.simple_material_ctrl.GetStringSelection():
                 # 斜めは布のみ
-                diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 1.2))
-                self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
-                self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
-                self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_rot)
-                self.diagonal_joint_rot_y_max_spin.SetValue(diagonal_joint_rot)
-                self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
-                self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
+                self.advance_diagonal_joint_valid_check.SetValue(1)
 
-            reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 1.2))
-            self.reverse_joint_rot_x_min_spin.SetValue(-reverse_joint_rot)
-            self.reverse_joint_rot_x_max_spin.SetValue(reverse_joint_rot)
-            self.reverse_joint_rot_y_min_spin.SetValue(-reverse_joint_rot)
-            self.reverse_joint_rot_y_max_spin.SetValue(reverse_joint_rot)
-            self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
-            self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
+            self.advance_reverse_joint_valid_check.SetValue(1)
+        else:
+            self.advance_diagonal_joint_valid_check.SetValue(0)
+            self.advance_reverse_joint_valid_check.SetValue(0)
+
 
