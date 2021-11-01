@@ -84,6 +84,7 @@ class ParamPanel(BasePanel):
         self.frame.advance_param_panel_ctrl.advance_sizer.Layout()
 
         # 初期値設定
+        self.physics_list[-1].advance_rigidbody_shape_type_ctrl.SetStringSelection('箱')
         self.physics_list[-1].set_material_name(event)
         self.physics_list[-1].set_fineness(event)
         self.physics_list[-1].set_mass(event)
@@ -231,6 +232,7 @@ class PhysicsParam():
 
         self.simple_primitive_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["布(コットン)", "布(絹)", "布(レザー)", "布(デニム)", "髪(ロング)", "髪(ショート)"])
         self.simple_primitive_ctrl.SetToolTip(u"物理の参考値プリセット")
+        self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
 
         self.simple_header_grid_sizer.Add(wx.StaticText(self.simple_window, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize, 0), 0, wx.ALL, 5)
@@ -449,7 +451,7 @@ class PhysicsParam():
         self.rigidbody_friction_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_friction_txt, 0, wx.ALL, 5)
 
-        self.rigidbody_friction_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=10, initial=0, inc=0.01)
+        self.rigidbody_friction_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0.2", min=0, max=10, initial=0.2, inc=0.01)
         self.rigidbody_friction_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_friction_spin, 0, wx.ALL, 5)
 
@@ -459,9 +461,19 @@ class PhysicsParam():
         self.rigidbody_coefficient_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_coefficient_txt, 0, wx.ALL, 5)
 
-        self.rigidbody_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2", min=1, max=10, initial=2, inc=0.1)
+        self.rigidbody_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1.2", min=1, max=10, initial=1.2, inc=0.1)
         self.rigidbody_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_coefficient_spin, 0, wx.ALL, 5)
+
+        # 剛体形状
+        self.advance_rigidbody_shape_type_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"剛体形状", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.advance_rigidbody_shape_type_txt.SetToolTip(u"剛体の形状")
+        self.advance_rigidbody_shape_type_txt.Wrap(-1)
+        self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_shape_type_txt, 0, wx.ALL, 5)
+
+        self.advance_rigidbody_shape_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=['球', '箱', 'カプセル'])
+        self.advance_rigidbody_shape_type_ctrl.SetToolTip(u"剛体の形状")
+        self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_shape_type_ctrl, 0, wx.ALL, 5)
 
         self.advance_rigidbody_sizer.Add(self.advance_rigidbody_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_rigidbody_sizer, 0, wx.ALL, 5)
@@ -476,9 +488,15 @@ class PhysicsParam():
         self.advance_vertical_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_vertical_joint)
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_valid_check, 0, wx.ALL, 5)
 
-        self.advance_vertical_joint_step_check = wx.CheckBox(self.advance_window, wx.ID_ANY, "上の段ほど制限を強くする")
-        self.advance_vertical_joint_step_check.SetToolTip("縦ジョイントの制限を上の段ほど強くするか。OFFの場合、全ての段の制限が均一になります。")
-        self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_step_check, 0, wx.ALL, 5)
+        # 係数
+        self.advance_vertical_joint_coefficient_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"係数", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.advance_vertical_joint_coefficient_txt.SetToolTip(u"根元ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+        self.advance_vertical_joint_coefficient_txt.Wrap(-1)
+        self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_txt, 0, wx.ALL, 5)
+
+        self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1)
+        self.advance_vertical_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
+        self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_vertical_joint_sizer.Add(self.advance_vertical_joint_head_sizer, 0, wx.ALL, 5)
 
@@ -677,9 +695,15 @@ class PhysicsParam():
         self.advance_horizonal_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_horizonal_joint)
         self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_valid_check, 0, wx.ALL, 5)
 
-        self.advance_horizonal_joint_step_check = wx.CheckBox(self.advance_window, wx.ID_ANY, "上の段ほど制限を強くする")
-        self.advance_horizonal_joint_step_check.SetToolTip("横ジョイントの制限を上の段ほど強くするか。OFFの場合、全ての段の制限が均一になります。")
-        self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_step_check, 0, wx.ALL, 5)
+        # 係数
+        self.advance_horizonal_joint_coefficient_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"係数", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.advance_horizonal_joint_coefficient_txt.SetToolTip(u"根元ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+        self.advance_horizonal_joint_coefficient_txt.Wrap(-1)
+        self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_coefficient_txt, 0, wx.ALL, 5)
+
+        self.advance_horizonal_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1)
+        self.advance_horizonal_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
+        self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_horizonal_joint_sizer.Add(self.advance_horizonal_joint_head_sizer, 0, wx.ALL, 5)
 
@@ -878,9 +902,15 @@ class PhysicsParam():
         self.advance_diagonal_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_diagonal_joint)
         self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_valid_check, 0, wx.ALL, 5)
 
-        self.advance_diagonal_joint_step_check = wx.CheckBox(self.advance_window, wx.ID_ANY, "上の段ほど制限を強くする")
-        self.advance_diagonal_joint_step_check.SetToolTip("斜めジョイントの制限を上の段ほど強くするか。OFFの場合、全ての段の制限が均一になります。")
-        self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_step_check, 0, wx.ALL, 5)
+        # 係数
+        self.advance_diagonal_joint_coefficient_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"係数", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.advance_diagonal_joint_coefficient_txt.SetToolTip(u"根元ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+        self.advance_diagonal_joint_coefficient_txt.Wrap(-1)
+        self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_coefficient_txt, 0, wx.ALL, 5)
+
+        self.advance_diagonal_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1)
+        self.advance_diagonal_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
+        self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_diagonal_joint_sizer.Add(self.advance_diagonal_joint_head_sizer, 0, wx.ALL, 5)
 
@@ -1079,9 +1109,15 @@ class PhysicsParam():
         self.advance_reverse_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_reverse_joint)
         self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_valid_check, 0, wx.ALL, 5)
 
-        self.advance_reverse_joint_step_check = wx.CheckBox(self.advance_window, wx.ID_ANY, "上の段ほど制限を強くする")
-        self.advance_reverse_joint_step_check.SetToolTip("逆ジョイントの制限を上の段ほど強くするか。OFFの場合、全ての段の制限が均一になります。")
-        self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_step_check, 0, wx.ALL, 5)
+        # 係数
+        self.advance_reverse_joint_coefficient_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"係数", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.advance_reverse_joint_coefficient_txt.SetToolTip(u"根元ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+        self.advance_reverse_joint_coefficient_txt.Wrap(-1)
+        self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_coefficient_txt, 0, wx.ALL, 5)
+
+        self.advance_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1)
+        self.advance_reverse_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
+        self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_head_sizer, 0, wx.ALL, 5)
 
@@ -1301,8 +1337,8 @@ class PhysicsParam():
                     no_collision_group |= 1 << nc
 
             params["rigidbody"] = RigidBody("", "", self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.bones[self.simple_parent_bone_ctrl.GetStringSelection()].index, \
-                                            int(self.simple_group_ctrl.GetStringSelection()) - 1, no_collision_group, 0, MVector3D(), MVector3D(), MVector3D(), \
-                                            self.rigidbody_mass_spin.GetValue(), self.rigidbody_linear_damping_spin.GetValue(), self.rigidbody_angular_damping_spin.GetValue(), \
+                                            int(self.simple_group_ctrl.GetStringSelection()) - 1, no_collision_group, self.advance_rigidbody_shape_type_ctrl.GetSelection(), MVector3D(), MVector3D(), \
+                                            MVector3D(), self.rigidbody_mass_spin.GetValue(), self.rigidbody_linear_damping_spin.GetValue(), self.rigidbody_angular_damping_spin.GetValue(), \
                                             self.rigidbody_restitution_spin.GetValue(), self.rigidbody_friction_spin.GetValue(), 0)
             params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
 
@@ -1317,6 +1353,7 @@ class PhysicsParam():
                           MVector3D(self.vertical_joint_spring_mov_x_spin.GetValue(), self.vertical_joint_spring_mov_y_spin.GetValue(), self.vertical_joint_spring_mov_z_spin.GetValue()), \
                           MVector3D(self.vertical_joint_spring_rot_x_spin.GetValue(), self.vertical_joint_spring_rot_y_spin.GetValue(), self.vertical_joint_spring_rot_z_spin.GetValue())
                           )
+            params['vertical_joint_coefficient'] = self.advance_vertical_joint_coefficient_spin.GetValue()
 
             params["horizonal_joint"] = None
             if self.advance_horizonal_joint_valid_check.GetValue():
@@ -1329,6 +1366,7 @@ class PhysicsParam():
                           MVector3D(self.horizonal_joint_spring_mov_x_spin.GetValue(), self.horizonal_joint_spring_mov_y_spin.GetValue(), self.horizonal_joint_spring_mov_z_spin.GetValue()), \
                           MVector3D(self.horizonal_joint_spring_rot_x_spin.GetValue(), self.horizonal_joint_spring_rot_y_spin.GetValue(), self.horizonal_joint_spring_rot_z_spin.GetValue())
                           )
+            params['horizonal_joint_coefficient'] = self.advance_horizonal_joint_coefficient_spin.GetValue()
 
             params["diagonal_joint"] = None
             if self.advance_diagonal_joint_valid_check.GetValue():
@@ -1341,6 +1379,7 @@ class PhysicsParam():
                           MVector3D(self.diagonal_joint_spring_mov_x_spin.GetValue(), self.diagonal_joint_spring_mov_y_spin.GetValue(), self.diagonal_joint_spring_mov_z_spin.GetValue()), \
                           MVector3D(self.diagonal_joint_spring_rot_x_spin.GetValue(), self.diagonal_joint_spring_rot_y_spin.GetValue(), self.diagonal_joint_spring_rot_z_spin.GetValue())
                           )
+            params['diagonal_joint_coefficient'] = self.advance_diagonal_joint_coefficient_spin.GetValue()
 
             params["reverse_joint"] = None
             if self.advance_reverse_joint_valid_check.GetValue():
@@ -1353,6 +1392,7 @@ class PhysicsParam():
                           MVector3D(self.reverse_joint_spring_mov_x_spin.GetValue(), self.reverse_joint_spring_mov_y_spin.GetValue(), self.reverse_joint_spring_mov_z_spin.GetValue()), \
                           MVector3D(self.reverse_joint_spring_rot_x_spin.GetValue(), self.reverse_joint_spring_rot_y_spin.GetValue(), self.reverse_joint_spring_rot_z_spin.GetValue())
                           )
+            params['reverse_joint_coefficient'] = self.advance_reverse_joint_coefficient_spin.GetValue()
         else:
             if is_show_error:
                 empty_param_list = []
@@ -1456,22 +1496,33 @@ class PhysicsParam():
         self.reverse_joint_spring_rot_z_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
     
     def set_material_name(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
         self.simple_abb_ctrl.SetValue(self.simple_material_ctrl.GetStringSelection()[:3])
     
     def set_fineness(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
         self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.3))
         self.horizonal_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.5))
-        self.bone_thinning_out_check.SetValue((self.simple_fineness_slider.GetValue() // 1.2) % 2 == 0)
+        # self.bone_thinning_out_check.SetValue((self.simple_fineness_slider.GetValue() // 1.2) % 2 == 0)
 
     def set_mass(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
         self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
         self.set_air_resistance(event)
+    
+    def set_simple_primitive(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
+        if '布' in self.simple_primitive_ctrl.GetStringSelection():
+            self.advance_rigidbody_shape_type_ctrl.SetStringSelection('箱')
+        elif '髪' in self.simple_primitive_ctrl.GetStringSelection():
+            self.advance_rigidbody_shape_type_ctrl.SetStringSelection('カプセル')
 
     def set_air_resistance(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
         # 質量に応じて減衰を設定
         self.rigidbody_linear_damping_spin.SetValue(
-            min(0.9999, (self.simple_air_resistance_slider.GetValue() * self.simple_mass_slider.GetValue() * 5) / self.simple_air_resistance_slider.GetMax()))
+            min(0.9999, (self.simple_air_resistance_slider.GetValue() * self.simple_mass_slider.GetValue() * 3) / self.simple_air_resistance_slider.GetMax()))
         self.rigidbody_angular_damping_spin.SetValue(
             min(0.9999, (self.simple_air_resistance_slider.GetValue() * self.simple_mass_slider.GetValue() * 3) / self.simple_air_resistance_slider.GetMax()))
         # 摩擦力を設定
@@ -1480,6 +1531,7 @@ class PhysicsParam():
         self.set_shape_maintenance(event)
 
     def set_shape_maintenance(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
         # 縦と横は基本ON
         self.advance_vertical_joint_valid_check.SetValue(1)
         self.advance_horizonal_joint_valid_check.SetValue(1)
@@ -1488,7 +1540,7 @@ class PhysicsParam():
                           self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax() * 10 * \
                           self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax() * 5)
 
-        vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 7))
+        vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 2))
         self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
         self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
         self.vertical_joint_rot_y_min_spin.SetValue(-vertical_joint_rot)
@@ -1498,12 +1550,14 @@ class PhysicsParam():
 
         if "髪" in self.simple_material_ctrl.GetStringSelection():
             # 髪は上(根元)に行くほど制限を強くする
-            self.advance_horizonal_joint_step_check.SetValue(1)
-            horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 2))
+            self.advance_vertical_joint_coefficient_spin.SetValue(2)
+            self.advance_horizonal_joint_coefficient_spin.SetValue(2)
+            horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 1.3))
         else:
             # 布はとりあえず均一
-            self.advance_horizonal_joint_step_check.SetValue(0)
-            horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 5))
+            self.advance_vertical_joint_coefficient_spin.SetValue(1)
+            self.advance_horizonal_joint_coefficient_spin.SetValue(1)
+            horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 2))
         self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot)
         self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot)
         self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_rot)
@@ -1511,15 +1565,14 @@ class PhysicsParam():
         self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
         self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
 
-        self.advance_diagonal_joint_step_check.SetValue(0)
-        self.advance_reverse_joint_step_check.SetValue(0)
+        self.advance_diagonal_joint_coefficient_spin.SetValue(1)
+        self.advance_reverse_joint_coefficient_spin.SetValue(1)
 
         if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.7:
             # 一定以上の維持感であれば斜めと逆も張る
             if "布" in self.simple_material_ctrl.GetStringSelection():
                 # 斜めは布のみ
-                self.advance_diagonal_joint_step_check.SetValue(1)
-                diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 2))
+                diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 1.2))
                 self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
                 self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
                 self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_rot)
@@ -1527,8 +1580,7 @@ class PhysicsParam():
                 self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
                 self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
 
-            self.advance_reverse_joint_step_check.SetValue(1)
-            reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 4))
+            reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 1.2))
             self.reverse_joint_rot_x_min_spin.SetValue(-reverse_joint_rot)
             self.reverse_joint_rot_x_max_spin.SetValue(reverse_joint_rot)
             self.reverse_joint_rot_y_min_spin.SetValue(-reverse_joint_rot)

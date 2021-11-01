@@ -877,7 +877,7 @@ class PmxReader:
                         english_name=self.read_text(),
                         bone_index=self.read_bone_index_size(),
                         collision_group=self.read_int(1),
-                        no_collision_group=self.read_int(2),
+                        no_collision_group=self.read_uint(2),
                         shape_type=self.read_int(1),
                         shape_size=self.read_Vector3D(),
                         shape_position=self.read_Vector3D(),

@@ -391,7 +391,7 @@ class PmxWriter:
                 # 1  : byte	| グループ
                 fout.write(struct.pack(TYPE_BYTE, rigidbody.collision_group))
                 # 2  : ushort	| 非衝突グループフラグ
-                fout.write(struct.pack(TYPE_SHORT, rigidbody.no_collision_group))
+                fout.write(struct.pack(TYPE_UNSIGNED_SHORT, rigidbody.no_collision_group))
                 # 1  : byte	| 形状 - 0:球 1:箱 2:カプセル
                 fout.write(struct.pack(TYPE_BYTE, rigidbody.shape_type))
                 # 12 : float3	| サイズ(x,y,z)
