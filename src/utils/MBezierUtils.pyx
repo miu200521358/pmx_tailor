@@ -380,7 +380,7 @@ cdef tuple convert_catmullrom_2_bezier(np.ndarray xs, np.ndarray ys):
 
 
 # 指定された複数のXと交わるそれぞれのYを返す
-cdef np.ndarray intersect_by_x(curve, np.ndarray xs):
+cpdef np.ndarray intersect_by_x(curve, np.ndarray xs):
     cdef double x
     cdef list ys = []
     cdef np.ndarray[np.float_t, ndim=1] s_vals

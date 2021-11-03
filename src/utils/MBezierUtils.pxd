@@ -15,6 +15,8 @@ cdef list fit_bezier_mmd(list bzs)
 
 cdef tuple convert_catmullrom_2_bezier(np.ndarray xs, np.ndarray ys)
 
+cpdef np.ndarray intersect_by_x(curve, np.ndarray xs)
+
 cdef tuple c_evaluate(int x1v, int y1v, int x2v, int y2v, int start, int now, int end)
 
 cdef tuple c_evaluate_by_t(int x1v, int y1v, int x2v, int y2v, int start, int end, double t)
