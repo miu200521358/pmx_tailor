@@ -11,4 +11,7 @@ https://fire.st/4X3UmUR
 PmxTailor_1.00.00_β03 (2021/11/03)
 ・真横展開材質の展開調整
 
+https://fire.st/RRWMJDn
+PmxTailor_1.00.00_β04 (2021/11/03)
+・斜め展開材質の初期設定が逆になっていたので修正
 

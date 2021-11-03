@@ -1447,7 +1447,7 @@ class PmxTailorExportService():
                         if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) == \
                             abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()):  # noqa
                             ivy = vertex_axis_map[iv1]['y'] if model.vertex_dict[iv1].position.distanceToPoint(model.vertex_dict[remaining_vidx].position) < \
-                                    model.vertex_dict[iv2].position.distanceToPoint(model.vertex_dict[remaining_vidx].position) else vertex_axis_map[iv2]['y']
+                                model.vertex_dict[iv2].position.distanceToPoint(model.vertex_dict[remaining_vidx].position) else vertex_axis_map[iv2]['y']
                         else:
                             ivy = vertex_axis_map[iv1]['y'] if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) < \
                                 abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()) else vertex_axis_map[iv2]['y']
@@ -1823,9 +1823,9 @@ class PmxTailorExportService():
                 # Y抜きで距離判定
                 z_sign = np.sign(MVector3D.crossProduct((vv1_vec - remaining_v.position).normalized(), (vv0_vec - remaining_v.position).normalized()).z())
                 if z_sign == 1:
-                    remaining_x = vv1_x
-                elif z_sign == -1:
                     remaining_x = vv0_x
+                elif z_sign == -1:
+                    remaining_x = vv1_x
                 else:
                     remaining_x = vv1_x if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_x
                 logger.debug(f"{remaining_x}, {remaining_y}")
