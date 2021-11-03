@@ -22,20 +22,31 @@ class FilePanel(BasePanel):
         super().__init__(frame, export, tab_idx)
         self.convert_export_worker = None
 
+        self.txt_exec = f"{self.frame.my_program}実行"
+        self.txt_stop = f"{self.frame.my_program}停止"
+        self.model_type = "Vroid" if self.frame.is_vroid else "PMX"
+
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.description_txt = wx.StaticText(self, wx.ID_ANY, u"PMXモデルの指定された材質に物理を設定します。\n" \
-                                             + "PMXモデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.description_txt = wx.StaticText(self, wx.ID_ANY, f"{self.model_type}モデルの指定された材質に物理を設定します。\n" \
+                                             + f"{self.model_type}モデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。", wx.DefaultPosition, wx.DefaultSize, 0)
         self.header_sizer.Add(self.description_txt, 0, wx.ALL, 5)
 
         self.static_line01 = wx.StaticLine(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         self.header_sizer.Add(self.static_line01, 0, wx.EXPAND | wx.ALL, 5)
 
-        # 対象Pmxファイルコントロール
-        self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, u"対象モデル", u"対象モデルPMXファイルを開く", ("pmx"), wx.FLP_DEFAULT_STYLE, \
-                                                         u"変換したいPMXファイルパスを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。", \
-                                                         file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_pmx", \
-                                                         is_change_output=True, is_aster=False, is_save=False, set_no=1)
+        if self.frame.is_vroid:
+            # 対象Vroidファイルコントロール
+            self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, u"対象モデル", u"対象モデルVroidファイルを開く", ("vroid"), wx.FLP_DEFAULT_STYLE, \
+                                                             u"変換したいVroidファイルパスを指定してください\n正式版(1.0.0)以降のみ対応しています。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。", \
+                                                             file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_vroid", \
+                                                             is_change_output=True, is_aster=False, is_save=False, set_no=1)
+        else:
+            # 対象Pmxファイルコントロール
+            self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, u"対象モデル", u"対象モデルPMXファイルを開く", ("pmx"), wx.FLP_DEFAULT_STYLE, \
+                                                             u"変換したいPMXファイルパスを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。", \
+                                                             file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_pmx", \
+                                                             is_change_output=True, is_aster=False, is_save=False, set_no=1)
         self.header_sizer.Add(self.org_model_file_ctrl.sizer, 1, wx.EXPAND, 0)
 
         # 出力先Pmxファイルコントロール
@@ -49,8 +60,8 @@ class FilePanel(BasePanel):
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # 変換変換実行ボタン
-        self.export_btn_ctrl = wx.Button(self, wx.ID_ANY, u"PmxTailor実行", wx.DefaultPosition, wx.Size(200, 50), 0)
-        self.export_btn_ctrl.SetToolTip(u"PMXモデルに物理を設定します")
+        self.export_btn_ctrl = wx.Button(self, wx.ID_ANY, self.txt_exec, wx.DefaultPosition, wx.Size(200, 50), 0)
+        self.export_btn_ctrl.SetToolTip(f"{self.model_type}モデルに物理を設定します")
         self.export_btn_ctrl.Bind(wx.EVT_LEFT_DOWN, self.on_convert_export)
         self.export_btn_ctrl.Bind(wx.EVT_LEFT_DCLICK, self.on_doubleclick)
         btn_sizer.Add(self.export_btn_ctrl, 0, wx.ALL, 5)
@@ -149,7 +160,7 @@ class FilePanel(BasePanel):
             return result
 
         # VRM2PMX変換開始
-        if self.export_btn_ctrl.GetLabel() == "PmxTailor停止" and self.convert_export_worker:
+        if self.export_btn_ctrl.GetLabel() == self.txt_stop and self.convert_export_worker:
             # フォーム無効化
             self.disable()
             # 停止状態でボタン押下時、停止
@@ -164,8 +175,8 @@ class FilePanel(BasePanel):
             # プログレス非表示
             self.gauge_ctrl.SetValue(0)
 
-            logger.warning("PmxTailor変換処理を中断します。", decoration=MLogger.DECORATION_BOX)
-            self.export_btn_ctrl.SetLabel("PmxTailor実行")
+            logger.warning(f"{self.txt_exec}処理を中断します。", decoration=MLogger.DECORATION_BOX)
+            self.export_btn_ctrl.SetLabel(self.txt_exec)
             
             event.Skip(False)
         elif not self.convert_export_worker:

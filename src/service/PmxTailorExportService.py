@@ -133,12 +133,13 @@ class PmxTailorExportService():
         param_reverse_joint = param_option['reverse_joint']
 
         v_yidxs = list(reversed(list(target_bone_map.keys())))
+        prev_joint_cnt = 0
 
         max_vy = max(v_yidxs)
         middle_vy = (max(v_yidxs)) * 0.3
         min_vy = 0
         xs = np.arange(min_vy, max_vy, step=1)
-
+    
         if param_vertical_joint:
             coefficient = param_option['vertical_joint_coefficient']
 
@@ -371,6 +372,10 @@ class PmxTailorExportService():
                                       MVector3D(vertical_spring_constant_rot_xs[yi], vertical_spring_constant_rot_ys[yi], vertical_spring_constant_rot_zs[yi]))   # noqa
                         created_joints[joint.name] = joint
 
+                        if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                            logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                            prev_joint_cnt = len(created_joints) // 200
+                        
                         if param_reverse_joint:
                             # 逆ジョイント
                             joint_name = f'↑|{prev_below_bone_name}|{prev_above_bone_name}'
@@ -386,6 +391,10 @@ class PmxTailorExportService():
                                               MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))  # noqa
                                 created_joints[joint.name] = joint
 
+                                if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                                    logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                                    prev_joint_cnt = len(created_joints) // 200
+                                
                 if param_horizonal_joint:
                     # 横ジョイント
                     if xi < len(below_v_xidxs) - 2:
@@ -396,9 +405,13 @@ class PmxTailorExportService():
                             
                             joint_vertical_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
                             joint_horizonal_vec = ((target_bone_positions[next_below_bone_name] - target_bone_positions[prev_below_bone_name]) / 2)
-                            joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() + joint_horizonal_vec.x(), \
-                                                  target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y() + joint_vertical_vec.y(), \
-                                                  target_bone_positions[prev_below_bone_name].z() + joint_horizonal_vec.z())
+
+                            if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
+                                joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() + joint_horizonal_vec.x(), \
+                                                      target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y() + joint_vertical_vec.y(), \
+                                                      target_bone_positions[prev_below_bone_name].z() + joint_horizonal_vec.z())
+                            else:
+                                joint_vec = target_bone_positions[prev_below_bone_name] + joint_horizonal_vec + joint_vertical_vec
 
                             # joint_vertical_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
                             # joint_horizonal_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[next_below_bone_name]) / 2)
@@ -425,6 +438,10 @@ class PmxTailorExportService():
                                           MVector3D(horizonal_spring_constant_rot_xs[yi], horizonal_spring_constant_rot_ys[yi], horizonal_spring_constant_rot_zs[yi]))    # noqa
                             created_joints[joint.name] = joint
 
+                            if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                                logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                                prev_joint_cnt = len(created_joints) // 200
+                            
                         if param_reverse_joint:
                             # 横逆ジョイント
                             joint_name = f'←|{next_below_bone_name}|{prev_below_bone_name}'
@@ -441,6 +458,10 @@ class PmxTailorExportService():
                                               MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))      # noqa
                                 created_joints[joint.name] = joint
 
+                                if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                                    logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                                    prev_joint_cnt = len(created_joints) // 200
+                                
                 if param_diagonal_joint:
                     # ＼ジョイント
                     joint_name = f'＼|{prev_above_bone_name}|{next_below_bone_name}'
@@ -449,11 +470,8 @@ class PmxTailorExportService():
                         # 未登録のみ追加
                         
                         # ＼ジョイント
-                        joint_vertical_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
-                        joint_horizonal_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[next_below_bone_name]) / 2)
-                        joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() - (model.rigidbodies[prev_above_bone_name].shape_size.x() * np.sign(joint_horizonal_vec.x())), \
-                                              target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y(), \
-                                              target_bone_positions[prev_below_bone_name].z())                        
+                        joint_diagonal_vec = ((target_bone_positions[next_above_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
+                        joint_vec = target_bone_positions[prev_below_bone_name] + joint_diagonal_vec
                         # joint_vec = target_bone_positions[prev_below_bone_name]
 
                         # 回転量
@@ -475,6 +493,10 @@ class PmxTailorExportService():
                                       MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
                         created_joints[joint.name] = joint
 
+                        if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                            logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                            prev_joint_cnt = len(created_joints) // 200
+                        
                     # ／ジョイント ---------------
                     joint_name = f'／|{prev_below_bone_name}|{next_above_bone_name}'
 
@@ -482,12 +504,8 @@ class PmxTailorExportService():
                         # 未登録のみ追加
                     
                         # ／ジョイント
-                        joint_vertical_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[prev_below_bone_name]) / 2)
-                        joint_horizonal_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[next_above_bone_name]) / 2)
-                        joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() - (model.rigidbodies[prev_below_bone_name].shape_size.x() * np.sign(joint_horizonal_vec.x())), \
-                                              target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y(), \
-                                              target_bone_positions[prev_below_bone_name].z())
-                        # joint_vec = target_bone_positions[prev_below_bone_name]
+                        joint_diagonal_vec = ((target_bone_positions[next_above_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
+                        joint_vec = target_bone_positions[prev_below_bone_name] + joint_diagonal_vec
 
                         # 回転量
                         joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
@@ -508,6 +526,10 @@ class PmxTailorExportService():
                                       MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
                         created_joints[joint.name] = joint
 
+                        if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                            logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                            prev_joint_cnt = len(created_joints) // 200
+                        
         for joint_name in sorted(created_joints.keys()):
             # ジョイントを登録
             joint = created_joints[joint_name]
@@ -522,6 +544,7 @@ class PmxTailorExportService():
         created_rigidbody_masses = {}
         created_rigidbody_linear_dampinges = {}
         created_rigidbody_angular_dampinges = {}
+        prev_rigidbody_cnt = 0
 
         # 略称
         abb_name = param_option['abb_name']
@@ -579,11 +602,16 @@ class PmxTailorExportService():
                 shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).normalized()
 
                 shape_rotation_qq = MQuaternion.fromDirection(shape_axis, shape_axis_cross)
-                shape_rotation_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
-                shape_rotation_qq *= MQuaternion.fromEulerAngles(-90, 0, 0)
-                shape_rotation_qq *= MQuaternion.fromEulerAngles(0, -90, 0)
+                if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
+                    shape_rotation_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
+                    shape_rotation_qq *= MQuaternion.fromEulerAngles(-90, 0, 0)
+                    shape_rotation_qq *= MQuaternion.fromEulerAngles(0, -90, 0)
 
                 shape_rotation_euler = shape_rotation_qq.toEulerAngles()
+
+                if round(prev_below_bone_position.y(), 3) == round(prev_above_bone_position.y(), 3):
+                    shape_rotation_euler.setX(90)
+                    
                 shape_rotation_radians = MVector3D(math.radians(shape_rotation_euler.x()), math.radians(shape_rotation_euler.y()), math.radians(shape_rotation_euler.z()))
 
                 # 剛体の大きさ
@@ -592,11 +620,11 @@ class PmxTailorExportService():
                 shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
 
                 # 剛体の位置
-                # rigidbody_horizonal_vec = (next_above_bone_position - prev_above_bone_position) / 2
-                # shape_position = ((prev_above_bone_position + prev_below_bone_position) / 2) + \
-                #                     MVector3D(rigidbody_horizonal_vec.x(), 0, rigidbody_horizonal_vec.z() + rigidbody_limit_thicks[yi] / 2)     # noqa
                 rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
-                shape_position = prev_above_bone_position + MVector3D(0, rigidbody_vertical_vec.y(), 0)
+                if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
+                    shape_position = prev_above_bone_position + MVector3D(0, rigidbody_vertical_vec.y(), 0)
+                else:
+                    shape_position = prev_above_bone_position + rigidbody_vertical_vec
 
                 # 根元はボーン追従剛体、それ以降は物理剛体
                 mode = 0 if yi == len(v_yidxs) - 2 else 1
@@ -618,6 +646,10 @@ class PmxTailorExportService():
                 created_rigidbody_linear_dampinges[rigidbody.name] = linear_damping
                 created_rigidbody_angular_dampinges[rigidbody.name] = angular_damping
 
+                if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 200 > prev_rigidbody_cnt:
+                    logger.info(f"-- 剛体: {len(created_rigidbodies)}個目:終了")
+                    prev_rigidbody_cnt = len(created_rigidbodies) // 200
+                
         min_mass = np.min(list(created_rigidbody_masses.values()))
         min_linear_damping = np.min(list(created_rigidbody_linear_dampinges.values()))
         min_angular_damping = np.min(list(created_rigidbody_angular_dampinges.values()))
@@ -643,6 +675,8 @@ class PmxTailorExportService():
     def create_weight(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, \
                       registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone):
         # ウェイト分布
+        prev_weight_cnt = 0
+        weight_cnt = 0
 
         # 略称
         abb_name = param_option['abb_name']
@@ -683,6 +717,9 @@ class PmxTailorExportService():
                 
                 for vi, v_vertices in enumerate(v_map):
                     for vhi, vertex_idx in enumerate(v_vertices):
+                        if vertex_idx < 0:
+                            continue
+
                         horizonal_distance = np.sum(b_h_distances[vi, 1:])
                         v_horizonal_distance = np.sum(b_h_distances[vi, 1:(vhi + 1)])
                         vertical_distance = np.sum(b_v_distances[1:, vhi])
@@ -724,6 +761,11 @@ class PmxTailorExportService():
                                                           model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
                                                           weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
 
+                                weight_cnt += 1
+                                if weight_cnt > 0 and weight_cnt // 1000 > prev_weight_cnt:
+                                    logger.info(f"-- 頂点ウェイト: {weight_cnt}個目:終了")
+                                    prev_weight_cnt = weight_cnt // 1000
+                                
         vertex_remaining_map = {}
 
         target_bone_map = copy.deepcopy(registed_bone_indexs)
@@ -742,7 +784,12 @@ class PmxTailorExportService():
                 v = model.vertex_dict[vertex_idx]
                 if vertex_idx < 0:
                     continue
-                
+
+                weight_cnt += 1
+                if weight_cnt > 0 and weight_cnt // 1000 > prev_weight_cnt:
+                    logger.info(f"-- 頂点ウェイト: {weight_cnt}個目:終了")
+                    prev_weight_cnt = weight_cnt // 1000
+                                
                 bone_prev_above_names = []
                 bone_prev_above_distances = []
                 bone_next_above_names = []
@@ -1397,8 +1444,13 @@ class PmxTailorExportService():
                         remaining_vidx = tuple(set(model.indices[index_idx]) - set(duplicate_vertices[model.vertex_dict[iv1].position.to_log()]) \
                             - set(duplicate_vertices[model.vertex_dict[iv2].position.to_log()]))[0]     # noqa
                         remaining_vidxs = duplicate_vertices[model.vertex_dict[remaining_vidx].position.to_log()]
-                        ivy = vertex_axis_map[iv1]['y'] if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) < \
-                            abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()) else vertex_axis_map[iv2]['y']
+                        if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) == \
+                            abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()):  # noqa
+                            ivy = vertex_axis_map[iv1]['y'] if model.vertex_dict[iv1].position.distanceToPoint(model.vertex_dict[remaining_vidx].position) < \
+                                    model.vertex_dict[iv2].position.distanceToPoint(model.vertex_dict[remaining_vidx].position) else vertex_axis_map[iv2]['y']
+                        else:
+                            ivy = vertex_axis_map[iv1]['y'] if abs(model.vertex_dict[iv1].position.y() - model.vertex_dict[remaining_vidx].position.y()) < \
+                                abs(model.vertex_dict[iv2].position.y() - model.vertex_dict[remaining_vidx].position.y()) else vertex_axis_map[iv2]['y']
                         
                         iv1_map = (vertex_axis_map[iv1]['x'] + offset, ivy)
                         if iv1_map not in vertex_coordinate_map:
@@ -1623,12 +1675,14 @@ class PmxTailorExportService():
             else (v0.index, v2.index) if v0.index in vertex_axis_map and v2.index in vertex_axis_map and vertex_axis_map[v0.index]['x'] == vertex_axis_map[v2.index]['x'] \
             else (v1.index, v2.index) if v1.index in vertex_axis_map and v2.index in vertex_axis_map and vertex_axis_map[v1.index]['x'] == vertex_axis_map[v2.index]['x'] else None
         if vertical_vs:
-            vertical_vs = (vertical_vs[0], vertical_vs[1]) if model.vertex_dict[vertical_vs[0]].position.y() >= model.vertex_dict[vertical_vs[1]].position.y() else (vertical_vs[1], vertical_vs[0])
+            vertical_vs = (vertical_vs[0], vertical_vs[1]) if vertex_axis_map[vertical_vs[0]]['y'] < vertex_axis_map[vertical_vs[1]]['y'] else (vertical_vs[1], vertical_vs[0])
 
         # 横の辺を抽出
         horizonal_vs = (v0.index, v1.index) if v0.index in vertex_axis_map and v1.index in vertex_axis_map and vertex_axis_map[v0.index]['y'] == vertex_axis_map[v1.index]['y'] \
             else (v0.index, v2.index) if v0.index in vertex_axis_map and v2.index in vertex_axis_map and vertex_axis_map[v0.index]['y'] == vertex_axis_map[v2.index]['y'] \
             else (v1.index, v2.index) if v1.index in vertex_axis_map and v2.index in vertex_axis_map and vertex_axis_map[v1.index]['y'] == vertex_axis_map[v2.index]['y'] else None
+        if horizonal_vs:
+            horizonal_vs = (horizonal_vs[0], horizonal_vs[1]) if vertex_axis_map[horizonal_vs[0]]['x'] < vertex_axis_map[horizonal_vs[1]]['x'] else (horizonal_vs[1], horizonal_vs[0])
 
         # 斜めの辺を抽出
         diagonal_vs = (v0.index, v1.index) if v0.index in vertex_axis_map and v1.index in vertex_axis_map \
@@ -1667,6 +1721,9 @@ class PmxTailorExportService():
                 if abs(v0.position.y() - v1.position.y()) < abs(v2.position.y() - v1.position.y()):
                     # v1は横展開とみなす
                     vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
+                    vy = 0
+                elif abs(v0.position.y() - v1.position.y()) == abs(v2.position.y() - v1.position.y()):
+                    vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
                     vy = 0
                 else:
                     vy = -1 if v0.position.y() < v1.position.y() else 1
@@ -1764,7 +1821,13 @@ class PmxTailorExportService():
                 logger.debug(f"{remaining_x}, {remaining_y}")
             else:
                 # Y抜きで距離判定
-                remaining_x = vv1_x if np.sign(MVector3D.crossProduct((vv1_vec - remaining_v.position).normalized(), (vv0_vec - remaining_v.position).normalized()).z()) else vv0_x
+                z_sign = np.sign(MVector3D.crossProduct((vv1_vec - remaining_v.position).normalized(), (vv0_vec - remaining_v.position).normalized()).z())
+                if z_sign == 1:
+                    remaining_x = vv1_x
+                elif z_sign == -1:
+                    remaining_x = vv0_x
+                else:
+                    remaining_x = vv1_x if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_x
                 logger.debug(f"{remaining_x}, {remaining_y}")
         else:
             # 斜めが一致している場合

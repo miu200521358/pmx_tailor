@@ -1041,6 +1041,8 @@ class Joint:
 cdef class PmxModel:
     def __init__(self):
         self.path = ''
+        # Vroid用jsonデータ
+        self.json_data = None
         self.extended_uv = 0
         self.name = ''
         self.english_name = ''

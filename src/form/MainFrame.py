@@ -26,11 +26,12 @@ logger = MLogger(__name__)
 
 class MainFrame(wx.Frame):
 
-    def __init__(self, parent, mydir_path: str, version_name: str, logging_level: int, is_saving: bool, is_out_log: bool):
+    def __init__(self, parent, mydir_path: str, version_name: str, logging_level: int, is_saving: bool, is_out_log: bool, is_vroid: bool):
         self.version_name = version_name
         self.logging_level = logging_level
         self.is_out_log = is_out_log
         self.is_saving = is_saving
+        self.is_vroid = is_vroid
         self.mydir_path = mydir_path
         self.elapsed_time = 0
         self.popuped_finger_warning = False
@@ -38,7 +39,10 @@ class MainFrame(wx.Frame):
         self.worker = None
         self.load_worker = None
 
-        wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=u"PmxTailor ローカル版 {0}".format(self.version_name), \
+        self.my_program = 'Vroid2Pmx' if is_vroid else 'PmxTailor'
+
+        frame_title = f'{self.my_program} ローカル版 {self.version_name}'
+        wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=frame_title, \
                           pos=wx.DefaultPosition, size=wx.Size(600, 650), style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
 
         # ファイル履歴読み込み
@@ -266,7 +270,7 @@ class MainFrame(wx.Frame):
                 logger.error("まだ処理が実行中です。終了してから再度実行してください。", decoration=MLogger.DECORATION_BOX)
             else:
                 # 停止ボタンに切り替え
-                self.file_panel_ctrl.export_btn_ctrl.SetLabel("PmxTailor停止")
+                self.file_panel_ctrl.export_btn_ctrl.SetLabel(self.file_panel_ctrl.txt_stop)
                 self.file_panel_ctrl.export_btn_ctrl.Enable()
 
                 # 別スレッドで実行

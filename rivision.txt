@@ -7,3 +7,8 @@ https://fire.st/LD0LWzP
 PmxTailor_1.00.00_β02 (2021/11/03)
 ・剛体・ジョイントパラメーター調整
 
+https://fire.st/4X3UmUR
+PmxTailor_1.00.00_β03 (2021/11/03)
+・真横展開材質の展開調整
+
+

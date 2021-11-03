@@ -14,7 +14,7 @@ from form.MainFrame import MainFrame
 from utils.MLogger import MLogger
 from utils import MFileUtils
 
-VERSION_NAME = "1.00.00_β02"
+VERSION_NAME = "1.00.00_β03"
 
 # 指数表記なし、有効小数点桁数6、30を超えると省略あり、一行の文字数200
 np.set_printoptions(suppress=True, precision=6, threshold=30, linewidth=200)
@@ -41,12 +41,15 @@ if __name__ == '__main__':
         parser.add_argument("--verbose", default=20, type=int)
         parser.add_argument("--out_log", default=0, type=int)
         parser.add_argument("--is_saving", default=1, type=int)
+        parser.add_argument("--vroid", default=0, type=int)
         args = parser.parse_args()
         
         # ロギングレベル
         is_out_log = True if args.out_log == 1 else False
         # 省エネモード
         is_saving = True if args.is_saving == 1 else False
+        # Vroid2Pmx
+        is_vroid = True if args.vroid == 1 else False
 
         MLogger.initialize(level=args.verbose, is_file=False)
 
@@ -74,8 +77,11 @@ if __name__ == '__main__':
 
         # 引数指定がない場合、通常起動
         app = wx.App(False)
-        icon = wx.Icon(MFileUtils.resource_path('src/pmx_tailor.ico'), wx.BITMAP_TYPE_ICO)
-        frame = MainFrame(None, mydir_path, now_version_name, args.verbose, is_saving, is_out_log)
+        if is_vroid:
+            icon = wx.Icon(MFileUtils.resource_path('src/vroid2pmx.ico'), wx.BITMAP_TYPE_ICO)
+        else:
+            icon = wx.Icon(MFileUtils.resource_path('src/pmx_tailor.ico'), wx.BITMAP_TYPE_ICO)
+        frame = MainFrame(None, mydir_path, now_version_name, args.verbose, is_saving, is_out_log, is_vroid)
         frame.SetIcon(icon)
         frame.Show(True)
         app.MainLoop()
