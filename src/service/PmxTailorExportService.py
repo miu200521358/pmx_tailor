@@ -94,7 +94,7 @@ class PmxTailorExportService():
 
         logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ボーン生成", decoration=MLogger.DECORATION_LINE)
 
-        root_bone, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances \
+        root_bone, tmp_all_bones, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances \
             = self.create_bone(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx])
 
         logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ウェイト分布", decoration=MLogger.DECORATION_LINE)
@@ -104,18 +104,18 @@ class PmxTailorExportService():
 
         logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): 剛体生成", decoration=MLogger.DECORATION_LINE)
 
-        self.create_rigidbody(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, registed_bone_indexs, \
+        self.create_rigidbody(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, tmp_all_bones, registed_bone_indexs, \
                               bone_horizonal_distances, bone_vertical_distances, root_bone, target_bone_map, target_bone_parents, target_bone_positions)
 
         logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ジョイント生成", decoration=MLogger.DECORATION_LINE)
 
-        self.create_joint(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, registed_bone_indexs, \
+        self.create_joint(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, tmp_all_bones, registed_bone_indexs, \
                           bone_horizonal_distances, bone_vertical_distances, root_bone, target_bone_map, target_bone_parents, target_bone_positions)
 
         return True
 
-    def create_joint(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, registed_bone_indexs: dict, \
-                     bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, target_bone_map: dict, target_bone_parents: dict, target_bone_positions: dict):
+    def create_joint(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, tmp_all_bones: dict, registed_bone_indexs: dict, \
+                     bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, target_bone_map: dict, target_bone_parents: dict, target_bone_positions: dict):    # noqa
         # ジョイント生成
         created_joints = {}
 
@@ -133,7 +133,6 @@ class PmxTailorExportService():
         v_yidxs = list(reversed(list(target_bone_map.keys())))
 
         for yi, (above_v_yidx, below_v_yidx) in enumerate(zip(v_yidxs[1:], v_yidxs[:-1])):
-            above_v_xidxs = target_bone_map[above_v_yidx]
             below_v_xidxs = target_bone_map[below_v_yidx]
 
             for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
@@ -142,34 +141,41 @@ class PmxTailorExportService():
                 below_v_yno = below_v_yidx + 1
 
                 prev_below_bone_name = self.get_bone_name(abb_name, below_v_yno, prev_below_v_xno)
+                prev_below_bone_position = target_bone_positions[prev_below_bone_name]
                 next_below_bone_name = self.get_bone_name(abb_name, below_v_yno, next_below_v_xno)
+                next_below_bone_position = target_bone_positions[next_below_bone_name]
+
                 prev_above_bone_name = target_bone_parents[prev_below_bone_name]
-                next_above_bone_name = target_bone_parents[next_below_bone_name]
+                prev_above_bone_position = target_bone_positions[prev_above_bone_name]
+                prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+                
+                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_below_v_xno)
+                next_above_bone_position = tmp_all_bones[next_above_bone_name].position if next_above_bone_name in tmp_all_bones else target_bone_positions[next_below_bone_name]
 
                 if param_vertical_joint:
                     coefficient = param_option['vertical_joint_coefficient']
 
-                    vertical_limit_min_mov_xs = np.linspace(param_vertical_joint.translation_limit_min.x(), param_vertical_joint.translation_limit_min.x() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_min_mov_ys = np.linspace(param_vertical_joint.translation_limit_min.y(), param_vertical_joint.translation_limit_min.y() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_min_mov_zs = np.linspace(param_vertical_joint.translation_limit_min.z(), param_vertical_joint.translation_limit_min.z() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_min_rot_xs = np.linspace(param_vertical_joint.rotation_limit_min.x(), param_vertical_joint.rotation_limit_min.x() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_min_rot_ys = np.linspace(param_vertical_joint.rotation_limit_min.y(), param_vertical_joint.rotation_limit_min.y() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_min_rot_zs = np.linspace(param_vertical_joint.rotation_limit_min.z(), param_vertical_joint.rotation_limit_min.z() / coefficient, max(v_yidxs) + 1)
+                    vertical_limit_min_mov_xs = np.linspace(param_vertical_joint.translation_limit_min.x() / coefficient, param_vertical_joint.translation_limit_min.x(), max(v_yidxs) + 1)
+                    vertical_limit_min_mov_ys = np.linspace(param_vertical_joint.translation_limit_min.y() / coefficient, param_vertical_joint.translation_limit_min.y(), max(v_yidxs) + 1)
+                    vertical_limit_min_mov_zs = np.linspace(param_vertical_joint.translation_limit_min.z() / coefficient, param_vertical_joint.translation_limit_min.z(), max(v_yidxs) + 1)
+                    vertical_limit_min_rot_xs = np.linspace(param_vertical_joint.rotation_limit_min.x() / coefficient, param_vertical_joint.rotation_limit_min.x(), max(v_yidxs) + 1)
+                    vertical_limit_min_rot_ys = np.linspace(param_vertical_joint.rotation_limit_min.y() / coefficient, param_vertical_joint.rotation_limit_min.y(), max(v_yidxs) + 1)
+                    vertical_limit_min_rot_zs = np.linspace(param_vertical_joint.rotation_limit_min.z() / coefficient, param_vertical_joint.rotation_limit_min.z(), max(v_yidxs) + 1)
 
-                    vertical_limit_max_mov_xs = np.linspace(param_vertical_joint.translation_limit_max.x(), param_vertical_joint.translation_limit_max.x() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_max_mov_ys = np.linspace(param_vertical_joint.translation_limit_max.y(), param_vertical_joint.translation_limit_max.y() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_max_mov_zs = np.linspace(param_vertical_joint.translation_limit_max.z(), param_vertical_joint.translation_limit_max.z() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_max_rot_xs = np.linspace(param_vertical_joint.rotation_limit_max.x(), param_vertical_joint.rotation_limit_max.x() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_max_rot_ys = np.linspace(param_vertical_joint.rotation_limit_max.y(), param_vertical_joint.rotation_limit_max.y() / coefficient, max(v_yidxs) + 1)
-                    vertical_limit_max_rot_zs = np.linspace(param_vertical_joint.rotation_limit_max.z(), param_vertical_joint.rotation_limit_max.z() / coefficient, max(v_yidxs) + 1)
+                    vertical_limit_max_mov_xs = np.linspace(param_vertical_joint.translation_limit_max.x() / coefficient, param_vertical_joint.translation_limit_max.x(), max(v_yidxs) + 1)
+                    vertical_limit_max_mov_ys = np.linspace(param_vertical_joint.translation_limit_max.y() / coefficient, param_vertical_joint.translation_limit_max.y(), max(v_yidxs) + 1)
+                    vertical_limit_max_mov_zs = np.linspace(param_vertical_joint.translation_limit_max.z() / coefficient, param_vertical_joint.translation_limit_max.z(), max(v_yidxs) + 1)
+                    vertical_limit_max_rot_xs = np.linspace(param_vertical_joint.rotation_limit_max.x() / coefficient, param_vertical_joint.rotation_limit_max.x(), max(v_yidxs) + 1)
+                    vertical_limit_max_rot_ys = np.linspace(param_vertical_joint.rotation_limit_max.y() / coefficient, param_vertical_joint.rotation_limit_max.y(), max(v_yidxs) + 1)
+                    vertical_limit_max_rot_zs = np.linspace(param_vertical_joint.rotation_limit_max.z() / coefficient, param_vertical_joint.rotation_limit_max.z(), max(v_yidxs) + 1)
 
-                    vertical_spring_constant_mov_xs = np.linspace(param_vertical_joint.spring_constant_translation.x(), param_vertical_joint.spring_constant_translation.x(), max(v_yidxs) + 1)
-                    vertical_spring_constant_mov_ys = np.linspace(param_vertical_joint.spring_constant_translation.y(), param_vertical_joint.spring_constant_translation.y(), max(v_yidxs) + 1)
-                    vertical_spring_constant_mov_zs = np.linspace(param_vertical_joint.spring_constant_translation.z(), param_vertical_joint.spring_constant_translation.z(), max(v_yidxs) + 1)
+                    vertical_spring_constant_mov_xs = np.linspace(param_vertical_joint.spring_constant_translation.x() / coefficient, param_vertical_joint.spring_constant_translation.x(), max(v_yidxs) + 1)   # noqa
+                    vertical_spring_constant_mov_ys = np.linspace(param_vertical_joint.spring_constant_translation.y() / coefficient, param_vertical_joint.spring_constant_translation.y(), max(v_yidxs) + 1)   # noqa
+                    vertical_spring_constant_mov_zs = np.linspace(param_vertical_joint.spring_constant_translation.z() / coefficient, param_vertical_joint.spring_constant_translation.z(), max(v_yidxs) + 1)   # noqa
 
-                    vertical_spring_constant_rot_xs = np.linspace(param_vertical_joint.spring_constant_rotation.x(), param_vertical_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)
-                    vertical_spring_constant_rot_ys = np.linspace(param_vertical_joint.spring_constant_rotation.y(), param_vertical_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)
-                    vertical_spring_constant_rot_zs = np.linspace(param_vertical_joint.spring_constant_rotation.z(), param_vertical_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)
+                    vertical_spring_constant_rot_xs = np.linspace(param_vertical_joint.spring_constant_rotation.x() / coefficient, param_vertical_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)         # noqa
+                    vertical_spring_constant_rot_ys = np.linspace(param_vertical_joint.spring_constant_rotation.y() / coefficient, param_vertical_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)         # noqa
+                    vertical_spring_constant_rot_zs = np.linspace(param_vertical_joint.spring_constant_rotation.z() / coefficient, param_vertical_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)         # noqa
 
                     # 縦ジョイント
                     joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
@@ -179,16 +185,17 @@ class PmxTailorExportService():
                         
                         # 縦ジョイント
                         joint_horizonal_vec = ((target_bone_positions[next_below_bone_name] - target_bone_positions[prev_below_bone_name]) / 2)
+                        # joint_vec = target_bone_positions[prev_below_bone_name] + joint_horizonal_vec
                         joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x(), \
                                               target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y(), \
                                               target_bone_positions[prev_below_bone_name].z())
 
                         # 回転量
-                        joint_src_radians = model.rigidbodies[prev_above_bone_name].shape_rotation
-                        joint_dest_radians = model.rigidbodies[prev_below_bone_name].shape_rotation
-                        joint_src_qq = MQuaternion.fromEulerAngles(math.degrees(joint_src_radians.x()), math.degrees(joint_src_radians.y()), math.degrees(joint_src_radians.z()))
-                        joint_dest_qq = MQuaternion.fromEulerAngles(math.degrees(joint_dest_radians.x()), math.degrees(joint_dest_radians.y()), math.degrees(joint_dest_radians.z()))
-                        joint_euler = MQuaternion.slerp(joint_src_qq, joint_dest_qq, 0.5).toEulerAngles()
+                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                        joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                        joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yi, _ = self.disassemble_bone_name(prev_above_bone_name)
@@ -199,33 +206,33 @@ class PmxTailorExportService():
                                       MVector3D(math.radians(vertical_limit_min_rot_xs[yi]), math.radians(vertical_limit_min_rot_ys[yi]), math.radians(vertical_limit_min_rot_zs[yi])),
                                       MVector3D(math.radians(vertical_limit_max_rot_xs[yi]), math.radians(vertical_limit_max_rot_ys[yi]), math.radians(vertical_limit_max_rot_zs[yi])),
                                       MVector3D(vertical_spring_constant_mov_xs[yi], vertical_spring_constant_mov_ys[yi], vertical_spring_constant_mov_zs[yi]), \
-                                      MVector3D(math.radians(vertical_spring_constant_rot_xs[yi]), math.radians(vertical_spring_constant_rot_ys[yi]), math.radians(vertical_spring_constant_rot_zs[yi])))
+                                      MVector3D(vertical_spring_constant_rot_xs[yi], vertical_spring_constant_rot_ys[yi], vertical_spring_constant_rot_zs[yi]))   # noqa
                         created_joints[joint.name] = joint
 
                         if param_reverse_joint:
                             coefficient = param_option['reverse_joint_coefficient']
 
-                            reverse_limit_min_mov_xs = np.linspace(param_reverse_joint.translation_limit_min.x(), param_reverse_joint.translation_limit_min.x() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_min_mov_ys = np.linspace(param_reverse_joint.translation_limit_min.y(), param_reverse_joint.translation_limit_min.y() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_min_mov_zs = np.linspace(param_reverse_joint.translation_limit_min.z(), param_reverse_joint.translation_limit_min.z() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_min_rot_xs = np.linspace(param_reverse_joint.rotation_limit_min.x(), param_reverse_joint.rotation_limit_min.x() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_min_rot_ys = np.linspace(param_reverse_joint.rotation_limit_min.y(), param_reverse_joint.rotation_limit_min.y() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_min_rot_zs = np.linspace(param_reverse_joint.rotation_limit_min.z(), param_reverse_joint.rotation_limit_min.z() / coefficient, max(v_yidxs) + 1)
+                            reverse_limit_min_mov_xs = np.linspace(param_reverse_joint.translation_limit_min.x() / coefficient, param_reverse_joint.translation_limit_min.x(), max(v_yidxs) + 1)
+                            reverse_limit_min_mov_ys = np.linspace(param_reverse_joint.translation_limit_min.y() / coefficient, param_reverse_joint.translation_limit_min.y(), max(v_yidxs) + 1)
+                            reverse_limit_min_mov_zs = np.linspace(param_reverse_joint.translation_limit_min.z() / coefficient, param_reverse_joint.translation_limit_min.z(), max(v_yidxs) + 1)
+                            reverse_limit_min_rot_xs = np.linspace(param_reverse_joint.rotation_limit_min.x() / coefficient, param_reverse_joint.rotation_limit_min.x(), max(v_yidxs) + 1)
+                            reverse_limit_min_rot_ys = np.linspace(param_reverse_joint.rotation_limit_min.y() / coefficient, param_reverse_joint.rotation_limit_min.y(), max(v_yidxs) + 1)
+                            reverse_limit_min_rot_zs = np.linspace(param_reverse_joint.rotation_limit_min.z() / coefficient, param_reverse_joint.rotation_limit_min.z(), max(v_yidxs) + 1)
 
-                            reverse_limit_max_mov_xs = np.linspace(param_reverse_joint.translation_limit_max.x(), param_reverse_joint.translation_limit_max.x() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_max_mov_ys = np.linspace(param_reverse_joint.translation_limit_max.y(), param_reverse_joint.translation_limit_max.y() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_max_mov_zs = np.linspace(param_reverse_joint.translation_limit_max.z(), param_reverse_joint.translation_limit_max.z() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_max_rot_xs = np.linspace(param_reverse_joint.rotation_limit_max.x(), param_reverse_joint.rotation_limit_max.x() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_max_rot_ys = np.linspace(param_reverse_joint.rotation_limit_max.y(), param_reverse_joint.rotation_limit_max.y() / coefficient, max(v_yidxs) + 1)
-                            reverse_limit_max_rot_zs = np.linspace(param_reverse_joint.rotation_limit_max.z(), param_reverse_joint.rotation_limit_max.z() / coefficient, max(v_yidxs) + 1)
+                            reverse_limit_max_mov_xs = np.linspace(param_reverse_joint.translation_limit_max.x() / coefficient, param_reverse_joint.translation_limit_max.x(), max(v_yidxs) + 1)
+                            reverse_limit_max_mov_ys = np.linspace(param_reverse_joint.translation_limit_max.y() / coefficient, param_reverse_joint.translation_limit_max.y(), max(v_yidxs) + 1)
+                            reverse_limit_max_mov_zs = np.linspace(param_reverse_joint.translation_limit_max.z() / coefficient, param_reverse_joint.translation_limit_max.z(), max(v_yidxs) + 1)
+                            reverse_limit_max_rot_xs = np.linspace(param_reverse_joint.rotation_limit_max.x() / coefficient, param_reverse_joint.rotation_limit_max.x(), max(v_yidxs) + 1)
+                            reverse_limit_max_rot_ys = np.linspace(param_reverse_joint.rotation_limit_max.y() / coefficient, param_reverse_joint.rotation_limit_max.y(), max(v_yidxs) + 1)
+                            reverse_limit_max_rot_zs = np.linspace(param_reverse_joint.rotation_limit_max.z() / coefficient, param_reverse_joint.rotation_limit_max.z(), max(v_yidxs) + 1)
 
-                            reverse_spring_constant_mov_xs = np.linspace(param_reverse_joint.spring_constant_translation.x(), param_reverse_joint.spring_constant_translation.x(), max(v_yidxs) + 1)
-                            reverse_spring_constant_mov_ys = np.linspace(param_reverse_joint.spring_constant_translation.y(), param_reverse_joint.spring_constant_translation.y(), max(v_yidxs) + 1)
-                            reverse_spring_constant_mov_zs = np.linspace(param_reverse_joint.spring_constant_translation.z(), param_reverse_joint.spring_constant_translation.z(), max(v_yidxs) + 1)
+                            reverse_spring_constant_mov_xs = np.linspace(param_reverse_joint.spring_constant_translation.x() / coefficient, param_reverse_joint.spring_constant_translation.x(), max(v_yidxs) + 1)  # noqa
+                            reverse_spring_constant_mov_ys = np.linspace(param_reverse_joint.spring_constant_translation.y() / coefficient, param_reverse_joint.spring_constant_translation.y(), max(v_yidxs) + 1)  # noqa
+                            reverse_spring_constant_mov_zs = np.linspace(param_reverse_joint.spring_constant_translation.z() / coefficient, param_reverse_joint.spring_constant_translation.z(), max(v_yidxs) + 1)  # noqa
 
-                            reverse_spring_constant_rot_xs = np.linspace(param_reverse_joint.spring_constant_rotation.x(), param_reverse_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)
-                            reverse_spring_constant_rot_ys = np.linspace(param_reverse_joint.spring_constant_rotation.y(), param_reverse_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)
-                            reverse_spring_constant_rot_zs = np.linspace(param_reverse_joint.spring_constant_rotation.z(), param_reverse_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)
+                            reverse_spring_constant_rot_xs = np.linspace(param_reverse_joint.spring_constant_rotation.x() / coefficient, param_reverse_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)        # noqa
+                            reverse_spring_constant_rot_ys = np.linspace(param_reverse_joint.spring_constant_rotation.y() / coefficient, param_reverse_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)        # noqa
+                            reverse_spring_constant_rot_zs = np.linspace(param_reverse_joint.spring_constant_rotation.z() / coefficient, param_reverse_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)        # noqa
 
                             # 逆ジョイント
                             joint_name = f'↑|{prev_below_bone_name}|{prev_above_bone_name}'
@@ -238,33 +245,33 @@ class PmxTailorExportService():
                                               MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
                                               MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
                                               MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
-                                              MVector3D(math.radians(reverse_spring_constant_rot_xs[yi]), math.radians(reverse_spring_constant_rot_ys[yi]), math.radians(reverse_spring_constant_rot_zs[yi])))
+                                              MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))  # noqa
                                 created_joints[joint.name] = joint
 
                 if param_horizonal_joint:
                     coefficient = param_option['horizonal_joint_coefficient']
 
-                    horizonal_limit_min_mov_xs = np.linspace(param_horizonal_joint.translation_limit_min.x(), param_horizonal_joint.translation_limit_min.x() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_min_mov_ys = np.linspace(param_horizonal_joint.translation_limit_min.y(), param_horizonal_joint.translation_limit_min.y() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_min_mov_zs = np.linspace(param_horizonal_joint.translation_limit_min.z(), param_horizonal_joint.translation_limit_min.z() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_min_rot_xs = np.linspace(param_horizonal_joint.rotation_limit_min.x(), param_horizonal_joint.rotation_limit_min.x() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_min_rot_ys = np.linspace(param_horizonal_joint.rotation_limit_min.y(), param_horizonal_joint.rotation_limit_min.y() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_min_rot_zs = np.linspace(param_horizonal_joint.rotation_limit_min.z(), param_horizonal_joint.rotation_limit_min.z() / coefficient, max(below_v_xidxs) + 1)
+                    horizonal_limit_min_mov_xs = np.linspace(param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x(), max(v_yidxs) + 1)
+                    horizonal_limit_min_mov_ys = np.linspace(param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y(), max(v_yidxs) + 1)
+                    horizonal_limit_min_mov_zs = np.linspace(param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z(), max(v_yidxs) + 1)
+                    horizonal_limit_min_rot_xs = np.linspace(param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x(), max(v_yidxs) + 1)
+                    horizonal_limit_min_rot_ys = np.linspace(param_horizonal_joint.rotation_limit_min.y() / coefficient, param_horizonal_joint.rotation_limit_min.y(), max(v_yidxs) + 1)
+                    horizonal_limit_min_rot_zs = np.linspace(param_horizonal_joint.rotation_limit_min.z() / coefficient, param_horizonal_joint.rotation_limit_min.z(), max(v_yidxs) + 1)
 
-                    horizonal_limit_max_mov_xs = np.linspace(param_horizonal_joint.translation_limit_max.x(), param_horizonal_joint.translation_limit_max.x() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_max_mov_ys = np.linspace(param_horizonal_joint.translation_limit_max.y(), param_horizonal_joint.translation_limit_max.y() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_max_mov_zs = np.linspace(param_horizonal_joint.translation_limit_max.z(), param_horizonal_joint.translation_limit_max.z() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_max_rot_xs = np.linspace(param_horizonal_joint.rotation_limit_max.x(), param_horizonal_joint.rotation_limit_max.x() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_max_rot_ys = np.linspace(param_horizonal_joint.rotation_limit_max.y(), param_horizonal_joint.rotation_limit_max.y() / coefficient, max(below_v_xidxs) + 1)
-                    horizonal_limit_max_rot_zs = np.linspace(param_horizonal_joint.rotation_limit_max.z(), param_horizonal_joint.rotation_limit_max.z() / coefficient, max(below_v_xidxs) + 1)
+                    horizonal_limit_max_mov_xs = np.linspace(param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x(), max(v_yidxs) + 1)
+                    horizonal_limit_max_mov_ys = np.linspace(param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y(), max(v_yidxs) + 1)
+                    horizonal_limit_max_mov_zs = np.linspace(param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z(), max(v_yidxs) + 1)
+                    horizonal_limit_max_rot_xs = np.linspace(param_horizonal_joint.rotation_limit_max.x() / coefficient, param_horizonal_joint.rotation_limit_max.x(), max(v_yidxs) + 1)
+                    horizonal_limit_max_rot_ys = np.linspace(param_horizonal_joint.rotation_limit_max.y() / coefficient, param_horizonal_joint.rotation_limit_max.y(), max(v_yidxs) + 1)
+                    horizonal_limit_max_rot_zs = np.linspace(param_horizonal_joint.rotation_limit_max.z() / coefficient, param_horizonal_joint.rotation_limit_max.z(), max(v_yidxs) + 1)
 
-                    horizonal_spring_constant_mov_xs = np.linspace(param_horizonal_joint.spring_constant_translation.x(), param_horizonal_joint.spring_constant_translation.x(), max(below_v_xidxs) + 1)
-                    horizonal_spring_constant_mov_ys = np.linspace(param_horizonal_joint.spring_constant_translation.y(), param_horizonal_joint.spring_constant_translation.y(), max(below_v_xidxs) + 1)
-                    horizonal_spring_constant_mov_zs = np.linspace(param_horizonal_joint.spring_constant_translation.z(), param_horizonal_joint.spring_constant_translation.z(), max(below_v_xidxs) + 1)
+                    horizonal_spring_constant_mov_xs = np.linspace(param_horizonal_joint.spring_constant_translation.x() / coefficient, param_horizonal_joint.spring_constant_translation.x(), max(v_yidxs) + 1)
+                    horizonal_spring_constant_mov_ys = np.linspace(param_horizonal_joint.spring_constant_translation.y() / coefficient, param_horizonal_joint.spring_constant_translation.y(), max(v_yidxs) + 1)
+                    horizonal_spring_constant_mov_zs = np.linspace(param_horizonal_joint.spring_constant_translation.z() / coefficient, param_horizonal_joint.spring_constant_translation.z(), max(v_yidxs) + 1)
 
-                    horizonal_spring_constant_rot_xs = np.linspace(param_horizonal_joint.spring_constant_rotation.x(), param_horizonal_joint.spring_constant_rotation.x(), max(below_v_xidxs) + 1)
-                    horizonal_spring_constant_rot_ys = np.linspace(param_horizonal_joint.spring_constant_rotation.y(), param_horizonal_joint.spring_constant_rotation.y(), max(below_v_xidxs) + 1)
-                    horizonal_spring_constant_rot_zs = np.linspace(param_horizonal_joint.spring_constant_rotation.z(), param_horizonal_joint.spring_constant_rotation.z(), max(below_v_xidxs) + 1)
+                    horizonal_spring_constant_rot_xs = np.linspace(param_horizonal_joint.spring_constant_rotation.x() / coefficient, param_horizonal_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)
+                    horizonal_spring_constant_rot_ys = np.linspace(param_horizonal_joint.spring_constant_rotation.y() / coefficient, param_horizonal_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)
+                    horizonal_spring_constant_rot_zs = np.linspace(param_horizonal_joint.spring_constant_rotation.z() / coefficient, param_horizonal_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)
 
                     # 横ジョイント
                     if xi < len(below_v_xidxs) - 2:
@@ -274,54 +281,60 @@ class PmxTailorExportService():
                             # 未登録のみ追加
                             
                             joint_vertical_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
-                            joint_horizonal_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[next_below_bone_name]) / 2)
-                            joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() - (model.rigidbodies[prev_above_bone_name].shape_size.x() * np.sign(joint_horizonal_vec.x())), \
-                                                  target_bone_positions[prev_below_bone_name].y() + joint_vertical_vec.y() + joint_horizonal_vec.y(), \
-                                                  target_bone_positions[prev_below_bone_name].z())
+                            joint_horizonal_vec = ((target_bone_positions[next_below_bone_name] - target_bone_positions[prev_below_bone_name]) / 2)
+                            joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() + joint_horizonal_vec.x(), \
+                                                  target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y() + joint_vertical_vec.y(), \
+                                                  target_bone_positions[prev_below_bone_name].z() + joint_horizonal_vec.z())
+
+                            # joint_vertical_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[prev_above_bone_name]) / 2)
+                            # joint_horizonal_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[next_below_bone_name]) / 2)
+                            # joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x(), \
+                            #                       target_bone_positions[prev_below_bone_name].y() + joint_vertical_vec.y(), \
+                            #                       target_bone_positions[prev_below_bone_name].z())
 
                             # 回転量
-                            joint_src_radians = model.rigidbodies[prev_below_bone_name].shape_rotation
-                            joint_dest_radians = model.rigidbodies[next_below_bone_name].shape_rotation
-                            joint_src_qq = MQuaternion.fromEulerAngles(math.degrees(joint_src_radians.x()), math.degrees(joint_src_radians.y()), math.degrees(joint_src_radians.z()))
-                            joint_dest_qq = MQuaternion.fromEulerAngles(math.degrees(joint_dest_radians.x()), math.degrees(joint_dest_radians.y()), math.degrees(joint_dest_radians.z()))
-                            joint_euler = MQuaternion.slerp(joint_src_qq, joint_dest_qq, 0.5).toEulerAngles()
+                            joint_axis = (next_below_bone_position - prev_below_bone_position).normalized()
+                            joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                            joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                            joint_euler = joint_rotation_qq.toEulerAngles()
                             joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                            _, xi = self.disassemble_bone_name(prev_below_bone_name)
+                            yi, _ = self.disassemble_bone_name(prev_below_bone_name)
 
                             joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[next_below_bone_name].index,
-                                          joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[xi], horizonal_limit_min_mov_ys[xi], horizonal_limit_min_mov_zs[xi]), \
-                                          MVector3D(horizonal_limit_max_mov_xs[xi], horizonal_limit_max_mov_ys[xi], horizonal_limit_max_mov_zs[xi]),
-                                          MVector3D(math.radians(horizonal_limit_min_rot_xs[xi]), math.radians(horizonal_limit_min_rot_ys[xi]), math.radians(horizonal_limit_min_rot_zs[xi])),
-                                          MVector3D(math.radians(horizonal_limit_max_rot_xs[xi]), math.radians(horizonal_limit_max_rot_ys[xi]), math.radians(horizonal_limit_max_rot_zs[xi])),
-                                          MVector3D(horizonal_spring_constant_mov_xs[xi], horizonal_spring_constant_mov_ys[xi], horizonal_spring_constant_mov_zs[xi]), \
-                                          MVector3D(math.radians(horizonal_spring_constant_rot_xs[xi]), math.radians(horizonal_spring_constant_rot_ys[xi]), math.radians(horizonal_spring_constant_rot_zs[xi])))
+                                          joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi], horizonal_limit_min_mov_ys[yi], horizonal_limit_min_mov_zs[yi]), \
+                                          MVector3D(horizonal_limit_max_mov_xs[yi], horizonal_limit_max_mov_ys[yi], horizonal_limit_max_mov_zs[yi]),
+                                          MVector3D(math.radians(horizonal_limit_min_rot_xs[yi]), math.radians(horizonal_limit_min_rot_ys[yi]), math.radians(horizonal_limit_min_rot_zs[yi])),
+                                          MVector3D(math.radians(horizonal_limit_max_rot_xs[yi]), math.radians(horizonal_limit_max_rot_ys[yi]), math.radians(horizonal_limit_max_rot_zs[yi])),
+                                          MVector3D(horizonal_spring_constant_mov_xs[yi], horizonal_spring_constant_mov_ys[yi], horizonal_spring_constant_mov_zs[yi]), \
+                                          MVector3D(horizonal_spring_constant_rot_xs[yi], horizonal_spring_constant_rot_ys[yi], horizonal_spring_constant_rot_zs[yi]))    # noqa
                             created_joints[joint.name] = joint
 
                         if param_reverse_joint:
                             coefficient = param_option['reverse_joint_coefficient']
 
-                            reverse_limit_min_mov_xs = np.linspace(param_reverse_joint.translation_limit_min.x(), param_reverse_joint.translation_limit_min.x() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_min_mov_ys = np.linspace(param_reverse_joint.translation_limit_min.y(), param_reverse_joint.translation_limit_min.y() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_min_mov_zs = np.linspace(param_reverse_joint.translation_limit_min.z(), param_reverse_joint.translation_limit_min.z() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_min_rot_xs = np.linspace(param_reverse_joint.rotation_limit_min.x(), param_reverse_joint.rotation_limit_min.x() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_min_rot_ys = np.linspace(param_reverse_joint.rotation_limit_min.y(), param_reverse_joint.rotation_limit_min.y() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_min_rot_zs = np.linspace(param_reverse_joint.rotation_limit_min.z(), param_reverse_joint.rotation_limit_min.z() / coefficient, max(below_v_xidxs) + 1)
+                            reverse_limit_min_mov_xs = np.linspace(param_reverse_joint.translation_limit_min.x() / coefficient, param_reverse_joint.translation_limit_min.x(), max(v_yidxs) + 1)
+                            reverse_limit_min_mov_ys = np.linspace(param_reverse_joint.translation_limit_min.y() / coefficient, param_reverse_joint.translation_limit_min.y(), max(v_yidxs) + 1)
+                            reverse_limit_min_mov_zs = np.linspace(param_reverse_joint.translation_limit_min.z() / coefficient, param_reverse_joint.translation_limit_min.z(), max(v_yidxs) + 1)
+                            reverse_limit_min_rot_xs = np.linspace(param_reverse_joint.rotation_limit_min.x() / coefficient, param_reverse_joint.rotation_limit_min.x(), max(v_yidxs) + 1)
+                            reverse_limit_min_rot_ys = np.linspace(param_reverse_joint.rotation_limit_min.y() / coefficient, param_reverse_joint.rotation_limit_min.y(), max(v_yidxs) + 1)
+                            reverse_limit_min_rot_zs = np.linspace(param_reverse_joint.rotation_limit_min.z() / coefficient, param_reverse_joint.rotation_limit_min.z(), max(v_yidxs) + 1)
 
-                            reverse_limit_max_mov_xs = np.linspace(param_reverse_joint.translation_limit_max.x(), param_reverse_joint.translation_limit_max.x() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_max_mov_ys = np.linspace(param_reverse_joint.translation_limit_max.y(), param_reverse_joint.translation_limit_max.y() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_max_mov_zs = np.linspace(param_reverse_joint.translation_limit_max.z(), param_reverse_joint.translation_limit_max.z() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_max_rot_xs = np.linspace(param_reverse_joint.rotation_limit_max.x(), param_reverse_joint.rotation_limit_max.x() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_max_rot_ys = np.linspace(param_reverse_joint.rotation_limit_max.y(), param_reverse_joint.rotation_limit_max.y() / coefficient, max(below_v_xidxs) + 1)
-                            reverse_limit_max_rot_zs = np.linspace(param_reverse_joint.rotation_limit_max.z(), param_reverse_joint.rotation_limit_max.z() / coefficient, max(below_v_xidxs) + 1)
+                            reverse_limit_max_mov_xs = np.linspace(param_reverse_joint.translation_limit_max.x() / coefficient, param_reverse_joint.translation_limit_max.x(), max(v_yidxs) + 1)
+                            reverse_limit_max_mov_ys = np.linspace(param_reverse_joint.translation_limit_max.y() / coefficient, param_reverse_joint.translation_limit_max.y(), max(v_yidxs) + 1)
+                            reverse_limit_max_mov_zs = np.linspace(param_reverse_joint.translation_limit_max.z() / coefficient, param_reverse_joint.translation_limit_max.z(), max(v_yidxs) + 1)
+                            reverse_limit_max_rot_xs = np.linspace(param_reverse_joint.rotation_limit_max.x() / coefficient, param_reverse_joint.rotation_limit_max.x(), max(v_yidxs) + 1)
+                            reverse_limit_max_rot_ys = np.linspace(param_reverse_joint.rotation_limit_max.y() / coefficient, param_reverse_joint.rotation_limit_max.y(), max(v_yidxs) + 1)
+                            reverse_limit_max_rot_zs = np.linspace(param_reverse_joint.rotation_limit_max.z() / coefficient, param_reverse_joint.rotation_limit_max.z(), max(v_yidxs) + 1)
 
-                            reverse_spring_constant_mov_xs = np.linspace(param_reverse_joint.spring_constant_translation.x(), param_reverse_joint.spring_constant_translation.x(), max(below_v_xidxs) + 1)
-                            reverse_spring_constant_mov_ys = np.linspace(param_reverse_joint.spring_constant_translation.y(), param_reverse_joint.spring_constant_translation.y(), max(below_v_xidxs) + 1)
-                            reverse_spring_constant_mov_zs = np.linspace(param_reverse_joint.spring_constant_translation.z(), param_reverse_joint.spring_constant_translation.z(), max(below_v_xidxs) + 1)
+                            reverse_spring_constant_mov_xs = np.linspace(param_reverse_joint.spring_constant_translation.x() / coefficient, param_reverse_joint.spring_constant_translation.x(), max(v_yidxs) + 1)    # noqa
+                            reverse_spring_constant_mov_ys = np.linspace(param_reverse_joint.spring_constant_translation.y() / coefficient, param_reverse_joint.spring_constant_translation.y(), max(v_yidxs) + 1)    # noqa
+                            reverse_spring_constant_mov_zs = np.linspace(param_reverse_joint.spring_constant_translation.z() / coefficient, param_reverse_joint.spring_constant_translation.z(), max(v_yidxs) + 1)    # noqa
 
-                            reverse_spring_constant_rot_xs = np.linspace(param_reverse_joint.spring_constant_rotation.x(), param_reverse_joint.spring_constant_rotation.x(), max(below_v_xidxs) + 1)
-                            reverse_spring_constant_rot_ys = np.linspace(param_reverse_joint.spring_constant_rotation.y(), param_reverse_joint.spring_constant_rotation.y(), max(below_v_xidxs) + 1)
-                            reverse_spring_constant_rot_zs = np.linspace(param_reverse_joint.spring_constant_rotation.z(), param_reverse_joint.spring_constant_rotation.z(), max(below_v_xidxs) + 1)
+                            reverse_spring_constant_rot_xs = np.linspace(param_reverse_joint.spring_constant_rotation.x() / coefficient, param_reverse_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)          # noqa
+                            reverse_spring_constant_rot_ys = np.linspace(param_reverse_joint.spring_constant_rotation.y() / coefficient, param_reverse_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)          # noqa
+                            reverse_spring_constant_rot_zs = np.linspace(param_reverse_joint.spring_constant_rotation.z() / coefficient, param_reverse_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)          # noqa
 
                             # 横逆ジョイント
                             joint_name = f'←|{next_below_bone_name}|{prev_below_bone_name}'
@@ -330,38 +343,38 @@ class PmxTailorExportService():
                                 # 未登録のみ追加
                                 
                                 joint = Joint(joint_name, joint_name, 0, model.rigidbodies[next_below_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
-                                              joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[xi], reverse_limit_min_mov_ys[xi], reverse_limit_min_mov_zs[xi]), \
-                                              MVector3D(reverse_limit_max_mov_xs[xi], reverse_limit_max_mov_ys[xi], reverse_limit_max_mov_zs[xi]),
-                                              MVector3D(math.radians(reverse_limit_min_rot_xs[xi]), math.radians(reverse_limit_min_rot_ys[xi]), math.radians(reverse_limit_min_rot_zs[xi])),
-                                              MVector3D(math.radians(reverse_limit_max_rot_xs[xi]), math.radians(reverse_limit_max_rot_ys[xi]), math.radians(reverse_limit_max_rot_zs[xi])),
-                                              MVector3D(reverse_spring_constant_mov_xs[xi], reverse_spring_constant_mov_ys[xi], reverse_spring_constant_mov_zs[xi]), \
-                                              MVector3D(math.radians(reverse_spring_constant_rot_xs[xi]), math.radians(reverse_spring_constant_rot_ys[xi]), math.radians(reverse_spring_constant_rot_zs[xi])))
+                                              joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
+                                              MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
+                                              MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
+                                              MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
+                                              MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
+                                              MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))      # noqa
                                 created_joints[joint.name] = joint
 
                 if param_diagonal_joint:
                     coefficient = param_option['diagonal_joint_coefficient']
 
-                    diagonal_limit_min_mov_xs = np.linspace(param_diagonal_joint.translation_limit_min.x(), param_diagonal_joint.translation_limit_min.x() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_min_mov_ys = np.linspace(param_diagonal_joint.translation_limit_min.y(), param_diagonal_joint.translation_limit_min.y() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_min_mov_zs = np.linspace(param_diagonal_joint.translation_limit_min.z(), param_diagonal_joint.translation_limit_min.z() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_min_rot_xs = np.linspace(param_diagonal_joint.rotation_limit_min.x(), param_diagonal_joint.rotation_limit_min.x() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_min_rot_ys = np.linspace(param_diagonal_joint.rotation_limit_min.y(), param_diagonal_joint.rotation_limit_min.y() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_min_rot_zs = np.linspace(param_diagonal_joint.rotation_limit_min.z(), param_diagonal_joint.rotation_limit_min.z() / coefficient, max(v_yidxs) + 1)
+                    diagonal_limit_min_mov_xs = np.linspace(param_diagonal_joint.translation_limit_min.x() / coefficient, param_diagonal_joint.translation_limit_min.x(), max(v_yidxs) + 1)
+                    diagonal_limit_min_mov_ys = np.linspace(param_diagonal_joint.translation_limit_min.y() / coefficient, param_diagonal_joint.translation_limit_min.y(), max(v_yidxs) + 1)
+                    diagonal_limit_min_mov_zs = np.linspace(param_diagonal_joint.translation_limit_min.z() / coefficient, param_diagonal_joint.translation_limit_min.z(), max(v_yidxs) + 1)
+                    diagonal_limit_min_rot_xs = np.linspace(param_diagonal_joint.rotation_limit_min.x() / coefficient, param_diagonal_joint.rotation_limit_min.x(), max(v_yidxs) + 1)
+                    diagonal_limit_min_rot_ys = np.linspace(param_diagonal_joint.rotation_limit_min.y() / coefficient, param_diagonal_joint.rotation_limit_min.y(), max(v_yidxs) + 1)
+                    diagonal_limit_min_rot_zs = np.linspace(param_diagonal_joint.rotation_limit_min.z() / coefficient, param_diagonal_joint.rotation_limit_min.z(), max(v_yidxs) + 1)
 
-                    diagonal_limit_max_mov_xs = np.linspace(param_diagonal_joint.translation_limit_max.x(), param_diagonal_joint.translation_limit_max.x() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_max_mov_ys = np.linspace(param_diagonal_joint.translation_limit_max.y(), param_diagonal_joint.translation_limit_max.y() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_max_mov_zs = np.linspace(param_diagonal_joint.translation_limit_max.z(), param_diagonal_joint.translation_limit_max.z() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_max_rot_xs = np.linspace(param_diagonal_joint.rotation_limit_max.x(), param_diagonal_joint.rotation_limit_max.x() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_max_rot_ys = np.linspace(param_diagonal_joint.rotation_limit_max.y(), param_diagonal_joint.rotation_limit_max.y() / coefficient, max(v_yidxs) + 1)
-                    diagonal_limit_max_rot_zs = np.linspace(param_diagonal_joint.rotation_limit_max.z(), param_diagonal_joint.rotation_limit_max.z() / coefficient, max(v_yidxs) + 1)
+                    diagonal_limit_max_mov_xs = np.linspace(param_diagonal_joint.translation_limit_max.x() / coefficient, param_diagonal_joint.translation_limit_max.x(), max(v_yidxs) + 1)
+                    diagonal_limit_max_mov_ys = np.linspace(param_diagonal_joint.translation_limit_max.y() / coefficient, param_diagonal_joint.translation_limit_max.y(), max(v_yidxs) + 1)
+                    diagonal_limit_max_mov_zs = np.linspace(param_diagonal_joint.translation_limit_max.z() / coefficient, param_diagonal_joint.translation_limit_max.z(), max(v_yidxs) + 1)
+                    diagonal_limit_max_rot_xs = np.linspace(param_diagonal_joint.rotation_limit_max.x() / coefficient, param_diagonal_joint.rotation_limit_max.x(), max(v_yidxs) + 1)
+                    diagonal_limit_max_rot_ys = np.linspace(param_diagonal_joint.rotation_limit_max.y() / coefficient, param_diagonal_joint.rotation_limit_max.y(), max(v_yidxs) + 1)
+                    diagonal_limit_max_rot_zs = np.linspace(param_diagonal_joint.rotation_limit_max.z() / coefficient, param_diagonal_joint.rotation_limit_max.z(), max(v_yidxs) + 1)
 
-                    diagonal_spring_constant_mov_xs = np.linspace(param_diagonal_joint.spring_constant_translation.x(), param_diagonal_joint.spring_constant_translation.x(), max(v_yidxs) + 1)
-                    diagonal_spring_constant_mov_ys = np.linspace(param_diagonal_joint.spring_constant_translation.y(), param_diagonal_joint.spring_constant_translation.y(), max(v_yidxs) + 1)
-                    diagonal_spring_constant_mov_zs = np.linspace(param_diagonal_joint.spring_constant_translation.z(), param_diagonal_joint.spring_constant_translation.z(), max(v_yidxs) + 1)
+                    diagonal_spring_constant_mov_xs = np.linspace(param_diagonal_joint.spring_constant_translation.x() / coefficient, param_diagonal_joint.spring_constant_translation.x(), max(v_yidxs) + 1)
+                    diagonal_spring_constant_mov_ys = np.linspace(param_diagonal_joint.spring_constant_translation.y() / coefficient, param_diagonal_joint.spring_constant_translation.y(), max(v_yidxs) + 1)
+                    diagonal_spring_constant_mov_zs = np.linspace(param_diagonal_joint.spring_constant_translation.z() / coefficient, param_diagonal_joint.spring_constant_translation.z(), max(v_yidxs) + 1)
 
-                    diagonal_spring_constant_rot_xs = np.linspace(param_diagonal_joint.spring_constant_rotation.x(), param_diagonal_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)
-                    diagonal_spring_constant_rot_ys = np.linspace(param_diagonal_joint.spring_constant_rotation.y(), param_diagonal_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)
-                    diagonal_spring_constant_rot_zs = np.linspace(param_diagonal_joint.spring_constant_rotation.z(), param_diagonal_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)
+                    diagonal_spring_constant_rot_xs = np.linspace(param_diagonal_joint.spring_constant_rotation.x() / coefficient, param_diagonal_joint.spring_constant_rotation.x(), max(v_yidxs) + 1)
+                    diagonal_spring_constant_rot_ys = np.linspace(param_diagonal_joint.spring_constant_rotation.y() / coefficient, param_diagonal_joint.spring_constant_rotation.y(), max(v_yidxs) + 1)
+                    diagonal_spring_constant_rot_zs = np.linspace(param_diagonal_joint.spring_constant_rotation.z() / coefficient, param_diagonal_joint.spring_constant_rotation.z(), max(v_yidxs) + 1)
 
                     # ＼ジョイント
                     joint_name = f'＼|{prev_above_bone_name}|{next_below_bone_name}'
@@ -374,14 +387,15 @@ class PmxTailorExportService():
                         joint_horizonal_vec = ((target_bone_positions[prev_below_bone_name] - target_bone_positions[next_below_bone_name]) / 2)
                         joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() - (model.rigidbodies[prev_above_bone_name].shape_size.x() * np.sign(joint_horizonal_vec.x())), \
                                               target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y(), \
-                                              target_bone_positions[prev_below_bone_name].z())
+                                              target_bone_positions[prev_below_bone_name].z())                        
+                        # joint_vec = target_bone_positions[prev_below_bone_name]
 
                         # 回転量
-                        joint_src_radians = model.rigidbodies[prev_above_bone_name].shape_rotation
-                        joint_dest_radians = model.rigidbodies[next_below_bone_name].shape_rotation
-                        joint_src_qq = MQuaternion.fromEulerAngles(math.degrees(joint_src_radians.x()), math.degrees(joint_src_radians.y()), math.degrees(joint_src_radians.z()))
-                        joint_dest_qq = MQuaternion.fromEulerAngles(math.degrees(joint_dest_radians.x()), math.degrees(joint_dest_radians.y()), math.degrees(joint_dest_radians.z()))
-                        joint_euler = MQuaternion.slerp(joint_src_qq, joint_dest_qq, 0.5).toEulerAngles()
+                        joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - next_above_bone_position).normalized()
+                        joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                        joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                        joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yi, _ = self.disassemble_bone_name(prev_above_bone_name)
@@ -392,7 +406,7 @@ class PmxTailorExportService():
                                       MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
                                       MVector3D(math.radians(diagonal_limit_max_rot_xs[yi]), math.radians(diagonal_limit_max_rot_ys[yi]), math.radians(diagonal_limit_max_rot_zs[yi])),
                                       MVector3D(diagonal_spring_constant_mov_xs[yi], diagonal_spring_constant_mov_ys[yi], diagonal_spring_constant_mov_zs[yi]), \
-                                      MVector3D(math.radians(diagonal_spring_constant_rot_xs[yi]), math.radians(diagonal_spring_constant_rot_ys[yi]), math.radians(diagonal_spring_constant_rot_zs[yi])))
+                                      MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
                         created_joints[joint.name] = joint
 
                     # ／ジョイント ---------------
@@ -407,13 +421,14 @@ class PmxTailorExportService():
                         joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x() - (model.rigidbodies[prev_below_bone_name].shape_size.x() * np.sign(joint_horizonal_vec.x())), \
                                               target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y(), \
                                               target_bone_positions[prev_below_bone_name].z())
+                        # joint_vec = target_bone_positions[prev_below_bone_name]
 
                         # 回転量
-                        joint_src_radians = model.rigidbodies[prev_below_bone_name].shape_rotation
-                        joint_dest_radians = model.rigidbodies[next_above_bone_name].shape_rotation
-                        joint_src_qq = MQuaternion.fromEulerAngles(math.degrees(joint_src_radians.x()), math.degrees(joint_src_radians.y()), math.degrees(joint_src_radians.z()))
-                        joint_dest_qq = MQuaternion.fromEulerAngles(math.degrees(joint_dest_radians.x()), math.degrees(joint_dest_radians.y()), math.degrees(joint_dest_radians.z()))
-                        joint_euler = MQuaternion.slerp(joint_src_qq, joint_dest_qq, 0.5).toEulerAngles()
+                        joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
+                        joint_axis_up = (next_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                        joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                        joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yi, _ = self.disassemble_bone_name(prev_below_bone_name)
@@ -424,7 +439,7 @@ class PmxTailorExportService():
                                       MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
                                       MVector3D(math.radians(diagonal_limit_max_rot_xs[yi]), math.radians(diagonal_limit_max_rot_ys[yi]), math.radians(diagonal_limit_max_rot_zs[yi])),
                                       MVector3D(diagonal_spring_constant_mov_xs[yi], diagonal_spring_constant_mov_ys[yi], diagonal_spring_constant_mov_zs[yi]), \
-                                      MVector3D(math.radians(diagonal_spring_constant_rot_xs[yi]), math.radians(diagonal_spring_constant_rot_ys[yi]), math.radians(diagonal_spring_constant_rot_zs[yi])))
+                                      MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
                         created_joints[joint.name] = joint
 
         for joint_name in sorted(created_joints.keys()):
@@ -433,8 +448,8 @@ class PmxTailorExportService():
             joint.index = len(model.joints)
             model.joints[joint.name] = joint
 
-    def create_rigidbody(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, registed_bone_indexs: dict, \
-                         bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, target_bone_map: dict, target_bone_parents: dict, target_bone_positions: dict):
+    def create_rigidbody(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, tmp_all_bones: dict, registed_bone_indexs: dict, \
+                         bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, target_bone_map: dict, target_bone_parents: dict, target_bone_positions: dict):    # noqa
         # 剛体生成
         created_rigidbodies = {}
 
@@ -469,8 +484,13 @@ class PmxTailorExportService():
 
                 prev_above_bone_name = target_bone_parents[prev_below_bone_name]
                 prev_above_bone_position = target_bone_positions[prev_above_bone_name]
-                next_above_bone_name = target_bone_parents[next_below_bone_name]
-                next_above_bone_position = target_bone_positions[next_above_bone_name]
+                prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+                
+                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_below_v_xno)
+                next_above_bone_position = tmp_all_bones[next_above_bone_name].position if next_above_bone_name in tmp_all_bones else target_bone_positions[next_below_bone_name]
+
+                if prev_above_bone_name in created_rigidbodies:
+                    continue
 
                 prev_above_bone_index = -1
                 if prev_above_bone_name in model.bones:
@@ -486,7 +506,6 @@ class PmxTailorExportService():
                 shape_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
                 shape_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
                 shape_axis_up.setY(0)
-                # shape_axis_up = MVector3D(shape_axis.x(), 0, shape_axis.z())
                 shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).normalized()
 
                 shape_rotation_qq = MQuaternion.fromDirection(shape_axis, shape_axis_cross)
@@ -503,6 +522,9 @@ class PmxTailorExportService():
                 shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
 
                 # 剛体の位置
+                # rigidbody_horizonal_vec = (next_above_bone_position - prev_above_bone_position) / 2
+                # shape_position = ((prev_above_bone_position + prev_below_bone_position) / 2) + \
+                #                     MVector3D(rigidbody_horizonal_vec.x(), 0, rigidbody_horizonal_vec.z() + rigidbody_limit_thicks[yi] / 2)     # noqa
                 rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
                 shape_position = prev_above_bone_position + MVector3D(0, rigidbody_vertical_vec.y(), 0)
 
@@ -1026,7 +1048,7 @@ class PmxTailorExportService():
                     # 前ボーンとして設定
                     prev_xidx = v_xidx
         
-        return root_bone, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances
+        return root_bone, tmp_all_bones, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
         return f'{abb_name}-{(v_yno):03d}-{(v_xno):03d}'
