@@ -27,7 +27,7 @@ class BaseFilePickerCtrl():
         ("pmx"): u"PMXファイル (*.pmx)|*.pmx|すべてのファイル (*.*)|*.*",
         ("vmd"): u"VMDファイル (*.vmd)|*.vmd|すべてのファイル (*.*)|*.*",
         ("csv"): u"CSVファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*",
-        ("vroid"): u"Vroidファイル (*.vroid)|*.vroid|すべてのファイル (*.*)|*.*",
+        ("vrm"): u"Vrmファイル (*.vrm)|*.vrm|すべてのファイル (*.*)|*.*",
     }
 
     def __init__(self, frame, parent, title, message, file_type, style, tooltip, file_model_spacer=0, \
@@ -304,7 +304,7 @@ class BaseFilePickerCtrl():
                 reader = VpdReader(file_path)
             elif input_ext.lower() == ".pmx":
                 reader = PmxReader(file_path, is_check=is_check, is_sizing=is_sizing)
-            elif input_ext.lower() == ".vroid":
+            elif input_ext.lower() == ".vrm":
                 reader = VroidReader(file_path)
             else:
                 logger.error("%s%s 読み込み失敗(拡張子不正): %s", display_set_no, self.title, os.path.basename(file_path), decoration=MLogger.DECORATION_BOX)

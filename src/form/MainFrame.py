@@ -6,6 +6,7 @@ import wx
 import threading
 
 from form.panel.FilePanel import FilePanel
+from form.panel.VrmPanel import VrmPanel
 from form.panel.ParamPanel import ParamPanel
 from form.panel.ParamAdvancePanel import ParamAdvancePanel
 from utils import MFormUtils, MFileUtils # noqa
@@ -39,7 +40,7 @@ class MainFrame(wx.Frame):
         self.worker = None
         self.load_worker = None
 
-        self.my_program = 'Vroid2Pmx' if is_vroid else 'PmxTailor'
+        self.my_program = 'Vroid2Pmx' if self.is_vroid else 'PmxTailor'
 
         frame_title = f'{self.my_program} ローカル版 {self.version_name}'
         wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=frame_title, \
@@ -78,7 +79,7 @@ class MainFrame(wx.Frame):
         # ファイルタブ
         self.file_panel_ctrl = FilePanel(self, self.note_ctrl, 0)
         self.note_ctrl.AddPage(self.file_panel_ctrl, u"ファイル", False)
-        
+
         # パラ調整タブ
         self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
         self.note_ctrl.AddPage(self.simple_param_panel_ctrl, u"パラ調整", False)
@@ -86,6 +87,10 @@ class MainFrame(wx.Frame):
         # パラ調整(詳細)タブ
         self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
         self.note_ctrl.AddPage(self.advance_param_panel_ctrl, u"パラ調整(詳細)", False)
+
+        if self.is_vroid:
+            self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 3)
+            self.note_ctrl.AddPage(self.vrm_panel_ctrl, u"Vrm設定", False)
         
         # ---------------------------------------------
 

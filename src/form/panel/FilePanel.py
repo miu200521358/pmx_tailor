@@ -24,7 +24,7 @@ class FilePanel(BasePanel):
 
         self.txt_exec = f"{self.frame.my_program}実行"
         self.txt_stop = f"{self.frame.my_program}停止"
-        self.model_type = "Vroid" if self.frame.is_vroid else "PMX"
+        self.model_type = "Vrm" if self.frame.is_vroid else "PMX"
 
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -36,9 +36,9 @@ class FilePanel(BasePanel):
         self.header_sizer.Add(self.static_line01, 0, wx.EXPAND | wx.ALL, 5)
 
         if self.frame.is_vroid:
-            # 対象Vroidファイルコントロール
-            self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, u"対象モデル", u"対象モデルVroidファイルを開く", ("vroid"), wx.FLP_DEFAULT_STYLE, \
-                                                             u"変換したいVroidファイルパスを指定してください\n正式版(1.0.0)以降のみ対応しています。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。", \
+            # 対象Vrmファイルコントロール
+            self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, u"対象モデル", u"対象モデルVrmファイルを開く", ("vrm"), wx.FLP_DEFAULT_STYLE, \
+                                                             u"変換したいVrmファイルパスを指定してください\nVroid Studio 正式版(1.0.0)以降のみ対応しています。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。", \
                                                              file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_vroid", \
                                                              is_change_output=True, is_aster=False, is_save=False, set_no=1)
         else:

@@ -178,17 +178,21 @@ class PhysicsParam():
 
         self.simple_param_sizer.Add(self.simple_btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 0)
 
-        self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
+        self.simple_material_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.simple_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理材質", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_material_txt.SetToolTip(u"物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。")
         self.simple_material_txt.Wrap(-1)
-        self.simple_header_grid_sizer.Add(self.simple_material_txt, 0, wx.ALL, 5)
+        self.simple_material_sizer.Add(self.simple_material_txt, 0, wx.ALL, 5)
 
         self.simple_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
         self.simple_material_ctrl.SetToolTip(u"物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。")
         self.simple_material_ctrl.Bind(wx.EVT_CHOICE, self.set_material_name)
-        self.simple_header_grid_sizer.Add(self.simple_material_ctrl, 0, wx.ALL, 5)
+        self.simple_material_sizer.Add(self.simple_material_ctrl, 0, wx.ALL, 5)
+
+        self.simple_param_sizer.Add(self.simple_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
+
+        self.simple_header_grid_sizer = wx.FlexGridSizer(0, 4, 0, 0)
 
         self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を5文字以内で入力してください。")
@@ -491,7 +495,7 @@ class PhysicsParam():
         self.advance_param_sizer.Add(self.advance_rigidbody_sizer, 0, wx.ALL, 5)
 
         # 縦ジョイントブロック -------------------------------
-        self.advance_vertical_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "末端縦ジョイント"), orient=wx.VERTICAL)
+        self.advance_vertical_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "縦ジョイント"), orient=wx.VERTICAL)
 
         self.advance_vertical_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -517,7 +521,7 @@ class PhysicsParam():
 
         # 移動X(最小)
         self.vertical_joint_mov_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_mov_x_min_txt.SetToolTip(u"縦ジョイントの移動X(最小)")
+        self.vertical_joint_mov_x_min_txt.SetToolTip(u"末端縦ジョイントの移動X(最小)")
         self.vertical_joint_mov_x_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -528,7 +532,7 @@ class PhysicsParam():
 
         # 移動Y(最小)
         self.vertical_joint_mov_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_mov_y_min_txt.SetToolTip(u"縦ジョイントの移動Y(最小)")
+        self.vertical_joint_mov_y_min_txt.SetToolTip(u"末端縦ジョイントの移動Y(最小)")
         self.vertical_joint_mov_y_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -539,7 +543,7 @@ class PhysicsParam():
 
         # 移動Z(最小)
         self.vertical_joint_mov_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_mov_z_min_txt.SetToolTip(u"縦ジョイントの移動Z(最小)")
+        self.vertical_joint_mov_z_min_txt.SetToolTip(u"末端縦ジョイントの移動Z(最小)")
         self.vertical_joint_mov_z_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -550,7 +554,7 @@ class PhysicsParam():
 
         # 移動X(最大)
         self.vertical_joint_mov_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_mov_x_max_txt.SetToolTip(u"縦ジョイントの移動X(最大)")
+        self.vertical_joint_mov_x_max_txt.SetToolTip(u"末端縦ジョイントの移動X(最大)")
         self.vertical_joint_mov_x_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -561,7 +565,7 @@ class PhysicsParam():
 
         # 移動Y(最大)
         self.vertical_joint_mov_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_mov_y_max_txt.SetToolTip(u"縦ジョイントの移動Y(最大)")
+        self.vertical_joint_mov_y_max_txt.SetToolTip(u"末端縦ジョイントの移動Y(最大)")
         self.vertical_joint_mov_y_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -572,7 +576,7 @@ class PhysicsParam():
 
         # 移動Z(最大)
         self.vertical_joint_mov_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_mov_z_max_txt.SetToolTip(u"縦ジョイントの移動Z(最大)")
+        self.vertical_joint_mov_z_max_txt.SetToolTip(u"末端縦ジョイントの移動Z(最大)")
         self.vertical_joint_mov_z_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -583,7 +587,7 @@ class PhysicsParam():
 
         # 回転X(最小)
         self.vertical_joint_rot_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_rot_x_min_txt.SetToolTip(u"縦ジョイントの回転X(最小)")
+        self.vertical_joint_rot_x_min_txt.SetToolTip(u"末端縦ジョイントの回転X(最小)")
         self.vertical_joint_rot_x_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
@@ -594,7 +598,7 @@ class PhysicsParam():
 
         # 回転Y(最小)
         self.vertical_joint_rot_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_rot_y_min_txt.SetToolTip(u"縦ジョイントの回転Y(最小)")
+        self.vertical_joint_rot_y_min_txt.SetToolTip(u"末端縦ジョイントの回転Y(最小)")
         self.vertical_joint_rot_y_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
@@ -605,7 +609,7 @@ class PhysicsParam():
 
         # 回転Z(最小)
         self.vertical_joint_rot_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_rot_z_min_txt.SetToolTip(u"縦ジョイントの回転Z(最小)")
+        self.vertical_joint_rot_z_min_txt.SetToolTip(u"末端縦ジョイントの回転Z(最小)")
         self.vertical_joint_rot_z_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
@@ -616,7 +620,7 @@ class PhysicsParam():
 
         # 回転X(最大)
         self.vertical_joint_rot_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_rot_x_max_txt.SetToolTip(u"縦ジョイントの回転X(最大)")
+        self.vertical_joint_rot_x_max_txt.SetToolTip(u"末端縦ジョイントの回転X(最大)")
         self.vertical_joint_rot_x_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
@@ -627,7 +631,7 @@ class PhysicsParam():
 
         # 回転Y(最大)
         self.vertical_joint_rot_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_rot_y_max_txt.SetToolTip(u"縦ジョイントの回転Y(最大)")
+        self.vertical_joint_rot_y_max_txt.SetToolTip(u"末端縦ジョイントの回転Y(最大)")
         self.vertical_joint_rot_y_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
@@ -638,7 +642,7 @@ class PhysicsParam():
 
         # 回転Z(最大)
         self.vertical_joint_rot_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_rot_z_max_txt.SetToolTip(u"縦ジョイントの回転Z(最大)")
+        self.vertical_joint_rot_z_max_txt.SetToolTip(u"末端縦ジョイントの回転Z(最大)")
         self.vertical_joint_rot_z_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
@@ -649,7 +653,7 @@ class PhysicsParam():
 
         # ばね(移動X)
         self.vertical_joint_spring_mov_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_spring_mov_x_txt.SetToolTip(u"縦ジョイントのばね(移動X)")
+        self.vertical_joint_spring_mov_x_txt.SetToolTip(u"末端縦ジョイントのばね(移動X)")
         self.vertical_joint_spring_mov_x_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_mov_x_txt, 0, wx.ALL, 5)
 
@@ -660,7 +664,7 @@ class PhysicsParam():
 
         # ばね(移動Y)
         self.vertical_joint_spring_mov_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_spring_mov_y_txt.SetToolTip(u"縦ジョイントのばね(移動Y)")
+        self.vertical_joint_spring_mov_y_txt.SetToolTip(u"末端縦ジョイントのばね(移動Y)")
         self.vertical_joint_spring_mov_y_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_mov_y_txt, 0, wx.ALL, 5)
 
@@ -671,7 +675,7 @@ class PhysicsParam():
 
         # ばね(移動Z)
         self.vertical_joint_spring_mov_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_spring_mov_z_txt.SetToolTip(u"縦ジョイントのばね(移動Z)")
+        self.vertical_joint_spring_mov_z_txt.SetToolTip(u"末端縦ジョイントのばね(移動Z)")
         self.vertical_joint_spring_mov_z_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_mov_z_txt, 0, wx.ALL, 5)
 
@@ -682,7 +686,7 @@ class PhysicsParam():
 
         # ばね(回転X)
         self.vertical_joint_spring_rot_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_spring_rot_x_txt.SetToolTip(u"縦ジョイントのばね(回転X)")
+        self.vertical_joint_spring_rot_x_txt.SetToolTip(u"末端縦ジョイントのばね(回転X)")
         self.vertical_joint_spring_rot_x_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_rot_x_txt, 0, wx.ALL, 5)
 
@@ -693,7 +697,7 @@ class PhysicsParam():
 
         # ばね(回転Y)
         self.vertical_joint_spring_rot_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_spring_rot_y_txt.SetToolTip(u"縦ジョイントのばね(回転Y)")
+        self.vertical_joint_spring_rot_y_txt.SetToolTip(u"末端縦ジョイントのばね(回転Y)")
         self.vertical_joint_spring_rot_y_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_rot_y_txt, 0, wx.ALL, 5)
 
@@ -704,7 +708,7 @@ class PhysicsParam():
 
         # ばね(回転Z)
         self.vertical_joint_spring_rot_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.vertical_joint_spring_rot_z_txt.SetToolTip(u"縦ジョイントのばね(回転Z)")
+        self.vertical_joint_spring_rot_z_txt.SetToolTip(u"末端縦ジョイントのばね(回転Z)")
         self.vertical_joint_spring_rot_z_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_rot_z_txt, 0, wx.ALL, 5)
 
@@ -717,7 +721,7 @@ class PhysicsParam():
         self.advance_param_sizer.Add(self.advance_vertical_joint_sizer, 0, wx.ALL, 5)
 
         # 横ジョイントブロック -------------------------------
-        self.advance_horizonal_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "末端横ジョイント"), orient=wx.VERTICAL)
+        self.advance_horizonal_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "横ジョイント"), orient=wx.VERTICAL)
 
         self.advance_horizonal_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -743,7 +747,7 @@ class PhysicsParam():
 
         # 移動X(最小)
         self.horizonal_joint_mov_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_mov_x_min_txt.SetToolTip(u"横ジョイントの移動X(最小)")
+        self.horizonal_joint_mov_x_min_txt.SetToolTip(u"末端横ジョイントの移動X(最小)")
         self.horizonal_joint_mov_x_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -754,7 +758,7 @@ class PhysicsParam():
 
         # 移動Y(最小)
         self.horizonal_joint_mov_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_mov_y_min_txt.SetToolTip(u"横ジョイントの移動Y(最小)")
+        self.horizonal_joint_mov_y_min_txt.SetToolTip(u"末端横ジョイントの移動Y(最小)")
         self.horizonal_joint_mov_y_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -765,7 +769,7 @@ class PhysicsParam():
 
         # 移動Z(最小)
         self.horizonal_joint_mov_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_mov_z_min_txt.SetToolTip(u"横ジョイントの移動Z(最小)")
+        self.horizonal_joint_mov_z_min_txt.SetToolTip(u"末端横ジョイントの移動Z(最小)")
         self.horizonal_joint_mov_z_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -776,7 +780,7 @@ class PhysicsParam():
 
         # 移動X(最大)
         self.horizonal_joint_mov_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_mov_x_max_txt.SetToolTip(u"横ジョイントの移動X(最大)")
+        self.horizonal_joint_mov_x_max_txt.SetToolTip(u"末端横ジョイントの移動X(最大)")
         self.horizonal_joint_mov_x_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -787,7 +791,7 @@ class PhysicsParam():
 
         # 移動Y(最大)
         self.horizonal_joint_mov_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_mov_y_max_txt.SetToolTip(u"横ジョイントの移動Y(最大)")
+        self.horizonal_joint_mov_y_max_txt.SetToolTip(u"末端横ジョイントの移動Y(最大)")
         self.horizonal_joint_mov_y_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -798,7 +802,7 @@ class PhysicsParam():
 
         # 移動Z(最大)
         self.horizonal_joint_mov_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_mov_z_max_txt.SetToolTip(u"横ジョイントの移動Z(最大)")
+        self.horizonal_joint_mov_z_max_txt.SetToolTip(u"末端横ジョイントの移動Z(最大)")
         self.horizonal_joint_mov_z_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -809,7 +813,7 @@ class PhysicsParam():
 
         # 回転X(最小)
         self.horizonal_joint_rot_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_rot_x_min_txt.SetToolTip(u"横ジョイントの回転X(最小)")
+        self.horizonal_joint_rot_x_min_txt.SetToolTip(u"末端横ジョイントの回転X(最小)")
         self.horizonal_joint_rot_x_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
@@ -820,7 +824,7 @@ class PhysicsParam():
 
         # 回転Y(最小)
         self.horizonal_joint_rot_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_rot_y_min_txt.SetToolTip(u"横ジョイントの回転Y(最小)")
+        self.horizonal_joint_rot_y_min_txt.SetToolTip(u"末端横ジョイントの回転Y(最小)")
         self.horizonal_joint_rot_y_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
@@ -831,7 +835,7 @@ class PhysicsParam():
 
         # 回転Z(最小)
         self.horizonal_joint_rot_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_rot_z_min_txt.SetToolTip(u"横ジョイントの回転Z(最小)")
+        self.horizonal_joint_rot_z_min_txt.SetToolTip(u"末端横ジョイントの回転Z(最小)")
         self.horizonal_joint_rot_z_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
@@ -842,7 +846,7 @@ class PhysicsParam():
 
         # 回転X(最大)
         self.horizonal_joint_rot_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_rot_x_max_txt.SetToolTip(u"横ジョイントの回転X(最大)")
+        self.horizonal_joint_rot_x_max_txt.SetToolTip(u"末端横ジョイントの回転X(最大)")
         self.horizonal_joint_rot_x_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
@@ -853,7 +857,7 @@ class PhysicsParam():
 
         # 回転Y(最大)
         self.horizonal_joint_rot_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_rot_y_max_txt.SetToolTip(u"横ジョイントの回転Y(最大)")
+        self.horizonal_joint_rot_y_max_txt.SetToolTip(u"末端横ジョイントの回転Y(最大)")
         self.horizonal_joint_rot_y_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
@@ -864,7 +868,7 @@ class PhysicsParam():
 
         # 回転Z(最大)
         self.horizonal_joint_rot_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_rot_z_max_txt.SetToolTip(u"横ジョイントの回転Z(最大)")
+        self.horizonal_joint_rot_z_max_txt.SetToolTip(u"末端横ジョイントの回転Z(最大)")
         self.horizonal_joint_rot_z_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
@@ -875,7 +879,7 @@ class PhysicsParam():
 
         # ばね(移動X)
         self.horizonal_joint_spring_mov_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_spring_mov_x_txt.SetToolTip(u"横ジョイントのばね(移動X)")
+        self.horizonal_joint_spring_mov_x_txt.SetToolTip(u"末端横ジョイントのばね(移動X)")
         self.horizonal_joint_spring_mov_x_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_mov_x_txt, 0, wx.ALL, 5)
 
@@ -886,7 +890,7 @@ class PhysicsParam():
 
         # ばね(移動Y)
         self.horizonal_joint_spring_mov_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_spring_mov_y_txt.SetToolTip(u"横ジョイントのばね(移動Y)")
+        self.horizonal_joint_spring_mov_y_txt.SetToolTip(u"末端横ジョイントのばね(移動Y)")
         self.horizonal_joint_spring_mov_y_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_mov_y_txt, 0, wx.ALL, 5)
 
@@ -897,7 +901,7 @@ class PhysicsParam():
 
         # ばね(移動Z)
         self.horizonal_joint_spring_mov_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_spring_mov_z_txt.SetToolTip(u"横ジョイントのばね(移動Z)")
+        self.horizonal_joint_spring_mov_z_txt.SetToolTip(u"末端横ジョイントのばね(移動Z)")
         self.horizonal_joint_spring_mov_z_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_mov_z_txt, 0, wx.ALL, 5)
 
@@ -908,7 +912,7 @@ class PhysicsParam():
 
         # ばね(回転X)
         self.horizonal_joint_spring_rot_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_spring_rot_x_txt.SetToolTip(u"横ジョイントのばね(回転X)")
+        self.horizonal_joint_spring_rot_x_txt.SetToolTip(u"末端横ジョイントのばね(回転X)")
         self.horizonal_joint_spring_rot_x_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_rot_x_txt, 0, wx.ALL, 5)
 
@@ -919,7 +923,7 @@ class PhysicsParam():
 
         # ばね(回転Y)
         self.horizonal_joint_spring_rot_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_spring_rot_y_txt.SetToolTip(u"横ジョイントのばね(回転Y)")
+        self.horizonal_joint_spring_rot_y_txt.SetToolTip(u"末端横ジョイントのばね(回転Y)")
         self.horizonal_joint_spring_rot_y_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_rot_y_txt, 0, wx.ALL, 5)
 
@@ -930,7 +934,7 @@ class PhysicsParam():
 
         # ばね(回転Z)
         self.horizonal_joint_spring_rot_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.horizonal_joint_spring_rot_z_txt.SetToolTip(u"横ジョイントのばね(回転Z)")
+        self.horizonal_joint_spring_rot_z_txt.SetToolTip(u"末端横ジョイントのばね(回転Z)")
         self.horizonal_joint_spring_rot_z_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_rot_z_txt, 0, wx.ALL, 5)
 
@@ -943,7 +947,7 @@ class PhysicsParam():
         self.advance_param_sizer.Add(self.advance_horizonal_joint_sizer, 0, wx.ALL, 5)
 
         # 斜めジョイントブロック -------------------------------
-        self.advance_diagonal_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "末端斜めジョイント"), orient=wx.VERTICAL)
+        self.advance_diagonal_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "斜めジョイント"), orient=wx.VERTICAL)
 
         self.advance_diagonal_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -969,7 +973,7 @@ class PhysicsParam():
 
         # 移動X(最小)
         self.diagonal_joint_mov_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_mov_x_min_txt.SetToolTip(u"斜めジョイントの移動X(最小)")
+        self.diagonal_joint_mov_x_min_txt.SetToolTip(u"末端斜めジョイントの移動X(最小)")
         self.diagonal_joint_mov_x_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -980,7 +984,7 @@ class PhysicsParam():
 
         # 移動Y(最小)
         self.diagonal_joint_mov_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_mov_y_min_txt.SetToolTip(u"斜めジョイントの移動Y(最小)")
+        self.diagonal_joint_mov_y_min_txt.SetToolTip(u"末端斜めジョイントの移動Y(最小)")
         self.diagonal_joint_mov_y_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -991,7 +995,7 @@ class PhysicsParam():
 
         # 移動Z(最小)
         self.diagonal_joint_mov_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_mov_z_min_txt.SetToolTip(u"斜めジョイントの移動Z(最小)")
+        self.diagonal_joint_mov_z_min_txt.SetToolTip(u"末端斜めジョイントの移動Z(最小)")
         self.diagonal_joint_mov_z_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -1002,7 +1006,7 @@ class PhysicsParam():
 
         # 移動X(最大)
         self.diagonal_joint_mov_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_mov_x_max_txt.SetToolTip(u"斜めジョイントの移動X(最大)")
+        self.diagonal_joint_mov_x_max_txt.SetToolTip(u"末端斜めジョイントの移動X(最大)")
         self.diagonal_joint_mov_x_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -1013,7 +1017,7 @@ class PhysicsParam():
 
         # 移動Y(最大)
         self.diagonal_joint_mov_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_mov_y_max_txt.SetToolTip(u"斜めジョイントの移動Y(最大)")
+        self.diagonal_joint_mov_y_max_txt.SetToolTip(u"末端斜めジョイントの移動Y(最大)")
         self.diagonal_joint_mov_y_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -1024,7 +1028,7 @@ class PhysicsParam():
 
         # 移動Z(最大)
         self.diagonal_joint_mov_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_mov_z_max_txt.SetToolTip(u"斜めジョイントの移動Z(最大)")
+        self.diagonal_joint_mov_z_max_txt.SetToolTip(u"末端斜めジョイントの移動Z(最大)")
         self.diagonal_joint_mov_z_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -1035,7 +1039,7 @@ class PhysicsParam():
 
         # 回転X(最小)
         self.diagonal_joint_rot_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_rot_x_min_txt.SetToolTip(u"斜めジョイントの回転X(最小)")
+        self.diagonal_joint_rot_x_min_txt.SetToolTip(u"末端斜めジョイントの回転X(最小)")
         self.diagonal_joint_rot_x_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
@@ -1046,7 +1050,7 @@ class PhysicsParam():
 
         # 回転Y(最小)
         self.diagonal_joint_rot_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_rot_y_min_txt.SetToolTip(u"斜めジョイントの回転Y(最小)")
+        self.diagonal_joint_rot_y_min_txt.SetToolTip(u"末端斜めジョイントの回転Y(最小)")
         self.diagonal_joint_rot_y_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
@@ -1057,7 +1061,7 @@ class PhysicsParam():
 
         # 回転Z(最小)
         self.diagonal_joint_rot_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_rot_z_min_txt.SetToolTip(u"斜めジョイントの回転Z(最小)")
+        self.diagonal_joint_rot_z_min_txt.SetToolTip(u"末端斜めジョイントの回転Z(最小)")
         self.diagonal_joint_rot_z_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
@@ -1068,7 +1072,7 @@ class PhysicsParam():
 
         # 回転X(最大)
         self.diagonal_joint_rot_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_rot_x_max_txt.SetToolTip(u"斜めジョイントの回転X(最大)")
+        self.diagonal_joint_rot_x_max_txt.SetToolTip(u"末端斜めジョイントの回転X(最大)")
         self.diagonal_joint_rot_x_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
@@ -1079,7 +1083,7 @@ class PhysicsParam():
 
         # 回転Y(最大)
         self.diagonal_joint_rot_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_rot_y_max_txt.SetToolTip(u"斜めジョイントの回転Y(最大)")
+        self.diagonal_joint_rot_y_max_txt.SetToolTip(u"末端斜めジョイントの回転Y(最大)")
         self.diagonal_joint_rot_y_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
@@ -1090,7 +1094,7 @@ class PhysicsParam():
 
         # 回転Z(最大)
         self.diagonal_joint_rot_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_rot_z_max_txt.SetToolTip(u"斜めジョイントの回転Z(最大)")
+        self.diagonal_joint_rot_z_max_txt.SetToolTip(u"末端斜めジョイントの回転Z(最大)")
         self.diagonal_joint_rot_z_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
@@ -1101,7 +1105,7 @@ class PhysicsParam():
 
         # ばね(移動X)
         self.diagonal_joint_spring_mov_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_spring_mov_x_txt.SetToolTip(u"斜めジョイントのばね(移動X)")
+        self.diagonal_joint_spring_mov_x_txt.SetToolTip(u"末端斜めジョイントのばね(移動X)")
         self.diagonal_joint_spring_mov_x_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_mov_x_txt, 0, wx.ALL, 5)
 
@@ -1112,7 +1116,7 @@ class PhysicsParam():
 
         # ばね(移動Y)
         self.diagonal_joint_spring_mov_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_spring_mov_y_txt.SetToolTip(u"斜めジョイントのばね(移動Y)")
+        self.diagonal_joint_spring_mov_y_txt.SetToolTip(u"末端斜めジョイントのばね(移動Y)")
         self.diagonal_joint_spring_mov_y_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_mov_y_txt, 0, wx.ALL, 5)
 
@@ -1123,7 +1127,7 @@ class PhysicsParam():
 
         # ばね(移動Z)
         self.diagonal_joint_spring_mov_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_spring_mov_z_txt.SetToolTip(u"斜めジョイントのばね(移動Z)")
+        self.diagonal_joint_spring_mov_z_txt.SetToolTip(u"末端斜めジョイントのばね(移動Z)")
         self.diagonal_joint_spring_mov_z_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_mov_z_txt, 0, wx.ALL, 5)
 
@@ -1134,7 +1138,7 @@ class PhysicsParam():
 
         # ばね(回転X)
         self.diagonal_joint_spring_rot_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_spring_rot_x_txt.SetToolTip(u"斜めジョイントのばね(回転X)")
+        self.diagonal_joint_spring_rot_x_txt.SetToolTip(u"末端斜めジョイントのばね(回転X)")
         self.diagonal_joint_spring_rot_x_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_rot_x_txt, 0, wx.ALL, 5)
 
@@ -1145,7 +1149,7 @@ class PhysicsParam():
 
         # ばね(回転Y)
         self.diagonal_joint_spring_rot_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_spring_rot_y_txt.SetToolTip(u"斜めジョイントのばね(回転Y)")
+        self.diagonal_joint_spring_rot_y_txt.SetToolTip(u"末端斜めジョイントのばね(回転Y)")
         self.diagonal_joint_spring_rot_y_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_rot_y_txt, 0, wx.ALL, 5)
 
@@ -1156,7 +1160,7 @@ class PhysicsParam():
 
         # ばね(回転Z)
         self.diagonal_joint_spring_rot_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.diagonal_joint_spring_rot_z_txt.SetToolTip(u"斜めジョイントのばね(回転Z)")
+        self.diagonal_joint_spring_rot_z_txt.SetToolTip(u"末端斜めジョイントのばね(回転Z)")
         self.diagonal_joint_spring_rot_z_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_rot_z_txt, 0, wx.ALL, 5)
 
@@ -1169,7 +1173,7 @@ class PhysicsParam():
         self.advance_param_sizer.Add(self.advance_diagonal_joint_sizer, 0, wx.ALL, 5)
 
         # 逆ジョイントブロック -------------------------------
-        self.advance_reverse_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "末端逆ジョイント"), orient=wx.VERTICAL)
+        self.advance_reverse_joint_sizer = wx.StaticBoxSizer(wx.StaticBox(self.advance_window, wx.ID_ANY, "逆ジョイント"), orient=wx.VERTICAL)
 
         self.advance_reverse_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -1195,7 +1199,7 @@ class PhysicsParam():
 
         # 移動X(最小)
         self.reverse_joint_mov_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_mov_x_min_txt.SetToolTip(u"逆ジョイントの移動X(最小)")
+        self.reverse_joint_mov_x_min_txt.SetToolTip(u"末端逆ジョイントの移動X(最小)")
         self.reverse_joint_mov_x_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -1206,7 +1210,7 @@ class PhysicsParam():
 
         # 移動Y(最小)
         self.reverse_joint_mov_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_mov_y_min_txt.SetToolTip(u"逆ジョイントの移動Y(最小)")
+        self.reverse_joint_mov_y_min_txt.SetToolTip(u"末端逆ジョイントの移動Y(最小)")
         self.reverse_joint_mov_y_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -1217,7 +1221,7 @@ class PhysicsParam():
 
         # 移動Z(最小)
         self.reverse_joint_mov_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_mov_z_min_txt.SetToolTip(u"逆ジョイントの移動Z(最小)")
+        self.reverse_joint_mov_z_min_txt.SetToolTip(u"末端逆ジョイントの移動Z(最小)")
         self.reverse_joint_mov_z_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -1228,7 +1232,7 @@ class PhysicsParam():
 
         # 移動X(最大)
         self.reverse_joint_mov_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_mov_x_max_txt.SetToolTip(u"逆ジョイントの移動X(最大)")
+        self.reverse_joint_mov_x_max_txt.SetToolTip(u"末端逆ジョイントの移動X(最大)")
         self.reverse_joint_mov_x_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -1239,7 +1243,7 @@ class PhysicsParam():
 
         # 移動Y(最大)
         self.reverse_joint_mov_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_mov_y_max_txt.SetToolTip(u"逆ジョイントの移動Y(最大)")
+        self.reverse_joint_mov_y_max_txt.SetToolTip(u"末端逆ジョイントの移動Y(最大)")
         self.reverse_joint_mov_y_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -1250,7 +1254,7 @@ class PhysicsParam():
 
         # 移動Z(最大)
         self.reverse_joint_mov_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"移動Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_mov_z_max_txt.SetToolTip(u"逆ジョイントの移動Z(最大)")
+        self.reverse_joint_mov_z_max_txt.SetToolTip(u"末端逆ジョイントの移動Z(最大)")
         self.reverse_joint_mov_z_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -1261,7 +1265,7 @@ class PhysicsParam():
 
         # 回転X(最小)
         self.reverse_joint_rot_x_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_rot_x_min_txt.SetToolTip(u"逆ジョイントの回転X(最小)")
+        self.reverse_joint_rot_x_min_txt.SetToolTip(u"末端逆ジョイントの回転X(最小)")
         self.reverse_joint_rot_x_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
@@ -1272,7 +1276,7 @@ class PhysicsParam():
 
         # 回転Y(最小)
         self.reverse_joint_rot_y_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_rot_y_min_txt.SetToolTip(u"逆ジョイントの回転Y(最小)")
+        self.reverse_joint_rot_y_min_txt.SetToolTip(u"末端逆ジョイントの回転Y(最小)")
         self.reverse_joint_rot_y_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
@@ -1283,7 +1287,7 @@ class PhysicsParam():
 
         # 回転Z(最小)
         self.reverse_joint_rot_z_min_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最小)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_rot_z_min_txt.SetToolTip(u"逆ジョイントの回転Z(最小)")
+        self.reverse_joint_rot_z_min_txt.SetToolTip(u"末端逆ジョイントの回転Z(最小)")
         self.reverse_joint_rot_z_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
@@ -1294,7 +1298,7 @@ class PhysicsParam():
 
         # 回転X(最大)
         self.reverse_joint_rot_x_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転X(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_rot_x_max_txt.SetToolTip(u"逆ジョイントの回転X(最大)")
+        self.reverse_joint_rot_x_max_txt.SetToolTip(u"末端逆ジョイントの回転X(最大)")
         self.reverse_joint_rot_x_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
@@ -1305,7 +1309,7 @@ class PhysicsParam():
 
         # 回転Y(最大)
         self.reverse_joint_rot_y_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Y(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_rot_y_max_txt.SetToolTip(u"逆ジョイントの回転Y(最大)")
+        self.reverse_joint_rot_y_max_txt.SetToolTip(u"末端逆ジョイントの回転Y(最大)")
         self.reverse_joint_rot_y_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
@@ -1316,7 +1320,7 @@ class PhysicsParam():
 
         # 回転Z(最大)
         self.reverse_joint_rot_z_max_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"回転Z(最大)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_rot_z_max_txt.SetToolTip(u"逆ジョイントの回転Z(最大)")
+        self.reverse_joint_rot_z_max_txt.SetToolTip(u"末端逆ジョイントの回転Z(最大)")
         self.reverse_joint_rot_z_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
@@ -1327,7 +1331,7 @@ class PhysicsParam():
 
         # ばね(移動X)
         self.reverse_joint_spring_mov_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_spring_mov_x_txt.SetToolTip(u"逆ジョイントのばね(移動X)")
+        self.reverse_joint_spring_mov_x_txt.SetToolTip(u"末端逆ジョイントのばね(移動X)")
         self.reverse_joint_spring_mov_x_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_x_txt, 0, wx.ALL, 5)
 
@@ -1338,7 +1342,7 @@ class PhysicsParam():
 
         # ばね(移動Y)
         self.reverse_joint_spring_mov_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_spring_mov_y_txt.SetToolTip(u"逆ジョイントのばね(移動Y)")
+        self.reverse_joint_spring_mov_y_txt.SetToolTip(u"末端逆ジョイントのばね(移動Y)")
         self.reverse_joint_spring_mov_y_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_y_txt, 0, wx.ALL, 5)
 
@@ -1349,7 +1353,7 @@ class PhysicsParam():
 
         # ばね(移動Z)
         self.reverse_joint_spring_mov_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(移動Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_spring_mov_z_txt.SetToolTip(u"逆ジョイントのばね(移動Z)")
+        self.reverse_joint_spring_mov_z_txt.SetToolTip(u"末端逆ジョイントのばね(移動Z)")
         self.reverse_joint_spring_mov_z_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_z_txt, 0, wx.ALL, 5)
 
@@ -1360,7 +1364,7 @@ class PhysicsParam():
 
         # ばね(回転X)
         self.reverse_joint_spring_rot_x_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転X)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_spring_rot_x_txt.SetToolTip(u"逆ジョイントのばね(回転X)")
+        self.reverse_joint_spring_rot_x_txt.SetToolTip(u"末端逆ジョイントのばね(回転X)")
         self.reverse_joint_spring_rot_x_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_x_txt, 0, wx.ALL, 5)
 
@@ -1371,7 +1375,7 @@ class PhysicsParam():
 
         # ばね(回転Y)
         self.reverse_joint_spring_rot_y_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Y)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_spring_rot_y_txt.SetToolTip(u"逆ジョイントのばね(回転Y)")
+        self.reverse_joint_spring_rot_y_txt.SetToolTip(u"末端逆ジョイントのばね(回転Y)")
         self.reverse_joint_spring_rot_y_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_y_txt, 0, wx.ALL, 5)
 
@@ -1382,7 +1386,7 @@ class PhysicsParam():
 
         # ばね(回転Z)
         self.reverse_joint_spring_rot_z_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"ばね(回転Z)", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.reverse_joint_spring_rot_z_txt.SetToolTip(u"逆ジョイントのばね(回転Z)")
+        self.reverse_joint_spring_rot_z_txt.SetToolTip(u"末端逆ジョイントのばね(回転Z)")
         self.reverse_joint_spring_rot_z_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_z_txt, 0, wx.ALL, 5)
 

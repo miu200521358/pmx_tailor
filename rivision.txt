@@ -15,3 +15,10 @@ https://fire.st/RRWMJDn
 PmxTailor_1.00.00_β04 (2021/11/03)
 ・斜め展開材質の初期設定が逆になっていたので修正
 
+https://fire.st/KbSncSC
+PmxTailor_1.00.00_β05 (2021/11/04)
+・ジョイントの位置調整
+・デバッグログ追加
+
+
+
