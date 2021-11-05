@@ -992,7 +992,7 @@ class PmxTailorExportService():
         model.display_slots[material_name] = DisplaySlot(material_name, material_name, 0, 0)
 
         root_bone = Bone(f'{abb_name}中心', f'{abb_name}中心', model.bones[param_option['parent_bone_name']].position, \
-                         model.bones[param_option['parent_bone_name']].index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
+                         model.bones[param_option['parent_bone_name']].index, 0, 0x0000 | 0x0002 | 0x0004 | 0x0008 | 0x0010)
         root_bone.index = len(list(model.bones.keys()))
 
         # ボーン
