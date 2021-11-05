@@ -89,9 +89,14 @@ class FilePanel(BasePanel):
     
     # サイジングとかと同じ処理なので、VMD出力みたいだけど、PMXパス
     def set_output_vmd_path(self, event, is_force=False):
-        output_pmx_path = MFileUtils.get_output_pmx_path(
-            self.org_model_file_ctrl.file_ctrl.GetPath(),
-            self.output_pmx_file_ctrl.file_ctrl.GetPath(), is_force)
+        if self.frame.is_vroid:
+            output_pmx_path = MFileUtils.get_output_vrm_path(
+                self.org_model_file_ctrl.file_ctrl.GetPath(),
+                self.output_pmx_file_ctrl.file_ctrl.GetPath(), is_force)
+        else:
+            output_pmx_path = MFileUtils.get_output_pmx_path(
+                self.org_model_file_ctrl.file_ctrl.GetPath(),
+                self.output_pmx_file_ctrl.file_ctrl.GetPath(), is_force)
 
         self.output_pmx_file_ctrl.file_ctrl.SetPath(output_pmx_path)
 

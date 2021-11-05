@@ -88,9 +88,9 @@ class MainFrame(wx.Frame):
         self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
         self.note_ctrl.AddPage(self.advance_param_panel_ctrl, u"パラ調整(詳細)", False)
 
-        if self.is_vroid:
-            self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 3)
-            self.note_ctrl.AddPage(self.vrm_panel_ctrl, u"Vrm設定", False)
+        # if self.is_vroid:
+        #     self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 3)
+        #     self.note_ctrl.AddPage(self.vrm_panel_ctrl, u"Vrm設定", False)
         
         # ---------------------------------------------
 
@@ -220,7 +220,7 @@ class MainFrame(wx.Frame):
         return result
 
     def is_loaded_valid(self):
-        return len(self.simple_param_panel_ctrl.get_param_options(is_show_error=True)) > 0
+        return self.is_vroid or len(self.simple_param_panel_ctrl.get_param_options(is_show_error=True)) > 0
 
     # 読み込み完了処理
     def on_load_result(self, event: wx.Event):
@@ -349,3 +349,6 @@ class MainFrame(wx.Frame):
             event.GetEventObject().SetValue(event.GetEventObject().GetValue() - inc)
             if event.GetEventObject().GetValue() < 0:
                 event.GetEventObject().SetBackgroundColour("TURQUOISE")
+
+        # スピンコントロールでもタイムスタンプ変更
+        self.file_panel_ctrl.on_change_file(event)

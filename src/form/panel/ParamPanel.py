@@ -145,7 +145,7 @@ class ParamPanel(BasePanel):
                 if param:
                     params.append(param)
         
-        if len(params) == 0:
+        if len(params) == 0 and not self.frame.is_vroid:
             logger.error("物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
 
         return params
@@ -397,8 +397,7 @@ class PhysicsParam():
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_txt, 0, wx.ALL, 5)
 
         self.vertical_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=20, initial=1)
-        self.vertical_bone_density_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 1))
-        self.vertical_bone_density_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
+        self.vertical_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_spin, 0, wx.ALL, 5)
 
         # 横密度
@@ -408,8 +407,7 @@ class PhysicsParam():
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_txt, 0, wx.ALL, 5)
 
         self.horizonal_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2", min=1, max=20, initial=2)
-        self.horizonal_bone_density_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 1))
-        self.horizonal_bone_density_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
+        self.horizonal_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_spin, 0, wx.ALL, 5)
 
         # 間引きオプション
@@ -443,7 +441,6 @@ class PhysicsParam():
 
         self.rigidbody_mass_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0.5", min=0.000001, max=1000, initial=0.5, inc=0.01)
         self.rigidbody_mass_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.rigidbody_mass_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_mass_spin, 0, wx.ALL, 5)
 
         # 移動減衰
@@ -454,7 +451,6 @@ class PhysicsParam():
 
         self.rigidbody_linear_damping_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0.999", min=0.000001, max=0.9999999, initial=0.999, inc=0.01)
         self.rigidbody_linear_damping_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.rigidbody_linear_damping_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_linear_damping_spin, 0, wx.ALL, 5)
 
         # 回転減衰
@@ -465,7 +461,6 @@ class PhysicsParam():
 
         self.rigidbody_angular_damping_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0.999", min=0.000001, max=0.9999999, initial=0.999, inc=0.01)
         self.rigidbody_angular_damping_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.rigidbody_angular_damping_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_angular_damping_spin, 0, wx.ALL, 5)
 
         # 反発力
@@ -476,7 +471,6 @@ class PhysicsParam():
 
         self.rigidbody_restitution_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=10, initial=0, inc=0.01)
         self.rigidbody_restitution_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.rigidbody_restitution_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_restitution_spin, 0, wx.ALL, 5)
 
         # 摩擦力
@@ -487,7 +481,6 @@ class PhysicsParam():
 
         self.rigidbody_friction_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0.2", min=0, max=1000, initial=0.2, inc=0.01)
         self.rigidbody_friction_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.rigidbody_friction_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_friction_spin, 0, wx.ALL, 5)
 
         # 係数
@@ -498,7 +491,6 @@ class PhysicsParam():
 
         self.rigidbody_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1.2", min=1, max=10, initial=1.2, inc=0.1)
         self.rigidbody_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.rigidbody_coefficient_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_coefficient_spin, 0, wx.ALL, 5)
 
         # 剛体形状
@@ -533,7 +525,6 @@ class PhysicsParam():
 
         self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1.2", min=1.2, max=10, initial=1, inc=0.1)
         self.advance_vertical_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.advance_vertical_joint_coefficient_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_vertical_joint_sizer.Add(self.advance_vertical_joint_head_sizer, 0, wx.ALL, 5)
@@ -548,7 +539,6 @@ class PhysicsParam():
 
         self.vertical_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.vertical_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_mov_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
         # 移動Y(最小)
@@ -559,7 +549,6 @@ class PhysicsParam():
 
         self.vertical_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.vertical_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_mov_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
         # 移動Z(最小)
@@ -570,7 +559,6 @@ class PhysicsParam():
 
         self.vertical_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.vertical_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_mov_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
         # 移動X(最大)
@@ -581,7 +569,6 @@ class PhysicsParam():
 
         self.vertical_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_mov_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
         # 移動Y(最大)
@@ -592,7 +579,6 @@ class PhysicsParam():
 
         self.vertical_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_mov_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
         # 移動Z(最大)
@@ -603,7 +589,6 @@ class PhysicsParam():
 
         self.vertical_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_mov_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
         # 回転X(最小)
@@ -614,7 +599,6 @@ class PhysicsParam():
 
         self.vertical_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.vertical_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_rot_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
         # 回転Y(最小)
@@ -625,7 +609,6 @@ class PhysicsParam():
 
         self.vertical_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.vertical_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_rot_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
         # 回転Z(最小)
@@ -636,7 +619,6 @@ class PhysicsParam():
 
         self.vertical_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.vertical_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_rot_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
         # 回転X(最大)
@@ -647,7 +629,6 @@ class PhysicsParam():
 
         self.vertical_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_rot_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
         # 回転Y(最大)
@@ -658,7 +639,6 @@ class PhysicsParam():
 
         self.vertical_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_rot_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
         # 回転Z(最大)
@@ -669,7 +649,6 @@ class PhysicsParam():
 
         self.vertical_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_rot_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
         # ばね(移動X)
@@ -680,7 +659,6 @@ class PhysicsParam():
 
         self.vertical_joint_spring_mov_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_spring_mov_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_spring_mov_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_mov_x_spin, 0, wx.ALL, 5)
 
         # ばね(移動Y)
@@ -691,7 +669,6 @@ class PhysicsParam():
 
         self.vertical_joint_spring_mov_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_spring_mov_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_spring_mov_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_mov_y_spin, 0, wx.ALL, 5)
 
         # ばね(移動Z)
@@ -702,7 +679,6 @@ class PhysicsParam():
 
         self.vertical_joint_spring_mov_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_spring_mov_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_spring_mov_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_mov_z_spin, 0, wx.ALL, 5)
 
         # ばね(回転X)
@@ -713,7 +689,6 @@ class PhysicsParam():
 
         self.vertical_joint_spring_rot_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_spring_rot_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_spring_rot_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_rot_x_spin, 0, wx.ALL, 5)
 
         # ばね(回転Y)
@@ -724,7 +699,6 @@ class PhysicsParam():
 
         self.vertical_joint_spring_rot_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_spring_rot_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_spring_rot_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_rot_y_spin, 0, wx.ALL, 5)
 
         # ばね(回転Z)
@@ -735,7 +709,6 @@ class PhysicsParam():
 
         self.vertical_joint_spring_rot_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.vertical_joint_spring_rot_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.vertical_joint_spring_rot_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_spring_rot_z_spin, 0, wx.ALL, 5)
 
         self.advance_vertical_joint_sizer.Add(self.advance_vertical_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
@@ -759,7 +732,6 @@ class PhysicsParam():
 
         self.advance_horizonal_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.3", min=1, max=10, initial=2.3, inc=0.1)
         self.advance_horizonal_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.advance_horizonal_joint_coefficient_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_horizonal_joint_sizer.Add(self.advance_horizonal_joint_head_sizer, 0, wx.ALL, 5)
@@ -774,7 +746,6 @@ class PhysicsParam():
 
         self.horizonal_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.horizonal_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_mov_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
         # 移動Y(最小)
@@ -785,7 +756,6 @@ class PhysicsParam():
 
         self.horizonal_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.horizonal_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_mov_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
         # 移動Z(最小)
@@ -796,7 +766,6 @@ class PhysicsParam():
 
         self.horizonal_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.horizonal_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_mov_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
         # 移動X(最大)
@@ -807,7 +776,6 @@ class PhysicsParam():
 
         self.horizonal_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_mov_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
         # 移動Y(最大)
@@ -818,7 +786,6 @@ class PhysicsParam():
 
         self.horizonal_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_mov_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
         # 移動Z(最大)
@@ -829,7 +796,6 @@ class PhysicsParam():
 
         self.horizonal_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_mov_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
         # 回転X(最小)
@@ -840,7 +806,6 @@ class PhysicsParam():
 
         self.horizonal_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.horizonal_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_rot_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
         # 回転Y(最小)
@@ -851,7 +816,6 @@ class PhysicsParam():
 
         self.horizonal_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.horizonal_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_rot_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
         # 回転Z(最小)
@@ -862,7 +826,6 @@ class PhysicsParam():
 
         self.horizonal_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.horizonal_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_rot_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
         # 回転X(最大)
@@ -873,7 +836,6 @@ class PhysicsParam():
 
         self.horizonal_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_rot_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
         # 回転Y(最大)
@@ -884,7 +846,6 @@ class PhysicsParam():
 
         self.horizonal_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_rot_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
         # 回転Z(最大)
@@ -895,7 +856,6 @@ class PhysicsParam():
 
         self.horizonal_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_rot_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
         # ばね(移動X)
@@ -906,7 +866,6 @@ class PhysicsParam():
 
         self.horizonal_joint_spring_mov_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_spring_mov_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_spring_mov_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_mov_x_spin, 0, wx.ALL, 5)
 
         # ばね(移動Y)
@@ -917,7 +876,6 @@ class PhysicsParam():
 
         self.horizonal_joint_spring_mov_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_spring_mov_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_spring_mov_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_mov_y_spin, 0, wx.ALL, 5)
 
         # ばね(移動Z)
@@ -928,7 +886,6 @@ class PhysicsParam():
 
         self.horizonal_joint_spring_mov_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_spring_mov_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_spring_mov_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_mov_z_spin, 0, wx.ALL, 5)
 
         # ばね(回転X)
@@ -939,7 +896,6 @@ class PhysicsParam():
 
         self.horizonal_joint_spring_rot_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_spring_rot_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_spring_rot_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_rot_x_spin, 0, wx.ALL, 5)
 
         # ばね(回転Y)
@@ -950,7 +906,6 @@ class PhysicsParam():
 
         self.horizonal_joint_spring_rot_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_spring_rot_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_spring_rot_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_rot_y_spin, 0, wx.ALL, 5)
 
         # ばね(回転Z)
@@ -961,7 +916,6 @@ class PhysicsParam():
 
         self.horizonal_joint_spring_rot_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_spring_rot_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.horizonal_joint_spring_rot_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_spring_rot_z_spin, 0, wx.ALL, 5)
 
         self.advance_horizonal_joint_sizer.Add(self.advance_horizonal_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
@@ -985,7 +939,6 @@ class PhysicsParam():
 
         self.advance_diagonal_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1)
         self.advance_diagonal_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.advance_diagonal_joint_coefficient_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_diagonal_joint_sizer.Add(self.advance_diagonal_joint_head_sizer, 0, wx.ALL, 5)
@@ -1000,7 +953,6 @@ class PhysicsParam():
 
         self.diagonal_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.diagonal_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_mov_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
         # 移動Y(最小)
@@ -1011,7 +963,6 @@ class PhysicsParam():
 
         self.diagonal_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.diagonal_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_mov_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
         # 移動Z(最小)
@@ -1022,7 +973,6 @@ class PhysicsParam():
 
         self.diagonal_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.diagonal_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_mov_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
         # 移動X(最大)
@@ -1033,7 +983,6 @@ class PhysicsParam():
 
         self.diagonal_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_mov_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
         # 移動Y(最大)
@@ -1044,7 +993,6 @@ class PhysicsParam():
 
         self.diagonal_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_mov_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
         # 移動Z(最大)
@@ -1055,7 +1003,6 @@ class PhysicsParam():
 
         self.diagonal_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_mov_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
         # 回転X(最小)
@@ -1066,7 +1013,6 @@ class PhysicsParam():
 
         self.diagonal_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.diagonal_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_rot_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
         # 回転Y(最小)
@@ -1077,7 +1023,6 @@ class PhysicsParam():
 
         self.diagonal_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.diagonal_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_rot_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
         # 回転Z(最小)
@@ -1088,7 +1033,6 @@ class PhysicsParam():
 
         self.diagonal_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.diagonal_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_rot_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
         # 回転X(最大)
@@ -1099,7 +1043,6 @@ class PhysicsParam():
 
         self.diagonal_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_rot_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
         # 回転Y(最大)
@@ -1110,7 +1053,6 @@ class PhysicsParam():
 
         self.diagonal_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_rot_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
         # 回転Z(最大)
@@ -1121,7 +1063,6 @@ class PhysicsParam():
 
         self.diagonal_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_rot_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
         # ばね(移動X)
@@ -1132,7 +1073,6 @@ class PhysicsParam():
 
         self.diagonal_joint_spring_mov_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_spring_mov_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_spring_mov_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_mov_x_spin, 0, wx.ALL, 5)
 
         # ばね(移動Y)
@@ -1143,7 +1083,6 @@ class PhysicsParam():
 
         self.diagonal_joint_spring_mov_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_spring_mov_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_spring_mov_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_mov_y_spin, 0, wx.ALL, 5)
 
         # ばね(移動Z)
@@ -1154,7 +1093,6 @@ class PhysicsParam():
 
         self.diagonal_joint_spring_mov_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_spring_mov_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_spring_mov_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_mov_z_spin, 0, wx.ALL, 5)
 
         # ばね(回転X)
@@ -1165,7 +1103,6 @@ class PhysicsParam():
 
         self.diagonal_joint_spring_rot_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_spring_rot_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_spring_rot_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_rot_x_spin, 0, wx.ALL, 5)
 
         # ばね(回転Y)
@@ -1176,7 +1113,6 @@ class PhysicsParam():
 
         self.diagonal_joint_spring_rot_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_spring_rot_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_spring_rot_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_rot_y_spin, 0, wx.ALL, 5)
 
         # ばね(回転Z)
@@ -1187,7 +1123,6 @@ class PhysicsParam():
 
         self.diagonal_joint_spring_rot_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_spring_rot_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.diagonal_joint_spring_rot_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_spring_rot_z_spin, 0, wx.ALL, 5)
 
         self.advance_diagonal_joint_sizer.Add(self.advance_diagonal_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
@@ -1211,7 +1146,6 @@ class PhysicsParam():
 
         self.advance_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1)
         self.advance_reverse_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.advance_reverse_joint_coefficient_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_head_sizer, 0, wx.ALL, 5)
@@ -1226,7 +1160,6 @@ class PhysicsParam():
 
         self.reverse_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.reverse_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_mov_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
         # 移動Y(最小)
@@ -1237,7 +1170,6 @@ class PhysicsParam():
 
         self.reverse_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.reverse_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_mov_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
         # 移動Z(最小)
@@ -1248,7 +1180,6 @@ class PhysicsParam():
 
         self.reverse_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.reverse_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_mov_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
         # 移動X(最大)
@@ -1259,7 +1190,6 @@ class PhysicsParam():
 
         self.reverse_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_mov_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
         # 移動Y(最大)
@@ -1270,7 +1200,6 @@ class PhysicsParam():
 
         self.reverse_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_mov_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
         # 移動Z(最大)
@@ -1281,7 +1210,6 @@ class PhysicsParam():
 
         self.reverse_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_mov_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
         # 回転X(最小)
@@ -1292,7 +1220,6 @@ class PhysicsParam():
 
         self.reverse_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.reverse_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_rot_x_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
         # 回転Y(最小)
@@ -1303,7 +1230,6 @@ class PhysicsParam():
 
         self.reverse_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.reverse_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_rot_y_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
         # 回転Z(最小)
@@ -1314,7 +1240,6 @@ class PhysicsParam():
 
         self.reverse_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
         self.reverse_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_rot_z_min_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
         # 回転X(最大)
@@ -1325,7 +1250,6 @@ class PhysicsParam():
 
         self.reverse_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_rot_x_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
         # 回転Y(最大)
@@ -1336,7 +1260,6 @@ class PhysicsParam():
 
         self.reverse_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_rot_y_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
         # 回転Z(最大)
@@ -1347,7 +1270,6 @@ class PhysicsParam():
 
         self.reverse_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_rot_z_max_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
         # ばね(移動X)
@@ -1358,7 +1280,6 @@ class PhysicsParam():
 
         self.reverse_joint_spring_mov_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_spring_mov_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_spring_mov_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_x_spin, 0, wx.ALL, 5)
 
         # ばね(移動Y)
@@ -1369,7 +1290,6 @@ class PhysicsParam():
 
         self.reverse_joint_spring_mov_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_spring_mov_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_spring_mov_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_y_spin, 0, wx.ALL, 5)
 
         # ばね(移動Z)
@@ -1380,7 +1300,6 @@ class PhysicsParam():
 
         self.reverse_joint_spring_mov_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_spring_mov_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_spring_mov_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_z_spin, 0, wx.ALL, 5)
 
         # ばね(回転X)
@@ -1391,7 +1310,6 @@ class PhysicsParam():
 
         self.reverse_joint_spring_rot_x_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_spring_rot_x_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_spring_rot_x_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_x_spin, 0, wx.ALL, 5)
 
         # ばね(回転Y)
@@ -1402,7 +1320,6 @@ class PhysicsParam():
 
         self.reverse_joint_spring_rot_y_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_spring_rot_y_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_spring_rot_y_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_y_spin, 0, wx.ALL, 5)
 
         # ばね(回転Z)
@@ -1413,7 +1330,6 @@ class PhysicsParam():
 
         self.reverse_joint_spring_rot_z_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
         self.reverse_joint_spring_rot_z_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
-        self.reverse_joint_spring_rot_z_spin.Bind(wx.EVT_SPIN, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_z_spin, 0, wx.ALL, 5)
 
         self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
@@ -1424,7 +1340,7 @@ class PhysicsParam():
 
         if self.simple_material_ctrl.GetStringSelection() and self.simple_parent_bone_ctrl.GetStringSelection() and self.simple_group_ctrl.GetStringSelection() \
            and self.simple_abb_ctrl.GetValue():
-            if self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.material_indices[self.simple_material_ctrl.GetStringSelection()] == 0:
+            if not self.main_frame.is_vroid and self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.material_indices[self.simple_material_ctrl.GetStringSelection()] == 0:
                 logger.error("頂点のない材質が指定されています。", decoration=MLogger.DECORATION_BOX)
                 return params
 
@@ -1513,7 +1429,7 @@ class PhysicsParam():
                           MVector3D(self.reverse_joint_spring_rot_x_spin.GetValue(), self.reverse_joint_spring_rot_y_spin.GetValue(), self.reverse_joint_spring_rot_z_spin.GetValue())
                           )
             params['reverse_joint_coefficient'] = self.advance_reverse_joint_coefficient_spin.GetValue()
-        else:
+        elif not self.main_frame.is_vroid:
             if is_show_error:
                 empty_param_list = []
                 if not self.simple_material_ctrl.GetStringSelection():
