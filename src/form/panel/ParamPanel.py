@@ -180,7 +180,7 @@ class PhysicsParam():
 
         self.simple_material_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.simple_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理材質", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理材質 *", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_material_txt.SetToolTip(u"物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。")
         self.simple_material_txt.Wrap(-1)
         self.simple_material_sizer.Add(self.simple_material_txt, 0, wx.ALL, 5)
@@ -194,7 +194,7 @@ class PhysicsParam():
 
         self.simple_header_grid_sizer = wx.FlexGridSizer(0, 4, 0, 0)
 
-        self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称 *", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を5文字以内で入力してください。")
         self.simple_abb_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_abb_txt, 0, wx.ALL, 5)
@@ -204,7 +204,7 @@ class PhysicsParam():
         self.simple_abb_ctrl.SetMaxLength(5)
         self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
-        self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン *", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_parent_bone_txt.SetToolTip(u"材質の起点となる親ボーン")
         self.simple_parent_bone_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
@@ -213,7 +213,7 @@ class PhysicsParam():
         self.simple_parent_bone_ctrl.SetToolTip(u"材質の起点となる親ボーン")
         self.simple_header_grid_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
 
-        self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"剛体グループ", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"剛体グループ *", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_group_txt.SetToolTip(u"剛体のグループ。初期設定では、1と自分自身のグループのみ非衝突として設定します。")
         self.simple_group_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_group_txt, 0, wx.ALL, 5)

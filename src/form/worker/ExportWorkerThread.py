@@ -62,15 +62,8 @@ class ExportWorkerThread(BaseWorkerThread):
                     output_pmx_path = self.frame.file_panel_ctrl.output_pmx_file_ctrl.file_ctrl.GetPath()
                     output_log_path = re.sub(r'\.pmx$', '.log', output_pmx_path)
 
-                    try:
-                        # ファイルパスをオブジェクトとして解決し、親を取得する
-                        output_log_path = os.path.join(str(Path(output_pmx_path).resolve().parents[1]), "output.log")
-                    except Exception:
-                        pass
-
                     # 出力されたメッセージを全部出力
                     self.frame.file_panel_ctrl.console_ctrl.SaveFile(filename=output_log_path)
-
             except Exception:
                 pass
 

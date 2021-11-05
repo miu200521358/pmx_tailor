@@ -90,34 +90,39 @@ class PmxTailorExportService():
             logger.warning("有効な頂点マップが生成されななかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
             return False
         
-        base_map_idx = np.argmax(map_cnt)
+        vertex_map_orders = [k for k in np.argsort(-np.array(map_cnt)) if map_cnt[k] > np.max(map_cnt) * 0.5]
+        
+        logger.info(f"【{param_option['material_name']}】ボーン生成", decoration=MLogger.DECORATION_LINE)
 
-        logger.info(f"{param_option['material_name']}: 基準頂点マップ = No.{base_map_idx + 1}", decoration=MLogger.DECORATION_LINE)
+        root_bone, tmp_all_bones, all_registed_bone_indexs, all_bone_horizonal_distances, all_bone_vertical_distances \
+            = self.create_bone(model, param_option, vertex_map_orders, vertex_maps, vertex_connecteds)
 
-        logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ボーン生成", decoration=MLogger.DECORATION_LINE)
+        vertex_remaining_set = set(model.material_vertices[param_option['material_name']])
 
-        root_bone, tmp_all_bones, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances \
-            = self.create_bone(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx])
+        for base_map_idx in vertex_map_orders:
+            logger.info(f"【{param_option['material_name']}(No.{base_map_idx + 1})】 ウェイト分布", decoration=MLogger.DECORATION_LINE)
 
-        logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ウェイト分布", decoration=MLogger.DECORATION_LINE)
+            self.create_weight(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx], duplicate_vertices, \
+                               all_registed_bone_indexs[base_map_idx], all_bone_horizonal_distances[base_map_idx], all_bone_vertical_distances[base_map_idx], \
+                               root_bone, vertex_remaining_set)
 
-        target_bone_map, target_bone_parents, target_bone_positions = self.create_weight(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, \
-                                                                                         registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances, root_bone)
+        if len(list(vertex_remaining_set)) > 0:
+            logger.info(f"【{param_option['material_name']}】 残ウェイト分布", decoration=MLogger.DECORATION_LINE)
+            
+            self.create_remaining_weight(model, param_option, all_registed_bone_indexs, root_bone, vertex_remaining_set)
 
-        logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): 剛体生成", decoration=MLogger.DECORATION_LINE)
+        for base_map_idx in vertex_map_orders:
+            logger.info(f"【{param_option['material_name']}(No.{base_map_idx + 1})】 剛体生成", decoration=MLogger.DECORATION_LINE)
 
-        self.create_rigidbody(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, tmp_all_bones, registed_bone_indexs, \
-                              bone_horizonal_distances, bone_vertical_distances, root_bone, target_bone_map, target_bone_parents, target_bone_positions)
+            self.create_rigidbody(model, param_option, vertex_connecteds[base_map_idx], tmp_all_bones, all_registed_bone_indexs[base_map_idx])
 
-        logger.info(f"{param_option['material_name']}(No.{base_map_idx + 1}): ジョイント生成", decoration=MLogger.DECORATION_LINE)
+            logger.info(f"【{param_option['material_name']}(No.{base_map_idx + 1})】 ジョイント生成", decoration=MLogger.DECORATION_LINE)
 
-        self.create_joint(model, param_option, base_map_idx, vertex_maps, vertex_connecteds, duplicate_vertices, tmp_all_bones, registed_bone_indexs, \
-                          bone_horizonal_distances, bone_vertical_distances, root_bone, target_bone_map, target_bone_parents, target_bone_positions)
+            self.create_joint(model, param_option, vertex_connecteds[base_map_idx], tmp_all_bones, all_registed_bone_indexs[base_map_idx])
 
         return True
 
-    def create_joint(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, tmp_all_bones: dict, registed_bone_indexs: dict, \
-                     bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, target_bone_map: dict, target_bone_parents: dict, target_bone_positions: dict):    # noqa
+    def create_joint(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict):
         # ジョイント生成
         created_joints = {}
 
@@ -132,7 +137,7 @@ class PmxTailorExportService():
         # 逆ジョイント情報
         param_reverse_joint = param_option['reverse_joint']
 
-        v_yidxs = list(reversed(list(target_bone_map.keys())))
+        v_yidxs = list(reversed(list(registed_bone_indexs.keys())))
         prev_joint_cnt = 0
 
         max_vy = max(v_yidxs)
@@ -321,24 +326,35 @@ class PmxTailorExportService():
                 [param_reverse_joint.spring_constant_rotation.z() / coefficient, param_reverse_joint.spring_constant_rotation.z() / coefficient, param_reverse_joint.spring_constant_rotation.z()]])), xs)             # noqa
 
         for yi, (above_v_yidx, below_v_yidx) in enumerate(zip(v_yidxs[1:], v_yidxs[:-1])):
-            below_v_xidxs = target_bone_map[below_v_yidx]
+            below_v_xidxs = list(registed_bone_indexs[below_v_yidx].keys())
+            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
+
+            if below_v_yidx < len(vertex_connected) and vertex_connected[below_v_yidx]:
+                # 繋がってる場合、最後に最初のボーンを追加する
+                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[0]]
+            elif len(registed_bone_indexs[below_v_yidx]) > 2:
+                # 繋がってない場合、最後に最後のひとつ前のボーンを追加する
+                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[-2]]
+            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
 
             for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
-                prev_below_v_xno = prev_below_v_xidx + 1
-                next_below_v_xno = next_below_v_xidx + 1
+                prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_v_xidx] + 1
+                next_below_v_xno = registed_bone_indexs[below_v_yidx][next_below_v_xidx] + 1
                 below_v_yno = below_v_yidx + 1
 
                 prev_below_bone_name = self.get_bone_name(abb_name, below_v_yno, prev_below_v_xno)
-                prev_below_bone_position = target_bone_positions[prev_below_bone_name]
+                prev_below_bone_position = tmp_all_bones[prev_below_bone_name]["bone"].position
                 next_below_bone_name = self.get_bone_name(abb_name, below_v_yno, next_below_v_xno)
-                next_below_bone_position = target_bone_positions[next_below_bone_name]
+                next_below_bone_position = tmp_all_bones[next_below_bone_name]["bone"].position
 
-                prev_above_bone_name = target_bone_parents[prev_below_bone_name]
-                prev_above_bone_position = target_bone_positions[prev_above_bone_name]
+                prev_above_bone_name = tmp_all_bones[prev_below_bone_name]["parent"]
+                prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
                 prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
                 
-                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_below_v_xno)
-                next_above_bone_position = tmp_all_bones[next_above_bone_name].position if next_above_bone_name in tmp_all_bones else target_bone_positions[next_below_bone_name]
+                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - next_below_v_xidx)
+                next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
+                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
+                next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
 
                 if param_vertical_joint and prev_above_bone_name != prev_below_bone_name:
                     # 縦ジョイント
@@ -348,11 +364,7 @@ class PmxTailorExportService():
                         # 未登録のみ追加
                         
                         # 縦ジョイント
-                        # joint_horizonal_vec = ((target_bone_positions[next_below_bone_name] - target_bone_positions[prev_below_bone_name]) / 2)
-                        joint_vec = target_bone_positions[prev_below_bone_name]
-                        # joint_vec = MVector3D(target_bone_positions[prev_below_bone_name].x(), \
-                        #                       target_bone_positions[prev_below_bone_name].y() + joint_horizonal_vec.y(), \
-                        #                       target_bone_positions[prev_below_bone_name].z())
+                        joint_vec = prev_below_bone_position
 
                         # 回転量
                         joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
@@ -362,15 +374,15 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        yi, _ = self.disassemble_bone_name(prev_above_bone_name)
+                        yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
-                                      joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yi], vertical_limit_min_mov_ys[yi], vertical_limit_min_mov_zs[yi]), \
-                                      MVector3D(vertical_limit_max_mov_xs[yi], vertical_limit_max_mov_ys[yi], vertical_limit_max_mov_zs[yi]),
-                                      MVector3D(math.radians(vertical_limit_min_rot_xs[yi]), math.radians(vertical_limit_min_rot_ys[yi]), math.radians(vertical_limit_min_rot_zs[yi])),
-                                      MVector3D(math.radians(vertical_limit_max_rot_xs[yi]), math.radians(vertical_limit_max_rot_ys[yi]), math.radians(vertical_limit_max_rot_zs[yi])),
-                                      MVector3D(vertical_spring_constant_mov_xs[yi], vertical_spring_constant_mov_ys[yi], vertical_spring_constant_mov_zs[yi]), \
-                                      MVector3D(vertical_spring_constant_rot_xs[yi], vertical_spring_constant_rot_ys[yi], vertical_spring_constant_rot_zs[yi]))   # noqa
+                                      joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yidx], vertical_limit_min_mov_ys[yidx], vertical_limit_min_mov_zs[yidx]), \
+                                      MVector3D(vertical_limit_max_mov_xs[yidx], vertical_limit_max_mov_ys[yidx], vertical_limit_max_mov_zs[yidx]),
+                                      MVector3D(math.radians(vertical_limit_min_rot_xs[yidx]), math.radians(vertical_limit_min_rot_ys[yidx]), math.radians(vertical_limit_min_rot_zs[yidx])),
+                                      MVector3D(math.radians(vertical_limit_max_rot_xs[yidx]), math.radians(vertical_limit_max_rot_ys[yidx]), math.radians(vertical_limit_max_rot_zs[yidx])),
+                                      MVector3D(vertical_spring_constant_mov_xs[yidx], vertical_spring_constant_mov_ys[yidx], vertical_spring_constant_mov_zs[yidx]), \
+                                      MVector3D(vertical_spring_constant_rot_xs[yidx], vertical_spring_constant_rot_ys[yidx], vertical_spring_constant_rot_zs[yidx]))   # noqa
                         created_joints[joint.name] = joint
 
                         if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -384,12 +396,12 @@ class PmxTailorExportService():
                             if not (joint_name in created_joints or prev_below_bone_name not in model.rigidbodies or prev_above_bone_name not in model.rigidbodies):
                                 # 未登録のみ追加
                                 joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
-                                              joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
-                                              MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
-                                              MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
-                                              MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
-                                              MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
-                                              MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))  # noqa
+                                              joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yidx], reverse_limit_min_mov_ys[yidx], reverse_limit_min_mov_zs[yidx]), \
+                                              MVector3D(reverse_limit_max_mov_xs[yidx], reverse_limit_max_mov_ys[yidx], reverse_limit_max_mov_zs[yidx]),
+                                              MVector3D(math.radians(reverse_limit_min_rot_xs[yidx]), math.radians(reverse_limit_min_rot_ys[yidx]), math.radians(reverse_limit_min_rot_zs[yidx])),
+                                              MVector3D(math.radians(reverse_limit_max_rot_xs[yidx]), math.radians(reverse_limit_max_rot_ys[yidx]), math.radians(reverse_limit_max_rot_zs[yidx])),
+                                              MVector3D(reverse_spring_constant_mov_xs[yidx], reverse_spring_constant_mov_ys[yidx], reverse_spring_constant_mov_zs[yidx]), \
+                                              MVector3D(reverse_spring_constant_rot_xs[yidx], reverse_spring_constant_rot_ys[yidx], reverse_spring_constant_rot_zs[yidx]))  # noqa
                                 created_joints[joint.name] = joint
 
                                 if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -398,14 +410,14 @@ class PmxTailorExportService():
                                 
                 if param_horizonal_joint:
                     # 横ジョイント
-                    if xi < len(below_v_xidxs) - 2 and prev_above_bone_name != next_above_bone_name:
+                    if xi < len(below_v_xidxs) - 1 and prev_above_bone_name != next_above_bone_name:
                         joint_name = f'→|{prev_above_bone_name}|{next_above_bone_name}'
 
                         if not (joint_name in created_joints or prev_above_bone_name not in model.rigidbodies or next_above_bone_name not in model.rigidbodies):
                             # 未登録のみ追加
                             
-                            joint_vec = np.mean([target_bone_positions[prev_above_bone_name], target_bone_positions[prev_below_bone_name], \
-                                                 target_bone_positions[next_above_bone_name], target_bone_positions[next_below_bone_name]])
+                            joint_vec = np.mean([prev_above_bone_position, prev_below_bone_position, \
+                                                 next_above_bone_position, next_below_bone_position])
 
                             # 回転量
                             joint_axis = (next_above_bone_position - prev_above_bone_position).normalized()
@@ -415,15 +427,15 @@ class PmxTailorExportService():
                             joint_euler = joint_rotation_qq.toEulerAngles()
                             joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                            yi, _ = self.disassemble_bone_name(prev_above_bone_name)
+                            yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
 
                             joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_above_bone_name].index,
-                                          joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi], horizonal_limit_min_mov_ys[yi], horizonal_limit_min_mov_zs[yi]), \
-                                          MVector3D(horizonal_limit_max_mov_xs[yi], horizonal_limit_max_mov_ys[yi], horizonal_limit_max_mov_zs[yi]),
-                                          MVector3D(math.radians(horizonal_limit_min_rot_xs[yi]), math.radians(horizonal_limit_min_rot_ys[yi]), math.radians(horizonal_limit_min_rot_zs[yi])),
-                                          MVector3D(math.radians(horizonal_limit_max_rot_xs[yi]), math.radians(horizonal_limit_max_rot_ys[yi]), math.radians(horizonal_limit_max_rot_zs[yi])),
-                                          MVector3D(horizonal_spring_constant_mov_xs[yi], horizonal_spring_constant_mov_ys[yi], horizonal_spring_constant_mov_zs[yi]), \
-                                          MVector3D(horizonal_spring_constant_rot_xs[yi], horizonal_spring_constant_rot_ys[yi], horizonal_spring_constant_rot_zs[yi]))    # noqa
+                                          joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yidx], horizonal_limit_min_mov_ys[yidx], horizonal_limit_min_mov_zs[yidx]), \
+                                          MVector3D(horizonal_limit_max_mov_xs[yidx], horizonal_limit_max_mov_ys[yidx], horizonal_limit_max_mov_zs[yidx]),
+                                          MVector3D(math.radians(horizonal_limit_min_rot_xs[yidx]), math.radians(horizonal_limit_min_rot_ys[yidx]), math.radians(horizonal_limit_min_rot_zs[yidx])),
+                                          MVector3D(math.radians(horizonal_limit_max_rot_xs[yidx]), math.radians(horizonal_limit_max_rot_ys[yidx]), math.radians(horizonal_limit_max_rot_zs[yidx])),
+                                          MVector3D(horizonal_spring_constant_mov_xs[yidx], horizonal_spring_constant_mov_ys[yidx], horizonal_spring_constant_mov_zs[yidx]), \
+                                          MVector3D(horizonal_spring_constant_rot_xs[yidx], horizonal_spring_constant_rot_ys[yidx], horizonal_spring_constant_rot_zs[yidx]))    # noqa
                             created_joints[joint.name] = joint
 
                             if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -438,12 +450,12 @@ class PmxTailorExportService():
                                 # 未登録のみ追加
                                 
                                 joint = Joint(joint_name, joint_name, 0, model.rigidbodies[next_above_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
-                                              joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
-                                              MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
-                                              MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
-                                              MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
-                                              MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
-                                              MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))      # noqa
+                                              joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yidx], reverse_limit_min_mov_ys[yidx], reverse_limit_min_mov_zs[yidx]), \
+                                              MVector3D(reverse_limit_max_mov_xs[yidx], reverse_limit_max_mov_ys[yidx], reverse_limit_max_mov_zs[yidx]),
+                                              MVector3D(math.radians(reverse_limit_min_rot_xs[yidx]), math.radians(reverse_limit_min_rot_ys[yidx]), math.radians(reverse_limit_min_rot_zs[yidx])),
+                                              MVector3D(math.radians(reverse_limit_max_rot_xs[yidx]), math.radians(reverse_limit_max_rot_ys[yidx]), math.radians(reverse_limit_max_rot_zs[yidx])),
+                                              MVector3D(reverse_spring_constant_mov_xs[yidx], reverse_spring_constant_mov_ys[yidx], reverse_spring_constant_mov_zs[yidx]), \
+                                              MVector3D(reverse_spring_constant_rot_xs[yidx], reverse_spring_constant_rot_ys[yidx], reverse_spring_constant_rot_zs[yidx]))      # noqa
                                 created_joints[joint.name] = joint
 
                                 if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -458,7 +470,7 @@ class PmxTailorExportService():
                         # 未登録のみ追加
                         
                         # ＼ジョイント
-                        joint_vec = np.mean([target_bone_positions[prev_below_bone_name], target_bone_positions[next_below_bone_name]])
+                        joint_vec = np.mean([prev_below_bone_position, next_below_bone_position])
 
                         # 回転量
                         joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
@@ -468,15 +480,15 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        yi, _ = self.disassemble_bone_name(prev_above_bone_name)
+                        yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_below_bone_name].index,
-                                      joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yi], diagonal_limit_min_mov_ys[yi], diagonal_limit_min_mov_zs[yi]), \
-                                      MVector3D(diagonal_limit_max_mov_xs[yi], diagonal_limit_max_mov_ys[yi], diagonal_limit_max_mov_zs[yi]),
-                                      MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
-                                      MVector3D(math.radians(diagonal_limit_max_rot_xs[yi]), math.radians(diagonal_limit_max_rot_ys[yi]), math.radians(diagonal_limit_max_rot_zs[yi])),
-                                      MVector3D(diagonal_spring_constant_mov_xs[yi], diagonal_spring_constant_mov_ys[yi], diagonal_spring_constant_mov_zs[yi]), \
-                                      MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
+                                      joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yidx], diagonal_limit_min_mov_ys[yidx], diagonal_limit_min_mov_zs[yidx]), \
+                                      MVector3D(diagonal_limit_max_mov_xs[yidx], diagonal_limit_max_mov_ys[yidx], diagonal_limit_max_mov_zs[yidx]),
+                                      MVector3D(math.radians(diagonal_limit_min_rot_xs[yidx]), math.radians(diagonal_limit_min_rot_ys[yidx]), math.radians(diagonal_limit_min_rot_zs[yidx])),
+                                      MVector3D(math.radians(diagonal_limit_max_rot_xs[yidx]), math.radians(diagonal_limit_max_rot_ys[yidx]), math.radians(diagonal_limit_max_rot_zs[yidx])),
+                                      MVector3D(diagonal_spring_constant_mov_xs[yidx], diagonal_spring_constant_mov_ys[yidx], diagonal_spring_constant_mov_zs[yidx]), \
+                                      MVector3D(diagonal_spring_constant_rot_xs[yidx], diagonal_spring_constant_rot_ys[yidx], diagonal_spring_constant_rot_zs[yidx]))   # noqa
                         created_joints[joint.name] = joint
 
                         if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -499,15 +511,15 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        yi, _ = self.disassemble_bone_name(prev_below_bone_name)
+                        yidx, _ = self.disassemble_bone_name(prev_below_bone_name)
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[next_above_bone_name].index,
-                                      joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yi], diagonal_limit_min_mov_ys[yi], diagonal_limit_min_mov_zs[yi]), \
-                                      MVector3D(diagonal_limit_max_mov_xs[yi], diagonal_limit_max_mov_ys[yi], diagonal_limit_max_mov_zs[yi]),
-                                      MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
-                                      MVector3D(math.radians(diagonal_limit_max_rot_xs[yi]), math.radians(diagonal_limit_max_rot_ys[yi]), math.radians(diagonal_limit_max_rot_zs[yi])),
-                                      MVector3D(diagonal_spring_constant_mov_xs[yi], diagonal_spring_constant_mov_ys[yi], diagonal_spring_constant_mov_zs[yi]), \
-                                      MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
+                                      joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yidx], diagonal_limit_min_mov_ys[yidx], diagonal_limit_min_mov_zs[yidx]), \
+                                      MVector3D(diagonal_limit_max_mov_xs[yidx], diagonal_limit_max_mov_ys[yidx], diagonal_limit_max_mov_zs[yidx]),
+                                      MVector3D(math.radians(diagonal_limit_min_rot_xs[yidx]), math.radians(diagonal_limit_min_rot_ys[yidx]), math.radians(diagonal_limit_min_rot_zs[yidx])),
+                                      MVector3D(math.radians(diagonal_limit_max_rot_xs[yidx]), math.radians(diagonal_limit_max_rot_ys[yidx]), math.radians(diagonal_limit_max_rot_zs[yidx])),
+                                      MVector3D(diagonal_spring_constant_mov_xs[yidx], diagonal_spring_constant_mov_ys[yidx], diagonal_spring_constant_mov_zs[yidx]), \
+                                      MVector3D(diagonal_spring_constant_rot_xs[yidx], diagonal_spring_constant_rot_ys[yidx], diagonal_spring_constant_rot_zs[yidx]))   # noqa
                         created_joints[joint.name] = joint
 
                         if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -520,8 +532,7 @@ class PmxTailorExportService():
             joint.index = len(model.joints)
             model.joints[joint.name] = joint
     
-    def create_rigidbody(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, tmp_all_bones: dict, registed_bone_indexs: dict, \
-                         bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, target_bone_map: dict, target_bone_parents: dict, target_bone_positions: dict):    # noqa
+    def create_rigidbody(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict):
         # 剛体生成
         created_rigidbodies = {}
         # 剛体の質量
@@ -537,34 +548,40 @@ class PmxTailorExportService():
         # 剛体係数
         coefficient = param_option['rigidbody_coefficient']
 
-        v_yidxs = list(reversed(list(target_bone_map.keys())))
+        v_yidxs = list(reversed(list(registed_bone_indexs.keys())))
         rigidbody_limit_thicks = np.linspace(0.3, 0.1, len(v_yidxs))
 
         for yi, (above_v_yidx, below_v_yidx) in enumerate(zip(v_yidxs[1:], v_yidxs[:-1])):
-            below_v_xidxs = target_bone_map[below_v_yidx]
-            if below_v_yidx in vertex_connecteds[base_map_idx] and vertex_connecteds[base_map_idx][below_v_yidx]:
+            below_v_xidxs = list(registed_bone_indexs[below_v_yidx].keys())
+            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
+
+            if below_v_yidx < len(vertex_connected) and vertex_connected[below_v_yidx]:
                 # 繋がってる場合、最後に最初のボーンを追加する
-                below_v_xidxs += [target_bone_map[below_v_yidx][0]]
-            else:
+                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[0]]
+            elif len(registed_bone_indexs[below_v_yidx]) > 2:
                 # 繋がってない場合、最後に最後のひとつ前のボーンを追加する
-                below_v_xidxs += [target_bone_map[below_v_yidx][-2]]
+                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[-2]]
+            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
 
             for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
-                prev_below_v_xno = prev_below_v_xidx + 1
+                prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_v_xidx] + 1
+                next_below_v_xidx = registed_bone_indexs[below_v_yidx][next_below_v_xidx]
                 next_below_v_xno = next_below_v_xidx + 1
                 below_v_yno = below_v_yidx + 1
 
                 prev_below_bone_name = self.get_bone_name(abb_name, below_v_yno, prev_below_v_xno)
-                prev_below_bone_position = target_bone_positions[prev_below_bone_name]
+                prev_below_bone_position = tmp_all_bones[prev_below_bone_name]["bone"].position
                 next_below_bone_name = self.get_bone_name(abb_name, below_v_yno, next_below_v_xno)
-                next_below_bone_position = target_bone_positions[next_below_bone_name]
+                next_below_bone_position = tmp_all_bones[next_below_bone_name]["bone"].position
 
-                prev_above_bone_name = target_bone_parents[prev_below_bone_name]
-                prev_above_bone_position = target_bone_positions[prev_above_bone_name]
+                prev_above_bone_name = tmp_all_bones[prev_below_bone_name]["parent"]
+                prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
                 prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
-                
-                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_below_v_xno)
-                next_above_bone_position = tmp_all_bones[next_above_bone_name].position if next_above_bone_name in tmp_all_bones else target_bone_positions[next_below_bone_name]
+    
+                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - next_below_v_xidx)
+                next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
+                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
+                next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
 
                 if prev_above_bone_name in created_rigidbodies:
                     continue
@@ -573,12 +590,6 @@ class PmxTailorExportService():
                 if prev_above_bone_name in model.bones:
                     prev_above_bone_index = model.bones[prev_above_bone_name].index
 
-                # # 減衰：根元から末端の線形補間
-                # # 反発・摩擦：根元一定
-                # # masses = np.linspace(param_rigidbody.param.mass, param_rigidbody.param.mass * len(v_yidxs) * coefficient, len(v_yidxs))
-                # linear_dampinges = np.linspace(param_rigidbody.param.linear_damping, min(0.9999, param_rigidbody.param.linear_damping * len(v_yidxs) * coefficient), len(v_yidxs))
-                # angular_dampinges = np.linspace(param_rigidbody.param.angular_damping, min(0.9999, param_rigidbody.param.angular_damping * len(v_yidxs) * coefficient), len(v_yidxs))
-
                 # 剛体の傾き
                 shape_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
                 shape_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
@@ -586,14 +597,14 @@ class PmxTailorExportService():
                 shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).normalized()
 
                 shape_rotation_qq = MQuaternion.fromDirection(shape_axis, shape_axis_cross)
-                if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
+                if round(prev_below_bone_position.y(), 2) != round(prev_above_bone_position.y(), 2):
                     shape_rotation_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
                     shape_rotation_qq *= MQuaternion.fromEulerAngles(-90, 0, 0)
                     shape_rotation_qq *= MQuaternion.fromEulerAngles(0, -90, 0)
 
                 shape_rotation_euler = shape_rotation_qq.toEulerAngles()
 
-                if round(prev_below_bone_position.y(), 3) == round(prev_above_bone_position.y(), 3):
+                if round(prev_below_bone_position.y(), 2) == round(prev_above_bone_position.y(), 2):
                     shape_rotation_euler.setX(90)
                     
                 shape_rotation_radians = MVector3D(math.radians(shape_rotation_euler.x()), math.radians(shape_rotation_euler.y()), math.radians(shape_rotation_euler.z()))
@@ -656,8 +667,8 @@ class PmxTailorExportService():
             
             model.rigidbodies[rigidbody.name] = rigidbody
 
-    def create_weight(self, model: PmxModel, param_option: dict, base_map_idx: int, vertex_maps: list, vertex_connecteds: dict, duplicate_vertices: dict, \
-                      registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone):
+    def create_weight(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray, vertex_connected: dict, duplicate_vertices: dict, \
+                      registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict, root_bone: Bone, vertex_remaining_set: set):
         # ウェイト分布
         prev_weight_cnt = 0
         weight_cnt = 0
@@ -665,20 +676,19 @@ class PmxTailorExportService():
         # 略称
         abb_name = param_option['abb_name']
 
-        vertex_remaining_set = set(model.material_vertices[param_option['material_name']])
         v_yidxs = list(reversed(list(registed_bone_indexs.keys())))
         for above_v_yidx, below_v_yidx in zip(v_yidxs[1:], v_yidxs[:-1]):
-            above_v_xidxs = registed_bone_indexs[above_v_yidx]
-            below_v_xidxs = registed_bone_indexs[below_v_yidx]
+            above_v_xidxs = list(registed_bone_indexs[above_v_yidx].keys())
+            below_v_xidxs = list(registed_bone_indexs[below_v_yidx].keys())
             # 繋がってる場合、最後に最初のボーンを追加する
-            if vertex_connecteds[base_map_idx][above_v_yidx]:
-                above_v_xidxs += [registed_bone_indexs[above_v_yidx][0]]
-            if vertex_connecteds[base_map_idx][below_v_yidx]:
-                below_v_xidxs += [registed_bone_indexs[below_v_yidx][0]]
+            if vertex_connected[above_v_yidx]:
+                above_v_xidxs += [list(registed_bone_indexs[above_v_yidx].keys())[0]]
+            if vertex_connected[below_v_yidx]:
+                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[0]]
 
             for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
-                prev_below_v_xno = prev_below_v_xidx + 1
-                next_below_v_xno = next_below_v_xidx + 1
+                prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_v_xidx] + 1
+                next_below_v_xno = registed_bone_indexs[below_v_yidx][next_below_v_xidx] + 1
                 below_v_yno = below_v_yidx + 1
 
                 prev_below_bone = model.bones[self.get_bone_name(abb_name, below_v_yno, prev_below_v_xno)]
@@ -686,16 +696,17 @@ class PmxTailorExportService():
                 prev_above_bone = model.bones[model.bone_indexes[prev_below_bone.parent_index]]
                 next_above_bone = model.bones[model.bone_indexes[next_below_bone.parent_index]]
 
-                _, prev_above_v_xidx = self.disassemble_bone_name(prev_above_bone.name)
-                _, next_above_v_xidx = self.disassemble_bone_name(next_above_bone.name)
+                _, prev_above_v_xidx = self.disassemble_bone_name(prev_above_bone.name, registed_bone_indexs[above_v_yidx])
+                _, next_above_v_xidx = self.disassemble_bone_name(next_above_bone.name, registed_bone_indexs[above_v_yidx])
 
-                if xi > 0 and (next_below_v_xidx == registed_bone_indexs[below_v_yidx][0] or next_above_v_xidx == registed_bone_indexs[above_v_yidx][0]):
+                if xi > 0 and (next_below_v_xidx == registed_bone_indexs[below_v_yidx][list(registed_bone_indexs[below_v_yidx].keys())[0]] \
+                               or next_above_v_xidx == registed_bone_indexs[above_v_yidx][list(registed_bone_indexs[above_v_yidx].keys())[0]]):
                     # nextが最初のボーンである場合、最後まで
-                    v_map = vertex_maps[base_map_idx][above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
+                    v_map = vertex_map[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
                     b_h_distances = bone_horizonal_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
                     b_v_distances = bone_vertical_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):]
                 else:
-                    v_map = vertex_maps[base_map_idx][above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
+                    v_map = vertex_map[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
                     b_h_distances = bone_horizonal_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
                     b_v_distances = bone_vertical_distances[above_v_yidx:(below_v_yidx + 1), min(prev_below_v_xidx, prev_above_v_xidx):(max(next_below_v_xidx, next_above_v_xidx) + 1)]
                 
@@ -749,43 +760,42 @@ class PmxTailorExportService():
                                 if weight_cnt > 0 and weight_cnt // 1000 > prev_weight_cnt:
                                     logger.info(f"-- 頂点ウェイト: {weight_cnt}個目:終了")
                                     prev_weight_cnt = weight_cnt // 1000
-                                
-        vertex_remaining_map = {}
+        
+        return vertex_remaining_set
 
-        target_bone_map = copy.deepcopy(registed_bone_indexs)
-        target_bone_parents = {}
-        target_bone_positions = {}
+    def create_remaining_weight(self, model: PmxModel, param_option: dict, all_registed_bone_indexs: dict, root_bone: Bone, vertex_remaining_set: set):
+        # ウェイト分布
+        prev_weight_cnt = 0
+        weight_cnt = 0
 
-        for yidx, xs in registed_bone_indexs.items():
-            for xidx in xs:
-                bone_name = self.get_bone_name(abb_name, yidx + 1, xidx + 1)
-                target_bone_parents[bone_name] = model.bone_indexes[model.bones[bone_name].parent_index]
-                target_bone_positions[bone_name] = model.bones[bone_name].position
+        # 略称
+        abb_name = param_option['abb_name']
 
-        if len(list(vertex_remaining_set)) > 0:
-            # 基準頂点マップ以外の頂点が残っていたら、それも割り当てる
-            for vertex_idx in list(vertex_remaining_set):
-                v = model.vertex_dict[vertex_idx]
-                if vertex_idx < 0:
-                    continue
+        # 基準頂点マップ以外の頂点が残っていたら、それも割り当てる
+        for vertex_idx in list(vertex_remaining_set):
+            v = model.vertex_dict[vertex_idx]
+            if vertex_idx < 0:
+                continue
 
-                weight_cnt += 1
-                if weight_cnt > 0 and weight_cnt // 1000 > prev_weight_cnt:
-                    logger.info(f"-- 頂点ウェイト: {weight_cnt}個目:終了")
-                    prev_weight_cnt = weight_cnt // 1000
-                                
-                bone_prev_above_names = []
-                bone_prev_above_distances = []
-                bone_next_above_names = []
-                bone_next_above_distances = []
-                bone_prev_below_names = []
-                bone_prev_below_distances = []
-                bone_next_below_names = []
-                bone_next_below_distances = []
-                for byidx in reversed(registed_bone_indexs.keys()):
+            weight_cnt += 1
+            if weight_cnt > 0 and weight_cnt // 1000 > prev_weight_cnt:
+                logger.info(f"-- 頂点ウェイト: {weight_cnt}個目:終了")
+                prev_weight_cnt = weight_cnt // 1000
+                            
+            bone_prev_above_names = []
+            bone_prev_above_distances = []
+            bone_next_above_names = []
+            bone_next_above_distances = []
+            bone_prev_below_names = []
+            bone_prev_below_distances = []
+            bone_next_below_names = []
+            bone_next_below_distances = []
+            for registed_bone_indexs in all_registed_bone_indexs.values():
+                for byidx in list(reversed(registed_bone_indexs.keys()))[1:]:
+                    # 最下段にはウェイトを振らない
                     v_yno = byidx + 1
-                    for bxidx in registed_bone_indexs[byidx]:
-                        v_xno = bxidx + 1
+                    for bxidx, total_bxidx in registed_bone_indexs[byidx].items():
+                        v_xno = total_bxidx + 1
                         bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
                         if round(model.vertex_dict[vertex_idx].position.y(), 1) < round(model.bones[bone_name].position.y(), 1):
                             if round(model.vertex_dict[vertex_idx].position.x(), 1) < round(model.bones[bone_name].position.x(), 1):
@@ -802,260 +812,149 @@ class PmxTailorExportService():
                                 bone_next_below_names.append(bone_name)
                                 bone_next_below_distances.append(model.vertex_dict[vertex_idx].position.distanceToPoint(model.bones[bone_name].position))
 
-                prev_below_bone = None
-                next_below_bone = None
-                prev_above_bone = None
-                next_above_bone = None
+            prev_below_bone = None
+            next_below_bone = None
+            prev_above_bone = None
+            next_above_bone = None
 
-                if len(bone_prev_above_distances) > 0:
-                    prev_above_bone = model.bones[bone_prev_above_names[np.argmin(bone_prev_above_distances)]]
-                if len(bone_next_above_distances) > 0:
-                    next_above_bone = model.bones[bone_next_above_names[np.argmin(bone_next_above_distances)]]
+            if len(bone_prev_above_distances) > 0:
+                prev_above_bone = model.bones[bone_prev_above_names[np.argmin(bone_prev_above_distances)]]
+            if len(bone_next_above_distances) > 0:
+                next_above_bone = model.bones[bone_next_above_names[np.argmin(bone_next_above_distances)]]
 
-                if prev_above_bone and next_above_bone:
-                    prev_above_v_yidx, prev_above_v_xidx = self.disassemble_bone_name(prev_above_bone.name)
-                    next_above_v_yidx, next_above_v_xidx = self.disassemble_bone_name(next_above_bone.name)
+            if prev_above_bone and next_above_bone:
+                prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone.name)
+                next_above_v_yidx, _ = self.disassemble_bone_name(next_above_bone.name)
 
-                    if prev_above_v_yidx != next_above_v_yidx:
-                        # 高さが違う場合、揃える
-                        above_v_yidx = max(prev_above_v_yidx, next_above_v_yidx)
-                        if prev_above_v_yidx != above_v_yidx:
-                            for vdidx in np.argsort(bone_prev_above_distances):
-                                prev_above_v_yidx, prev_above_v_xidx = self.disassemble_bone_name(bone_prev_above_names[vdidx])
-                                if prev_above_v_yidx == above_v_yidx:
-                                    prev_above_bone = model.bones[bone_prev_above_names[vdidx]]
-                                    break
-                        if next_above_v_yidx != above_v_yidx:
-                            for vdidx in np.argsort(bone_next_above_distances):
-                                next_above_v_yidx, next_above_v_xidx = self.disassemble_bone_name(bone_next_above_names[vdidx])
-                                if next_above_v_yidx == above_v_yidx:
-                                    next_above_bone = model.bones[bone_next_above_names[vdidx]]
-                                    break
+                if prev_above_v_yidx != next_above_v_yidx:
+                    # 高さが違う場合、揃える
+                    above_v_yidx = max(prev_above_v_yidx, next_above_v_yidx)
+                    if prev_above_v_yidx != above_v_yidx:
+                        for vdidx in np.argsort(bone_prev_above_distances):
+                            prev_above_v_yidx, _ = self.disassemble_bone_name(bone_prev_above_names[vdidx])
+                            if prev_above_v_yidx == above_v_yidx:
+                                prev_above_bone = model.bones[bone_prev_above_names[vdidx]]
+                                break
+                    if next_above_v_yidx != above_v_yidx:
+                        for vdidx in np.argsort(bone_next_above_distances):
+                            next_above_v_yidx, _ = self.disassemble_bone_name(bone_next_above_names[vdidx])
+                            if next_above_v_yidx == above_v_yidx:
+                                next_above_bone = model.bones[bone_next_above_names[vdidx]]
+                                break
 
-                if len(bone_prev_below_distances) > 0 and ((bone_prev_above_distances and np.min(bone_prev_above_distances) * 1.5 >= np.min(bone_prev_below_distances)) or (not bone_prev_above_distances)):  # noqa
-                    prev_below_bone = model.bones[bone_prev_below_names[np.argmin(bone_prev_below_distances)]]
-                if len(bone_next_below_distances) > 0 and ((bone_next_above_distances and np.min(bone_next_above_distances) * 1.5 >= np.min(bone_next_below_distances)) or (not bone_next_above_distances)):  # noqa:
-                    next_below_bone = model.bones[bone_next_below_names[np.argmin(bone_next_below_distances)]]
+            if len(bone_prev_below_distances) > 0 and ((bone_prev_above_distances and np.min(bone_prev_above_distances) * 1.5 >= np.min(bone_prev_below_distances)) or (not bone_prev_above_distances)):  # noqa
+                prev_below_bone = model.bones[bone_prev_below_names[np.argmin(bone_prev_below_distances)]]
+            if len(bone_next_below_distances) > 0 and ((bone_next_above_distances and np.min(bone_next_above_distances) * 1.5 >= np.min(bone_next_below_distances)) or (not bone_next_above_distances)):  # noqa:
+                next_below_bone = model.bones[bone_next_below_names[np.argmin(bone_next_below_distances)]]
 
-                if prev_below_bone and next_below_bone:
-                    prev_below_v_yidx, prev_below_v_xidx = self.disassemble_bone_name(prev_below_bone.name)
-                    next_below_v_yidx, next_below_v_xidx = self.disassemble_bone_name(next_below_bone.name)
+            if prev_below_bone and next_below_bone:
+                prev_below_v_yidx, _ = self.disassemble_bone_name(prev_below_bone.name)
+                next_below_v_yidx, _ = self.disassemble_bone_name(next_below_bone.name)
 
-                    if prev_below_v_yidx != next_below_v_yidx:
-                        # 高さが違う場合、揃える
-                        below_v_yidx = max(prev_below_v_yidx, next_below_v_yidx)
-                        if prev_below_v_yidx != below_v_yidx:
-                            for vdidx in np.argsort(bone_prev_below_distances):
-                                prev_below_v_yidx, prev_below_v_xidx = self.disassemble_bone_name(bone_prev_below_names[vdidx])
-                                if prev_below_v_yidx == below_v_yidx:
-                                    prev_below_bone = model.bones[bone_prev_below_names[vdidx]]
-                                    break
-                        if next_below_v_yidx != below_v_yidx:
-                            for vdidx in np.argsort(bone_next_below_distances):
-                                next_below_v_yidx, next_below_v_xidx = self.disassemble_bone_name(bone_next_below_names[vdidx])
-                                if next_below_v_yidx == below_v_yidx:
-                                    next_below_bone = model.bones[bone_next_below_names[vdidx]]
-                                    break
+                if prev_below_v_yidx != next_below_v_yidx:
+                    # 高さが違う場合、揃える
+                    below_v_yidx = max(prev_below_v_yidx, next_below_v_yidx)
+                    if prev_below_v_yidx != below_v_yidx:
+                        for vdidx in np.argsort(bone_prev_below_distances):
+                            prev_below_v_yidx, _ = self.disassemble_bone_name(bone_prev_below_names[vdidx])
+                            if prev_below_v_yidx == below_v_yidx:
+                                prev_below_bone = model.bones[bone_prev_below_names[vdidx]]
+                                break
+                    if next_below_v_yidx != below_v_yidx:
+                        for vdidx in np.argsort(bone_next_below_distances):
+                            next_below_v_yidx, _ = self.disassemble_bone_name(bone_next_below_names[vdidx])
+                            if next_below_v_yidx == below_v_yidx:
+                                next_below_bone = model.bones[bone_next_below_names[vdidx]]
+                                break
 
-                v_prev_horizonal_distance = 0
-                if prev_above_bone:
-                    v_prev_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
-                                                MVector3D(model.bones[prev_above_bone.name].position.x(), 0, model.bones[prev_above_bone.name].position.z()))   # noqa
-                elif next_above_bone:
-                    v_prev_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
-                                                MVector3D(model.bones[next_above_bone.name].position.x(), 0, model.bones[next_above_bone.name].position.z()))   # noqa
-                else:
-                    v_prev_horizonal_distance = 1
+            v_prev_horizonal_distance = 0
+            if prev_above_bone:
+                v_prev_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
+                                            MVector3D(model.bones[prev_above_bone.name].position.x(), 0, model.bones[prev_above_bone.name].position.z()))   # noqa
+            elif next_above_bone:
+                v_prev_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
+                                            MVector3D(model.bones[next_above_bone.name].position.x(), 0, model.bones[next_above_bone.name].position.z()))   # noqa
+            else:
+                v_prev_horizonal_distance = 1
 
-                v_next_horizonal_distance = 0
-                if next_above_bone:
-                    v_next_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
-                                                MVector3D(model.bones[next_above_bone.name].position.x(), 0, model.bones[next_above_bone.name].position.z()))   # noqa
-                elif next_below_bone:
-                    v_next_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
-                                                MVector3D(model.bones[next_below_bone.name].position.x(), 0, model.bones[next_below_bone.name].position.z()))   # noqa
-                else:
-                    v_next_horizonal_distance = 1
+            v_next_horizonal_distance = 0
+            if next_above_bone:
+                v_next_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
+                                            MVector3D(model.bones[next_above_bone.name].position.x(), 0, model.bones[next_above_bone.name].position.z()))   # noqa
+            elif next_below_bone:
+                v_next_horizonal_distance = MVector3D(model.vertex_dict[vertex_idx].position.x(), 0, model.vertex_dict[vertex_idx].position.z()).distanceToPoint( \
+                                            MVector3D(model.bones[next_below_bone.name].position.x(), 0, model.bones[next_below_bone.name].position.z()))   # noqa
+            else:
+                v_next_horizonal_distance = 1
 
-                v_above_vertical_distance = 0
-                if prev_above_bone:
-                    v_above_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
-                                                MVector3D(0, model.bones[prev_above_bone.name].position.y(), 0))    # noqa
-                elif next_above_bone:
-                    v_above_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
-                                                MVector3D(0, model.bones[next_above_bone.name].position.y(), 0))    # noqa
-                else:
-                    v_above_vertical_distance = 1
-                
-                v_below_vertical_distance = 0
-                if prev_below_bone:
-                    v_below_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
-                                                MVector3D(0, model.bones[prev_below_bone.name].position.y(), 0))    # noqa
-                elif next_below_bone:
-                    v_below_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
-                                                MVector3D(0, model.bones[next_below_bone.name].position.y(), 0))    # noqa
-                else:
-                    v_below_vertical_distance = 1
-                
-                horizonal_distance = v_prev_horizonal_distance + v_next_horizonal_distance if v_prev_horizonal_distance or v_next_horizonal_distance else (v_prev_horizonal_distance + v_next_horizonal_distance) * 2   # noqa
-                vertical_distance = v_above_vertical_distance + v_below_vertical_distance if v_above_vertical_distance or v_below_vertical_distance else (v_above_vertical_distance + v_below_vertical_distance) * 2    # noqa
-
-                prev_above_weight = max(0, ((horizonal_distance - v_prev_horizonal_distance) / horizonal_distance) \
-                                        * ((vertical_distance - v_above_vertical_distance) / vertical_distance))
-                prev_below_weight = max(0, ((horizonal_distance - v_prev_horizonal_distance) / horizonal_distance) \
-                                        * ((vertical_distance - v_below_vertical_distance) / vertical_distance))
-                next_above_weight = max(0, ((horizonal_distance - v_next_horizonal_distance) / horizonal_distance) \
-                                        * ((vertical_distance - v_above_vertical_distance) / vertical_distance))
-                next_below_weight = max(0, ((horizonal_distance - v_next_horizonal_distance) / horizonal_distance) \
-                                        * ((vertical_distance - v_below_vertical_distance) / vertical_distance))
-
-                # 処理対象全ボーン名とウェイト
-                total_name_weights = {}
-                for bone, bweight in [(prev_above_bone, prev_above_weight), (next_above_bone, next_above_weight), (prev_below_bone, prev_below_weight), (next_below_bone, next_below_weight)]:
-                    if bone:
-                        if bone.name not in total_name_weights:
-                            total_name_weights[bone.name] = 0
-                        total_name_weights[bone.name] += bweight
-
-                # 埋まらなかった部分はルートボーンで埋める
-                for _ in range(len(total_name_weights.keys()), 4):
-                    total_name_weights[root_bone.name] = 0
-                weight_names = np.array(list(total_name_weights.keys()))
-                total_weights = np.array(list(total_name_weights.values()))
-
-                if len(np.nonzero(total_weights)[0]) > 0:
-                    weights = total_weights / total_weights.sum(axis=0, keepdims=1)
-                    weight_idxs = np.argsort(weights)
-
-                    if v.deform.index0 == model.bones[param_option['parent_bone_name']].index:
-                        # 重複頂点にも同じウェイトを割り当てる
-                        if np.count_nonzero(weights) == 1:
-                            weight1_bone = model.bones[weight_names[weight_idxs[-1]]]
-                            if weight1_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight1_bone.name] = {}
-                            vertex_remaining_map[weight1_bone.name][v.index] = 1
-                            v.deform = Bdef1(weight1_bone.index)
-                        elif np.count_nonzero(weights) == 2:
-                            weight1_bone = model.bones[weight_names[weight_idxs[-1]]]
-                            if weight1_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight1_bone.name] = {}
-                            vertex_remaining_map[weight1_bone.name][v.index] = weights[weight_idxs[-1]]
-
-                            weight2_bone = model.bones[weight_names[weight_idxs[-2]]]
-                            if weight2_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight2_bone.name] = {}
-                            vertex_remaining_map[weight2_bone.name][v.index] = 1 - weights[weight_idxs[-1]]
-
-                            v.deform = Bdef2(weight1_bone.index, weight2_bone.index, weights[weight_idxs[-1]])
-                        else:
-                            weight1_bone = model.bones[weight_names[weight_idxs[-1]]]
-                            if weight1_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight1_bone.name] = {}
-                            vertex_remaining_map[weight1_bone.name][v.index] = weights[weight_idxs[-1]]
-
-                            weight2_bone = model.bones[weight_names[weight_idxs[-2]]]
-                            if weight2_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight2_bone.name] = {}
-                            vertex_remaining_map[weight2_bone.name][v.index] = 1 - weights[weight_idxs[-2]]
-
-                            weight3_bone = model.bones[weight_names[weight_idxs[-3]]]
-                            if weight3_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight3_bone.name] = {}
-                            vertex_remaining_map[weight3_bone.name][v.index] = weights[weight_idxs[-3]]
-
-                            weight4_bone = model.bones[weight_names[weight_idxs[-4]]]
-                            if weight4_bone.name not in vertex_remaining_map:
-                                vertex_remaining_map[weight4_bone.name] = {}
-                            vertex_remaining_map[weight4_bone.name][v.index] = weights[weight_idxs[-4]]
-
-                            v.deform = Bdef4(weight1_bone.index, weight2_bone.index, weight3_bone.index, weight4_bone.index, \
-                                             weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
-
-            append_yidx = []
-
-            for parent_bone_name in sorted(list(vertex_remaining_map.keys())):
-                bone_vertices = vertex_remaining_map[parent_bone_name]
-                parent_bone = model.bones[parent_bone_name]
-
-                vertex_idxs = np.array(list(bone_vertices.keys()))
-                vertex_weights = np.array(list(bone_vertices.values()))
-
-                if np.max(vertex_weights) == 0:
-                    continue
-
-                max_vertex_idxs = [k for k, v in zip(vertex_idxs, vertex_weights) if v == np.max(vertex_weights)]
-                max_farthest_vertex_distances = [parent_bone.position.distanceToPoint(model.vertex_dict[k].position) for k in max_vertex_idxs]
-                max_farthest_vertex_idx = [k for k, v in zip(max_vertex_idxs, max_farthest_vertex_distances) if v == np.max(max_farthest_vertex_distances)][0]
-
-                bone_yidx, bone_xidx = self.disassemble_bone_name(parent_bone_name)
-                below_bone_yidx = bone_yidx + 1
-
-                if below_bone_yidx not in target_bone_map:
-                    target_bone_map[below_bone_yidx] = []
-
-                if bone_xidx not in target_bone_map[below_bone_yidx]:
-                    is_regist = False
-                    for xi, bxidx in enumerate(target_bone_map[below_bone_yidx]):
-                        if bxidx > bone_xidx:
-                            is_regist = True
-                            target_bone_map[below_bone_yidx].insert(xi, bone_xidx)
-                            break
-                    if not is_regist:
-                        target_bone_map[below_bone_yidx].append(bone_xidx)
-
-                    below_bone_name = self.get_bone_name(abb_name, below_bone_yidx + 1, bone_xidx + 1)
-                    target_bone_parents[below_bone_name] = parent_bone_name
-                    target_bone_positions[below_bone_name] = model.vertex_dict[max_farthest_vertex_idx].position
-                    append_yidx.append(below_bone_yidx)
-
-                # max_farthest_vertex_idx = -1
-                # for i in np.argsort(max_farthest_vertex_distances):
-                #     k = max_vertex_idxs[i]
-                #     v = max_farthest_vertex_distances[i]
-                #     if v > 0:
-                #         max_farthest_vertex_idx = k
-                #         break
-
-                # if max_farthest_vertex_idx < 0:
-                #     continue
-
-            #     if below_bone_yidx not in registed_bone_indexs:
-            #         registed_bone_indexs[below_bone_yidx] = []
-
-            #     if below_bone_name not in model.bones:
-            #         bone = Bone(below_bone_name, below_bone_name, model.vertex_dict[max_farthest_vertex_idx].position, parent_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
-            #         bone.index = len(list(model.bones.keys()))
-            #         # 親ボーンの表示先も同時設定
-            #         parent_bone.tail_index = bone.index
-            #         parent_bone.flag |= 0x0001
-
-            #         model.bones[bone.name] = bone
-            #         model.bone_indexes[bone.index] = bone.name
-
-            #         for xi, bxidx in enumerate(registed_bone_indexs[below_bone_yidx]):
-            #             if bxidx > bone_xidx:
-            #                 registed_bone_indexs[below_bone_yidx].insert(xi, bone_xidx)
-            #                 break
-
-            # bone_yidx = min(append_yidx)
-            # below_bone_yidx = bone_yidx + 1
-
-            # if below_bone_yidx not in target_bone_map:
-            #     target_bone_map[below_bone_yidx] = []
+            v_above_vertical_distance = 0
+            if prev_above_bone:
+                v_above_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
+                                            MVector3D(0, model.bones[prev_above_bone.name].position.y(), 0))    # noqa
+            elif next_above_bone:
+                v_above_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
+                                            MVector3D(0, model.bones[next_above_bone.name].position.y(), 0))    # noqa
+            else:
+                v_above_vertical_distance = 1
             
-            # for bone_xidx in target_bone_map[bone_yidx - 1]:
-            #     above_bone_name = self.get_bone_name(abb_name, bone_yidx + 1, bone_xidx + 1)
-            #     below_bone_name = self.get_bone_name(abb_name, below_bone_yidx + 1, bone_xidx + 1)
+            v_below_vertical_distance = 0
+            if prev_below_bone:
+                v_below_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
+                                            MVector3D(0, model.bones[prev_below_bone.name].position.y(), 0))    # noqa
+            elif next_below_bone:
+                v_below_vertical_distance = MVector3D(0, model.vertex_dict[vertex_idx].position.y(), 0).distanceToPoint( \
+                                            MVector3D(0, model.bones[next_below_bone.name].position.y(), 0))    # noqa
+            else:
+                v_below_vertical_distance = 1
+            
+            horizonal_distance = v_prev_horizonal_distance + v_next_horizonal_distance if v_prev_horizonal_distance or v_next_horizonal_distance else (v_prev_horizonal_distance + v_next_horizonal_distance) * 2   # noqa
+            vertical_distance = v_above_vertical_distance + v_below_vertical_distance if v_above_vertical_distance or v_below_vertical_distance else (v_above_vertical_distance + v_below_vertical_distance) * 2    # noqa
 
-            #     if below_bone_name not in target_bone_map:
-            #         above_parent_bone_name = model.bone_indexes[model.bones[above_bone_name].parent_index]
+            prev_above_weight = max(0, ((horizonal_distance - v_prev_horizonal_distance) / horizonal_distance) \
+                                    * ((vertical_distance - v_above_vertical_distance) / vertical_distance))
+            prev_below_weight = max(0, ((horizonal_distance - v_prev_horizonal_distance) / horizonal_distance) \
+                                    * ((vertical_distance - v_below_vertical_distance) / vertical_distance))
+            next_above_weight = max(0, ((horizonal_distance - v_next_horizonal_distance) / horizonal_distance) \
+                                    * ((vertical_distance - v_above_vertical_distance) / vertical_distance))
+            next_below_weight = max(0, ((horizonal_distance - v_next_horizonal_distance) / horizonal_distance) \
+                                    * ((vertical_distance - v_below_vertical_distance) / vertical_distance))
 
-            #         target_bone_map[below_bone_yidx].append(bone_xidx)
-            #         target_bone_positions[below_bone_name] = target_bone_positions[above_bone_name] + (target_bone_positions[above_bone_name] - target_bone_positions[above_parent_bone_name])
+            # 処理対象全ボーン名とウェイト
+            total_name_weights = {}
+            for bone, bweight in [(prev_above_bone, prev_above_weight), (next_above_bone, next_above_weight), (prev_below_bone, prev_below_weight), (next_below_bone, next_below_weight)]:
+                if bone:
+                    if bone.name not in total_name_weights:
+                        total_name_weights[bone.name] = 0
+                    total_name_weights[bone.name] += bweight
 
-        return target_bone_map, target_bone_parents, target_bone_positions
+            # 埋まらなかった部分はルートボーンで埋める
+            for _ in range(len(total_name_weights.keys()), 4):
+                total_name_weights[root_bone.name] = 0
+            weight_names = np.array(list(total_name_weights.keys()))
+            total_weights = np.array(list(total_name_weights.values()))
 
-    def create_bone(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray, vertex_connected: list):
+            if len(np.nonzero(total_weights)[0]) > 0:
+                weights = total_weights / total_weights.sum(axis=0, keepdims=1)
+                weight_idxs = np.argsort(weights)
+
+                if v.deform.index0 == model.bones[param_option['parent_bone_name']].index:
+                    # 重複頂点にも同じウェイトを割り当てる
+                    if np.count_nonzero(weights) == 1:
+                        weight1_bone = model.bones[weight_names[weight_idxs[-1]]]
+                        v.deform = Bdef1(weight1_bone.index)
+                    elif np.count_nonzero(weights) == 2:
+                        weight1_bone = model.bones[weight_names[weight_idxs[-1]]]
+                        weight2_bone = model.bones[weight_names[weight_idxs[-2]]]
+                        v.deform = Bdef2(weight1_bone.index, weight2_bone.index, weights[weight_idxs[-1]])
+                    else:
+                        weight1_bone = model.bones[weight_names[weight_idxs[-1]]]
+                        weight2_bone = model.bones[weight_names[weight_idxs[-2]]]
+                        weight3_bone = model.bones[weight_names[weight_idxs[-3]]]
+                        weight4_bone = model.bones[weight_names[weight_idxs[-4]]]
+                        v.deform = Bdef4(weight1_bone.index, weight2_bone.index, weight3_bone.index, weight4_bone.index, \
+                                         weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
+
+    def create_bone(self, model: PmxModel, param_option: dict, vertex_map_orders: list, vertex_maps: dict, vertex_connecteds: dict):
         # 中心ボーン生成
 
         # 略称
@@ -1076,109 +975,140 @@ class PmxTailorExportService():
         # 表示枠
         model.display_slots[material_name].references.append((0, model.bones[root_bone.name].index))
 
-        # Map用INDEXリスト(根元はボーン追従にするため、常に一段だけ)
-        v_yidxs = [0] + list(range(1, vertex_map.shape[0] - param_option["vertical_bone_density"] + 1, param_option["vertical_bone_density"]))
-        if v_yidxs[-1] < vertex_map.shape[0] - 1:
-            # 最下段は必ず登録
-            v_yidxs = v_yidxs + [vertex_map.shape[0] - 1]
-        
-        all_v_xidxs = []
-        for yi in range(vertex_map.shape[0]):
-            v_xidxs = list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]))
-            if not vertex_connected[yi] and v_xidxs[-1] < vertex_map.shape[1] - 1:
-                # 繋がってなくて、かつ端っこが登録されていない場合、登録
-                v_xidxs = v_xidxs + [vertex_map.shape[1] - 1]
-            all_v_xidxs.append(v_xidxs)
-
         tmp_all_bones = {}
-        bone_horizonal_distances = np.zeros(vertex_map.shape)
-        bone_vertical_distances = np.zeros(vertex_map.shape)
+        all_bone_indexes = {}
+        all_registed_bone_indexs = {}
+        all_bone_horizonal_distances = {}
+        all_bone_vertical_distances = {}
 
-        for yi, v_yidx in enumerate(v_yidxs):
-            for v_xidx in all_v_xidxs[yi]:
-                if vertex_map[v_yidx, v_xidx] < 0:
-                    # 存在しない頂点はスルー
-                    continue
+        for base_map_idx in vertex_map_orders:
+            vertex_map = vertex_maps[base_map_idx]
+            vertex_connected = vertex_connecteds[base_map_idx]
 
-                v = model.vertex_dict[vertex_map[v_yidx, v_xidx]]
-                v_xno = v_xidx + 1
-                v_yno = v_yidx + 1
+            # Map用INDEXリスト(根元はボーン追従にするため、常に一段だけ)
+            v_yidxs = [0] + list(range(1, vertex_map.shape[0] - param_option["vertical_bone_density"] + 1, param_option["vertical_bone_density"]))
+            if v_yidxs[-1] < vertex_map.shape[0] - 1:
+                # 最下段は必ず登録
+                v_yidxs = v_yidxs + [vertex_map.shape[0] - 1]
+            
+            all_bone_indexes[base_map_idx] = {}
+            for yi in range(vertex_map.shape[0]):
+                all_bone_indexes[base_map_idx][yi] = {}
+                v_xidxs = list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]))
+                if not vertex_connected[yi] and v_xidxs[-1] < vertex_map.shape[1] - 1:
+                    # 繋がってなくて、かつ端っこが登録されていない場合、登録
+                    v_xidxs = v_xidxs + [vertex_map.shape[1] - 1]
+                max_xi = 0
+                for midx, myidxs in all_bone_indexes.items():
+                    if midx != base_map_idx and yi in all_bone_indexes[midx]:
+                        max_xi = max(list(all_bone_indexes[midx][yi].keys())) + 1
+                for xi in v_xidxs:
+                    all_bone_indexes[base_map_idx][yi][xi] = xi + max_xi
+            
+        for base_map_idx in vertex_map_orders:
+            vertex_map = vertex_maps[base_map_idx]
+            vertex_connected = vertex_connecteds[base_map_idx]
+            registed_bone_indexs = {}
 
-                # ボーン仮登録
-                bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
-                bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
-                tmp_all_bones[bone.name] = bone
+            bone_horizonal_distances = np.zeros(vertex_map.shape)
+            bone_vertical_distances = np.zeros(vertex_map.shape)
 
-        # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
-        for v_yidx in range(vertex_map.shape[0]):
-            for v_xidx in range(vertex_map.shape[1]):
-                if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx, v_xidx - 1] >= 0:
-                    now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
-                    prev_v_vec = now_v_vec if v_xidx == 0 else model.vertex_dict[vertex_map[v_yidx, v_xidx - 1]].position
-                    bone_horizonal_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
-                if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx - 1, v_xidx] >= 0:
-                    now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
-                    prev_v_vec = now_v_vec if v_yidx == 0 else model.vertex_dict[vertex_map[v_yidx - 1, v_xidx]].position
-                    bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
-
-        # 最下段の横幅最小値(段数単位)
-        edge_size = np.min(bone_horizonal_distances[-1, 1:]) * param_option["horizonal_bone_density"]
-
-        registed_bone_indexs = {}
-
-        for yi, v_yidx in enumerate(v_yidxs):
-            prev_xidx = 0
-            registed_bone_indexs[v_yidx] = []
-
-            for v_xidx in all_v_xidxs[yi]:
-                if v_xidx == 0 or (not vertex_connected[yi] and v_xidx == all_v_xidxs[yi][-1]) or \
-                    not param_option['bone_thinning_out'] or (param_option['bone_thinning_out'] and \
-                    np.sum(bone_horizonal_distances[v_yidx, (prev_xidx + 1):(v_xidx + 1)]) >= edge_size * 0.9):  # noqa
-                    # 前ボーンとの間隔が最下段の横幅平均値より開いている場合、登録対象
-                    v_xno = v_xidx + 1
+            for yi, v_yidx in enumerate(v_yidxs):
+                for v_xidx, total_v_xidx in all_bone_indexes[base_map_idx][yi].items():
+                    if vertex_map[v_yidx, v_xidx] < 0:
+                        # 存在しない頂点はスルー
+                        continue
+                    
+                    v = model.vertex_dict[vertex_map[v_yidx, v_xidx]]
+                    v_xno = total_v_xidx + 1
                     v_yno = v_yidx + 1
 
-                    # ボーン名
+                    # ボーン仮登録
                     bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
-                    if bone_name not in tmp_all_bones:
-                        continue
+                    bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
+                    tmp_all_bones[bone.name] = {"bone": bone, "parent": root_bone.name, "regist": False}
+                    logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
 
-                    # ボーン本登録
-                    bone = tmp_all_bones[bone_name]
-                    bone.index = len(list(model.bones.keys()))
+            # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
+            for v_yidx in range(vertex_map.shape[0]):
+                for v_xidx in range(vertex_map.shape[1]):
+                    if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx, v_xidx - 1] >= 0:
+                        now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
+                        prev_v_vec = now_v_vec if v_xidx == 0 else model.vertex_dict[vertex_map[v_yidx, v_xidx - 1]].position
+                        bone_horizonal_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                    if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx - 1, v_xidx] >= 0:
+                        now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
+                        prev_v_vec = now_v_vec if v_yidx == 0 else model.vertex_dict[vertex_map[v_yidx - 1, v_xidx]].position
+                        bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
 
-                    if yi > 0:
-                        parent_v_xidx_diff = np.abs(np.array(registed_bone_indexs[v_yidxs[yi - 1]]) - v_xidx)
+            all_bone_horizonal_distances[base_map_idx] = bone_horizonal_distances
+            all_bone_vertical_distances[base_map_idx] = bone_vertical_distances
 
-                        # 2段目以降は最も近い親段でv_xidxを探す
-                        parent_v_xidx = registed_bone_indexs[v_yidxs[yi - 1]][(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(parent_v_xidx_diff) else np.argmin(parent_v_xidx_diff))]   # noqa
+            # 最下段の横幅最小値(段数単位)
+            edge_size = np.min(bone_horizonal_distances[-1, 1:]) * param_option["horizonal_bone_density"]
 
-                        parent_bone = model.bones[self.get_bone_name(abb_name, v_yidxs[yi - 1] + 1, parent_v_xidx + 1)]
-                        bone.parent_index = parent_bone.index
+            for yi, v_yidx in enumerate(v_yidxs):
+                prev_xidx = 0
+                if v_yidx not in registed_bone_indexs:
+                    registed_bone_indexs[v_yidx] = {}
 
-                        # 親ボーンの表示先も同時設定
-                        parent_bone.tail_index = bone.index
-                        parent_bone.flag |= 0x0001
+                for v_xidx, total_v_xidx in all_bone_indexes[base_map_idx][yi].items():
+                    if v_xidx == 0 or (not vertex_connected[yi] and v_xidx == list(all_bone_indexes[base_map_idx][yi].keys())[-1]) or \
+                        not param_option['bone_thinning_out'] or (param_option['bone_thinning_out'] and \
+                        np.sum(bone_horizonal_distances[v_yidx, (prev_xidx + 1):(v_xidx + 1)]) >= edge_size * 0.9):  # noqa
+                        # 前ボーンとの間隔が最下段の横幅平均値より開いている場合、登録対象
+                        v_xno = total_v_xidx + 1
+                        v_yno = v_yidx + 1
 
-                    model.bones[bone.name] = bone
-                    model.bone_indexes[bone.index] = bone.name
+                        # ボーン名
+                        bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
+                        if bone_name not in tmp_all_bones:
+                            continue
 
-                    registed_bone_indexs[v_yidx].append(v_xidx)
+                        # ボーン本登録
+                        bone = tmp_all_bones[bone_name]["bone"]
+                        bone.index = len(list(model.bones.keys()))
 
-                    # 表示枠
-                    model.display_slots[material_name].references.append((0, bone.index))
+                        if yi > 0:
+                            parent_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi - 1]].values())) - total_v_xidx)
 
-                    # 前ボーンとして設定
-                    prev_xidx = v_xidx
-        
-        return root_bone, tmp_all_bones, registed_bone_indexs, bone_horizonal_distances, bone_vertical_distances
+                            # 2段目以降は最も近い親段でv_xidxを探す
+                            parent_v_xidx = list(registed_bone_indexs[v_yidxs[yi - 1]].values())[(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(parent_v_xidx_diff) else np.argmin(parent_v_xidx_diff))]   # noqa
+
+                            parent_bone = model.bones[self.get_bone_name(abb_name, v_yidxs[yi - 1] + 1, parent_v_xidx + 1)]
+                            bone.parent_index = parent_bone.index
+                            tmp_all_bones[bone.name]["parent"] = parent_bone.name
+
+                            # 親ボーンの表示先も同時設定
+                            parent_bone.tail_index = bone.index
+                            parent_bone.flag |= 0x0001
+
+                        model.bones[bone.name] = bone
+                        model.bone_indexes[bone.index] = bone.name
+                        tmp_all_bones[bone.name]["regist"] = True
+
+                        registed_bone_indexs[v_yidx][v_xidx] = total_v_xidx
+
+                        # 表示枠
+                        model.display_slots[material_name].references.append((0, bone.index))
+
+                        # 前ボーンとして設定
+                        prev_xidx = v_xidx
+            
+            logger.debug(f"registed_bone_indexs: {registed_bone_indexs}")
+
+            all_registed_bone_indexs[base_map_idx] = registed_bone_indexs
+
+        return root_bone, tmp_all_bones, all_registed_bone_indexs, all_bone_horizonal_distances, all_bone_vertical_distances
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
         return f'{abb_name}-{(v_yno):03d}-{(v_xno):03d}'
 
-    def disassemble_bone_name(self, bone_name: str):
-        v_xidx = int(bone_name[-3:]) - 1
+    def disassemble_bone_name(self, bone_name: str, v_xidxs=None):
+        total_v_xidx = int(bone_name[-3:]) - 1
+        v_xidx = [k for k, v in v_xidxs.items() if v == total_v_xidx][0] if v_xidxs else total_v_xidx
         v_yidx = int(bone_name[-7:-4]) - 1
+
         return v_yidx, v_xidx
 
     # 頂点を展開した図を作成
@@ -1206,15 +1136,22 @@ class PmxTailorExportService():
         index_combs_by_vpos = {}
         duplicate_indices = {}
         below_iidx = None
-        max_below_x = 99999999
+        max_below_x = -9999
         for index_idx in model.material_indices[param_option['material_name']]:
             # 頂点の組み合わせから面INDEXを引く
             indices_by_vidx[tuple(sorted(model.indices[index_idx]))] = index_idx
+            v0 = model.vertex_dict[model.indices[index_idx][0]]
+            v1 = model.vertex_dict[model.indices[index_idx][1]]
+            v2 = model.vertex_dict[model.indices[index_idx][2]]
+            below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0)) * \
+                v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
+            # below_x = abs(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).x())
+            if below_x > max_below_x:
+                below_iidx = index_idx
+                max_below_x = below_x
             # 重複辺（2点）の組み合わせ
             index_combs = list(itertools.combinations(model.indices[index_idx], 2))
             for (iv1, iv2) in index_combs:
-                if abs((model.vertex_dict[iv1].position - model.vertex_dict[iv1].position).normalized().x()) < max_below_x:
-                    below_iidx = index_idx
                 for ivv1, ivv2 in list(itertools.product(duplicate_vertices[model.vertex_dict[iv1].position.to_log()], duplicate_vertices[model.vertex_dict[iv2].position.to_log()])):
                     # 小さいINDEX・大きい頂点INDEXのセットでキー生成
                     key = (min(ivv1, ivv2), max(ivv1, ivv2))
@@ -1247,23 +1184,30 @@ class PmxTailorExportService():
         vertical_iidxs = []
         prev_index_cnt = 0
 
-        logger.debug(f'below_iidx: {below_iidx}')
-
         while len(registed_iidxs) < len(model.material_indices[param_option['material_name']]):
             if not vertical_iidxs:
                 # 切替時はとりあえず一面取り出して判定(二次元配列になる)
-                if not registed_iidxs:
-                    # 初回は出来るだけ真っ直ぐの辺がある面とする
-                    index_idx = below_iidx
-                else:
+                if registed_iidxs:
+                    # 出来るだけ真っ直ぐの辺がある面とする
+                    below_iidx = None
+                    max_below_x = -9999
                     remaining_iidxs = list(set(model.material_indices[param_option['material_name']]) - set(registed_iidxs))
-                    index_idx = remaining_iidxs[0]
+                    for index_idx in remaining_iidxs:
+                        v0 = model.vertex_dict[model.indices[index_idx][0]]
+                        v1 = model.vertex_dict[model.indices[index_idx][1]]
+                        v2 = model.vertex_dict[model.indices[index_idx][2]]
+                        below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0)) * \
+                            v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
+                        if below_x > max_below_x:
+                            below_iidx = index_idx
+                            max_below_x = below_x
+                logger.debug(f'below_iidx: {below_iidx}')
                 first_vertex_axis_map, first_vertex_coordinate_map = \
-                    self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, {}, {}, index_idx)
+                    self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, {}, {}, below_iidx)
                 vertex_axis_maps.append(first_vertex_axis_map)
                 vertex_coordinate_maps.append(first_vertex_coordinate_map)
-                registed_iidxs.append(index_idx)
-                vertical_iidxs.append(index_idx)
+                registed_iidxs.append(below_iidx)
+                vertical_iidxs.append(below_iidx)
                 
                 # 斜めが埋まってる場合、残りの一点を埋める
                 vertex_axis_maps[-1], vertex_coordinate_maps[-1], registed_iidxs, diagonal_now_iidxs = \
@@ -1312,6 +1256,8 @@ class PmxTailorExportService():
 
                         if not now_vertical_iidxs:
                             break
+
+                logger.debug(f'縦一列: {total_vertical_iidxs} --------------')
                 
                 # 縦が終わった場合、横に移動する
                 min_x, min_y, max_x, max_y = self.get_axis_range(model, vertex_coordinate_maps[-1], registed_iidxs)
@@ -1383,8 +1329,11 @@ class PmxTailorExportService():
                 if vertex_map.shape[0] > vmap['y'] - min_y and vertex_map.shape[1] > vmap['x'] - min_x:
                     logger.debug(f"vertex_map: y[{vmap['y'] - min_y}], x[{vmap['x'] - min_x}]: vidx[{vmap['vidx']}] orgx[{vmap['x']}] orgy[{vmap['y']}] pos[{vmap['position'].to_log()}]")
 
-                    vertex_map[vmap['y'] - min_y, vmap['x'] - min_x] = vmap['vidx']
-                    vertex_display_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
+                    try:
+                        vertex_map[vmap['y'] - min_y, vmap['x'] - min_x] = vmap['vidx']
+                        vertex_display_map[vmap['y'] - min_y, vmap['x'] - min_x] = ':'.join([str(v) for v in vertex_coordinate_map[(vmap['x'], vmap['y'])]])
+                    except Exception as e:
+                        logger.debug("vertex_map失敗: %s", e)
 
             # 左端と右端で面が連続しているかチェック
             for yi in range(vertex_map.shape[0]):
@@ -1396,6 +1345,8 @@ class PmxTailorExportService():
                             is_connect = True
                             break
                 vertex_connected.append(is_connect)
+
+            logger.debug(f'vertex_connected: {vertex_connected}')
 
             vertex_maps.append(vertex_map)
             vertex_connecteds.append(vertex_connected)
@@ -1725,23 +1676,71 @@ class PmxTailorExportService():
 
             for vidx in vs_duplicated[v1.index]:
                 # v1 は位置関係で当てはめる
-                if abs(v0.position.y() - v1.position.y()) < abs(v2.position.y() - v1.position.y()):
-                    # v1は横展開とみなす
-                    vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
-                    vy = 0
-                elif abs(v0.position.y() - v1.position.y()) == abs(v2.position.y() - v1.position.y()):
-                    vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
-                    vy = 0
-                else:
-                    vy = -1 if v0.position.y() < v1.position.y() else 1
-                    v1dot = MVector3D.dotProduct(MVector3D(0, -vy), (v1.position - v0.position).normalized())
-                    v2dot = MVector3D.dotProduct(MVector3D(0, -vy), (v2.position - v0.position).normalized())
-                    if v1dot > v2dot:
-                        # v1の方がv0に近い場合、xは0
-                        vx = 0
+                if round(v0.position.y(), 2) == round(v1.position.y(), 2) == round(v2.position.y(), 2):
+                    v1dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v1.position - v0.position).normalized())
+                    v2dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v2.position - v0.position).normalized())
+
+                    if abs(v1dot) > abs(v2dot):
+                        # v1の方がv2よりX平行に近い場合、v1は横方向とみなす
+                        vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
+                        vy = 0
                     else:
-                        # v2の方がv0に近い場合、斜めと見なして外積から時計回りで求める
-                        vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
+                        # v2の方がv1よりX平行に近い場合、v1は縦方向とみなす
+                        vx = 0
+                        vy = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
+                else:
+                    if abs(v1.position.y() - v0.position.y()) < abs(v2.position.y() - v0.position.y()):
+                        # v1は横展開とみなす
+                        if v0.position.y() < v2.position.y():
+                            # 上にあがる場合、v1は左方向
+                            vx = -1
+                        else:
+                            # 下におりる場合、v1は右方向
+                            vx = 1
+                        # vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
+                        # vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
+                        # vx = int(np.sign(MVector3D.crossProduct((v0.position - v1.position).normalized(), (v1.position - v2.position).normalized()).z()))
+                        # vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
+                        vy = 0
+                    else:
+                        vy = -1 if v0.position.y() < v1.position.y() else 1
+                        v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
+                        v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
+                        if v1dot > v2dot:
+                            # v1の方がv0に近い場合、v1は縦展開とみなす
+                            vx = 0
+                        else:
+                            # v2の方がv0に近い場合、v1は斜めと見なす
+                            if abs(v1.position.y() - v0.position.y()) < abs(v2.position.y() - v0.position.y()):
+                                # ＼の場合、v1は左方向
+                                vx = -1
+                            else:
+                                # ／の場合、v1は右方向
+                                vx = 1
+
+                            # vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
+                            # vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
+                            # vx = int(np.sign(MVector3D.crossProduct((v0.position - v1.position).normalized(), (v1.position - v2.position).normalized()).z()))
+
+                    # dot = MVector3D.dotProduct((v2.position - v0.position).normalized(), (v1.position - v0.position).normalized())
+                    # v1dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v1.position - v0.position).normalized())
+                    # v2dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v2.position - v0.position).normalized())
+
+                    # if abs(v1dot) > abs(v2dot):
+                    #     # v1の方がv2よりX平行に近い場合、v1は横方向とみなす
+                    #     vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
+                    #     vy = 0
+                    # else:
+                    #     # v2の方がv1よりX平行に近い場合、v1は縦方向とみなす
+                    #     vy = -1 if v0.position.y() < v1.position.y() else 1
+                    #     v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
+                    #     v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
+                    #     if v1dot > v2dot:
+                    #         # v1の方がv0に近い場合、xは0
+                    #         vx = 0
+                    #     else:
+                    #         # v2の方がv0に近い場合、斜めと見なして外積から時計回りで求める
+                    #         vx = int(np.sign(MVector3D.crossProduct((v0.position - v1.position).normalized(), (v2.position - v1.position).normalized()).z()))
 
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': vx, 'y': vy, 'position': model.vertex_dict[vidx].position, 'duplicate': duplicate_vertices[model.vertex_dict[vidx].position.to_log()]}
             vertex_coordinate_map[(vx, vy)] = vs_duplicated[v1.index]
@@ -1810,8 +1809,7 @@ class PmxTailorExportService():
                 remaining_y = vv0_y
                 logger.debug(f"get_remaining_vertex_vec(縦): {remaining_x}, {remaining_y}")
             else:
-                # Yのみで距離判定
-                remaining_y = vv0_y if abs(remaining_v.position.y() - vv0_vec.y()) < abs(remaining_v.position.y() - vv1_vec.y()) else vv1_y
+                remaining_y = vv1_y if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_y
                 logger.debug(f"get_remaining_vertex_vec(縦計算): {remaining_x}, {remaining_y}")
 
         elif vv0_y == vv1_y:
@@ -1829,14 +1827,7 @@ class PmxTailorExportService():
                 remaining_x = vv0_x
                 logger.debug(f"get_remaining_vertex_vec(横): {remaining_x}, {remaining_y}")
             else:
-                # Y抜きで距離判定
-                z_sign = np.sign(MVector3D.crossProduct((vv1_vec - remaining_v.position).normalized(), (vv0_vec - remaining_v.position).normalized()).z())
-                if z_sign == 1:
-                    remaining_x = vv0_x
-                elif z_sign == -1:
-                    remaining_x = vv1_x
-                else:
-                    remaining_x = vv1_x if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_x
+                remaining_x = vv1_x if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_x
                 logger.debug(f"get_remaining_vertex_vec(横計算): {remaining_x}, {remaining_y}")
         else:
             # 斜めが一致している場合
