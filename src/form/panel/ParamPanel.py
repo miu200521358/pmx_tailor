@@ -232,10 +232,21 @@ class PhysicsParam():
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
 
-        self.simple_header_grid_sizer.Add(wx.StaticText(self.simple_window, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize, 0), 0, wx.ALL, 5)
-        self.simple_header_grid_sizer.Add(wx.StaticText(self.simple_window, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize, 0), 0, wx.ALL, 5)
-
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
+
+        self.simple_back_material_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.simple_back_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"裏面材質", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_back_material_txt.SetToolTip(u"物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます")
+        self.simple_back_material_txt.Wrap(-1)
+        self.simple_back_material_sizer.Add(self.simple_back_material_txt, 0, wx.ALL, 5)
+
+        self.simple_back_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
+        self.simple_back_material_ctrl.SetToolTip(u"物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます")
+        self.simple_back_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_back_material_sizer.Add(self.simple_back_material_ctrl, 0, wx.ALL, 5)
+
+        self.simple_param_sizer.Add(self.simple_back_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
 
@@ -1407,8 +1418,13 @@ class PhysicsParam():
                 logger.error("頂点のない材質が指定されています。", decoration=MLogger.DECORATION_BOX)
                 return params
 
+            if self.simple_material_ctrl.GetStringSelection() == self.simple_back_material_ctrl.GetStringSelection():
+                logger.error("物理材質と同じ材質が裏面に指定されています。", decoration=MLogger.DECORATION_BOX)
+                return params
+
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
+            params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["similarity"] = self.simple_similarity_slider.GetValue()

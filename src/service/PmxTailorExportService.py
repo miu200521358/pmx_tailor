@@ -79,7 +79,7 @@ class PmxTailorExportService():
 
         logger.info(f"{param_option['material_name']}: 頂点マップ生成", decoration=MLogger.DECORATION_LINE)
 
-        vertex_maps, vertex_connecteds, duplicate_vertices = self.create_vertex_map(model, param_option)
+        vertex_maps, vertex_connecteds, duplicate_vertices = self.create_vertex_map(model, param_option, param_option['material_name'])
         
         # 各頂点の有効INDEX数が最も多いものをベースとする
         map_cnt = []
@@ -110,7 +110,12 @@ class PmxTailorExportService():
             logger.info(f"【{param_option['material_name']}】 残ウェイト分布", decoration=MLogger.DECORATION_LINE)
             
             self.create_remaining_weight(model, param_option, all_registed_bone_indexs, root_bone, vertex_remaining_set)
+ 
+        if param_option['back_material_name']:
+            logger.info(f"【{param_option['material_name']}】 裏面ウェイト分布", decoration=MLogger.DECORATION_LINE)
 
+            self.create_back_weight(model, param_option)
+ 
         for base_map_idx in vertex_map_orders:
             logger.info(f"【{param_option['material_name']}(No.{base_map_idx + 1})】 剛体生成", decoration=MLogger.DECORATION_LINE)
 
@@ -762,6 +767,27 @@ class PmxTailorExportService():
                                     prev_weight_cnt = weight_cnt // 1000
         
         return vertex_remaining_set
+    
+    def create_back_weight(self, model: PmxModel, param_option: dict):
+        # ウェイト分布
+        prev_weight_cnt = 0
+        weight_cnt = 0
+
+        for vertex_idx in list(model.material_vertices[param_option['back_material_name']]):
+            bv = model.vertex_dict[vertex_idx]
+
+            front_vertex_distances = {}
+            for front_vertex_idx in list(model.material_vertices[param_option['material_name']]):
+                front_vertex_distances[front_vertex_idx] = bv.position.distanceToPoint(model.vertex_dict[front_vertex_idx].position)
+
+            # 直近頂点INDEXのウェイトを転写
+            copy_front_vertex_idx = list(front_vertex_distances.keys())[np.argmin(list(front_vertex_distances.values()))]
+            bv.deform = copy.deepcopy(model.vertex_dict[copy_front_vertex_idx].deform)
+
+            weight_cnt += 1
+            if weight_cnt > 0 and weight_cnt // 10 > prev_weight_cnt:
+                logger.info(f"-- 裏頂点ウェイト: {weight_cnt}個目:終了")
+                prev_weight_cnt = weight_cnt // 10
 
     def create_remaining_weight(self, model: PmxModel, param_option: dict, all_registed_bone_indexs: dict, root_bone: Bone, vertex_remaining_set: set):
         # ウェイト分布
@@ -1112,14 +1138,14 @@ class PmxTailorExportService():
         return v_yidx, v_xidx
 
     # 頂点を展開した図を作成
-    def create_vertex_map(self, model: PmxModel, param_option: dict):
-        logger.info(f"{param_option['material_name']}: 面の抽出")
+    def create_vertex_map(self, model: PmxModel, param_option: dict, material_name: str):
+        logger.info(f"{material_name}: 面の抽出")
 
-        logger.info(f"{param_option['material_name']}: 重複頂点の抽出")
+        logger.info(f"{material_name}: 重複頂点の抽出")
 
         # 位置ベースで重複頂点の抽出
         duplicate_vertices = {}
-        for vertex_idx in model.material_vertices[param_option['material_name']]:
+        for vertex_idx in model.material_vertices[material_name]:
             # 重複頂点の抽出
             vertex = model.vertex_dict[vertex_idx]
             key = vertex.position.to_log()
@@ -1137,7 +1163,7 @@ class PmxTailorExportService():
         duplicate_indices = {}
         below_iidx = None
         max_below_x = -9999
-        for index_idx in model.material_indices[param_option['material_name']]:
+        for index_idx in model.material_indices[material_name]:
             # 頂点の組み合わせから面INDEXを引く
             indices_by_vidx[tuple(sorted(model.indices[index_idx]))] = index_idx
             v0 = model.vertex_dict[model.indices[index_idx][0]]
@@ -1175,7 +1201,7 @@ class PmxTailorExportService():
                 if key not in index_combs_by_vpos[vpkey]:
                     index_combs_by_vpos[vpkey].append(key)
 
-        logger.info(f"{param_option['material_name']}: 相対頂点マップの生成")
+        logger.info(f"{material_name}: 相対頂点マップの生成")
 
         # 頂点マップ生成(最初の頂点が(0, 0))
         vertex_axis_maps = []
@@ -1184,14 +1210,14 @@ class PmxTailorExportService():
         vertical_iidxs = []
         prev_index_cnt = 0
 
-        while len(registed_iidxs) < len(model.material_indices[param_option['material_name']]):
+        while len(registed_iidxs) < len(model.material_indices[material_name]):
             if not vertical_iidxs:
                 # 切替時はとりあえず一面取り出して判定(二次元配列になる)
                 if registed_iidxs:
                     # 出来るだけ真っ直ぐの辺がある面とする
                     below_iidx = None
                     max_below_x = -9999
-                    remaining_iidxs = list(set(model.material_indices[param_option['material_name']]) - set(registed_iidxs))
+                    remaining_iidxs = list(set(model.material_indices[material_name]) - set(registed_iidxs))
                     for index_idx in remaining_iidxs:
                         v0 = model.vertex_dict[model.indices[index_idx][0]]
                         v1 = model.vertex_dict[model.indices[index_idx][1]]
@@ -1279,7 +1305,7 @@ class PmxTailorExportService():
                 vertical_iidxs = now_vertical_iidxs
                 
             if not vertical_iidxs:
-                remaining_iidxs = list(set(model.material_indices[param_option['material_name']]) - set(registed_iidxs))
+                remaining_iidxs = list(set(model.material_indices[material_name]) - set(registed_iidxs))
                 # 全頂点登録済みの面を潰していく
                 for index_idx in remaining_iidxs:
                     iv0, iv1, iv2 = model.indices[index_idx]
@@ -1293,7 +1319,7 @@ class PmxTailorExportService():
             
         logger.info(f"-- 面: {len(registed_iidxs)}個目:終了")
 
-        logger.info(f"{param_option['material_name']}: 絶対頂点マップの生成")
+        logger.info(f"{material_name}: 絶対頂点マップの生成")
         vertex_maps = []
         vertex_connecteds = []
 
