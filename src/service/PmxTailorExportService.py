@@ -622,9 +622,14 @@ class PmxTailorExportService():
                 # 剛体の位置
                 rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
                 if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
-                    shape_position = prev_above_bone_position + MVector3D(0, rigidbody_vertical_vec.y(), 0)
+                    mat = MMatrix4x4()
+                    mat.setToIdentity()
+                    mat.rotate(shape_rotation_qq)
+                    thick_vec = mat * MVector3D(0, 0, -rigidbody_limit_thicks[yi] / 2)
+
+                    shape_position = prev_above_bone_position + MVector3D(0, rigidbody_vertical_vec.y(), 0) + thick_vec
                 else:
-                    shape_position = prev_above_bone_position + rigidbody_vertical_vec
+                    shape_position = prev_above_bone_position + rigidbody_vertical_vec + MVector3D(0, rigidbody_limit_thicks[yi] / 2, 0)
 
                 # 根元はボーン追従剛体、それ以降は物理剛体
                 mode = 0 if yi == len(v_yidxs) - 2 else 1
