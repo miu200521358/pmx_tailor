@@ -686,9 +686,9 @@ class PmxTailorExportService():
             above_v_xidxs = list(registed_bone_indexs[above_v_yidx].keys())
             below_v_xidxs = list(registed_bone_indexs[below_v_yidx].keys())
             # 繋がってる場合、最後に最初のボーンを追加する
-            if vertex_connected[above_v_yidx]:
+            if above_v_yidx < len(vertex_connected) and vertex_connected[above_v_yidx]:
                 above_v_xidxs += [list(registed_bone_indexs[above_v_yidx].keys())[0]]
-            if vertex_connected[below_v_yidx]:
+            if below_v_yidx < len(vertex_connected) and vertex_connected[below_v_yidx]:
                 below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[0]]
 
             for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
@@ -1041,7 +1041,7 @@ class PmxTailorExportService():
 
             for yi, v_yidx in enumerate(v_yidxs):
                 for v_xidx, total_v_xidx in all_bone_indexes[base_map_idx][yi].items():
-                    if vertex_map[v_yidx, v_xidx] < 0:
+                    if v_yidx >= vertex_map.shape[0] or v_xidx >= vertex_map.shape[1] or vertex_map[v_yidx, v_xidx] < 0:
                         # 存在しない頂点はスルー
                         continue
                     
@@ -1715,21 +1715,36 @@ class PmxTailorExportService():
                         vx = 0
                         vy = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
                 else:
-                    if abs(v1.position.y() - v0.position.y()) < abs(v2.position.y() - v0.position.y()):
+                    # 方向に応じて判定値を変える
+                    if param_option['direction'] == '上':
+                        v0v = -v0.position.y()
+                        v1v = -v1.position.y()
+                        v2v = -v2.position.y()
+                    elif param_option['direction'] == '右':
+                        v0v = v0.position.x()
+                        v1v = v1.position.x()
+                        v2v = v2.position.x()
+                    elif param_option['direction'] == '左':
+                        v0v = -v0.position.x()
+                        v1v = -v1.position.x()
+                        v2v = -v2.position.x()
+                    else:
+                        # デフォルトは下
+                        v0v = v0.position.y()
+                        v1v = v1.position.y()
+                        v2v = v2.position.y()
+
+                    if abs(v1v - v0v) < abs(v2v - v0v):
                         # v1は横展開とみなす
-                        if v0.position.y() < v2.position.y():
+                        if v0v < v2v:
                             # 上にあがる場合、v1は左方向
                             vx = -1
                         else:
                             # 下におりる場合、v1は右方向
                             vx = 1
-                        # vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
-                        # vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).z()))
-                        # vx = int(np.sign(MVector3D.crossProduct((v0.position - v1.position).normalized(), (v1.position - v2.position).normalized()).z()))
-                        # vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
                         vy = 0
                     else:
-                        vy = -1 if v0.position.y() < v1.position.y() else 1
+                        vy = -1 if v0v < v1v else 1
                         v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
                         v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
                         if v1dot > v2dot:
@@ -1737,36 +1752,12 @@ class PmxTailorExportService():
                             vx = 0
                         else:
                             # v2の方がv0に近い場合、v1は斜めと見なす
-                            if abs(v1.position.y() - v0.position.y()) < abs(v2.position.y() - v0.position.y()):
+                            if abs(v1v - v0v) < abs(v2v - v0v):
                                 # ＼の場合、v1は左方向
                                 vx = -1
                             else:
                                 # ／の場合、v1は右方向
                                 vx = 1
-
-                            # vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
-                            # vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
-                            # vx = int(np.sign(MVector3D.crossProduct((v0.position - v1.position).normalized(), (v1.position - v2.position).normalized()).z()))
-
-                    # dot = MVector3D.dotProduct((v2.position - v0.position).normalized(), (v1.position - v0.position).normalized())
-                    # v1dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v1.position - v0.position).normalized())
-                    # v2dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v2.position - v0.position).normalized())
-
-                    # if abs(v1dot) > abs(v2dot):
-                    #     # v1の方がv2よりX平行に近い場合、v1は横方向とみなす
-                    #     vx = int(np.sign((v1.position - v0.position).normalized().x()) * -1)
-                    #     vy = 0
-                    # else:
-                    #     # v2の方がv1よりX平行に近い場合、v1は縦方向とみなす
-                    #     vy = -1 if v0.position.y() < v1.position.y() else 1
-                    #     v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
-                    #     v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
-                    #     if v1dot > v2dot:
-                    #         # v1の方がv0に近い場合、xは0
-                    #         vx = 0
-                    #     else:
-                    #         # v2の方がv0に近い場合、斜めと見なして外積から時計回りで求める
-                    #         vx = int(np.sign(MVector3D.crossProduct((v0.position - v1.position).normalized(), (v2.position - v1.position).normalized()).z()))
 
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': vx, 'y': vy, 'position': model.vertex_dict[vidx].position, 'duplicate': duplicate_vertices[model.vertex_dict[vidx].position.to_log()]}
             vertex_coordinate_map[(vx, vy)] = vs_duplicated[v1.index]

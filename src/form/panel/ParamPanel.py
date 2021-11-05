@@ -192,7 +192,7 @@ class PhysicsParam():
 
         self.simple_param_sizer.Add(self.simple_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
-        self.simple_header_grid_sizer = wx.FlexGridSizer(0, 4, 0, 0)
+        self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称 *", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を5文字以内で入力してください。")
@@ -212,6 +212,16 @@ class PhysicsParam():
         self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
         self.simple_parent_bone_ctrl.SetToolTip(u"材質の起点となる親ボーン")
         self.simple_header_grid_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
+
+        self.simple_direction_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理方向", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_direction_txt.SetToolTip(u"物理材質の向き")
+        self.simple_direction_txt.Wrap(-1)
+        self.simple_header_grid_sizer.Add(self.simple_direction_txt, 0, wx.ALL, 5)
+
+        self.simple_direction_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["下", "上", "右", "左"])
+        self.simple_direction_ctrl.SetToolTip(u"物理材質の向き")
+        self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_header_grid_sizer.Add(self.simple_direction_ctrl, 0, wx.ALL, 5)
 
         self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"剛体グループ *", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_group_txt.SetToolTip(u"剛体のグループ。初期設定では、1と自分自身のグループのみ非衝突として設定します。")
@@ -1427,6 +1437,7 @@ class PhysicsParam():
             params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
+            params["direction"] = self.simple_direction_ctrl.GetStringSelection()
             params["similarity"] = self.simple_similarity_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -1731,6 +1742,7 @@ class PhysicsParam():
         self.simple_mass_slider.SetValue(1.5)
         self.simple_air_resistance_slider.SetValue(1.8)
         self.simple_shape_maintenance_slider.SetValue(1.5)
+        self.simple_direction_ctrl.SetStringSelection('下')
 
         self.advance_rigidbody_shape_type_ctrl.SetStringSelection('箱')
         self.physics_type_ctrl.SetStringSelection('布')
