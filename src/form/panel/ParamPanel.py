@@ -418,10 +418,10 @@ class PhysicsParam():
         self.horizonal_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_spin, 0, wx.ALL, 5)
 
-        # 間引きオプション
-        self.bone_thinning_out_check = wx.CheckBox(self.advance_window, wx.ID_ANY, "間引き")
-        self.bone_thinning_out_check.SetToolTip("ボーン密度が均一になるよう間引きするか否か")
-        self.advance_bone_grid_sizer.Add(self.bone_thinning_out_check, 0, wx.ALL, 5)
+        # # 間引きオプション
+        # self.bone_thinning_out_check = wx.CheckBox(self.advance_window, wx.ID_ANY, "間引き")
+        # self.bone_thinning_out_check.SetToolTip("ボーン密度が均一になるよう間引きするか否か")
+        # self.advance_bone_grid_sizer.Add(self.bone_thinning_out_check, 0, wx.ALL, 5)
 
         # 物理タイプ
         self.physics_type_txt = wx.StaticText(self.advance_window, wx.ID_ANY, u"物理タイプ", wx.DefaultPosition, wx.DefaultSize, 0)
@@ -531,7 +531,7 @@ class PhysicsParam():
         self.advance_vertical_joint_coefficient_txt.Wrap(-1)
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_txt, 0, wx.ALL, 5)
 
-        self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1.2", min=1.2, max=10, initial=1, inc=0.1)
+        self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.4", min=2.4, max=10, initial=1, inc=0.1)
         self.advance_vertical_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_spin, 0, wx.ALL, 5)
 
@@ -738,7 +738,7 @@ class PhysicsParam():
         self.advance_horizonal_joint_coefficient_txt.Wrap(-1)
         self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_coefficient_txt, 0, wx.ALL, 5)
 
-        self.advance_horizonal_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.3", min=1, max=10, initial=2.3, inc=0.1)
+        self.advance_horizonal_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="4.2", min=1, max=10, initial=4.2, inc=0.1)
         self.advance_horizonal_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_coefficient_spin, 0, wx.ALL, 5)
 
@@ -1371,7 +1371,8 @@ class PhysicsParam():
             # 詳細版オプションデータ -------------
             params["vertical_bone_density"] = int(self.vertical_bone_density_spin.GetValue())
             params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
-            params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
+            # params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
+            params["bone_thinning_out"] = False
             params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
             
             # 自身を非衝突対象
@@ -1577,10 +1578,10 @@ class PhysicsParam():
         # 質量に応じて減衰を設定
         self.rigidbody_linear_damping_spin.SetValue(
             max(0, min(0.9999, 1 - (((1 - self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()) \
-                * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())) * 0.8))))
+                * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())) * 2))))
         self.rigidbody_angular_damping_spin.SetValue(
             max(0, min(0.9999, 1 - (((1 - self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()) \
-                * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())) * 0.6))))
+                * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())) * 1.5))))
         # 摩擦力を設定
         self.rigidbody_friction_spin.SetValue(
             max(0, min(0.9999, (self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax() * 0.7))))
@@ -1603,12 +1604,16 @@ class PhysicsParam():
         self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot / 1.5)
         self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot / 1.5)
 
-        spring_rot = max(0, min(180, base_spring_val * 30))
+        spring_rot = max(0, min(180, base_spring_val * 10))
         self.vertical_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.vertical_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.vertical_joint_spring_rot_z_spin.SetValue(spring_rot)
 
-        horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 1.5))
+        horizonal_joint_mov = base_joint_val / 2
+        self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov)
+        self.horizonal_joint_mov_z_max_spin.SetValue(horizonal_joint_mov)
+
+        horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 2))
         self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot / 1.5)
         self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot / 1.5)
         self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_rot / 1.5)
@@ -1616,7 +1621,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
         self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
 
-        spring_rot = max(0, min(180, base_spring_val * 40))
+        spring_rot = max(0, min(180, base_spring_val * 20))
         self.horizonal_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.horizonal_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.horizonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1629,7 +1634,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
         self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
 
-        spring_rot = max(0, min(180, base_spring_val * 20))
+        spring_rot = max(0, min(180, base_spring_val * 5))
         self.diagonal_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.diagonal_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.diagonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1642,7 +1647,7 @@ class PhysicsParam():
         self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
         self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
 
-        spring_rot = max(0, min(180, base_spring_val * 20))
+        spring_rot = max(0, min(180, base_spring_val * 5))
         self.reverse_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.reverse_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.reverse_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1677,7 +1682,7 @@ class PhysicsParam():
 
         self.advance_rigidbody_shape_type_ctrl.SetStringSelection('箱')
         self.physics_type_ctrl.SetStringSelection('布')
-        self.bone_thinning_out_check.SetValue(0)
+        # self.bone_thinning_out_check.SetValue(0)
 
         self.set_material_name(event)
         self.set_fineness(event)
@@ -1692,8 +1697,8 @@ class PhysicsParam():
         self.advance_diagonal_joint_valid_check.SetValue(0)
         self.advance_reverse_joint_valid_check.SetValue(0)
 
-        self.advance_vertical_joint_coefficient_spin.SetValue(1.2)
-        self.advance_horizonal_joint_coefficient_spin.SetValue(2.3)
+        self.advance_vertical_joint_coefficient_spin.SetValue(2.4)
+        self.advance_horizonal_joint_coefficient_spin.SetValue(4.2)
         self.advance_diagonal_joint_coefficient_spin.SetValue(1)
         self.advance_reverse_joint_coefficient_spin.SetValue(1)
 

@@ -90,7 +90,7 @@ class VroidExportService():
             if not model:
                 return False
 
-            model, bone_dict = self.convert_bone(model)
+            model, bone_dict, node_name_dict = self.convert_bone(model)
             if not model:
                 return False
 
@@ -236,9 +236,9 @@ class VroidExportService():
             # 位置
             position = MVector3D(*node['translation']) * MIKU_METER * MVector3D(-1, 1, 1)
 
-            childlen = node['children'] if 'children' in node else []
+            children = node['children'] if 'children' in node else []
 
-            node_dict[nidx] = {'name': node_name, 'position': position, 'parent': -1, 'children': childlen}
+            node_dict[nidx] = {'name': node_name, 'position': position, 'parent': -1, 'children': children}
             node_name_dict[node_name] = nidx
 
         # 親子関係設定
@@ -270,7 +270,7 @@ class VroidExportService():
             model.bones[bone.name] = bone
             bone_dict[node_name] = {'bone': bone, 'parent': bone.parent_index}
 
-        return model, bone_dict
+        return model, bone_dict, node_name_dict
 
     def convert_texture(self, model: PmxModel):
         # テクスチャ用ディレクトリ

@@ -201,19 +201,44 @@ class PmxTailorExportService():
         if param_horizonal_joint:
             coefficient = param_option['horizonal_joint_coefficient']
 
-            horizonal_limit_min_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
-                [param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x()]])), xs)             # noqa
-            horizonal_limit_min_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
-                [param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y()]])), xs)             # noqa
-            horizonal_limit_min_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
-                [param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z()]])), xs)             # noqa
+            if param_option['bone_thinning_out']:
+                horizonal_limit_min_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                    [param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x()]])), xs)             # noqa
+                horizonal_limit_min_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                    [param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y()]])), xs)             # noqa
+                horizonal_limit_min_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                    [param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z()]])), xs)             # noqa
 
-            horizonal_limit_max_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
-                [param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x()]])), xs)             # noqa
-            horizonal_limit_max_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
-                [param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y()]])), xs)             # noqa
-            horizonal_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
-                [param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z()]])), xs)             # noqa
+                horizonal_limit_max_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                    [param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x()]])), xs)             # noqa
+                horizonal_limit_max_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                    [param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y()]])), xs)             # noqa
+                horizonal_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                    [param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z()]])), xs)             # noqa
+            else:
+                x_distances = np.zeros((len(registed_bone_indexs), len(registed_bone_indexs[0])))
+                for yi, v_yidx in enumerate(v_yidxs):
+                    v_xidxs = list(registed_bone_indexs[v_yidx].keys())
+                    if v_yidx < len(vertex_connected) and vertex_connected[v_yidx]:
+                        # 繋がってる場合、最後に最初のボーンを追加する
+                        v_xidxs += [list(registed_bone_indexs[v_yidx].keys())[0]]
+                    elif len(registed_bone_indexs[v_yidx]) > 2:
+                        # 繋がってない場合、最後に最後のひとつ前のボーンを追加する
+                        v_xidxs += [list(registed_bone_indexs[v_yidx].keys())[-2]]
+
+                    for xi, (prev_v_xidx, next_v_xidx) in enumerate(zip(v_xidxs[:-1], v_xidxs[1:])):
+                        prev_bone_name = self.get_bone_name(abb_name, v_yidx + 1, prev_v_xidx + 1)
+                        next_bone_name = self.get_bone_name(abb_name, v_yidx + 1, next_v_xidx + 1)
+                        x_distances[yi, xi] = tmp_all_bones[prev_bone_name]["bone"].position.distanceToPoint(tmp_all_bones[next_bone_name]["bone"].position)
+                x_ratio_distances = np.array(x_distances) / (np.min(x_distances, axis=0) * 2)
+
+                horizonal_limit_min_mov_xs = x_ratio_distances * param_horizonal_joint.translation_limit_min.x()
+                horizonal_limit_min_mov_ys = x_ratio_distances * param_horizonal_joint.translation_limit_min.y()
+                horizonal_limit_min_mov_zs = x_ratio_distances * param_horizonal_joint.translation_limit_min.z()
+
+                horizonal_limit_max_mov_xs = x_ratio_distances * param_horizonal_joint.translation_limit_max.x()
+                horizonal_limit_max_mov_ys = x_ratio_distances * param_horizonal_joint.translation_limit_max.y()
+                horizonal_limit_max_mov_zs = x_ratio_distances * param_horizonal_joint.translation_limit_max.z()
 
             horizonal_limit_min_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
                 [param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x()]])), xs)             # noqa
@@ -435,11 +460,11 @@ class PmxTailorExportService():
                             joint_euler = joint_rotation_qq.toEulerAngles()
                             joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                            yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+                            yidx, xidx = self.disassemble_bone_name(prev_above_bone_name)
 
                             joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_above_bone_name].index,
-                                          joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yidx], horizonal_limit_min_mov_ys[yidx], horizonal_limit_min_mov_zs[yidx]), \
-                                          MVector3D(horizonal_limit_max_mov_xs[yidx], horizonal_limit_max_mov_ys[yidx], horizonal_limit_max_mov_zs[yidx]),
+                                          joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi, xi], horizonal_limit_min_mov_ys[yi, xi], horizonal_limit_min_mov_zs[yi, xi]), \
+                                          MVector3D(horizonal_limit_max_mov_xs[yi, xi], horizonal_limit_max_mov_ys[yi, xi], horizonal_limit_max_mov_zs[yi, xi]),
                                           MVector3D(math.radians(horizonal_limit_min_rot_xs[yidx]), math.radians(horizonal_limit_min_rot_ys[yidx]), math.radians(horizonal_limit_min_rot_zs[yidx])),
                                           MVector3D(math.radians(horizonal_limit_max_rot_xs[yidx]), math.radians(horizonal_limit_max_rot_ys[yidx]), math.radians(horizonal_limit_max_rot_zs[yidx])),
                                           MVector3D(horizonal_spring_constant_mov_xs[yidx], horizonal_spring_constant_mov_ys[yidx], horizonal_spring_constant_mov_zs[yidx]), \
@@ -1549,64 +1574,11 @@ class PmxTailorExportService():
                             else:
                                 not_horizonaled_duplicate_dots.append(0)
 
-
-                        # if horizonal_in_vs:
-                        #     horizonaled_duplicate_indexs.append(duplicate_index_idx)
-                        #     horizonaled_vertical_below_v.append(vertical_below_v)
-                        # else:
-                        #     not_horizonaled_duplicate_indexs.append(duplicate_index_idx)
-                        #     not_horizonaled_vertical_below_v.append(vertical_below_v)
-
-                        # iv0 = None
-                        # iv1 = None
-                        # if iv0_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()] and (vertical_below_v.index, iv1_comb_idx) not in horizonaled_index_combs \
-                        #         and (vertical_below_v.index, iv1_comb_idx) not in not_horizonaled_index_combs:
-                        #     iv0 = model.vertex_dict[iv0_comb_idx]
-                        #     iv1 = model.vertex_dict[iv1_comb_idx]
-                        #     if horizonal_in_vs:
-                        #         horizonaled_index_combs.append((vertical_below_v.index, iv1_comb_idx))
-                        #     else:
-                        #         not_horizonaled_index_combs.append((vertical_below_v.index, iv1_comb_idx))
-                        # elif iv1_comb_idx in duplicate_vertices[vertical_below_v.position.to_log()] and (vertical_below_v.index, iv0_comb_idx) not in horizonaled_index_combs \
-                        #         and (vertical_below_v.index, iv0_comb_idx) not in not_horizonaled_index_combs:
-                        #     iv0 = model.vertex_dict[iv1_comb_idx]
-                        #     iv1 = model.vertex_dict[iv0_comb_idx]
-                        #     if horizonal_in_vs:
-                        #         horizonaled_index_combs.append((vertical_below_v.index, iv0_comb_idx))
-                        #     else:
-                        #         not_horizonaled_index_combs.append((vertical_below_v.index, iv0_comb_idx))
-                        # else:
-                        #     if horizonal_in_vs:
-                        #         horizonaled_index_combs.append((-1, -1))
-                        #     else:
-                        #         not_horizonaled_index_combs.append((-1, -1))
-
-                        # if iv0 and iv1:
-                        #     if iv0.index in vertex_axis_map and (vertex_axis_map[iv0.index]['x'], vertex_axis_map[iv0.index]['y'] + offset) not in vertex_coordinate_map:
-                        #         # v1から繋がる辺のベクトル
-                        #         iv0 = model.vertex_dict[iv0.index]
-                        #         iv1 = model.vertex_dict[iv1.index]
-                        #         duplicate_vec = (iv0.position - iv1.position)
-                        #         if horizonal_in_vs:
-                        #             horizonaled_duplicate_dots.append(MVector3D.dotProduct(vertical_vec.normalized(), duplicate_vec.normalized()))
-                        #         else:
-                        #             not_horizonaled_duplicate_dots.append(MVector3D.dotProduct(vertical_vec.normalized(), duplicate_vec.normalized()))
-                        #     else:
-                        #         if horizonal_in_vs:
-                        #             horizonaled_duplicate_dots.append(0)
-                        #         else:
-                        #             not_horizonaled_duplicate_dots.append(0)
-                        # else:
-                        #     if horizonal_in_vs:
-                        #         horizonaled_duplicate_dots.append(0)
-                        #     else:
-                        #         not_horizonaled_duplicate_dots.append(0)
-
         if len(horizonaled_duplicate_dots) > 0 and np.max(horizonaled_duplicate_dots) >= param_option['similarity']:
             logger.debug(f"fill_vertical: horizonaled_duplicate_dots[{horizonaled_duplicate_dots}], horizonaled_index_combs[{horizonaled_index_combs}]")
 
             full_d = [i for i, d in enumerate(horizonaled_duplicate_dots) if np.round(d, decimals=5) == np.max(np.round(horizonaled_duplicate_dots, decimals=5))]  # noqa
-            not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.1]  # noqa
+            not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.05]  # noqa
             if full_d:
                 if not_full_d:
                     # 平行辺の内積より一定以上近い内積のINDEX組合せがあった場合、臨時採用
