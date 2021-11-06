@@ -338,7 +338,7 @@ class PhysicsParam():
 
         # 空気抵抗スライダー
         self.simple_air_resistance_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"柔らかさ", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_air_resistance_txt.SetToolTip(u"材質の柔らかさ。小さくなるほどすぐに元の形状に戻ります。（減衰が高い）\n剛体の減衰・ジョイントの強さ等に影響します。")
+        self.simple_air_resistance_txt.SetToolTip(u"材質の柔らかさ。大きくなるほどすぐに元の形状に戻ります。（減衰が高い）\n剛体の減衰・ジョイントの強さ等に影響します。")
         self.simple_air_resistance_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_air_resistance_txt, 0, wx.ALL, 5)
 
