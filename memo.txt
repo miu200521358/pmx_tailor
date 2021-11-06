@@ -19,3 +19,4 @@
 
 ‚»‚¢‚Â‚ÌÀ•W‚ª‚Ç‚Á‚¿•ûŒü‚É“®‚¢‚½‚©A‚Á‚Ä‚¢‚¤‚Ì‚Í
 
+pip install Pillow==8.4.0

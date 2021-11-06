@@ -9,6 +9,7 @@ import glob
 from pathlib import Path
 import re
 import _pickle as cPickle
+import shutil
 
 from utils.MLogger import MLogger # noqa
 
@@ -114,11 +115,45 @@ def get_output_pmx_path(org_pmx_path: str, output_pmx_path: str, is_force=False)
     new_output_pmx_path = os.path.join(pmx_dir_path, f'{org_pmx_file_name}_{datetime.now():%Y%m%d_%H%M%S}.pmx')
 
     # ファイルパス自体が変更されたか、自動生成ルールに則っている場合、ファイルパス変更
-    if is_force or re.match(r'%s_pmx_\d{8}_\d{6}' % (org_pmx_file_name), output_pmx_path) is not None:
+    if is_force or re.match(r'%s_\d{8}_\d{6}.pmx' % (org_pmx_file_name), output_pmx_path) is not None:
 
         try:
             open(new_output_pmx_path, 'w')
             os.remove(new_output_pmx_path)
+        except Exception:
+            logger.warning("出力ファイルパスの生成に失敗しました。以下の原因が考えられます。\n" \
+                           + "・ファイルパスが255文字を超えている\n" \
+                           + "・ファイルパスに使えない文字列が含まれている（例) \\　/　:　*　?　\"　<　>　|）" \
+                           + "・出力ファイルパスの親フォルダに書き込み権限がない" \
+                           + "・出力ファイルパスに書き込み権限がない")
+
+        return new_output_pmx_path
+
+    return output_pmx_path
+    
+
+# Vroid2Pmx出力ファイルパス生成
+# org_pmx_path: 変換先モデルVRMパス
+# output_pmx_path: 出力PMXファイルパス
+def get_output_vrm_path(org_pmx_path: str, output_pmx_path: str, is_force=False):
+    if not os.path.exists(org_pmx_path):
+        return ""
+
+    # VRMディレクトリパス
+    pmx_dir_path = get_dir_path(org_pmx_path)
+    # VRMモデルファイル名・拡張子
+    org_pmx_file_name, _ = os.path.splitext(os.path.basename(org_pmx_path))
+
+    # 出力ファイルパス生成
+    new_output_pmx_path = os.path.join(pmx_dir_path, org_pmx_file_name, f'{datetime.now():%Y%m%d_%H%M%S}', f'{org_pmx_file_name}.pmx')
+
+    # ファイルパス自体が変更されたか、自動生成ルールに則っている場合、ファイルパス変更
+    if is_force or re.match(r'\d{8}_\d{6}\\%s\.pmx' % (org_pmx_file_name), output_pmx_path) is not None:
+
+        try:
+            os.makedirs(os.path.dirname(new_output_pmx_path), exist_ok=True)
+            open(new_output_pmx_path, 'w')
+            shutil.rmtree(os.path.dirname(new_output_pmx_path))
         except Exception:
             logger.warning("出力ファイルパスの生成に失敗しました。以下の原因が考えられます。\n" \
                            + "・ファイルパスが255文字を超えている\n" \

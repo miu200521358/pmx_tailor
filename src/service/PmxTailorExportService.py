@@ -356,7 +356,7 @@ class PmxTailorExportService():
                 prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
                 prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
                 
-                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - next_below_v_xidx)
+                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - registed_bone_indexs[below_v_yidx][next_below_v_xidx])
                 next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
                 next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
                 next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
@@ -622,6 +622,7 @@ class PmxTailorExportService():
                 # 剛体の位置
                 rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
                 if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
+                    # 厚みを加味
                     mat = MMatrix4x4()
                     mat.setToIdentity()
                     mat.rotate(shape_rotation_qq)

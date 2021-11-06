@@ -10,6 +10,7 @@ import gc
 from pathlib import Path
 
 from form.worker.BaseWorkerThread import BaseWorkerThread, task_takes_time
+from service.VroidExportService import VroidExportService
 from service.PmxTailorExportService import PmxTailorExportService
 from module.MOptions import MExportOptions
 from utils.MLogger import MLogger # noqa
@@ -49,11 +50,15 @@ class ExportWorkerThread(BaseWorkerThread):
                     outout_datetime=logger.outout_datetime, \
                     max_workers=(1 if self.is_exec_saving else min(5, 32, os.cpu_count() + 4)))
                 
-                self.result = PmxTailorExportService(self.options).execute() and self.result
+                if self.frame.is_vroid:
+                    self.result = VroidExportService(self.options).execute() and self.result
+                else:
+                    self.result = PmxTailorExportService(self.options).execute() and self.result
 
             self.elapsed_time = time.time() - start
         except Exception as e:
-            logger.critical("PmxTailor変換処理が意図せぬエラーで終了しました。", e, decoration=MLogger.DECORATION_BOX)
+            process_name = 'Vroid2Pmx' if self.frame.is_vroid else 'PmxTailor変換'
+            logger.critical(f"{process_name}処理が意図せぬエラーで終了しました。", e, decoration=MLogger.DECORATION_BOX)
         finally:
             try:
                 logger.debug("★★★result: %s, is_killed: %s", self.result, self.is_killed)

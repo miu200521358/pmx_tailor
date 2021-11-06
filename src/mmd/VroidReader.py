@@ -3,10 +3,10 @@
 import hashlib
 import json
 
-from form.panel.VrmPanel import BONE_PAIRS
 from mmd.PmxReader import PmxReader
 from mmd.PmxData import PmxModel, Bone, RigidBody, Vertex, Material, Morph, DisplaySlot, RigidBody, Joint, Ik, IkLink, Bdef1, Bdef2, Bdef4, Sdef, Qdef, MaterialMorphData, UVMorphData, BoneMorphData, VertexMorphOffset, GroupMorphData # noqa
 from module.MMath import MRect, MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
+from service.VroidExportService import BONE_PAIRS
 from utils.MLogger import MLogger # noqa
 from utils.MException import SizingException, MKilledException, MParseException     # noqa
 
