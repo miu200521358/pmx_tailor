@@ -979,7 +979,8 @@ class PmxTailorExportService():
 
                     # ボーン仮登録
                     bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
-                    bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010)
+                    bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010 | 0x0800)
+                    bone.local_z_vector = v.normal.copy()
                     tmp_all_bones[bone.name] = {"bone": bone, "parent": root_bone.name, "regist": False}
                     logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
 
@@ -1016,10 +1017,14 @@ class PmxTailorExportService():
 
                             parent_bone = model.bones[self.get_bone_name(abb_name, v_yidxs[yi - 1] + 1, parent_v_xidx + 1)]
                             bone.parent_index = parent_bone.index
+                            bone.local_x_vector = (bone.position - parent_bone.position).normalized()
+                            bone.local_z_vector *= MVector3D(-1, 1, -1)
+
                             tmp_all_bones[bone.name]["parent"] = parent_bone.name
 
                             # 親ボーンの表示先も同時設定
                             parent_bone.tail_index = bone.index
+                            parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
                             parent_bone.flag |= 0x0001
 
                         model.bones[bone.name] = bone
