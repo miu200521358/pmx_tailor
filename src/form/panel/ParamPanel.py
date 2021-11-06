@@ -4,6 +4,7 @@ import os
 import wx
 import wx.lib.newevent
 import sys
+import unicodedata
 
 from form.panel.BasePanel import BasePanel
 from form.parts.FloatSliderCtrl import FloatSliderCtrl
@@ -115,7 +116,7 @@ class ParamPanel(BasePanel):
             # 物理リストクリア
             self.physics_list = []
             # プルダウン用材質名リスト
-            self.material_list = []
+            self.material_list = [""]
             for material_name in self.frame.file_panel_ctrl.org_model_file_ctrl.data.materials.keys():
                 self.material_list.append(material_name)
             # ボーンリストクリア
@@ -138,15 +139,22 @@ class ParamPanel(BasePanel):
 
     def get_param_options(self, is_show_error=False):
         params = []
+        param_material_names = []
 
         if self.frame.file_panel_ctrl.org_model_file_ctrl.data and self.org_model_digest == self.frame.file_panel_ctrl.org_model_file_ctrl.data.digest:
             for pidx, physics_param in enumerate(self.physics_list):
                 param = physics_param.get_param_options(pidx, is_show_error)
                 if param:
+                    if param['material_name'] in param_material_names:
+                        logger.error("同じ材質に対して複数の物理設定が割り当てられています", decoration=MLogger.DECORATION_BOX)
+                        return []
+
                     params.append(param)
+                    param_material_names.append(param['material_name'])
         
         if len(params) == 0 and not self.frame.is_vroid:
             logger.error("物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
+            return []
 
         return params
 
@@ -195,12 +203,12 @@ class PhysicsParam():
         self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称 *", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を5文字以内で入力してください。")
+        self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。")
         self.simple_abb_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_abb_txt, 0, wx.ALL, 5)
 
         self.simple_abb_ctrl = wx.TextCtrl(self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1))
-        self.simple_abb_ctrl.SetToolTip(u"ボーン名などに使用する材質略称を5文字以内で入力してください。")
+        self.simple_abb_ctrl.SetToolTip(u"ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。")
         self.simple_abb_ctrl.SetMaxLength(5)
         self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
@@ -228,7 +236,7 @@ class PhysicsParam():
         self.simple_group_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_group_txt, 0, wx.ALL, 5)
 
-        self.simple_group_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"])
+        self.simple_group_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"])
         self.simple_group_ctrl.SetToolTip(u"剛体のグループ。初期設定では、1と自分自身のグループのみ非衝突として設定します。")
         self.simple_header_grid_sizer.Add(self.simple_group_ctrl, 0, wx.ALL, 5)
 
@@ -288,7 +296,7 @@ class PhysicsParam():
         self.simple_fineness_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_fineness_txt, 0, wx.ALL, 5)
 
-        self.simple_fineness_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"（3）", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_fineness_label = wx.StaticText(self.simple_window, wx.ID_ANY, u"（3.4）", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_fineness_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_fineness_label, 0, wx.ALL, 5)
 
@@ -297,7 +305,7 @@ class PhysicsParam():
         self.simple_grid_sizer.Add(self.simple_fineness_min_label, 0, wx.ALL, 5)
 
         self.simple_fineness_slider = \
-            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 3, 1, 10, 0.1, self.simple_fineness_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
+            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 3.4, 1, 10, 0.1, self.simple_fineness_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
         self.simple_fineness_slider.Bind(wx.EVT_SCROLL_CHANGED, self.set_fineness)
         self.simple_grid_sizer.Add(self.simple_fineness_slider, 1, wx.ALL | wx.EXPAND, 5)
 
@@ -1497,7 +1505,7 @@ class PhysicsParam():
         
     def on_diagonal_joint(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        self.advance_diagonal_joint_coefficient_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
+        self.advance_diagonal_joint_coefficient_spin.Enable(self.advance_diagonal_joint_valid_check.GetValue())
         self.diagonal_joint_mov_x_min_spin.Enable(self.advance_diagonal_joint_valid_check.GetValue())
         self.diagonal_joint_mov_x_max_spin.Enable(self.advance_diagonal_joint_valid_check.GetValue())
         self.diagonal_joint_mov_y_min_spin.Enable(self.advance_diagonal_joint_valid_check.GetValue())
@@ -1542,12 +1550,13 @@ class PhysicsParam():
     def set_material_name(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
-        self.simple_abb_ctrl.SetValue(self.simple_material_ctrl.GetStringSelection()[:5])
+        # バイト長を加味してスライス
+        self.simple_abb_ctrl.SetValue(truncate_double_byte_str(self.simple_material_ctrl.GetStringSelection(), 6))
     
     def set_fineness(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.3))
-        self.horizonal_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.5))
+        self.horizonal_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.7))
         # self.bone_thinning_out_check.SetValue((self.simple_fineness_slider.GetValue() // 1.2) % 2 == 0)
 
     def set_mass(self, event: wx.Event):
@@ -1580,6 +1589,9 @@ class PhysicsParam():
     def set_shape_maintenance(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
+        base_spring_val = ((self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()) * \
+                           (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax()))
+
         base_joint_val = ((self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()) * \
                           (self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()))
 
@@ -1591,7 +1603,7 @@ class PhysicsParam():
         self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot / 1.5)
         self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot / 1.5)
 
-        spring_rot = max(0, min(180, base_joint_val * 20))
+        spring_rot = max(0, min(180, base_spring_val * 30))
         self.vertical_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.vertical_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.vertical_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1604,7 +1616,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
         self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
 
-        spring_rot = max(0, min(180, base_joint_val * 40))
+        spring_rot = max(0, min(180, base_spring_val * 40))
         self.horizonal_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.horizonal_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.horizonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1617,7 +1629,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
         self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
 
-        spring_rot = max(0, min(180, base_joint_val * 10))
+        spring_rot = max(0, min(180, base_spring_val * 20))
         self.diagonal_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.diagonal_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.diagonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1630,7 +1642,7 @@ class PhysicsParam():
         self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
         self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
 
-        spring_rot = max(0, min(180, base_joint_val * 10))
+        spring_rot = max(0, min(180, base_spring_val * 20))
         self.reverse_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.reverse_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.reverse_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -1653,8 +1665,11 @@ class PhysicsParam():
         self.on_reverse_joint(event)
     
     def on_clear(self, event: wx.Event):
+        self.simple_material_ctrl.SetStringSelection('')
+        self.simple_back_material_ctrl.SetStringSelection('')
+        self.simple_primitive_ctrl.SetStringSelection('')
         self.simple_similarity_slider.SetValue(0.75)
-        self.simple_fineness_slider.SetValue(3)
+        self.simple_fineness_slider.SetValue(3.4)
         self.simple_mass_slider.SetValue(1.5)
         self.simple_air_resistance_slider.SetValue(1.8)
         self.simple_shape_maintenance_slider.SetValue(1.5)
@@ -1687,3 +1702,21 @@ def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax
     # https://qastack.jp/programming/929103/convert-a-number-range-to-another-range-maintaining-ratio
     # NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
     return (((ratio - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
+
+
+def truncate_double_byte_str(text, len):
+    """ 全角・半角を区別して文字列を切り詰める
+        """
+    count = 0
+    sliced_text = ''
+    for c in text:
+        if unicodedata.east_asian_width(c) in 'FWA':
+            count += 2
+        else:
+            count += 1
+
+        # lenと同じ長さになったときに抽出完了
+        if count > len:
+            break
+        sliced_text += c
+    return sliced_text
