@@ -216,7 +216,12 @@ class PmxTailorExportService():
                 horizonal_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
                     [param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z()]])), xs)             # noqa
             else:
-                x_distances = np.zeros((len(registed_bone_indexs), len(registed_bone_indexs[0])))
+                max_x = 0
+                for yi, v_yidx in enumerate(v_yidxs):
+                    v_xidxs = list(registed_bone_indexs[v_yidx].keys())
+                    max_x = len(v_xidxs) if max_x < len(v_xidxs) else max_x
+
+                x_distances = np.zeros((len(registed_bone_indexs), max_x + 1))
                 for yi, v_yidx in enumerate(v_yidxs):
                     v_xidxs = list(registed_bone_indexs[v_yidx].keys())
                     if v_yidx < len(vertex_connected) and vertex_connected[v_yidx]:
@@ -227,18 +232,24 @@ class PmxTailorExportService():
                         v_xidxs += [list(registed_bone_indexs[v_yidx].keys())[-2]]
 
                     for xi, (prev_v_xidx, next_v_xidx) in enumerate(zip(v_xidxs[:-1], v_xidxs[1:])):
+                        prev_v_xidx_diff = np.array(list(registed_bone_indexs[v_yidx].values())) - registed_bone_indexs[v_yidx][prev_v_xidx]
+                        prev_v_xidx = list(registed_bone_indexs[v_yidx].values())[(0 if prev_v_xidx == 0 else np.argmax(prev_v_xidx_diff))]
                         prev_bone_name = self.get_bone_name(abb_name, v_yidx + 1, prev_v_xidx + 1)
+
+                        next_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidx].values())) - registed_bone_indexs[v_yidx][next_v_xidx])
+                        next_v_xidx = list(registed_bone_indexs[v_yidx].values())[(0 if next_v_xidx == 0 else np.argmin(next_v_xidx_diff))]
                         next_bone_name = self.get_bone_name(abb_name, v_yidx + 1, next_v_xidx + 1)
+                        
                         x_distances[yi, xi] = tmp_all_bones[prev_bone_name]["bone"].position.distanceToPoint(tmp_all_bones[next_bone_name]["bone"].position)
                 x_ratio_distances = np.array(x_distances) / (np.min(x_distances, axis=0) * 2)
 
-                horizonal_limit_min_mov_xs = x_ratio_distances * param_horizonal_joint.translation_limit_min.x()
-                horizonal_limit_min_mov_ys = x_ratio_distances * param_horizonal_joint.translation_limit_min.y()
-                horizonal_limit_min_mov_zs = x_ratio_distances * param_horizonal_joint.translation_limit_min.z()
+                horizonal_limit_min_mov_xs = np.nan_to_num(x_ratio_distances * param_horizonal_joint.translation_limit_min.x())
+                horizonal_limit_min_mov_ys = np.nan_to_num(x_ratio_distances * param_horizonal_joint.translation_limit_min.y())
+                horizonal_limit_min_mov_zs = np.nan_to_num(x_ratio_distances * param_horizonal_joint.translation_limit_min.z())
 
-                horizonal_limit_max_mov_xs = x_ratio_distances * param_horizonal_joint.translation_limit_max.x()
-                horizonal_limit_max_mov_ys = x_ratio_distances * param_horizonal_joint.translation_limit_max.y()
-                horizonal_limit_max_mov_zs = x_ratio_distances * param_horizonal_joint.translation_limit_max.z()
+                horizonal_limit_max_mov_xs = np.nan_to_num(x_ratio_distances * param_horizonal_joint.translation_limit_max.x())
+                horizonal_limit_max_mov_ys = np.nan_to_num(x_ratio_distances * param_horizonal_joint.translation_limit_max.y())
+                horizonal_limit_max_mov_zs = np.nan_to_num(x_ratio_distances * param_horizonal_joint.translation_limit_max.z())
 
             horizonal_limit_min_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
                 [param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x()]])), xs)             # noqa
@@ -1075,7 +1086,8 @@ class PmxTailorExportService():
 
     def disassemble_bone_name(self, bone_name: str, v_xidxs=None):
         total_v_xidx = int(bone_name[-3:]) - 1
-        v_xidx = [k for k, v in v_xidxs.items() if v == total_v_xidx][0] if v_xidxs else total_v_xidx
+        now_vidxs = [k for k, v in v_xidxs.items() if v == total_v_xidx] if v_xidxs else [total_v_xidx]
+        v_xidx = now_vidxs[0] if now_vidxs else total_v_xidx
         v_yidx = int(bone_name[-7:-4]) - 1
 
         return v_yidx, v_xidx
