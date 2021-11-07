@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 import struct
-from module.MOptions import MOptionsDataSet
 from utils.MLogger import MLogger # noqa
 
 logger = MLogger(__name__)
 
 
 class VmdWriter():
-    def __init__(self, data_set: MOptionsDataSet):
+    def __init__(self, data_set):
         self.data_set = data_set
 
     def write(self):

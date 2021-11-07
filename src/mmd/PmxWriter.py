@@ -2,7 +2,7 @@
 #
 import struct
 from mmd.PmxData import PmxModel, Bone, RigidBody, Vertex, Material, Morph, DisplaySlot, RigidBody, Joint, Ik, IkLink, Bdef1, Bdef2, Bdef4, Sdef, Qdef, VertexMorphOffset, GroupMorphData, BoneMorphData, UVMorphData, MaterialMorphData    # noqa
-from module.MMath import MVector3D # noqa
+from module.MMath import MVector3D, get_effective_value # noqa
 from utils.MLogger import MLogger # noqa
 
 logger = MLogger(__name__, level=1)
@@ -67,22 +67,22 @@ class PmxWriter:
             # 頂点データ
             for vidx, vertex in enumerate(pmx.vertex_dict.values()):
                 # position
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.position.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.position.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.position.z())))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.position.x()))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.position.y()))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.position.z()))
                 # normal
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.normal.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.normal.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.normal.z())))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.normal.x()))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.normal.y()))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.normal.z()))
                 # uv
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.uv.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.uv.y())))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.uv.x()))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.uv.y()))
                 # 追加uv
                 for uv in vertex.extended_uvs:
-                    fout.write(struct.pack(TYPE_FLOAT, float(uv.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(uv.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(uv.z())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(uv.w())))
+                    self.write_number(fout, TYPE_FLOAT, float(uv.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(uv.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(uv.z()))
+                    self.write_number(fout, TYPE_FLOAT, float(uv.w()))
 
                 # deform
                 if type(vertex.deform) is Bdef1:
@@ -92,35 +92,35 @@ class PmxWriter:
                     fout.write(struct.pack(TYPE_BYTE, 1))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index0)))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index1)))
-                    fout.write(struct.pack(TYPE_FLOAT, vertex.deform.weight0))
+                    self.write_number(fout, TYPE_FLOAT, vertex.deform.weight0, True)
                 elif type(vertex.deform) is Bdef4:
                     fout.write(struct.pack(TYPE_BYTE, 2))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index0)))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index1)))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index2)))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index3)))
-                    fout.write(struct.pack(TYPE_FLOAT, vertex.deform.weight0))
-                    fout.write(struct.pack(TYPE_FLOAT, vertex.deform.weight1))
-                    fout.write(struct.pack(TYPE_FLOAT, vertex.deform.weight2))
-                    fout.write(struct.pack(TYPE_FLOAT, vertex.deform.weight3))
+                    self.write_number(fout, TYPE_FLOAT, vertex.deform.weight0, True)
+                    self.write_number(fout, TYPE_FLOAT, vertex.deform.weight1, True)
+                    self.write_number(fout, TYPE_FLOAT, vertex.deform.weight2, True)
+                    self.write_number(fout, TYPE_FLOAT, vertex.deform.weight3, True)
                 elif type(vertex.deform) is Sdef:
                     fout.write(struct.pack(TYPE_BYTE, 3))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index0)))
                     fout.write(struct.pack(bone_idx_type, int(vertex.deform.index1)))
-                    fout.write(struct.pack(TYPE_FLOAT, vertex.deform.weight0))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_c.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_c.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_c.z())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_r0.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_r0.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_r0.z())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_r1.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_r1.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(vertex.deform.sdef_r1.z())))
+                    self.write_number(fout, TYPE_FLOAT, vertex.deform.weight0, True)
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_c.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_c.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_c.z()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_r0.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_r0.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_r0.z()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_r1.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_r1.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(vertex.deform.sdef_r1.z()))
                 else:
                     logger.error("頂点deformなし: %s", vertex)
 
-                fout.write(struct.pack(TYPE_FLOAT, float(vertex.edge_factor)))
+                self.write_number(fout, TYPE_FLOAT, float(vertex.edge_factor), True)
 
                 if vidx > 0 and vidx % 50000 == 0:
                     logger.debug(f"-- 頂点データ出力終了({round(vidx / len(pmx.vertex_dict.keys()) * 100, 2)}％)")
@@ -155,29 +155,29 @@ class PmxWriter:
                 self.write_text(fout, material.name, f"Material {midx}")
                 self.write_text(fout, material.english_name, f"Material {midx}")
                 # Diffuse
-                fout.write(struct.pack(TYPE_FLOAT, float(material.diffuse_color.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.diffuse_color.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.diffuse_color.z())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.alpha)))
+                self.write_number(fout, TYPE_FLOAT, float(material.diffuse_color.x()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.diffuse_color.y()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.diffuse_color.z()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.alpha), True)
                 # Specular
-                fout.write(struct.pack(TYPE_FLOAT, float(material.specular_color.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.specular_color.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.specular_color.z())))
+                self.write_number(fout, TYPE_FLOAT, float(material.specular_color.x()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.specular_color.y()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.specular_color.z()), True)
                 # Specular係数
-                fout.write(struct.pack(TYPE_FLOAT, float(material.specular_factor)))
+                self.write_number(fout, TYPE_FLOAT, float(material.specular_factor), True)
                 # Ambient
-                fout.write(struct.pack(TYPE_FLOAT, float(material.ambient_color.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.ambient_color.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.ambient_color.z())))
+                self.write_number(fout, TYPE_FLOAT, float(material.ambient_color.x()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.ambient_color.y()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.ambient_color.z()), True)
                 # 描画フラグ(8bit)
                 fout.write(struct.pack(TYPE_BYTE, material.flag))
                 # エッジ色 (R,G,B,A)
-                fout.write(struct.pack(TYPE_FLOAT, float(material.edge_color.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.edge_color.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.edge_color.z())))
-                fout.write(struct.pack(TYPE_FLOAT, float(material.edge_color.w())))
+                self.write_number(fout, TYPE_FLOAT, float(material.edge_color.x()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.edge_color.y()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.edge_color.z()), True)
+                self.write_number(fout, TYPE_FLOAT, float(material.edge_color.w()), True)
                 # エッジサイズ
-                fout.write(struct.pack(TYPE_FLOAT, float(material.edge_size)))
+                self.write_number(fout, TYPE_FLOAT, float(material.edge_size), True)
                 # 通常テクスチャ
                 fout.write(struct.pack(texture_idx_type, material.texture_index))
                 # スフィアテクスチャ
@@ -195,7 +195,7 @@ class PmxWriter:
                 # コメント
                 self.write_text(fout, material.comment, "")
                 # 材質に対応する面(頂点)数
-                fout.write(struct.pack(TYPE_INT, material.vertex_count))
+                self.write_number(fout, TYPE_INT, material.vertex_count)
 
             logger.debug(f"-- 材質データ出力終了({len(list(pmx.materials.values()))})")
 
@@ -207,13 +207,13 @@ class PmxWriter:
                 self.write_text(fout, bone.name, f"Bone {bidx}")
                 self.write_text(fout, bone.english_name, f"Bone {bidx}")
                 # position
-                fout.write(struct.pack(TYPE_FLOAT, float(bone.position.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(bone.position.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(bone.position.z())))
+                self.write_number(fout, TYPE_FLOAT, float(bone.position.x()))
+                self.write_number(fout, TYPE_FLOAT, float(bone.position.y()))
+                self.write_number(fout, TYPE_FLOAT, float(bone.position.z()))
                 # 親ボーンのボーンIndex
                 fout.write(struct.pack(bone_idx_type, bone.parent_index))
                 # 変形階層
-                fout.write(struct.pack(TYPE_INT, bone.layer))
+                self.write_number(fout, TYPE_INT, bone.layer, True)
                 # ボーンフラグ
                 fout.write(struct.pack(TYPE_SHORT, bone.flag))
 
@@ -222,44 +222,44 @@ class PmxWriter:
                     fout.write(struct.pack(bone_idx_type, bone.tail_index))
                 else:
                     # 接続先位置
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.tail_position.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.tail_position.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.tail_position.z())))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.tail_position.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.tail_position.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.tail_position.z()))
 
                 if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag():
                     # 付与親指定ありの場合
                     fout.write(struct.pack(bone_idx_type, bone.effect_index))
-                    fout.write(struct.pack(TYPE_FLOAT, bone.effect_factor))
+                    self.write_number(fout, TYPE_FLOAT, bone.effect_factor)
                 
                 if bone.getFixedAxisFlag():
                     # 軸制限先
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.fixed_axis.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.fixed_axis.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.fixed_axis.z())))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.fixed_axis.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.fixed_axis.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.fixed_axis.z()))
 
                 if bone.getLocalCoordinateFlag():
                     # ローカルX
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.local_x_vector.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.local_x_vector.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.local_x_vector.z())))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.local_x_vector.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.local_x_vector.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.local_x_vector.z()))
                     # ローカルZ
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.local_z_vector.x())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.local_z_vector.y())))
-                    fout.write(struct.pack(TYPE_FLOAT, float(bone.local_z_vector.z())))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.local_z_vector.x()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.local_z_vector.y()))
+                    self.write_number(fout, TYPE_FLOAT, float(bone.local_z_vector.z()))
 
                 if bone.getExternalParentDeformFlag():
-                    fout.write(struct.pack(TYPE_INT, bone.external_key))
+                    self.write_number(fout, TYPE_INT, bone.external_key)
 
                 if bone.getIkFlag():
                     # IKボーン
                     # n  : ボーンIndexサイズ  | IKターゲットボーンのボーンIndex
                     fout.write(struct.pack(bone_idx_type, bone.ik.target_index))
                     # 4  : int  	| IKループ回数
-                    fout.write(struct.pack(TYPE_INT, bone.ik.loop))
+                    self.write_number(fout, TYPE_INT, bone.ik.loop)
                     # 4  : float	| IKループ計算時の1回あたりの制限角度 -> ラジアン角
-                    fout.write(struct.pack(TYPE_FLOAT, bone.ik.limit_radian))
+                    self.write_number(fout, TYPE_FLOAT, bone.ik.limit_radian)
                     # 4  : int  	| IKリンク数 : 後続の要素数
-                    fout.write(struct.pack(TYPE_INT, len(bone.ik.link)))
+                    self.write_number(fout, TYPE_INT, len(bone.ik.link))
 
                     for link in bone.ik.link:
                         # n  : ボーンIndexサイズ  | リンクボーンのボーンIndex
@@ -268,18 +268,18 @@ class PmxWriter:
                         fout.write(struct.pack(TYPE_BYTE, int(link.limit_angle)))
 
                         if link.limit_angle == 1:
-                            fout.write(struct.pack(TYPE_FLOAT, float(link.limit_min.x())))
-                            fout.write(struct.pack(TYPE_FLOAT, float(link.limit_min.y())))
-                            fout.write(struct.pack(TYPE_FLOAT, float(link.limit_min.z())))
+                            self.write_number(fout, TYPE_FLOAT, float(link.limit_min.x()))
+                            self.write_number(fout, TYPE_FLOAT, float(link.limit_min.y()))
+                            self.write_number(fout, TYPE_FLOAT, float(link.limit_min.z()))
 
-                            fout.write(struct.pack(TYPE_FLOAT, float(link.limit_max.x())))
-                            fout.write(struct.pack(TYPE_FLOAT, float(link.limit_max.y())))
-                            fout.write(struct.pack(TYPE_FLOAT, float(link.limit_max.z())))
+                            self.write_number(fout, TYPE_FLOAT, float(link.limit_max.x()))
+                            self.write_number(fout, TYPE_FLOAT, float(link.limit_max.y()))
+                            self.write_number(fout, TYPE_FLOAT, float(link.limit_max.z()))
             
             logger.debug(f"-- ボーンデータ出力終了({len(list(pmx.bones.values()))})")
 
             # モーフの数
-            fout.write(struct.pack(TYPE_INT, len(list(pmx.org_morphs.values()))))
+            self.write_number(fout, TYPE_INT, len(list(pmx.org_morphs.values())))
 
             for midx, morph in enumerate(pmx.org_morphs.values()):
                 # モーフ名
@@ -290,73 +290,73 @@ class PmxWriter:
                 # モーフ種類 - 0:グループ, 1:頂点, 2:ボーン, 3:UV, 4:追加UV1, 5:追加UV2, 6:追加UV3, 7:追加UV4, 8:材質
                 fout.write(struct.pack(TYPE_BYTE, morph.morph_type))
                 # モーフのオフセット数 : 後続の要素数
-                fout.write(struct.pack(TYPE_INT, len(morph.offsets)))
+                self.write_number(fout, TYPE_INT, len(morph.offsets))
 
                 for offset in morph.offsets:
                     if type(offset) is VertexMorphOffset:
                         # 頂点モーフ
                         fout.write(struct.pack(vertex_idx_type, offset.vertex_index))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.position_offset.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.position_offset.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.position_offset.z())))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.position_offset.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.position_offset.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.position_offset.z()))
                     elif type(offset) is UVMorphData:
                         # UVモーフ
                         fout.write(struct.pack(vertex_idx_type, offset.vertex_index))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.uv.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.uv.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.uv.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.uv.w())))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.uv.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.uv.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.uv.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.uv.w()))
                     elif type(offset) is BoneMorphData:
                         # ボーンモーフ
                         fout.write(struct.pack(bone_idx_type, offset.bone_index))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.position.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.position.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.position.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.rotation.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.rotation.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.rotation.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.rotation.scalar())))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.position.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.position.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.position.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.rotation.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.rotation.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.rotation.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.rotation.scalar()))
                     elif type(offset) is MaterialMorphData:
                         # 材質モーフ
                         fout.write(struct.pack(material_idx_type, offset.material_index))
                         fout.write(struct.pack(TYPE_BYTE, int(offset.calc_mode)))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.diffuse.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.diffuse.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.diffuse.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.diffuse.w())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.specular.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.specular.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.specular.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.specular_factor)))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.ambient.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.ambient.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.ambient.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.edge_color.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.edge_color.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.edge_color.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.edge_color.w())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.edge_size)))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.texture_factor.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.texture_factor.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.texture_factor.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.texture_factor.w())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.sphere_texture_factor.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.sphere_texture_factor.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.sphere_texture_factor.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.sphere_texture_factor.w())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.toon_texture_factor.x())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.toon_texture_factor.y())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.toon_texture_factor.z())))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.toon_texture_factor.w())))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.diffuse.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.diffuse.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.diffuse.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.diffuse.w()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.specular.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.specular.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.specular.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.specular_factor))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.ambient.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.ambient.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.ambient.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.edge_color.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.edge_color.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.edge_color.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.edge_color.w()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.edge_size))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.texture_factor.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.texture_factor.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.texture_factor.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.texture_factor.w()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.sphere_texture_factor.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.sphere_texture_factor.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.sphere_texture_factor.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.sphere_texture_factor.w()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.toon_texture_factor.x()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.toon_texture_factor.y()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.toon_texture_factor.z()))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.toon_texture_factor.w()))
                     elif type(offset) is GroupMorphData:
                         # グループモーフ
                         fout.write(struct.pack(morph_idx_type, offset.morph_index))
-                        fout.write(struct.pack(TYPE_FLOAT, float(offset.value)))
+                        self.write_number(fout, TYPE_FLOAT, float(offset.value))
 
             logger.debug(f"-- モーフデータ出力終了({len(list(pmx.morphs.values()))})")
 
             # 表示枠の数
-            fout.write(struct.pack(TYPE_INT, len(list(pmx.display_slots.values()))))
+            self.write_number(fout, TYPE_INT, len(list(pmx.display_slots.values())))
 
             for didx, display_slot in enumerate(pmx.display_slots.values()):
                 # ボーン名
@@ -365,7 +365,7 @@ class PmxWriter:
                 # 特殊枠フラグ - 0:通常枠 1:特殊枠
                 fout.write(struct.pack(TYPE_BYTE, display_slot.special_flag))
                 # 枠内要素数
-                fout.write(struct.pack(TYPE_INT, len(display_slot.references)))
+                self.write_number(fout, TYPE_INT, len(display_slot.references))
                 # ボーンの場合
                 for display_type, bone_idx in display_slot.references:
                     # 要素対象 0:ボーン 1:モーフ
@@ -380,7 +380,7 @@ class PmxWriter:
             logger.debug(f"-- 表示枠データ出力終了({len(list(pmx.display_slots.values()))})")
 
             # 剛体の数
-            fout.write(struct.pack(TYPE_INT, len(list(pmx.rigidbodies.values()))))
+            self.write_number(fout, TYPE_INT, len(list(pmx.rigidbodies.values())))
 
             for ridx, rigidbody in enumerate(pmx.rigidbodies.values()):
                 # 剛体名
@@ -395,34 +395,34 @@ class PmxWriter:
                 # 1  : byte	| 形状 - 0:球 1:箱 2:カプセル
                 fout.write(struct.pack(TYPE_BYTE, rigidbody.shape_type))
                 # 12 : float3	| サイズ(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_size.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_size.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_size.z())))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_size.x()), True)
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_size.y()), True)
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_size.z()), True)
                 # 12 : float3	| 位置(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_position.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_position.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_position.z())))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_position.x()))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_position.y()))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_position.z()))
                 # 12 : float3	| 回転(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_rotation.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_rotation.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.shape_rotation.z())))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_rotation.x()))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_rotation.y()))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.shape_rotation.z()))
                 # 4  : float	| 質量
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.param.mass)))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.param.mass), True)
                 # 4  : float	| 移動減衰
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.param.linear_damping)))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.param.linear_damping), True)
                 # 4  : float	| 回転減衰
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.param.angular_damping)))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.param.angular_damping), True)
                 # 4  : float	| 反発力
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.param.restitution)))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.param.restitution), True)
                 # 4  : float	| 摩擦力
-                fout.write(struct.pack(TYPE_FLOAT, float(rigidbody.param.friction)))
+                self.write_number(fout, TYPE_FLOAT, float(rigidbody.param.friction), True)
                 # 1  : byte	| 剛体の物理演算 - 0:ボーン追従(static) 1:物理演算(dynamic) 2:物理演算 + Bone位置合わせ
                 fout.write(struct.pack(TYPE_BYTE, rigidbody.mode))
 
             logger.debug(f"-- 剛体データ出力終了({len(list(pmx.rigidbodies.values()))})")
             
             # ジョイントの数
-            fout.write(struct.pack(TYPE_INT, len(list(pmx.joints.values()))))
+            self.write_number(fout, TYPE_INT, len(list(pmx.joints.values())))
 
             for jidx, joint in enumerate(pmx.joints.values()):
                 # ジョイント名
@@ -435,37 +435,37 @@ class PmxWriter:
                 # n  : 剛体Indexサイズ  | 関連剛体BのIndex - 関連なしの場合は-1
                 fout.write(struct.pack(rigidbody_idx_type, joint.rigidbody_index_b))
                 # 12 : float3	| 位置(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.position.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.position.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.position.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.position.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.position.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.position.z()))
                 # 12 : float3	| 回転(x,y,z) -> ラジアン角
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation.z()))
                 # 12 : float3	| 移動制限-下限(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.translation_limit_min.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.translation_limit_min.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.translation_limit_min.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.translation_limit_min.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.translation_limit_min.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.translation_limit_min.z()))
                 # 12 : float3	| 移動制限-上限(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.translation_limit_max.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.translation_limit_max.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.translation_limit_max.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.translation_limit_max.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.translation_limit_max.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.translation_limit_max.z()))
                 # 12 : float3	| 回転制限-下限(x,y,z) -> ラジアン角
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation_limit_min.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation_limit_min.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation_limit_min.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation_limit_min.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation_limit_min.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation_limit_min.z()))
                 # 12 : float3	| 回転制限-上限(x,y,z) -> ラジアン角
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation_limit_max.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation_limit_max.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.rotation_limit_max.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation_limit_max.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation_limit_max.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.rotation_limit_max.z()))
                 # 12 : float3	| バネ定数-移動(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.spring_constant_translation.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.spring_constant_translation.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.spring_constant_translation.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_translation.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_translation.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_translation.z()))
                 # 12 : float3	| バネ定数-回転(x,y,z)
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.spring_constant_rotation.x())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.spring_constant_rotation.y())))
-                fout.write(struct.pack(TYPE_FLOAT, float(joint.spring_constant_rotation.z())))
+                self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_rotation.x()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_rotation.y()))
+                self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_rotation.z()))
 
             logger.debug(f"-- ジョイントデータ出力終了({len(list(pmx.joints.values()))})")
             
@@ -503,5 +503,10 @@ class PmxWriter:
         fout.write(struct.pack(type, len(btxt)))
         fout.write(btxt)
 
+    def write_number(self, fout, val_type: str, val: float, is_positive_only=False):
+        # 正常な値を強制設定
+        val = max(0, get_effective_value(val)) if is_positive_only else get_effective_value(val)
+        # INT型の場合、INT変換
+        val = int(val) if val_type in [TYPE_INT, TYPE_UNSIGNED_INT] else float(val)
 
-
+        fout.write(struct.pack(val_type, val))
