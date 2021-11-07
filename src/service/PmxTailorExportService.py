@@ -1021,7 +1021,7 @@ class PmxTailorExportService():
 
                     # ボーン仮登録
                     bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
-                    bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002 | 0x0008 | 0x0010 | 0x0800)
+                    bone = Bone(bone_name, bone_name, v.position, root_bone.index, 0, 0x0000 | 0x0002)
                     bone.local_z_vector = v.normal.copy()
                     tmp_all_bones[bone.name] = {"bone": bone, "parent": root_bone.name, "regist": False}
                     logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
@@ -1061,6 +1061,7 @@ class PmxTailorExportService():
                             bone.parent_index = parent_bone.index
                             bone.local_x_vector = (bone.position - parent_bone.position).normalized()
                             bone.local_z_vector *= MVector3D(-1, 1, -1)
+                            bone.flag |= 0x0800
 
                             tmp_all_bones[bone.name]["parent"] = parent_bone.name
 
@@ -1069,14 +1070,15 @@ class PmxTailorExportService():
                             parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
                             parent_bone.flag |= 0x0001
 
+                            # 表示枠
+                            parent_bone.flag |= 0x0008 | 0x0010
+                            model.display_slots[material_name].references.append((0, parent_bone.index))
+
                         model.bones[bone.name] = bone
                         model.bone_indexes[bone.index] = bone.name
                         tmp_all_bones[bone.name]["regist"] = True
 
                         registed_bone_indexs[v_yidx][v_xidx] = total_v_xidx
-
-                        # 表示枠
-                        model.display_slots[material_name].references.append((0, bone.index))
 
                         # 前ボーンとして設定
                         prev_xidx = v_xidx
