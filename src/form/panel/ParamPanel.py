@@ -203,31 +203,31 @@ class PhysicsParam():
         self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称 *", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。")
+        self.simple_abb_txt.SetToolTip(u"ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）")
         self.simple_abb_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_abb_txt, 0, wx.ALL, 5)
 
         self.simple_abb_ctrl = wx.TextCtrl(self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1))
-        self.simple_abb_ctrl.SetToolTip(u"ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。")
+        self.simple_abb_ctrl.SetToolTip(u"ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）")
         self.simple_abb_ctrl.SetMaxLength(5)
         self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
         self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン *", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_parent_bone_txt.SetToolTip(u"材質の起点となる親ボーン")
+        self.simple_parent_bone_txt.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
         self.simple_parent_bone_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
 
         self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
-        self.simple_parent_bone_ctrl.SetToolTip(u"材質の起点となる親ボーン")
+        self.simple_parent_bone_ctrl.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
         self.simple_header_grid_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
 
         self.simple_direction_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理方向", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_direction_txt.SetToolTip(u"物理材質の向き")
+        self.simple_direction_txt.SetToolTip(u"物理材質の向き(例：左腕側の物理を設定したい場合に「左」を設定して、物理が流れる方向を左方向に伸ばす)")
         self.simple_direction_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_direction_txt, 0, wx.ALL, 5)
 
         self.simple_direction_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["下", "上", "右", "左"])
-        self.simple_direction_ctrl.SetToolTip(u"物理材質の向き")
+        self.simple_direction_ctrl.SetToolTip(u"物理材質の向き(例：左腕側の物理を設定したい場合に「左」を設定して、物理が流れる方向を左方向に伸ばす)")
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_direction_ctrl, 0, wx.ALL, 5)
 
@@ -249,6 +249,16 @@ class PhysicsParam():
         self.simple_primitive_ctrl.SetToolTip(u"物理の参考値プリセット")
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
+
+        self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）を削除するか")
+        self.simple_exist_physics_clear_txt.Wrap(-1)
+        self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
+
+        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["削除しない", "削除する"])
+        self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）を削除するか")
+        self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
@@ -1362,6 +1372,7 @@ class PhysicsParam():
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["direction"] = self.simple_direction_ctrl.GetStringSelection()
+            params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection() == '削除する'
             params["similarity"] = self.simple_similarity_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -1992,6 +2003,7 @@ class PhysicsParam():
         self.simple_air_resistance_slider.SetValue(1.8)
         self.simple_shape_maintenance_slider.SetValue(1.5)
         self.simple_direction_ctrl.SetStringSelection('下')
+        self.simple_exist_physics_clear_ctrl.SetStringSelection('削除しない')
 
         self.advance_rigidbody_shape_type_ctrl.SetStringSelection('箱')
         self.physics_type_ctrl.SetStringSelection('布')

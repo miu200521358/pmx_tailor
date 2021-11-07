@@ -359,7 +359,7 @@ class PmxWriter:
             self.write_number(fout, TYPE_INT, len(list(pmx.display_slots.values())))
 
             for didx, display_slot in enumerate(pmx.display_slots.values()):
-                # ボーン名
+                # 表示枠名
                 self.write_text(fout, display_slot.name, f"Display {didx}")
                 self.write_text(fout, display_slot.english_name, f"Display {didx}")
                 # 特殊枠フラグ - 0:通常枠 1:特殊枠

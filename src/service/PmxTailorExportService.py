@@ -10,7 +10,7 @@ import copy
 import bezier
 
 from module.MOptions import MExportOptions
-from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, RigidBodyParam, IkLink, Ik # noqa
+from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef, RigidBodyParam, IkLink, Ik, BoneMorphData # noqa
 from mmd.PmxWriter import PmxWriter
 from module.MMath import MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
 from utils.MLogger import MLogger # noqa
@@ -76,6 +76,12 @@ class PmxTailorExportService():
         model.comment += f"\r\n　　質量: {param_option['mass']}"    # noqa
         model.comment += f"\r\n　　空気抵抗: {param_option['air_resistance']}"    # noqa
         model.comment += f"\r\n　　形状維持: {param_option['shape_maintenance']}"    # noqa
+
+        if param_option['exist_physics_clear']:
+            # 既存材質削除フラグONの場合
+            logger.info(f"{param_option['material_name']}: 既存材質削除", decoration=MLogger.DECORATION_LINE)
+
+            model = self.clear_exist_physics(model, param_option, param_option['material_name'])
 
         logger.info(f"{param_option['material_name']}: 頂点マップ生成", decoration=MLogger.DECORATION_LINE)
 
@@ -1092,11 +1098,186 @@ class PmxTailorExportService():
 
         return v_yidx, v_xidx
 
+    def clear_exist_physics(self, model: PmxModel, param_option: dict, material_name: str):
+        logger.info(f"{material_name}: 削除対象抽出（頂点 - ボーン）")
+
+        weighted_bone_indexes = {}
+        for vertex_idx in model.material_vertices[material_name]:
+            vertex = model.vertex_dict[vertex_idx]
+            if type(vertex.deform) is Bdef1:
+                if vertex.deform.index0 not in list(weighted_bone_indexes.values()):
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+            elif type(vertex.deform) is Bdef2:
+                if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+            elif type(vertex.deform) is Bdef4:
+                if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight1 > 0:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                if vertex.deform.index2 not in list(weighted_bone_indexes.values()) and vertex.deform.weight2 > 0:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
+                if vertex.deform.index3 not in list(weighted_bone_indexes.values()) and vertex.deform.weight3 > 0:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
+            elif type(vertex.deform) is Sdef:
+                if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
+                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+        
+        not_delete_bone_names = []
+        # 他の材質で該当ボーンにウェイト割り当てられている場合、ボーンの削除だけは避ける
+        for bone_idx, vertices in model.vertices.items():
+            is_not_delete = False
+            if bone_idx in list(weighted_bone_indexes.values()) and len(vertices) > 0:
+                is_not_delete = False
+                for vertex in vertices:
+                    if vertex.index not in model.material_vertices[material_name]:
+                        is_not_delete = is_not_delete or True
+            if is_not_delete:
+                not_delete_bone_names.append(model.bone_indexes[bone_idx])
+        
+        logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
+        logger.debug('not_delete_bone_names: %s', ", ".join(not_delete_bone_names))
+        
+        logger.info(f"{material_name}: 削除対象抽出（ボーン - 剛体）")
+
+        weighted_rigidbody_indexes = {}
+        for rigidbody in model.rigidbodies.values():
+            if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()):
+                weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
+
+        logger.debug('weighted_rigidbody_indexes: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
+
+        logger.info(f"{material_name}: 削除対象抽出（剛体 - ジョイント）")
+
+        weighted_joint_indexes = {}
+        for joint in model.joints.values():
+            if joint.name not in list(weighted_joint_indexes.values()) and joint.rigidbody_index_a in list(weighted_rigidbody_indexes.values()):
+                weighted_joint_indexes[joint.name] = joint.name
+            if joint.name not in list(weighted_joint_indexes.values()) and joint.rigidbody_index_b in list(weighted_rigidbody_indexes.values()):
+                weighted_joint_indexes[joint.name] = joint.name
+
+        logger.debug('weighted_joint_indexes: %s', ", ".join((weighted_joint_indexes.keys())))
+
+        logger.info(f"{material_name}: 削除実行")
+
+        # 削除
+        for joint_name in weighted_joint_indexes.keys():
+            del model.joints[joint_name]
+
+        for rigidbody_name in weighted_rigidbody_indexes.keys():
+            del model.rigidbodies[rigidbody_name]
+
+        for bone_name in weighted_bone_indexes.keys():
+            if bone_name not in not_delete_bone_names:
+                del model.bones[bone_name]
+
+        logger.info(f"{material_name}: INDEX振り直し")
+
+        reset_rigidbodies = {}
+        for ridx, (rigidbody_name, rigidbody) in enumerate(model.rigidbodies.items()):
+            reset_rigidbodies[rigidbody.index] = {'name': rigidbody_name, 'index': ridx}
+            model.rigidbodies[rigidbody_name].index = ridx
+
+        reset_bones = {}
+        for bidx, (bone_name, bone) in enumerate(model.bones.items()):
+            reset_bones[bone.index] = {'name': bone_name, 'index': bidx}
+            model.bones[bone_name].index = bidx
+            model.bone_indexes[bidx] = bone_name
+
+        logger.info(f"{material_name}: INDEX再割り当て（ジョイント - 剛体）")
+
+        for jidx, (joint_name, joint) in enumerate(model.joints.items()):
+            if joint.rigidbody_index_a in reset_rigidbodies:
+                joint.rigidbody_index_a = reset_rigidbodies[joint.rigidbody_index_a]['index']
+            if joint.rigidbody_index_b in reset_rigidbodies:
+                joint.rigidbody_index_b = reset_rigidbodies[joint.rigidbody_index_b]['index']
+
+        logger.info(f"{material_name}: INDEX再割り当て（剛体 - ボーン）")
+
+        for rigidbody in model.rigidbodies.values():
+            if rigidbody.bone_index in reset_bones:
+                rigidbody.bone_index = reset_bones[rigidbody.bone_index]['index']
+
+        logger.info(f"{material_name}: INDEX再割り当て（表示枠 - ボーン）")
+
+        for display_slot in model.display_slots.values():
+            new_references = []
+            for display_type, bone_idx in display_slot.references:
+                if display_type == 0:
+                    if bone_idx in reset_bones:
+                        new_references.append((display_type, reset_bones[bone_idx]['index']))
+                else:
+                    new_references.append((display_type, bone_idx))
+            display_slot.references = new_references
+
+        logger.info(f"{material_name}: INDEX再割り当て（モーフ - ボーン）")
+
+        for morph in model.morphs.values():
+            if morph.morph_type == 2:
+                new_offsets = []
+                for offset in morph.offsets:
+                    if type(offset) is BoneMorphData:
+                        if offset.bone_index in reset_bones:
+                            offset.bone_index = reset_bones[offset.bone_index]['index']
+                            new_offsets.append(offset)
+                    else:
+                        new_offsets.append(offset)
+                morph.offsets = new_offsets
+
+        logger.info(f"{material_name}: INDEX再割り当て（参照ボーン - ボーン）")
+
+        for bidx, bone in enumerate(model.bones.values()):
+            if bone.parent_index in reset_bones:
+                bone.parent_index = reset_bones[bone.parent_index]['index']
+
+            if bone.getConnectionFlag() and bone.tail_index in reset_bones:
+                bone.tail_index = reset_bones[bone.tail_index]['index']
+
+            if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag() and bone.effect_index in reset_bones:
+                bone.effect_index = reset_bones[bone.effect_index]['index']
+
+            if bone.getIkFlag() and bone.ik.target_index in reset_bones:
+                bone.ik.target_index = reset_bones[bone.ik.target_index]['index']
+                for link in bone.ik.link:
+                    link.bone_index = reset_bones[link.bone_index]['index']
+
+        logger.info(f"{material_name}: INDEX再割り当て（頂点 - ボーン）")
+
+        for vidx, vertex in enumerate(model.vertex_dict.values()):
+            if type(vertex.deform) is Bdef1:
+                if vertex.deform.index0 in reset_bones:
+                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
+            elif type(vertex.deform) is Bdef2:
+                if vertex.deform.index0 in reset_bones:
+                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
+                if vertex.deform.index1 in reset_bones:
+                    vertex.deform.index1 = reset_bones[vertex.deform.index1]['index']
+            elif type(vertex.deform) is Bdef4:
+                if vertex.deform.index0 in reset_bones:
+                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
+                if vertex.deform.index1 in reset_bones:
+                    vertex.deform.index1 = reset_bones[vertex.deform.index1]['index']
+                if vertex.deform.index2 in reset_bones:
+                    vertex.deform.index2 = reset_bones[vertex.deform.index2]['index']
+                if vertex.deform.index3 in reset_bones:
+                    vertex.deform.index3 = reset_bones[vertex.deform.index3]['index']
+            elif type(vertex.deform) is Sdef:
+                if vertex.deform.index0 in reset_bones:
+                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
+                if vertex.deform.index1 in reset_bones:
+                    vertex.deform.index1 = reset_bones[vertex.deform.index1]['index']
+
+        return model
+
     # 頂点を展開した図を作成
     def create_vertex_map(self, model: PmxModel, param_option: dict, material_name: str):
         logger.info(f"{material_name}: 面の抽出")
 
-        logger.info(f"{material_name}: 重複頂点の抽出")
+        logger.info(f"{material_name}: 面の抽出準備①")
 
         # 位置ベースで重複頂点の抽出
         duplicate_vertices = {}
@@ -1110,6 +1291,8 @@ class PmxTailorExportService():
                 duplicate_vertices[key].append(vertex.index)
             # 一旦ルートボーンにウェイトを一括置換
             vertex.deform = Bdef1(model.bones[param_option['parent_bone_name']].index)
+
+        logger.info(f"{material_name}: 面の抽出準備②")
 
         # 面組み合わせの生成
         indices_by_vidx = {}
