@@ -200,6 +200,19 @@ class PhysicsParam():
 
         self.simple_param_sizer.Add(self.simple_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
+        self.simple_parent_bone_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン *", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_parent_bone_txt.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
+        self.simple_parent_bone_txt.Wrap(-1)
+        self.simple_parent_bone_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
+
+        self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
+        self.simple_parent_bone_ctrl.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
+        self.simple_parent_bone_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
+
+        self.simple_param_sizer.Add(self.simple_parent_bone_sizer, 0, wx.ALL | wx.EXPAND, 0)
+
         self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"材質略称 *", wx.DefaultPosition, wx.DefaultSize, 0)
@@ -212,14 +225,14 @@ class PhysicsParam():
         self.simple_abb_ctrl.SetMaxLength(5)
         self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
-        self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン *", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_parent_bone_txt.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
-        self.simple_parent_bone_txt.Wrap(-1)
-        self.simple_header_grid_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
+        self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"剛体グループ *", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_group_txt.SetToolTip(u"剛体のグループ。初期設定では、自分自身のグループのみ非衝突として設定します。")
+        self.simple_group_txt.Wrap(-1)
+        self.simple_header_grid_sizer.Add(self.simple_group_txt, 0, wx.ALL, 5)
 
-        self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
-        self.simple_parent_bone_ctrl.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
-        self.simple_header_grid_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
+        self.simple_group_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"])
+        self.simple_group_ctrl.SetToolTip(u"剛体のグループ。初期設定では、自分自身のグループのみ非衝突として設定します。")
+        self.simple_header_grid_sizer.Add(self.simple_group_ctrl, 0, wx.ALL, 5)
 
         self.simple_direction_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"物理方向", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_direction_txt.SetToolTip(u"物理材質の向き(例：左腕側の物理を設定したい場合に「左」を設定して、物理が流れる方向を左方向に伸ばす)")
@@ -231,14 +244,17 @@ class PhysicsParam():
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_direction_ctrl, 0, wx.ALL, 5)
 
-        self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"剛体グループ *", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_group_txt.SetToolTip(u"剛体のグループ。初期設定では、1と自分自身のグループのみ非衝突として設定します。")
-        self.simple_group_txt.Wrap(-1)
-        self.simple_header_grid_sizer.Add(self.simple_group_txt, 0, wx.ALL, 5)
+        self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
+                                                       + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+        self.simple_exist_physics_clear_txt.Wrap(-1)
+        self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
 
-        self.simple_group_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"])
-        self.simple_group_ctrl.SetToolTip(u"剛体のグループ。初期設定では、1と自分自身のグループのみ非衝突として設定します。")
-        self.simple_header_grid_sizer.Add(self.simple_group_ctrl, 0, wx.ALL, 5)
+        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "再利用", "上書き"])
+        self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
+                                                        + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+        self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
 
         self.simple_primitive_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"プリセット", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_primitive_txt.SetToolTip(u"物理の参考値プリセット")
@@ -249,16 +265,6 @@ class PhysicsParam():
         self.simple_primitive_ctrl.SetToolTip(u"物理の参考値プリセット")
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
-
-        self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）を削除するか")
-        self.simple_exist_physics_clear_txt.Wrap(-1)
-        self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
-
-        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["削除しない", "削除する"])
-        self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）を削除するか")
-        self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
-        self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
@@ -1372,7 +1378,7 @@ class PhysicsParam():
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["direction"] = self.simple_direction_ctrl.GetStringSelection()
-            params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection() == '削除する'
+            params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection()
             params["similarity"] = self.simple_similarity_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -2003,7 +2009,7 @@ class PhysicsParam():
         self.simple_air_resistance_slider.SetValue(1.8)
         self.simple_shape_maintenance_slider.SetValue(1.5)
         self.simple_direction_ctrl.SetStringSelection('下')
-        self.simple_exist_physics_clear_ctrl.SetStringSelection('削除しない')
+        self.simple_exist_physics_clear_ctrl.SetStringSelection('そのまま')
 
         self.advance_rigidbody_shape_type_ctrl.SetStringSelection('箱')
         self.physics_type_ctrl.SetStringSelection('布')
