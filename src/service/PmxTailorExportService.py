@@ -1129,6 +1129,9 @@ class PmxTailorExportService():
                 if xi == 0 or np.sum(bone_horizonal_distances[median_y, prev_xi:(xi + 1)]) >= median_x_distance * param_option["horizonal_bone_density"] * 0.9:
                     base_v_xidxs.append(xi)
                     prev_xi = xi + 1
+            # if base_v_xidxs[-1] < vertex_map.shape[1] - 1:
+            #     # 右端は必ず登録
+            #     base_v_xidxs = base_v_xidxs + [vertex_map.shape[1] - 1]
             
             all_bone_indexes[base_map_idx] = {}
             for yi in range(vertex_map.shape[0]):
@@ -1434,17 +1437,19 @@ class PmxTailorExportService():
         duplicate_indices = {}
         below_iidx = None
         max_below_x = -9999
+        max_below_size = -9999
         for index_idx in model.material_indices[material_name]:
             # 頂点の組み合わせから面INDEXを引く
             indices_by_vidx[tuple(sorted(model.indices[index_idx]))] = index_idx
             v0 = model.vertex_dict[model.indices[index_idx][0]]
             v1 = model.vertex_dict[model.indices[index_idx][1]]
             v2 = model.vertex_dict[model.indices[index_idx][2]]
-            below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0)) * \
-                v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
-            if below_x > max_below_x:
+            below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
+            below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
+            if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
                 below_iidx = index_idx
                 max_below_x = below_x
+                max_below_size = below_size
             # 重複辺（2点）の組み合わせ
             index_combs = list(itertools.combinations(model.indices[index_idx], 2))
             for (iv1, iv2) in index_combs:
@@ -1487,16 +1492,18 @@ class PmxTailorExportService():
                     # 出来るだけ真っ直ぐの辺がある面とする
                     below_iidx = None
                     max_below_x = -9999
+                    max_below_size = -9999
                     remaining_iidxs = list(set(model.material_indices[material_name]) - set(registed_iidxs))
                     for index_idx in remaining_iidxs:
                         v0 = model.vertex_dict[model.indices[index_idx][0]]
                         v1 = model.vertex_dict[model.indices[index_idx][1]]
                         v2 = model.vertex_dict[model.indices[index_idx][2]]
-                        below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0)) * \
-                            v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
-                        if below_x > max_below_x:
+                        below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
+                        below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
+                        if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
                             below_iidx = index_idx
                             max_below_x = below_x
+                            max_below_size = below_size
                 logger.debug(f'below_iidx: {below_iidx}')
                 first_vertex_axis_map, first_vertex_coordinate_map = \
                     self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, {}, {}, below_iidx)
@@ -2089,7 +2096,7 @@ class PmxTailorExportService():
                             vx = 0
                         else:
                             # v2の方がv0に近い場合、v1は斜めと見なす
-                            if abs(v1v - v0v) < abs(v2v - v0v):
+                            if abs(v1v - v0v) <= abs(v2v - v0v):
                                 # ＼の場合、v1は左方向
                                 vx = -1
                             else:

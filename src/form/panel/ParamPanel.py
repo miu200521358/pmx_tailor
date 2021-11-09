@@ -246,15 +246,27 @@ class PhysicsParam():
 
         self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
-                                                       + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+                                                       + "\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
         self.simple_exist_physics_clear_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
 
-        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "再利用", "上書き"])
+        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "上書き"])
         self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
-                                                        + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+                                                        + "\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
         self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
+
+        # self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
+        # self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
+        #                                                + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+        # self.simple_exist_physics_clear_txt.Wrap(-1)
+        # self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
+
+        # self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "再利用", "上書き"])
+        # self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
+        #                                                 + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+        # self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        # self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
 
         self.simple_primitive_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"プリセット", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_primitive_txt.SetToolTip(u"物理の参考値プリセット")
