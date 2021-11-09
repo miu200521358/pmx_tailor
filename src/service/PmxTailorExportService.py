@@ -1072,6 +1072,7 @@ class PmxTailorExportService():
         model.display_slots[material_name].references.append((0, model.bones[root_bone.name].index))
 
         tmp_all_bones = {}
+        all_yidxs = {}
         all_bone_indexes = {}
         all_registed_bone_indexs = {}
 
@@ -1116,6 +1117,7 @@ class PmxTailorExportService():
             if v_yidxs[-1] < vertex_map.shape[0] - 1:
                 # 最下段は必ず登録
                 v_yidxs = v_yidxs + [vertex_map.shape[0] - 1]
+            all_yidxs[base_map_idx] = v_yidxs
 
             # 中央あたりの横幅中央値ベースで横の割りを決める
             bone_horizonal_distances = all_bone_horizonal_distances[base_map_idx]
@@ -1148,6 +1150,7 @@ class PmxTailorExportService():
                     all_bone_indexes[base_map_idx][yi][xi] = xi + max_xi
             
         for base_map_idx in vertex_map_orders:
+            v_yidxs = all_yidxs[base_map_idx]
             vertex_map = vertex_maps[base_map_idx]
             vertex_connected = vertex_connecteds[base_map_idx]
             registed_bone_indexs = {}
