@@ -9,6 +9,7 @@ from form.panel.FilePanel import FilePanel
 from form.panel.VrmPanel import VrmPanel
 from form.panel.ParamPanel import ParamPanel
 from form.panel.ParamAdvancePanel import ParamAdvancePanel
+from form.panel.ParamBonePanel import ParamBonePanel
 from utils import MFormUtils, MFileUtils # noqa
 from utils.MLogger import MLogger # noqa
 from form.worker.ExportWorkerThread import ExportWorkerThread
@@ -88,8 +89,12 @@ class MainFrame(wx.Frame):
         self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
         self.note_ctrl.AddPage(self.advance_param_panel_ctrl, u"パラ調整(詳細)", False)
 
+        # パラ調整(ボーン)タブ
+        self.bone_param_panel_ctrl = ParamBonePanel(self, self.note_ctrl, 3)
+        self.note_ctrl.AddPage(self.bone_param_panel_ctrl, u"パラ調整(ボーン)", False)
+
         # if self.is_vroid:
-        #     self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 3)
+        #     self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 4)
         #     self.note_ctrl.AddPage(self.vrm_panel_ctrl, u"Vrm設定", False)
         
         # ---------------------------------------------

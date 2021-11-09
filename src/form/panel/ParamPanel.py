@@ -2,6 +2,8 @@
 #
 import wx
 import wx.lib.newevent
+from wx.grid import Grid, GridCellChoiceEditor, EVT_GRID_CELL_CHANGING
+
 import json
 import os
 import unicodedata
@@ -9,7 +11,7 @@ import traceback
 
 from form.panel.BasePanel import BasePanel
 from form.parts.FloatSliderCtrl import FloatSliderCtrl
-from mmd.PmxData import RigidBody, Joint
+from mmd.PmxData import RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef
 from module.MMath import MRect, MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
 from utils.MLogger import MLogger # noqa
 
@@ -74,7 +76,8 @@ class ParamPanel(BasePanel):
         self.fit()
 
     def on_add(self, event: wx.Event):
-        self.physics_list.append(PhysicsParam(self.frame, self, self.scrolled_window, self.frame.advance_param_panel_ctrl.scrolled_window, len(self.physics_list)))
+        self.physics_list.append(PhysicsParam(self.frame, self, self.scrolled_window, self.frame.advance_param_panel_ctrl.scrolled_window, \
+                                              self.frame.bone_param_panel_ctrl.scrolled_window, len(self.physics_list)))
 
         # 基本
         self.simple_sizer.Add(self.physics_list[-1].simple_sizer, 0, wx.ALL | wx.EXPAND, 5)
@@ -83,6 +86,10 @@ class ParamPanel(BasePanel):
         # 詳細
         self.frame.advance_param_panel_ctrl.advance_sizer.Add(self.physics_list[-1].advance_sizer, 0, wx.ALL | wx.EXPAND, 5)
         self.frame.advance_param_panel_ctrl.advance_sizer.Layout()
+
+        # ボーン
+        self.frame.bone_param_panel_ctrl.bone_sizer.Add(self.physics_list[-1].bone_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        self.frame.bone_param_panel_ctrl.bone_sizer.Layout()
 
         # 初期値設定
         self.physics_list[-1].on_clear(event)
@@ -110,6 +117,7 @@ class ParamPanel(BasePanel):
             for physics_param in self.physics_list:
                 self.simple_sizer.Hide(physics_param.simple_sizer, recursive=True)
                 self.frame.advance_param_panel_ctrl.advance_sizer.Hide(physics_param.advance_sizer, recursive=True)
+                self.frame.bone_param_panel_ctrl.bone_sizer.Hide(physics_param.bone_sizer, recursive=True)
 
             # ハッシュ
             self.org_model_digest = self.frame.file_panel_ctrl.org_model_file_ctrl.data.digest
@@ -160,11 +168,13 @@ class ParamPanel(BasePanel):
 
 
 class PhysicsParam():
-    def __init__(self, main_frame: wx.Frame, frame: wx.Frame, simple_window: wx.Panel, advance_window: wx.Panel, param_no: int):
+    def __init__(self, main_frame: wx.Frame, frame: wx.Frame, simple_window: wx.Panel, advance_window: wx.Panel, bone_window: wx.Panel, param_no: int):
         self.main_frame = main_frame
         self.frame = frame
         self.simple_window = simple_window
         self.advance_window = advance_window
+        self.bone_window = bone_window
+        self.weighted_bone_names = {}
 
         # 簡易版 ------------------
         self.simple_sizer = wx.StaticBoxSizer(wx.StaticBox(self.simple_window, wx.ID_ANY, "【No.{0}】".format(param_no + 1)), orient=wx.VERTICAL)
@@ -244,29 +254,17 @@ class PhysicsParam():
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_direction_ctrl, 0, wx.ALL, 5)
 
-        self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存設定", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
-                                                       + "\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+                                                       + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
         self.simple_exist_physics_clear_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
 
-        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "上書き"])
+        self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "再利用", "上書き"])
         self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
-                                                        + "\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
+                                                        + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
         self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
-
-        # self.simple_exist_physics_clear_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"既存物理", wx.DefaultPosition, wx.DefaultSize, 0)
-        # self.simple_exist_physics_clear_txt.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
-        #                                                + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
-        # self.simple_exist_physics_clear_txt.Wrap(-1)
-        # self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_txt, 0, wx.ALL, 5)
-
-        # self.simple_exist_physics_clear_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["そのまま", "再利用", "上書き"])
-        # self.simple_exist_physics_clear_ctrl.SetToolTip("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n" \
-        #                                                 + "再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
-        # self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
-        # self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
 
         self.simple_primitive_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"プリセット", wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_primitive_txt.SetToolTip(u"物理の参考値プリセット")
@@ -1371,6 +1369,19 @@ class PhysicsParam():
         self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_reverse_joint_sizer, 0, wx.ALL, 5)
 
+        # ボーン版 ------------------
+        self.bone_sizer = wx.StaticBoxSizer(wx.StaticBox(self.bone_window, wx.ID_ANY, "【No.{0}】".format(param_no + 1)), orient=wx.VERTICAL)
+        self.bone_param_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.bone_material_ctrl = wx.StaticText(self.bone_window, wx.ID_ANY, u"（材質未選択）", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.bone_param_sizer.Add(self.bone_material_ctrl, 0, wx.ALL, 5)
+
+        self.bone_sizer.Add(self.bone_param_sizer, 1, wx.ALL | wx.EXPAND, 0)
+
+        self.bone_grid_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.bone_sizer.Add(self.bone_grid_sizer, 1, wx.ALL | wx.EXPAND, 0)
+
     def get_param_options(self, pidx: int, is_show_error):
         params = {}
 
@@ -1837,9 +1848,72 @@ class PhysicsParam():
     def set_material_name(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
+        self.bone_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
         # バイト長を加味してスライス
         self.simple_abb_ctrl.SetValue(truncate_double_byte_str(self.simple_material_ctrl.GetStringSelection(), 6))
-    
+
+        # 設定ボーンパネル初期化
+        self.initialize_bone_param(event)
+
+    def initialize_bone_param(self, event: wx.Event):
+        # ウェイトボーンリンク生成
+        self.create_weighted_bone_names()
+        max_link_num = 0
+        for bone_names in self.weighted_bone_names.values():
+            max_link_num = len(bone_names) if max_link_num < len(bone_names) else max_link_num
+
+        self.bone_sizer.Remove(self.bone_grid_sizer)
+
+        # ボーングリッド再生成
+        self.bone_grid_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.bone_grid = Grid(self.bone_window)
+        self.bone_grid.CreateGrid(max_link_num, len(self.weighted_bone_names.keys()))
+
+        max_bone_name_cnt = 0
+        all_bone_names = [""]
+        for bone_names in self.weighted_bone_names.values():
+            for bone_name in bone_names:
+                all_bone_names.append(bone_name)
+                max_bone_name_cnt = len(bone_name) if max_bone_name_cnt < len(bone_name) else max_bone_name_cnt
+
+        for c in range(len(self.weighted_bone_names.keys())):
+            for r in range(max_link_num):
+                self.bone_grid.SetCellEditor(r, c, GridCellChoiceEditor(choices=all_bone_names))
+            self.bone_grid.SetColLabelValue(c, str(c + 1))
+            self.bone_grid.SetColSize(c, int((self.bone_grid.GetCellFont(r, c).PointSize + 1) * max_bone_name_cnt))
+        
+        self.bone_grid.Bind(EVT_GRID_CELL_CHANGING, self.change_bone_grid)
+
+        self.bone_grid_sizer.Add(self.bone_grid, 0, wx.ALL | wx.EXPAND, 0)
+        self.bone_sizer.Add(self.bone_grid_sizer, 0, wx.ALL, 0)
+
+        self.bone_sizer.Layout()
+
+        self.main_frame.bone_param_panel_ctrl.bone_sizer.Layout()
+        self.main_frame.bone_param_panel_ctrl.bone_sizer.FitInside(self.bone_window)
+
+    def change_bone_grid(self, event: wx.Event):
+        if event.GetString():
+            # 文字列が選択されている場合、その子どもを下位層に設定する
+            is_set = False
+            for tail_bone_name, bone_names in self.weighted_bone_names.items():
+                for bi, bone_name in enumerate(bone_names):
+                    if bone_name == event.GetString():
+                        is_set = True
+                        break
+                if is_set:
+                    break
+            
+            for r in range(event.GetRow() + 1, self.bone_grid.GetNumberRows()):
+                bi += 1
+                if bi < len(bone_names):
+                    # editor = self.bone_grid.GetCellEditor(r, event.GetCol())
+                    self.bone_grid.GetTable().SetValue(r, event.GetCol(), bone_names[bi])
+                    # editor.SetParameters(f'{bone_names[bi]},""')
+                    # editor.EndEdit(r, event.GetCol(), self.bone_grid, "")
+            
+            self.bone_grid.ForceRefresh()
+
     def set_fineness(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.3))
@@ -2044,6 +2118,66 @@ class PhysicsParam():
         self.advance_horizonal_joint_coefficient_spin.SetValue(4.2)
         self.advance_diagonal_joint_coefficient_spin.SetValue(1)
         self.advance_reverse_joint_coefficient_spin.SetValue(1)
+    
+    def create_weighted_bone_names(self):
+        self.weighted_bone_names = {}
+        model = self.main_frame.file_panel_ctrl.org_model_file_ctrl.data
+        material_name = self.simple_material_ctrl.GetStringSelection()
+
+        if material_name not in model.material_vertices:
+            return
+
+        # ウェイトボーンリスト取得
+        weighted_bone_names = {}
+        for vertex_idx in model.material_vertices[material_name]:
+            vertex = model.vertex_dict[vertex_idx]
+            if type(vertex.deform) is Bdef1:
+                if vertex.deform.index0 not in list(weighted_bone_names.values()):
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+            elif type(vertex.deform) is Bdef2:
+                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight0 < 1:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+            elif type(vertex.deform) is Bdef4:
+                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight1 > 0:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                if vertex.deform.index2 not in list(weighted_bone_names.values()) and vertex.deform.weight2 > 0:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
+                if vertex.deform.index3 not in list(weighted_bone_names.values()) and vertex.deform.weight3 > 0:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
+            elif type(vertex.deform) is Sdef:
+                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight0 < 1:
+                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+        
+        # まず親子マップを作成する
+        bone_links = {}
+        for bone_name, bone_idx in weighted_bone_names.items():
+            bone_links[bone_name] = model.create_link_2_top_one(bone_name, is_defined=False)
+
+            logger.debug("link[%s]: %s", bone_name, bone_links[bone_name].all().keys())
+
+        target_bone_links = {}
+        for bone_name, links in reversed(bone_links.items()):
+            is_regist = True
+            for bname, blinks in bone_links.items():
+                if bname != bone_name and bone_name in blinks.all().keys():
+                    # 他のボーンリストに含まれている場合、登録対象外
+                    is_regist = False
+                    break
+            if is_regist:
+                target_bone_links[bone_name] = links
+        
+        for tail_bone_name, links in target_bone_links.items():
+            self.weighted_bone_names[tail_bone_name] = []
+            for bone in links.all().values():
+                if bone.name in list(weighted_bone_names.keys()):
+                    self.weighted_bone_names[tail_bone_name].append(bone.name)
+            logger.debug("weighted_bone_names[%s]: %s", tail_bone_name, self.weighted_bone_names[tail_bone_name])
 
 
 def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax: float):
