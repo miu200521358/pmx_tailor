@@ -20,7 +20,6 @@ class FilePanel(BasePanel):
         
     def __init__(self, frame: wx.Frame, export: wx.Notebook, tab_idx: int):
         super().__init__(frame, export, tab_idx)
-        self.convert_export_worker = None
 
         self.txt_exec = f"{self.frame.my_program}実行"
         self.txt_stop = f"{self.frame.my_program}停止"
@@ -165,18 +164,18 @@ class FilePanel(BasePanel):
             return result
 
         # VRM2PMX変換開始
-        if self.export_btn_ctrl.GetLabel() == self.txt_stop and self.convert_export_worker:
+        if self.export_btn_ctrl.GetLabel() == self.txt_stop and self.frame.worker:
             # フォーム無効化
             self.disable()
             # 停止状態でボタン押下時、停止
-            self.convert_export_worker.stop()
+            self.frame.worker.stop()
 
             # タブ移動可
             self.frame.release_tab()
             # フォーム有効化
             self.frame.enable()
             # ワーカー終了
-            self.convert_export_worker = None
+            self.frame.worker = None
             # プログレス非表示
             self.gauge_ctrl.SetValue(0)
 
@@ -184,7 +183,7 @@ class FilePanel(BasePanel):
             self.export_btn_ctrl.SetLabel(self.txt_exec)
             
             event.Skip(False)
-        elif not self.convert_export_worker:
+        elif not self.frame.worker:
             # フォーム無効化
             self.disable()
             # タブ固定
