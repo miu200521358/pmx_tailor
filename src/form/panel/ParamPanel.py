@@ -558,7 +558,7 @@ class PhysicsParam():
         self.advance_vertical_joint_coefficient_txt.Wrap(-1)
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_txt, 0, wx.ALL, 5)
 
-        self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.8", min=2.8, max=10, initial=1, inc=0.1)
+        self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.8", min=1, max=10, initial=1, inc=0.1)
         self.advance_vertical_joint_coefficient_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_spin, 0, wx.ALL, 5)
 
@@ -572,7 +572,7 @@ class PhysicsParam():
         self.vertical_joint_mov_x_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.vertical_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.vertical_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
@@ -582,7 +582,7 @@ class PhysicsParam():
         self.vertical_joint_mov_y_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.vertical_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.vertical_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
@@ -592,7 +592,7 @@ class PhysicsParam():
         self.vertical_joint_mov_z_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.vertical_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.vertical_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
@@ -602,7 +602,7 @@ class PhysicsParam():
         self.vertical_joint_mov_x_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.vertical_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.vertical_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
@@ -612,7 +612,7 @@ class PhysicsParam():
         self.vertical_joint_mov_y_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.vertical_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.vertical_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
@@ -622,7 +622,7 @@ class PhysicsParam():
         self.vertical_joint_mov_z_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.vertical_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.vertical_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
@@ -632,7 +632,7 @@ class PhysicsParam():
         self.vertical_joint_rot_x_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.vertical_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.vertical_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
@@ -642,7 +642,7 @@ class PhysicsParam():
         self.vertical_joint_rot_y_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.vertical_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.vertical_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
@@ -652,7 +652,7 @@ class PhysicsParam():
         self.vertical_joint_rot_z_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.vertical_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.vertical_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
@@ -662,7 +662,7 @@ class PhysicsParam():
         self.vertical_joint_rot_x_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.vertical_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.vertical_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
@@ -672,7 +672,7 @@ class PhysicsParam():
         self.vertical_joint_rot_y_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.vertical_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.vertical_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
@@ -682,7 +682,7 @@ class PhysicsParam():
         self.vertical_joint_rot_z_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
-        self.vertical_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.vertical_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.vertical_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
@@ -779,7 +779,7 @@ class PhysicsParam():
         self.horizonal_joint_mov_x_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.horizonal_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.horizonal_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
@@ -789,7 +789,7 @@ class PhysicsParam():
         self.horizonal_joint_mov_y_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.horizonal_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.horizonal_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
@@ -799,7 +799,7 @@ class PhysicsParam():
         self.horizonal_joint_mov_z_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.horizonal_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.horizonal_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
@@ -809,7 +809,7 @@ class PhysicsParam():
         self.horizonal_joint_mov_x_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.horizonal_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
@@ -819,7 +819,7 @@ class PhysicsParam():
         self.horizonal_joint_mov_y_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.horizonal_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
@@ -829,7 +829,7 @@ class PhysicsParam():
         self.horizonal_joint_mov_z_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.horizonal_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
@@ -839,7 +839,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_x_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.horizonal_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.horizonal_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
@@ -849,7 +849,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_y_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.horizonal_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.horizonal_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
@@ -859,7 +859,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_z_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.horizonal_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.horizonal_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
@@ -869,7 +869,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_x_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.horizonal_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
@@ -879,7 +879,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_y_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.horizonal_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
@@ -889,7 +889,7 @@ class PhysicsParam():
         self.horizonal_joint_rot_z_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
-        self.horizonal_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.horizonal_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.horizonal_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
@@ -986,7 +986,7 @@ class PhysicsParam():
         self.diagonal_joint_mov_x_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.diagonal_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.diagonal_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
@@ -996,7 +996,7 @@ class PhysicsParam():
         self.diagonal_joint_mov_y_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.diagonal_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.diagonal_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
@@ -1006,7 +1006,7 @@ class PhysicsParam():
         self.diagonal_joint_mov_z_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.diagonal_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.diagonal_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
@@ -1016,7 +1016,7 @@ class PhysicsParam():
         self.diagonal_joint_mov_x_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.diagonal_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
@@ -1026,7 +1026,7 @@ class PhysicsParam():
         self.diagonal_joint_mov_y_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.diagonal_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
@@ -1036,7 +1036,7 @@ class PhysicsParam():
         self.diagonal_joint_mov_z_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.diagonal_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
@@ -1046,7 +1046,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_x_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.diagonal_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.diagonal_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
@@ -1056,7 +1056,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_y_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.diagonal_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.diagonal_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
@@ -1066,7 +1066,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_z_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.diagonal_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.diagonal_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
@@ -1076,7 +1076,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_x_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.diagonal_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
@@ -1086,7 +1086,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_y_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.diagonal_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
@@ -1096,7 +1096,7 @@ class PhysicsParam():
         self.diagonal_joint_rot_z_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
-        self.diagonal_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.diagonal_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.diagonal_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
@@ -1193,7 +1193,7 @@ class PhysicsParam():
         self.reverse_joint_mov_x_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.reverse_joint_mov_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.reverse_joint_mov_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
@@ -1203,7 +1203,7 @@ class PhysicsParam():
         self.reverse_joint_mov_y_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.reverse_joint_mov_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.reverse_joint_mov_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
@@ -1213,7 +1213,7 @@ class PhysicsParam():
         self.reverse_joint_mov_z_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.reverse_joint_mov_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.reverse_joint_mov_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
@@ -1223,7 +1223,7 @@ class PhysicsParam():
         self.reverse_joint_mov_x_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.reverse_joint_mov_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.reverse_joint_mov_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
@@ -1233,7 +1233,7 @@ class PhysicsParam():
         self.reverse_joint_mov_y_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.reverse_joint_mov_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.reverse_joint_mov_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
@@ -1243,7 +1243,7 @@ class PhysicsParam():
         self.reverse_joint_mov_z_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.reverse_joint_mov_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.reverse_joint_mov_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
@@ -1253,7 +1253,7 @@ class PhysicsParam():
         self.reverse_joint_rot_x_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.reverse_joint_rot_x_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.reverse_joint_rot_x_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
@@ -1263,7 +1263,7 @@ class PhysicsParam():
         self.reverse_joint_rot_y_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.reverse_joint_rot_y_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.reverse_joint_rot_y_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
@@ -1273,7 +1273,7 @@ class PhysicsParam():
         self.reverse_joint_rot_z_min_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=0, initial=0, inc=0.1)
+        self.reverse_joint_rot_z_min_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1)
         self.reverse_joint_rot_z_min_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
@@ -1283,7 +1283,7 @@ class PhysicsParam():
         self.reverse_joint_rot_x_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.reverse_joint_rot_x_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.reverse_joint_rot_x_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
@@ -1293,7 +1293,7 @@ class PhysicsParam():
         self.reverse_joint_rot_y_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.reverse_joint_rot_y_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.reverse_joint_rot_y_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
@@ -1303,7 +1303,7 @@ class PhysicsParam():
         self.reverse_joint_rot_z_max_txt.Wrap(-1)
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1)
+        self.reverse_joint_rot_z_max_spin = wx.SpinCtrlDouble(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1)
         self.reverse_joint_rot_z_max_spin.Bind(wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1))
         self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
@@ -2041,6 +2041,8 @@ class PhysicsParam():
         base_joint_val = ((self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()) * \
                           (self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()))
 
+        self.advance_vertical_joint_coefficient_spin.SetValue(base_joint_val * 20)
+
         vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 1))
         self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
         self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
@@ -2058,6 +2060,8 @@ class PhysicsParam():
         # self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov)
         # self.horizonal_joint_mov_z_max_spin.SetValue(horizonal_joint_mov)
 
+        self.advance_horizonal_joint_coefficient_spin.SetValue(base_joint_val * 30)
+
         horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 2))
         self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot / 1.5)
         self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot / 1.5)
@@ -2071,6 +2075,8 @@ class PhysicsParam():
         self.horizonal_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.horizonal_joint_spring_rot_z_spin.SetValue(spring_rot)
 
+        self.advance_diagonal_joint_coefficient_spin.SetValue(base_joint_val * 10)
+
         diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 0.75))
         self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
         self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
@@ -2083,6 +2089,8 @@ class PhysicsParam():
         self.diagonal_joint_spring_rot_x_spin.SetValue(spring_rot)
         self.diagonal_joint_spring_rot_y_spin.SetValue(spring_rot)
         self.diagonal_joint_spring_rot_z_spin.SetValue(spring_rot)
+
+        self.advance_reverse_joint_coefficient_spin.SetValue(base_joint_val * 10)
 
         reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 0.5))
         self.reverse_joint_rot_x_min_spin.SetValue(-reverse_joint_rot)
