@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 #
+from operator import is_
 import wx
 import wx.lib.newevent
 from wx.grid import Grid, GridCellChoiceEditor, EVT_GRID_CELL_CHANGING
@@ -161,7 +162,7 @@ class ParamPanel(BasePanel):
                     param_material_names.append(param['material_name'])
         
         if len(params) == 0 and not self.frame.is_vroid:
-            logger.error("物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
+            logger.error("有効な物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
             return []
 
         return params
@@ -1395,6 +1396,19 @@ class PhysicsParam():
                 logger.error("物理材質と同じ材質が裏面に指定されています。", decoration=MLogger.DECORATION_BOX)
                 return params
 
+            if self.simple_exist_physics_clear_ctrl.GetStringSelection() == '再利用':
+                bone_grid, bone_grid_rows, bone_grid_cols, is_boned = self.get_bone_grid()
+                if not is_boned:
+                    logger.error("既存物理を再利用する場合、「パラ調整(ボーン)」画面でボーン並び順を指定してください。", decoration=MLogger.DECORATION_BOX)
+                    return {}
+                params["bone_grid"] = bone_grid
+                params["bone_grid_rows"] = bone_grid_rows
+                params["bone_grid_cols"] = bone_grid_cols
+            else:
+                params["bone_grid"] = {}
+                params["bone_grid_rows"] = 0
+                params["bone_grid_cols"] = 0
+
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
             params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
@@ -1907,12 +1921,27 @@ class PhysicsParam():
             for r in range(event.GetRow() + 1, self.bone_grid.GetNumberRows()):
                 bi += 1
                 if bi < len(bone_names):
-                    # editor = self.bone_grid.GetCellEditor(r, event.GetCol())
                     self.bone_grid.GetTable().SetValue(r, event.GetCol(), bone_names[bi])
-                    # editor.SetParameters(f'{bone_names[bi]},""')
-                    # editor.EndEdit(r, event.GetCol(), self.bone_grid, "")
             
             self.bone_grid.ForceRefresh()
+    
+    def get_bone_grid(self):
+        bone_grid = {}
+        is_boned = False
+        max_r = 0
+        max_c = 0
+        for r in range(self.bone_grid.GetNumberRows()):
+            bone_grid[r] = {}
+            for c in range(self.bone_grid.GetNumberCols()):
+                bone_name = self.bone_grid.GetTable().GetValue(r, c)
+                bone_grid[r][c] = bone_name
+                if bone_name:
+                    is_boned = True
+
+                max_r = r if r > max_r and bone_name else max_r
+                max_c = c if c > max_c and bone_name else max_c
+
+        return bone_grid, max_r + 1, max_c + 1, is_boned
 
     def set_fineness(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
@@ -2128,37 +2157,36 @@ class PhysicsParam():
             return
 
         # ウェイトボーンリスト取得
-        weighted_bone_names = {}
+        all_weighted_bone_names = {}
         for vertex_idx in model.material_vertices[material_name]:
             vertex = model.vertex_dict[vertex_idx]
             if type(vertex.deform) is Bdef1:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()):
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index0 not in list(all_weighted_bone_names.values()):
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
             elif type(vertex.deform) is Bdef2:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight0 < 1:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                if vertex.deform.index0 not in list(all_weighted_bone_names.values()) and vertex.deform.weight0 > 0:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(all_weighted_bone_names.values()) and vertex.deform.weight0 < 1:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
             elif type(vertex.deform) is Bdef4:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight1 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
-                if vertex.deform.index2 not in list(weighted_bone_names.values()) and vertex.deform.weight2 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
-                if vertex.deform.index3 not in list(weighted_bone_names.values()) and vertex.deform.weight3 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
+                if vertex.deform.index0 not in list(all_weighted_bone_names.values()) and vertex.deform.weight0 > 0:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(all_weighted_bone_names.values()) and vertex.deform.weight1 > 0:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                if vertex.deform.index2 not in list(all_weighted_bone_names.values()) and vertex.deform.weight2 > 0:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
+                if vertex.deform.index3 not in list(all_weighted_bone_names.values()) and vertex.deform.weight3 > 0:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
             elif type(vertex.deform) is Sdef:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight0 < 1:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                if vertex.deform.index0 not in list(all_weighted_bone_names.values()) and vertex.deform.weight0 > 0:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                if vertex.deform.index1 not in list(all_weighted_bone_names.values()) and vertex.deform.weight0 < 1:
+                    all_weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
         
         # まず親子マップを作成する
         bone_links = {}
-        for bone_name, bone_idx in weighted_bone_names.items():
+        for bone_name, bone in model.bones.items():
             bone_links[bone_name] = model.create_link_2_top_one(bone_name, is_defined=False)
-
             logger.debug("link[%s]: %s", bone_name, bone_links[bone_name].all().keys())
 
         target_bone_links = {}
@@ -2172,11 +2200,21 @@ class PhysicsParam():
             if is_regist:
                 target_bone_links[bone_name] = links
         
+        target_bone_names = {}
         for tail_bone_name, links in target_bone_links.items():
-            self.weighted_bone_names[tail_bone_name] = []
+            target_bone_names[tail_bone_name] = []
+            is_regist = False
             for bone in links.all().values():
-                if bone.name in list(weighted_bone_names.keys()):
-                    self.weighted_bone_names[tail_bone_name].append(bone.name)
+                if bone.name in list(all_weighted_bone_names.keys()):
+                    is_regist = True
+                    break
+            if is_regist:
+                for bone in links.all().values():
+                    target_bone_names[tail_bone_name].append(bone.name)
+
+        self.weighted_bone_names = {}
+        for tail_bone_name in sorted(list(target_bone_names.keys())):
+            self.weighted_bone_names[tail_bone_name] = target_bone_names[tail_bone_name]
             logger.debug("weighted_bone_names[%s]: %s", tail_bone_name, self.weighted_bone_names[tail_bone_name])
 
 

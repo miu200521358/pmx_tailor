@@ -86,7 +86,20 @@ class PmxTailorExportService():
         if param_option['exist_physics_clear'] == '再利用':
             logger.info(f"{param_option['material_name']}: ボーンマップ生成", decoration=MLogger.DECORATION_LINE)
 
-            bone_maps = self.create_bone_map(model, param_option, param_option['material_name'])
+            bone_blocks = self.create_bone_blocks(model, param_option, param_option['material_name'])
+
+            if not bone_blocks:
+                logger.warning("有効なボーンマップが生成できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                return False
+
+            logger.info(f"【{param_option['material_name']}】 剛体生成", decoration=MLogger.DECORATION_LINE)
+
+            self.create_rigidbody_by_bone_blocks(model, param_option, bone_blocks)
+
+            logger.info(f"【{param_option['material_name']}】 ジョイント生成", decoration=MLogger.DECORATION_LINE)
+
+            self.create_joint_by_bone_blocks(model, param_option, bone_blocks)
+
         else:
             logger.info(f"{param_option['material_name']}: 頂点マップ生成", decoration=MLogger.DECORATION_LINE)
 
@@ -99,7 +112,7 @@ class PmxTailorExportService():
                 map_cnt.append(np.count_nonzero(vertex_map >= 0))
             
             if len(map_cnt) == 0:
-                logger.warning("有効な頂点マップが生成されななかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                logger.warning("有効な頂点マップが生成できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
                 return False
             
             vertex_map_orders = [k for k in np.argsort(-np.array(map_cnt)) if map_cnt[k] > np.max(map_cnt) * 0.5]
@@ -141,19 +154,21 @@ class PmxTailorExportService():
 
         return True
 
-    def create_bone_map(self, model: PmxModel, param_option: dict, material_name: str):
+    def create_bone_blocks(self, model: PmxModel, param_option: dict, material_name: str):
+        bone_grid = param_option["bone_grid"]
+        bone_grid_cols = param_option["bone_grid_cols"]
+        bone_grid_rows = param_option["bone_grid_rows"]
+
         # ウェイトボーンリスト取得（ついでにウェイト正規化）
-        weighted_bone_names = {}
+        weighted_bone_pairs = []
         for vertex_idx in model.material_vertices[material_name]:
             vertex = model.vertex_dict[vertex_idx]
-            if type(vertex.deform) is Bdef1:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()):
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-            elif type(vertex.deform) is Bdef2:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight0 < 1:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+            if type(vertex.deform) is Bdef2 or type(vertex.deform) is Sdef:
+                if 0 < vertex.deform.weight0 < 1:
+                    # 2つめのボーンも有効値を持っている場合、判定対象
+                    key = (min(vertex.deform.index0, vertex.deform.index1), max(vertex.deform.index0, vertex.deform.index1))
+                    if key not in weighted_bone_pairs:
+                        weighted_bone_pairs.append(key)
             elif type(vertex.deform) is Bdef4:
                 # ウェイト正規化
                 total_weights = np.array([vertex.deform.weight0, vertex.deform.weight1, vertex.deform.weight2, vertex.deform.weight3])
@@ -164,94 +179,501 @@ class PmxTailorExportService():
                 vertex.deform.weight2 = weights[2]
                 vertex.deform.weight3 = weights[3]
 
-                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight1 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
-                if vertex.deform.index2 not in list(weighted_bone_names.values()) and vertex.deform.weight2 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
-                if vertex.deform.index3 not in list(weighted_bone_names.values()) and vertex.deform.weight3 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
-            elif type(vertex.deform) is Sdef:
-                if vertex.deform.index0 not in list(weighted_bone_names.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_names.values()) and vertex.deform.weight0 < 1:
-                    weighted_bone_names[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                weighted_bone_indexes = []
+                if vertex.deform.weight0 > 0:
+                    weighted_bone_indexes.append(vertex.deform.index0)
+                if vertex.deform.weight1 > 0:
+                    weighted_bone_indexes.append(vertex.deform.index1)
+                if vertex.deform.weight2 > 0:
+                    weighted_bone_indexes.append(vertex.deform.index2)
+                if vertex.deform.weight3 > 0:
+                    weighted_bone_indexes.append(vertex.deform.index3)
+
+                for bi0, bi1 in list(itertools.combinations(weighted_bone_indexes, 2)):
+                    # ボーン2つずつのペアでウェイト繋がり具合を保持する
+                    key = (min(bi0, bi1), max(bi0, bi1))
+                    if key not in weighted_bone_pairs:
+                        weighted_bone_pairs.append(key)
         
-        # まず親子マップを作成する
-        bone_links = {}
-        for bone_name, bone_idx in weighted_bone_names.items():
-            bone_links[bone_name] = model.create_link_2_top_one(bone_name, is_defined=False)
+        bone_blocks = {}
+        for pac in range(bone_grid_cols):
+            prev_above_bone_name = None
+            prev_above_bone_position = None
+            for par in range(bone_grid_rows):
+                prev_above_bone_name = bone_grid[par][pac]
+                if not prev_above_bone_name:
+                    continue
 
-            logger.debug("link[%s]: %s", bone_name, bone_links[bone_name].all().keys())
+                prev_above_bone_position = model.bones[prev_above_bone_name].position
+                prev_above_bone_index = model.bones[prev_above_bone_name].index
+                if prev_above_bone_name:
+                    prev_below_bone_name = None
+                    prev_below_bone_position = None
+                    for pbr in range(par + 1, bone_grid_rows):
+                        prev_below_bone_name = bone_grid[pbr][pac]
+                        if prev_below_bone_name:
+                            prev_below_bone_position = model.bones[prev_below_bone_name].position
+                            break
+                    if not prev_below_bone_name and model.bones[prev_above_bone_name].tail_position != MVector3D():
+                        # 下がない場合、かつ上ボーンの相対位置がある場合、下段があると見なす
+                        prev_below_bone_name = prev_above_bone_name
+                        prev_below_bone_position = prev_above_bone_position + model.bones[prev_above_bone_name].tail_position
+                    next_above_bone_name = None
+                    next_above_bone_position = None
+                    if pac < bone_grid_cols - 1:
+                        # 右周りにボーンの連携をチェック
+                        for nac in list(range(pac + 1, bone_grid_cols)):
+                            next_above_bone_name = bone_grid[par][nac]
+                            if next_above_bone_name:
+                                next_above_bone_position = model.bones[next_above_bone_name].position
+                                next_above_bone_index = model.bones[next_above_bone_name].index
+                                break
+                                # key = (min(prev_above_bone_index, next_above_bone_index), max(prev_above_bone_index, next_above_bone_index))
+                                # if key in weighted_bone_pairs:
+                                #     break
+                                # else:
+                                #     next_above_bone_name = None
+                    else:
+                        # 一旦円周を描いてみる
+                        next_above_bone_name = bone_grid[par][0]
+                        if next_above_bone_name:
+                            next_above_bone_position = model.bones[next_above_bone_name].position
+                            next_above_bone_index = model.bones[next_above_bone_name].index
+                            key = (min(prev_above_bone_index, next_above_bone_index), max(prev_above_bone_index, next_above_bone_index))
+                            if key not in weighted_bone_pairs:
+                                # ウェイトが乗ってなかった場合、2つ前のボーンと結合させる
+                                for nac in list(range(pac - 1, pac - 2, -1)):
+                                    next_above_bone_name = bone_grid[par][nac]
+                                    if next_above_bone_name:
+                                        next_above_bone_position = model.bones[next_above_bone_name].position
+                                        next_above_bone_index = model.bones[next_above_bone_name].index
+                                        break
+                                        # key = (min(prev_above_bone_index, next_above_bone_index), max(prev_above_bone_index, next_above_bone_index))
+                                        # if key in weighted_bone_pairs:
+                                        #     break
+                                        # else:
+                                        #     next_above_bone_name = None
+                    next_below_bone_name = None
+                    next_below_bone_position = None
+                    for nbr in range(par + 1, bone_grid_rows):
+                        next_below_bone_name = bone_grid[nbr][nac]
+                        if next_below_bone_name:
+                            next_below_bone_position = model.bones[next_below_bone_name].position
+                            break
+                    next_next_above_bone_name = None
+                    if next_above_bone_name and not next_below_bone_name and model.bones[next_above_bone_name].tail_position != MVector3D():
+                        # 下がない場合、かつ上ボーンの相対位置がある場合、下段があると見なす
+                        next_below_bone_name = next_above_bone_name
+                        next_below_bone_position = next_above_bone_position + model.bones[next_above_bone_name].tail_position
 
-        weighted_bone_links = {}
-        for bone_name, links in reversed(bone_links.items()):
-            is_regist = True
-            for bname, blinks in bone_links.items():
-                if bname != bone_name and bone_name in blinks.all().keys():
-                    # 他のボーンリストに含まれている場合、登録対象外
-                    is_regist = False
-                    break
-            if is_regist:
-                weighted_bone_links[bone_name] = links
+                    for nnac in list(range(nac + 1, bone_grid_cols)) + [0]:
+                        next_next_above_bone_name = bone_grid[par][nnac]
+                        break
+                        # if next_next_above_bone_name and next_above_bone_name != next_next_above_bone_name:
+                        #     next_next_above_bone_index = model.bones[next_next_above_bone_name].index
+                        #     key = (min(next_next_above_bone_index, next_above_bone_index), max(next_next_above_bone_index, next_above_bone_index))
+                        #     if key in weighted_bone_pairs:
+                        #         break
+                        #     else:
+                        #         next_next_above_bone_name = None
+                    if prev_above_bone_name and prev_below_bone_name and next_above_bone_name and next_below_bone_name:
+                        bone_blocks[prev_above_bone_name] = {'prev_above': prev_above_bone_name, 'prev_below': prev_below_bone_name, \
+                                                             'next_above': next_above_bone_name, 'next_below': next_below_bone_name, \
+                                                             'prev_above_pos': prev_above_bone_position, 'prev_below_pos': prev_below_bone_position, \
+                                                             'next_above_pos': next_above_bone_position, 'next_below_pos': next_below_bone_position, \
+                                                             'next_connect': (next_next_above_bone_name is not None), 'yi': par, 'xi': pac}
+                        logger.debug(f'prev_above: {prev_above_bone_name}, [{prev_above_bone_position.to_log()}], ' \
+                                     + f'next_above: {next_above_bone_name}, [{next_above_bone_position.to_log()}], ' \
+                                     + f'prev_below: {prev_below_bone_name}, [{prev_below_bone_position.to_log()}], ' \
+                                     + f'next_below: {next_below_bone_name}, [{next_below_bone_position.to_log()}], ' \
+                                     + f'next_connect: {(next_next_above_bone_name is not None)}, [{next_next_above_bone_name}], ' \
+                                     + f'yi: {par}, xi: {pac}')
 
-        for bone_name, links in weighted_bone_links.items():
-            logger.debug("weighted_bone_links[%s]: %s", bone_name, links.all().keys())
+        return bone_blocks
+    
+    def create_joint_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict):
+        bone_grid_rows = param_option["bone_grid_rows"]
+        bone_grid_cols = param_option["bone_grid_cols"]
+
+        # ジョイント生成
+        created_joints = {}
+
+        # 略称
+        abb_name = param_option['abb_name']
+        # 縦ジョイント情報
+        param_vertical_joint = param_option['vertical_joint']
+        # 横ジョイント情報
+        param_horizonal_joint = param_option['horizonal_joint']
+        # 斜めジョイント情報
+        param_diagonal_joint = param_option['diagonal_joint']
+        # 逆ジョイント情報
+        param_reverse_joint = param_option['reverse_joint']
+
+        prev_joint_cnt = 0
+
+        max_vy = bone_grid_rows
+        middle_vy = (bone_grid_rows) * 0.3
+        min_vy = 0
+        xs = np.arange(min_vy, max_vy, step=1)
+    
+        if param_vertical_joint:
+            coefficient = param_option['vertical_joint_coefficient']
+
+            vertical_limit_min_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.translation_limit_min.x() / coefficient, param_vertical_joint.translation_limit_min.x() / coefficient, param_vertical_joint.translation_limit_min.x()]])), xs)             # noqa
+            vertical_limit_min_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.translation_limit_min.y() / coefficient, param_vertical_joint.translation_limit_min.y() / coefficient, param_vertical_joint.translation_limit_min.y()]])), xs)             # noqa
+            vertical_limit_min_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.translation_limit_min.z() / coefficient, param_vertical_joint.translation_limit_min.z() / coefficient, param_vertical_joint.translation_limit_min.z()]])), xs)             # noqa
+
+            vertical_limit_max_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.translation_limit_max.x() / coefficient, param_vertical_joint.translation_limit_max.x() / coefficient, param_vertical_joint.translation_limit_max.x()]])), xs)             # noqa
+            vertical_limit_max_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.translation_limit_max.y() / coefficient, param_vertical_joint.translation_limit_max.y() / coefficient, param_vertical_joint.translation_limit_max.y()]])), xs)             # noqa
+            vertical_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.translation_limit_max.z() / coefficient, param_vertical_joint.translation_limit_max.z() / coefficient, param_vertical_joint.translation_limit_max.z()]])), xs)             # noqa
+
+            vertical_limit_min_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.rotation_limit_min.x() / coefficient, param_vertical_joint.rotation_limit_min.x() / coefficient, param_vertical_joint.rotation_limit_min.x()]])), xs)             # noqa
+            vertical_limit_min_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.rotation_limit_min.y() / coefficient, param_vertical_joint.rotation_limit_min.y() / coefficient, param_vertical_joint.rotation_limit_min.y()]])), xs)             # noqa
+            vertical_limit_min_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.rotation_limit_min.z() / coefficient, param_vertical_joint.rotation_limit_min.z() / coefficient, param_vertical_joint.rotation_limit_min.z()]])), xs)             # noqa
+
+            vertical_limit_max_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.rotation_limit_max.x() / coefficient, param_vertical_joint.rotation_limit_max.x() / coefficient, param_vertical_joint.rotation_limit_max.x()]])), xs)             # noqa
+            vertical_limit_max_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.rotation_limit_max.y() / coefficient, param_vertical_joint.rotation_limit_max.y() / coefficient, param_vertical_joint.rotation_limit_max.y()]])), xs)             # noqa
+            vertical_limit_max_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.rotation_limit_max.z() / coefficient, param_vertical_joint.rotation_limit_max.z() / coefficient, param_vertical_joint.rotation_limit_max.z()]])), xs)             # noqa
+
+            vertical_spring_constant_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.spring_constant_translation.x() / coefficient, param_vertical_joint.spring_constant_translation.x() / coefficient, param_vertical_joint.spring_constant_translation.x()]])), xs)             # noqa
+            vertical_spring_constant_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.spring_constant_translation.y() / coefficient, param_vertical_joint.spring_constant_translation.y() / coefficient, param_vertical_joint.spring_constant_translation.y()]])), xs)             # noqa
+            vertical_spring_constant_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.spring_constant_translation.z() / coefficient, param_vertical_joint.spring_constant_translation.z() / coefficient, param_vertical_joint.spring_constant_translation.z()]])), xs)             # noqa
+
+            vertical_spring_constant_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.spring_constant_rotation.x() / coefficient, param_vertical_joint.spring_constant_rotation.x() / coefficient, param_vertical_joint.spring_constant_rotation.x()]])), xs)             # noqa
+            vertical_spring_constant_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.spring_constant_rotation.y() / coefficient, param_vertical_joint.spring_constant_rotation.y() / coefficient, param_vertical_joint.spring_constant_rotation.y()]])), xs)             # noqa
+            vertical_spring_constant_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_vertical_joint.spring_constant_rotation.z() / coefficient, param_vertical_joint.spring_constant_rotation.z() / coefficient, param_vertical_joint.spring_constant_rotation.z()]])), xs)             # noqa
+
+        if param_horizonal_joint:
+            coefficient = param_option['horizonal_joint_coefficient']
+
+            horizonal_limit_min_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x() / coefficient, param_horizonal_joint.translation_limit_min.x()]])), xs)             # noqa
+            horizonal_limit_min_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y() / coefficient, param_horizonal_joint.translation_limit_min.y()]])), xs)             # noqa
+            horizonal_limit_min_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z() / coefficient, param_horizonal_joint.translation_limit_min.z()]])), xs)             # noqa
+
+            horizonal_limit_max_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x() / coefficient, param_horizonal_joint.translation_limit_max.x()]])), xs)             # noqa
+            horizonal_limit_max_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y() / coefficient, param_horizonal_joint.translation_limit_max.y()]])), xs)             # noqa
+            horizonal_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z() / coefficient, param_horizonal_joint.translation_limit_max.z()]])), xs)             # noqa
+
+            horizonal_limit_min_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x() / coefficient, param_horizonal_joint.rotation_limit_min.x()]])), xs)             # noqa
+            horizonal_limit_min_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.rotation_limit_min.y() / coefficient, param_horizonal_joint.rotation_limit_min.y() / coefficient, param_horizonal_joint.rotation_limit_min.y()]])), xs)             # noqa
+            horizonal_limit_min_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.rotation_limit_min.z() / coefficient, param_horizonal_joint.rotation_limit_min.z() / coefficient, param_horizonal_joint.rotation_limit_min.z()]])), xs)             # noqa
+
+            horizonal_limit_max_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.rotation_limit_max.x() / coefficient, param_horizonal_joint.rotation_limit_max.x() / coefficient, param_horizonal_joint.rotation_limit_max.x()]])), xs)             # noqa
+            horizonal_limit_max_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.rotation_limit_max.y() / coefficient, param_horizonal_joint.rotation_limit_max.y() / coefficient, param_horizonal_joint.rotation_limit_max.y()]])), xs)             # noqa
+            horizonal_limit_max_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.rotation_limit_max.z() / coefficient, param_horizonal_joint.rotation_limit_max.z() / coefficient, param_horizonal_joint.rotation_limit_max.z()]])), xs)             # noqa
+
+            horizonal_spring_constant_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.spring_constant_translation.x() / coefficient, param_horizonal_joint.spring_constant_translation.x() / coefficient, param_horizonal_joint.spring_constant_translation.x()]])), xs)             # noqa
+            horizonal_spring_constant_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.spring_constant_translation.y() / coefficient, param_horizonal_joint.spring_constant_translation.y() / coefficient, param_horizonal_joint.spring_constant_translation.y()]])), xs)             # noqa
+            horizonal_spring_constant_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.spring_constant_translation.z() / coefficient, param_horizonal_joint.spring_constant_translation.z() / coefficient, param_horizonal_joint.spring_constant_translation.z()]])), xs)             # noqa
+
+            horizonal_spring_constant_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.spring_constant_rotation.x() / coefficient, param_horizonal_joint.spring_constant_rotation.x() / coefficient, param_horizonal_joint.spring_constant_rotation.x()]])), xs)             # noqa
+            horizonal_spring_constant_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.spring_constant_rotation.y() / coefficient, param_horizonal_joint.spring_constant_rotation.y() / coefficient, param_horizonal_joint.spring_constant_rotation.y()]])), xs)             # noqa
+            horizonal_spring_constant_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_horizonal_joint.spring_constant_rotation.z() / coefficient, param_horizonal_joint.spring_constant_rotation.z() / coefficient, param_horizonal_joint.spring_constant_rotation.z()]])), xs)             # noqa
+
+        if param_diagonal_joint:
+            coefficient = param_option['diagonal_joint_coefficient']
+
+            diagonal_limit_min_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.translation_limit_min.x() / coefficient, param_diagonal_joint.translation_limit_min.x() / coefficient, param_diagonal_joint.translation_limit_min.x()]])), xs)             # noqa
+            diagonal_limit_min_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.translation_limit_min.y() / coefficient, param_diagonal_joint.translation_limit_min.y() / coefficient, param_diagonal_joint.translation_limit_min.y()]])), xs)             # noqa
+            diagonal_limit_min_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.translation_limit_min.z() / coefficient, param_diagonal_joint.translation_limit_min.z() / coefficient, param_diagonal_joint.translation_limit_min.z()]])), xs)             # noqa
+
+            diagonal_limit_max_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.translation_limit_max.x() / coefficient, param_diagonal_joint.translation_limit_max.x() / coefficient, param_diagonal_joint.translation_limit_max.x()]])), xs)             # noqa
+            diagonal_limit_max_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.translation_limit_max.y() / coefficient, param_diagonal_joint.translation_limit_max.y() / coefficient, param_diagonal_joint.translation_limit_max.y()]])), xs)             # noqa
+            diagonal_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.translation_limit_max.z() / coefficient, param_diagonal_joint.translation_limit_max.z() / coefficient, param_diagonal_joint.translation_limit_max.z()]])), xs)             # noqa
+
+            diagonal_limit_min_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.rotation_limit_min.x() / coefficient, param_diagonal_joint.rotation_limit_min.x() / coefficient, param_diagonal_joint.rotation_limit_min.x()]])), xs)             # noqa
+            diagonal_limit_min_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.rotation_limit_min.y() / coefficient, param_diagonal_joint.rotation_limit_min.y() / coefficient, param_diagonal_joint.rotation_limit_min.y()]])), xs)             # noqa
+            diagonal_limit_min_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.rotation_limit_min.z() / coefficient, param_diagonal_joint.rotation_limit_min.z() / coefficient, param_diagonal_joint.rotation_limit_min.z()]])), xs)             # noqa
+
+            diagonal_limit_max_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.rotation_limit_max.x() / coefficient, param_diagonal_joint.rotation_limit_max.x() / coefficient, param_diagonal_joint.rotation_limit_max.x()]])), xs)             # noqa
+            diagonal_limit_max_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.rotation_limit_max.y() / coefficient, param_diagonal_joint.rotation_limit_max.y() / coefficient, param_diagonal_joint.rotation_limit_max.y()]])), xs)             # noqa
+            diagonal_limit_max_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.rotation_limit_max.z() / coefficient, param_diagonal_joint.rotation_limit_max.z() / coefficient, param_diagonal_joint.rotation_limit_max.z()]])), xs)             # noqa
+
+            diagonal_spring_constant_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.spring_constant_translation.x() / coefficient, param_diagonal_joint.spring_constant_translation.x() / coefficient, param_diagonal_joint.spring_constant_translation.x()]])), xs)             # noqa
+            diagonal_spring_constant_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.spring_constant_translation.y() / coefficient, param_diagonal_joint.spring_constant_translation.y() / coefficient, param_diagonal_joint.spring_constant_translation.y()]])), xs)             # noqa
+            diagonal_spring_constant_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.spring_constant_translation.z() / coefficient, param_diagonal_joint.spring_constant_translation.z() / coefficient, param_diagonal_joint.spring_constant_translation.z()]])), xs)             # noqa
+
+            diagonal_spring_constant_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.spring_constant_rotation.x() / coefficient, param_diagonal_joint.spring_constant_rotation.x() / coefficient, param_diagonal_joint.spring_constant_rotation.x()]])), xs)             # noqa
+            diagonal_spring_constant_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.spring_constant_rotation.y() / coefficient, param_diagonal_joint.spring_constant_rotation.y() / coefficient, param_diagonal_joint.spring_constant_rotation.y()]])), xs)             # noqa
+            diagonal_spring_constant_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_diagonal_joint.spring_constant_rotation.z() / coefficient, param_diagonal_joint.spring_constant_rotation.z() / coefficient, param_diagonal_joint.spring_constant_rotation.z()]])), xs)             # noqa
+
+        if param_reverse_joint:
+            coefficient = param_option['reverse_joint_coefficient']
+
+            reverse_limit_min_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.translation_limit_min.x() / coefficient, param_reverse_joint.translation_limit_min.x() / coefficient, param_reverse_joint.translation_limit_min.x()]])), xs)             # noqa
+            reverse_limit_min_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.translation_limit_min.y() / coefficient, param_reverse_joint.translation_limit_min.y() / coefficient, param_reverse_joint.translation_limit_min.y()]])), xs)             # noqa
+            reverse_limit_min_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.translation_limit_min.z() / coefficient, param_reverse_joint.translation_limit_min.z() / coefficient, param_reverse_joint.translation_limit_min.z()]])), xs)             # noqa
+
+            reverse_limit_max_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.translation_limit_max.x() / coefficient, param_reverse_joint.translation_limit_max.x() / coefficient, param_reverse_joint.translation_limit_max.x()]])), xs)             # noqa
+            reverse_limit_max_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.translation_limit_max.y() / coefficient, param_reverse_joint.translation_limit_max.y() / coefficient, param_reverse_joint.translation_limit_max.y()]])), xs)             # noqa
+            reverse_limit_max_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.translation_limit_max.z() / coefficient, param_reverse_joint.translation_limit_max.z() / coefficient, param_reverse_joint.translation_limit_max.z()]])), xs)             # noqa
+
+            reverse_limit_min_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.rotation_limit_min.x() / coefficient, param_reverse_joint.rotation_limit_min.x() / coefficient, param_reverse_joint.rotation_limit_min.x()]])), xs)             # noqa
+            reverse_limit_min_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.rotation_limit_min.y() / coefficient, param_reverse_joint.rotation_limit_min.y() / coefficient, param_reverse_joint.rotation_limit_min.y()]])), xs)             # noqa
+            reverse_limit_min_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.rotation_limit_min.z() / coefficient, param_reverse_joint.rotation_limit_min.z() / coefficient, param_reverse_joint.rotation_limit_min.z()]])), xs)             # noqa
+
+            reverse_limit_max_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.rotation_limit_max.x() / coefficient, param_reverse_joint.rotation_limit_max.x() / coefficient, param_reverse_joint.rotation_limit_max.x()]])), xs)             # noqa
+            reverse_limit_max_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.rotation_limit_max.y() / coefficient, param_reverse_joint.rotation_limit_max.y() / coefficient, param_reverse_joint.rotation_limit_max.y()]])), xs)             # noqa
+            reverse_limit_max_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.rotation_limit_max.z() / coefficient, param_reverse_joint.rotation_limit_max.z() / coefficient, param_reverse_joint.rotation_limit_max.z()]])), xs)             # noqa
+
+            reverse_spring_constant_mov_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.spring_constant_translation.x() / coefficient, param_reverse_joint.spring_constant_translation.x() / coefficient, param_reverse_joint.spring_constant_translation.x()]])), xs)             # noqa
+            reverse_spring_constant_mov_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.spring_constant_translation.y() / coefficient, param_reverse_joint.spring_constant_translation.y() / coefficient, param_reverse_joint.spring_constant_translation.y()]])), xs)             # noqa
+            reverse_spring_constant_mov_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.spring_constant_translation.z() / coefficient, param_reverse_joint.spring_constant_translation.z() / coefficient, param_reverse_joint.spring_constant_translation.z()]])), xs)             # noqa
+
+            reverse_spring_constant_rot_xs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.spring_constant_rotation.x() / coefficient, param_reverse_joint.spring_constant_rotation.x() / coefficient, param_reverse_joint.spring_constant_rotation.x()]])), xs)             # noqa
+            reverse_spring_constant_rot_ys = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.spring_constant_rotation.y() / coefficient, param_reverse_joint.spring_constant_rotation.y() / coefficient, param_reverse_joint.spring_constant_rotation.y()]])), xs)             # noqa
+            reverse_spring_constant_rot_zs = MBezierUtils.intersect_by_x(bezier.Curve.from_nodes(np.asfortranarray([[min_vy, middle_vy, max_vy],
+                [param_reverse_joint.spring_constant_rotation.z() / coefficient, param_reverse_joint.spring_constant_rotation.z() / coefficient, param_reverse_joint.spring_constant_rotation.z()]])), xs)             # noqa
         
-        related_bone_names = {}
-        for bone_name, links in weighted_bone_links.items():
-            for bone_name, bone in links.all().items():
-                if bone_name in weighted_bone_names and bone.index in model.vertices:
-                    related_bone_names[bone_name] = {}
-                    for vertex in model.vertices[bone.index]:
-                        # Bdef1は参考にならないのでスルー
-                        if type(vertex.deform) is Bdef2 or type(vertex.deform) is Sdef:
-                            if model.bone_indexes[vertex.deform.index0] in weighted_bone_names and 0 < vertex.deform.weight0 < 1 \
-                                    and model.bone_indexes[vertex.deform.index1] in weighted_bone_names:
-                                bindexes = np.array([vertex.deform.index0, vertex.deform.index1], dtype=np.int)
-                                weights = np.array([vertex.deform.weight0, 1 - vertex.deform.weight0], dtype=np.float)
-                                bsorts = np.argsort(bindexes)
-                                related_bone_names[bone_name][(bindexes[bsorts[0]], bindexes[bsorts[1]])] = (weights[bsorts[0]], weights[bsorts[1]])
-                        elif type(vertex.deform) is Bdef4:
-                            if ((model.bone_indexes[vertex.deform.index0] in weighted_bone_names and vertex.deform.weight0 > 0.1) \
-                                        or (model.bone_indexes[vertex.deform.index0] not in weighted_bone_names and round(vertex.deform.weight0, 4) == 0)) \
-                                    and ((model.bone_indexes[vertex.deform.index1] in weighted_bone_names and vertex.deform.weight1 > 0.1) \
-                                        or (model.bone_indexes[vertex.deform.index1] not in weighted_bone_names and round(vertex.deform.weight1, 4) == 0)) \
-                                    and ((model.bone_indexes[vertex.deform.index2] in weighted_bone_names and vertex.deform.weight2 > 0.1) \
-                                        or (model.bone_indexes[vertex.deform.index2] not in weighted_bone_names and round(vertex.deform.weight2, 4) == 0)) \
-                                    and ((model.bone_indexes[vertex.deform.index3] in weighted_bone_names and vertex.deform.weight3 > 0.1) \
-                                        or (model.bone_indexes[vertex.deform.index3] not in weighted_bone_names and round(vertex.deform.weight3, 4) == 0)):     # noqa
-                                bindexes = np.array([vertex.deform.index0, vertex.deform.index1, vertex.deform.index2, vertex.deform.index3], dtype=np.int)
-                                weights = np.array([vertex.deform.weight0, vertex.deform.weight1, vertex.deform.weight2, vertex.deform.weight3], dtype=np.float)
-                                bsorts = np.argsort(bindexes)
+        for bone_block in bone_blocks.values():
+            prev_above_bone_name = bone_block['prev_above']
+            prev_above_bone_position = bone_block['prev_above_pos']
+            prev_below_bone_name = bone_block['prev_below']
+            prev_below_bone_position = bone_block['prev_below_pos']
+            next_above_bone_name = bone_block['next_above']
+            next_above_bone_position = bone_block['next_above_pos']
+            next_below_bone_name = bone_block['next_below']
+            next_below_bone_position = bone_block['next_below_pos']
+            yi = bone_block['yi']
 
-                                # ウェイトが対象の場合、親子ボーンの組み合わせであるか確認する
-                                for links in weighted_bone_links.values():
-                                    bnames = [model.bone_indexes[vertex.deform.index0], model.bone_indexes[vertex.deform.index1], \
-                                              model.bone_indexes[vertex.deform.index2], model.bone_indexes[vertex.deform.index3]]
-                                    target_bone = links.get(bnames[0])
-                                    parent_bone = links.get(bnames[0], offset=-1)
-                                    child_bone = links.get(bnames[0], offset=1)
-                                    remaining_bnames = None
-                                    if target_bone and parent_bone and parent_bone.name in bnames[1:]:
-                                        remaining_bnames = list(set(bnames) - {bnames[0], parent_bone.name})
-                                    elif target_bone and child_bone and child_bone.name in bnames[1:]:
-                                        remaining_bnames = list(set(bnames) - {bnames[0], child_bone.name})
+            if param_vertical_joint and prev_above_bone_name != prev_below_bone_name:
+                # 縦ジョイント
+                joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
 
-                                    if remaining_bnames:
-                                        for remaining_links in weighted_bone_links.values():
-                                            target_bone = remaining_links.get(remaining_bnames[0])
-                                            parent_bone = remaining_links.get(remaining_bnames[0], offset=-1)
-                                            child_bone = remaining_links.get(remaining_bnames[0], offset=1)
-                                            if target_bone and (parent_bone and parent_bone.name in remaining_bnames[1:]) or (child_bone and child_bone.name in remaining_bnames[1:]):
-                                                # 親子になってるボーンがある場合、処理対象とする
-                                                related_bone_names[bone_name][(bindexes[bsorts[0]], bindexes[bsorts[1]], bindexes[bsorts[2]], bindexes[bsorts[3]])] \
-                                                    = (weights[bsorts[0]], weights[bsorts[1]], weights[bsorts[2]], weights[bsorts[3]])
-                                                break
-                    logger.debug("related_bone_names[%s]: %s", bone_name, related_bone_names[bone_name])
+                if not (joint_name in created_joints or prev_above_bone_name not in model.rigidbodies or prev_below_bone_name not in model.rigidbodies):
+                    # 未登録のみ追加
+                    
+                    # 縦ジョイント
+                    joint_vec = prev_below_bone_position
+
+                    # 回転量
+                    joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+                    joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                    joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                    joint_euler = joint_rotation_qq.toEulerAngles()
+                    joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
+
+                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
+                                  joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yi], vertical_limit_min_mov_ys[yi], vertical_limit_min_mov_zs[yi]), \
+                                  MVector3D(vertical_limit_max_mov_xs[yi], vertical_limit_max_mov_ys[yi], vertical_limit_max_mov_zs[yi]),
+                                  MVector3D(math.radians(vertical_limit_min_rot_xs[yi]), math.radians(vertical_limit_min_rot_ys[yi]), math.radians(vertical_limit_min_rot_zs[yi])),
+                                  MVector3D(math.radians(vertical_limit_max_rot_xs[yi]), math.radians(vertical_limit_max_rot_ys[yi]), math.radians(vertical_limit_max_rot_zs[yi])),
+                                  MVector3D(vertical_spring_constant_mov_xs[yi], vertical_spring_constant_mov_ys[yi], vertical_spring_constant_mov_zs[yi]), \
+                                  MVector3D(vertical_spring_constant_rot_xs[yi], vertical_spring_constant_rot_ys[yi], vertical_spring_constant_rot_zs[yi]))   # noqa
+                    created_joints[joint.name] = joint
+
+                    if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                        logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                        prev_joint_cnt = len(created_joints) // 200
+                    
+                    if param_reverse_joint:
+                        # 逆ジョイント
+                        joint_name = f'↑|{prev_below_bone_name}|{prev_above_bone_name}'
+
+                        if not (joint_name in created_joints or prev_below_bone_name not in model.rigidbodies or prev_above_bone_name not in model.rigidbodies):
+                            # 未登録のみ追加
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
+                                          joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
+                                          MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
+                                          MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
+                                          MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
+                                          MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
+                                          MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))  # noqa
+                            created_joints[joint.name] = joint
+
+                            if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                                logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                                prev_joint_cnt = len(created_joints) // 200
+                            
+            if param_horizonal_joint:
+                # 横ジョイント
+                if prev_above_bone_name != next_above_bone_name:
+                    joint_name = f'→|{prev_above_bone_name}|{next_above_bone_name}'
+
+                    if not (joint_name in created_joints or prev_above_bone_name not in model.rigidbodies or next_above_bone_name not in model.rigidbodies):
+                        # 未登録のみ追加
                         
+                        joint_vec = np.mean([prev_above_bone_position, prev_below_bone_position, \
+                                             next_above_bone_position, next_below_bone_position])
 
+                        # 回転量
+                        joint_axis = (next_above_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                        joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                        joint_euler = joint_rotation_qq.toEulerAngles()
+                        joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
+
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_above_bone_name].index,
+                                      joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi], horizonal_limit_min_mov_ys[yi], horizonal_limit_min_mov_zs[yi]), \
+                                      MVector3D(horizonal_limit_max_mov_xs[yi], horizonal_limit_max_mov_ys[yi], horizonal_limit_max_mov_zs[yi]),
+                                      MVector3D(math.radians(horizonal_limit_min_rot_xs[yi]), math.radians(horizonal_limit_min_rot_ys[yi]), math.radians(horizonal_limit_min_rot_zs[yi])),
+                                      MVector3D(math.radians(horizonal_limit_max_rot_xs[yi]), math.radians(horizonal_limit_max_rot_ys[yi]), math.radians(horizonal_limit_max_rot_zs[yi])),
+                                      MVector3D(horizonal_spring_constant_mov_xs[yi], horizonal_spring_constant_mov_ys[yi], horizonal_spring_constant_mov_zs[yi]), \
+                                      MVector3D(horizonal_spring_constant_rot_xs[yi], horizonal_spring_constant_rot_ys[yi], horizonal_spring_constant_rot_zs[yi]))    # noqa
+                        created_joints[joint.name] = joint
+
+                        if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                            logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                            prev_joint_cnt = len(created_joints) // 200
+                        
+                    if param_reverse_joint:
+                        # 横逆ジョイント
+                        joint_name = f'←|{next_above_bone_name}|{prev_above_bone_name}'
+
+                        if not (joint_name in created_joints or prev_above_bone_name not in model.rigidbodies or next_above_bone_name not in model.rigidbodies):
+                            # 未登録のみ追加
+                            
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[next_above_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
+                                          joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
+                                          MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
+                                          MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
+                                          MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
+                                          MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
+                                          MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))      # noqa
+                            created_joints[joint.name] = joint
+
+                            if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                                logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                                prev_joint_cnt = len(created_joints) // 200
+                            
+            if param_diagonal_joint:
+                # ＼ジョイント
+                joint_name = f'＼|{prev_above_bone_name}|{next_below_bone_name}'
+
+                if not (joint_name in created_joints or prev_above_bone_name not in model.rigidbodies or next_below_bone_name not in model.rigidbodies):
+                    # 未登録のみ追加
+                    
+                    # ＼ジョイント
+                    joint_vec = np.mean([prev_below_bone_position, next_below_bone_position])
+
+                    # 回転量
+                    joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis_up = (prev_below_bone_position - next_above_bone_position).normalized()
+                    joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                    joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                    joint_euler = joint_rotation_qq.toEulerAngles()
+                    joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
+
+                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_below_bone_name].index,
+                                  joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yi], diagonal_limit_min_mov_ys[yi], diagonal_limit_min_mov_zs[yi]), \
+                                  MVector3D(diagonal_limit_max_mov_xs[yi], diagonal_limit_max_mov_ys[yi], diagonal_limit_max_mov_zs[yi]),
+                                  MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
+                                  MVector3D(math.radians(diagonal_limit_max_rot_xs[yi]), math.radians(diagonal_limit_max_rot_ys[yi]), math.radians(diagonal_limit_max_rot_zs[yi])),
+                                  MVector3D(diagonal_spring_constant_mov_xs[yi], diagonal_spring_constant_mov_ys[yi], diagonal_spring_constant_mov_zs[yi]), \
+                                  MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
+                    created_joints[joint.name] = joint
+
+                    if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                        logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                        prev_joint_cnt = len(created_joints) // 200
+                    
+                # ／ジョイント ---------------
+                joint_name = f'／|{prev_below_bone_name}|{next_above_bone_name}'
+
+                if not (joint_name in created_joints or prev_below_bone_name not in model.rigidbodies or next_below_bone_name not in model.rigidbodies):
+                    # 未登録のみ追加
+                
+                    # ／ジョイント
+
+                    # 回転量
+                    joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
+                    joint_axis_up = (next_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                    joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                    joint_euler = joint_rotation_qq.toEulerAngles()
+                    joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
+
+                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[next_above_bone_name].index,
+                                  joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yi], diagonal_limit_min_mov_ys[yi], diagonal_limit_min_mov_zs[yi]), \
+                                  MVector3D(diagonal_limit_max_mov_xs[yi], diagonal_limit_max_mov_ys[yi], diagonal_limit_max_mov_zs[yi]),
+                                  MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
+                                  MVector3D(math.radians(diagonal_limit_max_rot_xs[yi]), math.radians(diagonal_limit_max_rot_ys[yi]), math.radians(diagonal_limit_max_rot_zs[yi])),
+                                  MVector3D(diagonal_spring_constant_mov_xs[yi], diagonal_spring_constant_mov_ys[yi], diagonal_spring_constant_mov_zs[yi]), \
+                                  MVector3D(diagonal_spring_constant_rot_xs[yi], diagonal_spring_constant_rot_ys[yi], diagonal_spring_constant_rot_zs[yi]))   # noqa
+                    created_joints[joint.name] = joint
+
+                    if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
+                        logger.info(f"-- ジョイント: {len(created_joints)}個目:終了")
+                        prev_joint_cnt = len(created_joints) // 200
+                    
+        for joint_name in sorted(created_joints.keys()):
+            # ジョイントを登録
+            joint = created_joints[joint_name]
+            joint.index = len(model.joints)
+            model.joints[joint.name] = joint
 
     def create_joint(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict):
         # ジョイント生成
@@ -698,6 +1120,125 @@ class PmxTailorExportService():
             joint = created_joints[joint_name]
             joint.index = len(model.joints)
             model.joints[joint.name] = joint
+
+    def create_rigidbody_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict):
+        bone_grid_rows = param_option["bone_grid_rows"]
+
+        # 剛体生成
+        created_rigidbodies = {}
+        # 剛体の質量
+        created_rigidbody_masses = {}
+        created_rigidbody_linear_dampinges = {}
+        created_rigidbody_angular_dampinges = {}
+        prev_rigidbody_cnt = 0
+
+        # 剛体情報
+        param_rigidbody = param_option['rigidbody']
+        # 剛体係数
+        coefficient = param_option['rigidbody_coefficient']
+
+        rigidbody_limit_thicks = np.linspace(0.3, 0.1, bone_grid_rows)
+
+        for bone_block in bone_blocks.values():
+            prev_above_bone_name = bone_block['prev_above']
+            prev_above_bone_position = bone_block['prev_above_pos']
+            prev_below_bone_name = bone_block['prev_below']
+            prev_below_bone_position = bone_block['prev_below_pos']
+            next_above_bone_name = bone_block['next_above']
+            next_above_bone_position = bone_block['next_above_pos']
+            next_below_bone_name = bone_block['next_below']
+            next_below_bone_position = bone_block['next_below_pos']
+            yi = bone_block['yi']
+
+            if prev_above_bone_name in created_rigidbodies:
+                continue
+
+            prev_above_bone_index = -1
+            if prev_above_bone_name in model.bones:
+                prev_above_bone_index = model.bones[prev_above_bone_name].index
+
+            # 剛体の傾き
+            shape_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
+            shape_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+            shape_axis_up.setY(0)
+            shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).normalized()
+
+            shape_rotation_qq = MQuaternion.fromDirection(shape_axis, shape_axis_cross)
+            if round(prev_below_bone_position.y(), 2) != round(prev_above_bone_position.y(), 2):
+                shape_rotation_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
+                shape_rotation_qq *= MQuaternion.fromEulerAngles(-90, 0, 0)
+                shape_rotation_qq *= MQuaternion.fromEulerAngles(0, -90, 0)
+
+            shape_rotation_euler = shape_rotation_qq.toEulerAngles()
+
+            if round(prev_below_bone_position.y(), 2) == round(prev_above_bone_position.y(), 2):
+                shape_rotation_euler.setX(90)
+                
+            shape_rotation_radians = MVector3D(math.radians(shape_rotation_euler.x()), math.radians(shape_rotation_euler.y()), math.radians(shape_rotation_euler.z()))
+
+            # 剛体の大きさ
+            x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
+            y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+            shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+
+            # 剛体の位置
+            rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
+            if round(prev_below_bone_position.y(), 3) != round(prev_above_bone_position.y(), 3):
+                mat = MMatrix4x4()
+                mat.setToIdentity()
+                mat.translate(prev_above_bone_position)
+                mat.rotate(shape_rotation_qq)
+                # ローカルY軸方向にボーンの長さの半分を上げる
+                mat.translate(MVector3D(0, -prev_below_bone_position.distanceToPoint(prev_above_bone_position) / 2, 0))
+                shape_position = mat * MVector3D()
+            else:
+                shape_position = prev_above_bone_position + rigidbody_vertical_vec + MVector3D(0, rigidbody_limit_thicks[yi] / 2, 0)
+
+            # 根元はボーン追従剛体、それ以降は物理剛体
+            mode = 0 if yi == 0 else 1
+            shape_type = param_rigidbody.shape_type
+            if prev_above_bone_name not in model.bones:
+                # 登録ボーンの対象外である場合、余っているので球にしておく
+                ball_size = np.max([0.25, x_size * 0.5, y_size * 0.5])
+                shape_size = MVector3D(ball_size, ball_size, ball_size)
+                shape_type = 0
+            mass = param_rigidbody.param.mass * shape_size.x() * shape_size.y() * shape_size.z()
+            linear_damping = param_rigidbody.param.linear_damping * shape_size.x() * shape_size.y() * shape_size.z()
+            angular_damping = param_rigidbody.param.angular_damping * shape_size.x() * shape_size.y() * shape_size.z()
+            rigidbody = RigidBody(prev_above_bone_name, prev_above_bone_name, prev_above_bone_index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
+                                  shape_type, shape_size, shape_position, shape_rotation_radians, \
+                                  mass, linear_damping, angular_damping, param_rigidbody.param.restitution, param_rigidbody.param.friction, mode)
+            # 別途保持しておく
+            created_rigidbodies[rigidbody.name] = rigidbody
+            created_rigidbody_masses[rigidbody.name] = mass
+            created_rigidbody_linear_dampinges[rigidbody.name] = linear_damping
+            created_rigidbody_angular_dampinges[rigidbody.name] = angular_damping
+
+            if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 200 > prev_rigidbody_cnt:
+                logger.info(f"-- 剛体: {len(created_rigidbodies)}個目:終了")
+                prev_rigidbody_cnt = len(created_rigidbodies) // 200
+            
+        min_mass = np.min(list(created_rigidbody_masses.values()))
+        min_linear_damping = np.min(list(created_rigidbody_linear_dampinges.values()))
+        min_angular_damping = np.min(list(created_rigidbody_angular_dampinges.values()))
+
+        max_mass = np.max(list(created_rigidbody_masses.values()))
+        max_linear_damping = np.max(list(created_rigidbody_linear_dampinges.values()))
+        max_angular_damping = np.max(list(created_rigidbody_angular_dampinges.values()))
+
+        for rigidbody_name in sorted(created_rigidbodies.keys()):
+            # 剛体を登録
+            rigidbody = created_rigidbodies[rigidbody_name]
+            rigidbody.index = len(model.rigidbodies)
+
+            # 質量と減衰は面積に応じた値に変換
+            rigidbody.param.mass = calc_ratio(rigidbody.param.mass, max_mass, min_mass, param_rigidbody.param.mass, param_rigidbody.param.mass * coefficient)
+            rigidbody.param.linear_damping = calc_ratio(rigidbody.param.linear_damping, max_linear_damping, min_linear_damping, param_rigidbody.param.linear_damping, \
+                min(0.9999999, param_rigidbody.param.linear_damping * coefficient))     # noqa
+            rigidbody.param.angular_damping = calc_ratio(rigidbody.param.angular_damping, max_angular_damping, min_angular_damping, param_rigidbody.param.angular_damping, \
+                min(0.9999999, param_rigidbody.param.angular_damping * coefficient))    # noqa
+            
+            model.rigidbodies[rigidbody.name] = rigidbody
     
     def create_rigidbody(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict):
         # 剛体生成
@@ -1250,30 +1791,42 @@ class PmxTailorExportService():
         logger.info(f"{material_name}: 削除対象抽出")
 
         weighted_bone_indexes = {}
-        for vertex_idx in model.material_vertices[material_name]:
-            vertex = model.vertex_dict[vertex_idx]
-            if type(vertex.deform) is Bdef1:
-                if vertex.deform.index0 not in list(weighted_bone_indexes.values()):
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-            elif type(vertex.deform) is Bdef2:
-                if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
-            elif type(vertex.deform) is Bdef4:
-                if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight1 > 0:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
-                if vertex.deform.index2 not in list(weighted_bone_indexes.values()) and vertex.deform.weight2 > 0:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
-                if vertex.deform.index3 not in list(weighted_bone_indexes.values()) and vertex.deform.weight3 > 0:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
-            elif type(vertex.deform) is Sdef:
-                if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
-                if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
-                    weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+
+        if param_option['exist_physics_clear'] == '再利用':
+            # 再利用の場合、指定されている全ボーンを対象とする
+            bone_grid = param_option["bone_grid"]
+            bone_grid_cols = param_option["bone_grid_cols"]
+            bone_grid_rows = param_option["bone_grid_rows"]
+
+            for r in range(bone_grid_rows):
+                for c in range(bone_grid_cols):
+                    if bone_grid[r][c]:
+                        weighted_bone_indexes[bone_grid[r][c]] = model.bones[bone_grid[r][c]].index
+        else:
+            for vertex_idx in model.material_vertices[material_name]:
+                vertex = model.vertex_dict[vertex_idx]
+                if type(vertex.deform) is Bdef1:
+                    if vertex.deform.index0 not in list(weighted_bone_indexes.values()):
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                elif type(vertex.deform) is Bdef2:
+                    if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                    if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                elif type(vertex.deform) is Bdef4:
+                    if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                    if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight1 > 0:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                    if vertex.deform.index2 not in list(weighted_bone_indexes.values()) and vertex.deform.weight2 > 0:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
+                    if vertex.deform.index3 not in list(weighted_bone_indexes.values()) and vertex.deform.weight3 > 0:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
+                elif type(vertex.deform) is Sdef:
+                    if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                    if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
+                        weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
         
         not_delete_bone_names = []
         if param_option['exist_physics_clear'] == '再利用':
