@@ -1575,21 +1575,26 @@ class PmxTailorExportService():
         prev_weight_cnt = 0
         weight_cnt = 0
 
+        front_vertex_keys = []
+        front_vertex_positions = []
+        for front_vertex_idx in list(model.material_vertices[param_option['material_name']]):
+            front_vertex_keys.append(front_vertex_idx)
+            front_vertex_positions.append(model.vertex_dict[front_vertex_idx].position.data())
+
         for vertex_idx in list(model.material_vertices[param_option['back_material_name']]):
             bv = model.vertex_dict[vertex_idx]
 
-            front_vertex_distances = {}
-            for front_vertex_idx in list(model.material_vertices[param_option['material_name']]):
-                front_vertex_distances[front_vertex_idx] = bv.position.distanceToPoint(model.vertex_dict[front_vertex_idx].position)
+            # 各頂点の位置との差分から距離を測る
+            bv_distances = np.linalg.norm((np.array(front_vertex_positions) - bv.position.data()), ord=2, axis=1)
 
             # 直近頂点INDEXのウェイトを転写
-            copy_front_vertex_idx = list(front_vertex_distances.keys())[np.argmin(list(front_vertex_distances.values()))]
+            copy_front_vertex_idx = front_vertex_keys[np.argmin(bv_distances)]
             bv.deform = copy.deepcopy(model.vertex_dict[copy_front_vertex_idx].deform)
 
             weight_cnt += 1
-            if weight_cnt > 0 and weight_cnt // 10 > prev_weight_cnt:
+            if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
                 logger.info(f"-- 裏頂点ウェイト: {weight_cnt}個目:終了")
-                prev_weight_cnt = weight_cnt // 10
+                prev_weight_cnt = weight_cnt // 200
 
     def create_bone(self, model: PmxModel, param_option: dict, vertex_map_orders: list, vertex_maps: dict, vertex_connecteds: dict):
         # 中心ボーン生成
