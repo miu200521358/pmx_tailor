@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-from operator import is_
 import wx
 import wx.lib.newevent
 from wx.grid import Grid, GridCellChoiceEditor, EVT_GRID_CELL_CHANGING
@@ -9,6 +8,7 @@ import json
 import os
 import unicodedata
 import traceback
+import csv
 
 from form.panel.BasePanel import BasePanel
 from form.parts.FloatSliderCtrl import FloatSliderCtrl
@@ -186,13 +186,13 @@ class PhysicsParam():
         # インポートボタン
         self.import_btn_ctrl = wx.Button(self.simple_window, wx.ID_ANY, u"インポート ...", wx.DefaultPosition, wx.DefaultSize, 0)
         self.import_btn_ctrl.SetToolTip(u"材質設定データをjsonファイルから読み込みます。\nファイル選択ダイアログが開きます。")
-        self.import_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_import)
+        self.import_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_param_import)
         self.simple_btn_sizer.Add(self.import_btn_ctrl, 0, wx.ALL, 5)
 
         # エクスポートボタン
         self.export_btn_ctrl = wx.Button(self.simple_window, wx.ID_ANY, u"エクスポート ...", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.export_btn_ctrl.SetToolTip(u"材質設定データをjsonファイルに出力します。\n元モデルと同じフォルダに出力します。")
-        self.export_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_export)
+        self.export_btn_ctrl.SetToolTip(u"材質設定データをjsonファイルに出力します。\n出力先を指定できます。")
+        self.export_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_param_export)
         self.simple_btn_sizer.Add(self.export_btn_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 0)
@@ -1374,6 +1374,22 @@ class PhysicsParam():
         self.bone_sizer = wx.StaticBoxSizer(wx.StaticBox(self.bone_window, wx.ID_ANY, "【No.{0}】".format(param_no + 1)), orient=wx.VERTICAL)
         self.bone_param_sizer = wx.BoxSizer(wx.VERTICAL)
 
+        self.bone_btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # インポートボタン
+        self.bone_import_btn_ctrl = wx.Button(self.bone_window, wx.ID_ANY, u"インポート ...", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.bone_import_btn_ctrl.SetToolTip(u"ボーン設定データをcsvファイルから読み込みます。\nファイル選択ダイアログが開きます。")
+        self.bone_import_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_bone_import)
+        self.bone_btn_sizer.Add(self.bone_import_btn_ctrl, 0, wx.ALL, 5)
+
+        # エクスポートボタン
+        self.bone_export_btn_ctrl = wx.Button(self.bone_window, wx.ID_ANY, u"エクスポート ...", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.bone_export_btn_ctrl.SetToolTip(u"ボーン設定データをcsvファイルに出力します。\n出力先を指定できます。")
+        self.bone_export_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_bone_export)
+        self.bone_btn_sizer.Add(self.bone_export_btn_ctrl, 0, wx.ALL, 5)
+
+        self.bone_param_sizer.Add(self.bone_btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 0)
+
         self.bone_material_ctrl = wx.StaticText(self.bone_window, wx.ID_ANY, u"（材質未選択）", wx.DefaultPosition, wx.DefaultSize, 0)
         self.bone_param_sizer.Add(self.bone_material_ctrl, 0, wx.ALL, 5)
 
@@ -1508,7 +1524,7 @@ class PhysicsParam():
 
         return params
 
-    def on_import(self, event: wx.Event):
+    def on_param_import(self, event: wx.Event):
         with wx.FileDialog(self.frame, "材質物理設定JSONを読み込む", wildcard=u"JSONファイル (*.json)|*.json|すべてのファイル (*.*)|*.*",
                            defaultDir=os.path.dirname(self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.path),
                            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
@@ -1631,12 +1647,15 @@ class PhysicsParam():
                     self.reverse_joint_spring_rot_z_spin.SetValue(params["reverse_joint_spring_rot_z"])
                     self.advance_reverse_joint_coefficient_spin.SetValue(params['reverse_joint_coefficient'])
 
+                dialog = wx.MessageDialog(self.frame, f"材質物理設定のインポートに成功しました \n{target_physics_path}", style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
             except Exception:
                 dialog = wx.MessageDialog(self.frame, "材質物理設定JSONが読み込めませんでした '%s'\n\n%s." % (target_physics_path, traceback.format_exc()), style=wx.OK)
                 dialog.ShowModal()
                 dialog.Destroy()
 
-    def on_export(self, event: wx.Event):
+    def on_param_export(self, event: wx.Event):
         params = {}
 
         # 簡易版オプションデータ -------------
@@ -1768,6 +1787,62 @@ class PhysicsParam():
                 dialog.Destroy()
             except Exception:
                 dialog = wx.MessageDialog(self.frame, "材質物理設定JSONが保存できませんでした '%s'\n\n%s." % (target_physics_path, traceback.format_exc()), style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+
+    def on_bone_import(self, event: wx.Event):
+        with wx.FileDialog(self.frame, "ボーン設定CSVを読み込む", wildcard=u"CSVファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*",
+                           defaultDir=os.path.dirname(self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.path),
+                           style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return     # the user changed their mind
+
+            # Proceed loading the file chosen by the user
+            target_physics_path = fileDialog.GetPath()
+            try:
+                with open(target_physics_path, encoding='cp932', mode='r') as f:
+                    cr = csv.reader(f, delimiter=",", quotechar='"')
+                    
+                    for r, row in enumerate(cr):
+                        for c, val in enumerate(row):
+                            if r < self.bone_grid.GetNumberRows() and c < self.bone_grid.GetNumberCols():
+                                self.bone_grid.GetTable().SetValue(r, c, val)
+            
+                self.bone_grid.ForceRefresh()
+
+                dialog = wx.MessageDialog(self.frame, f"ボーン設定CSVのインポートに成功しました \n{target_physics_path}", style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+            except Exception:
+                dialog = wx.MessageDialog(self.frame, "ボーン設定CSVが読み込めませんでした '%s'\n\n%s." % (target_physics_path, traceback.format_exc()), style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+
+    def on_bone_export(self, event: wx.Event):
+        bone_grid, _, _, _ = self.get_bone_grid()
+
+        with wx.FileDialog(self.frame, "ボーン設定CSVを保存する", wildcard=u"CSVファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*",
+                           defaultDir=os.path.dirname(self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.path),
+                           style=wx.FD_SAVE) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return     # the user changed their mind
+
+            # Proceed loading the file chosen by the user
+            target_physics_path = fileDialog.GetPath()
+            try:
+                with open(target_physics_path, encoding='cp932', mode='w', newline='') as f:
+                    cw = csv.writer(f, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
+
+                    for bone_cols in bone_grid.values():
+                        cw.writerow(list(bone_cols.values()))
+        
+                dialog = wx.MessageDialog(self.frame, f"ボーン設定CSVのエクスポートに成功しました \n{target_physics_path}", style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+            except Exception:
+                dialog = wx.MessageDialog(self.frame, "ボーン設定CSVが保存できませんでした '%s'\n\n%s." % (target_physics_path, traceback.format_exc()), style=wx.OK)
                 dialog.ShowModal()
                 dialog.Destroy()
 
@@ -2110,14 +2185,11 @@ class PhysicsParam():
             if "布" in self.simple_material_ctrl.GetStringSelection():
                 # 斜めは布のみ
                 self.advance_diagonal_joint_valid_check.SetValue(1)
-        else:
-            self.advance_diagonal_joint_valid_check.SetValue(0)
+        # 一度張ったらチェックは自動で外さない
 
         if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.8:
             # 一定以上の維持感であれば逆も張る
             self.advance_reverse_joint_valid_check.SetValue(1)
-        else:
-            self.advance_reverse_joint_valid_check.SetValue(0)
 
         self.on_diagonal_joint(event)
         self.on_reverse_joint(event)
