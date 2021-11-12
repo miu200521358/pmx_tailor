@@ -130,8 +130,11 @@ class ParamPanel(BasePanel):
                 self.material_list.append(material_name)
             # ボーンリストクリア
             self.bone_list = []
-            for bone_name in self.frame.file_panel_ctrl.org_model_file_ctrl.data.bones.keys():
-                self.bone_list.append(bone_name)
+            for bone in self.frame.file_panel_ctrl.org_model_file_ctrl.data.bones.values():
+                for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
+                    if bone.index == rigidbody.bone_index:
+                        self.bone_list.append(bone.name)
+                        break
             # セットクリア
             self.on_clear_set(event)
             # 1件追加
@@ -214,12 +217,12 @@ class PhysicsParam():
         self.simple_parent_bone_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, u"親ボーン *", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_parent_bone_txt.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
+        self.simple_parent_bone_txt.SetToolTip(u"材質物理の起点となる親ボーン\n剛体を持っているボーンのみが対象となります。\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
         self.simple_parent_bone_txt.Wrap(-1)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
 
         self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
-        self.simple_parent_bone_ctrl.SetToolTip(u"材質物理の起点となる親ボーン（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
+        self.simple_parent_bone_ctrl.SetToolTip(u"材質物理の起点となる親ボーン\n剛体を持っているボーンのみが対象となります。\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_parent_bone_sizer, 0, wx.ALL | wx.EXPAND, 0)
@@ -2282,7 +2285,8 @@ class PhysicsParam():
         
         target_bone_names = {}
         for tail_bone_name, links in target_bone_links.items():
-            target_bone_names[tail_bone_name] = []
+            tail_bone_idx = model.bones[tail_bone_name].index
+            target_bone_names[tail_bone_idx] = []
             is_regist = False
             for bone in links.all().values():
                 if bone.name in list(all_weighted_bone_names.keys()):
@@ -2290,12 +2294,17 @@ class PhysicsParam():
                     break
             if is_regist:
                 for bone in links.all().values():
-                    target_bone_names[tail_bone_name].append(bone.name)
+                    target_bone_names[tail_bone_idx].append(bone.name)
 
+        registed_bone_names = []
         self.weighted_bone_names = {}
-        for tail_bone_name in sorted(list(target_bone_names.keys())):
-            self.weighted_bone_names[tail_bone_name] = target_bone_names[tail_bone_name]
-            logger.debug("weighted_bone_names[%s]: %s", tail_bone_name, self.weighted_bone_names[tail_bone_name])
+        for tail_bone_idx in sorted(list(target_bone_names.keys())):
+            self.weighted_bone_names[tail_bone_idx] = []
+            for bone_name in target_bone_names[tail_bone_idx]:
+                if bone_name not in registed_bone_names:
+                    self.weighted_bone_names[tail_bone_idx].append(bone_name)
+                    registed_bone_names.append(bone_name)
+            logger.debug("weighted_bone_names[%s]: %s", tail_bone_idx, self.weighted_bone_names[tail_bone_idx])
 
 
 def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax: float):
