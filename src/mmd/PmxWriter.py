@@ -125,7 +125,7 @@ class PmxWriter:
                 if vidx > 0 and vidx % 50000 == 0:
                     logger.debug(f"-- 頂点データ出力終了({round(vidx / len(pmx.vertex_dict.keys()) * 100, 2)}％)")
 
-            logger.debug(f"-- 頂点データ出力終了({len(pmx.vertex_dict.keys())})")
+            logger.info("-- 頂点データ出力終了(%s)", len(pmx.vertex_dict.keys()))
 
             # 面の数
             fout.write(struct.pack(TYPE_INT, len(pmx.indices) * 3))
@@ -135,7 +135,7 @@ class PmxWriter:
                 for index in index_list:
                     fout.write(struct.pack(vertex_idx_type, index))
 
-            logger.debug(f"-- 面データ出力終了({len(pmx.indices)})")
+            logger.info("-- 面データ出力終了(%s)", len(pmx.indices))
 
             # テクスチャの数
             fout.write(struct.pack(TYPE_INT, len(pmx.textures)))
@@ -144,7 +144,7 @@ class PmxWriter:
             for tex_path in pmx.textures:
                 self.write_text(fout, tex_path, "")
 
-            logger.debug(f"-- テクスチャデータ出力終了({len(pmx.textures)})")
+            logger.info("-- テクスチャデータ出力終了(%s)", len(pmx.textures))
 
             # 材質の数
             fout.write(struct.pack(TYPE_INT, len(list(pmx.materials.values()))))
@@ -197,7 +197,7 @@ class PmxWriter:
                 # 材質に対応する面(頂点)数
                 self.write_number(fout, TYPE_INT, material.vertex_count)
 
-            logger.debug(f"-- 材質データ出力終了({len(list(pmx.materials.values()))})")
+            logger.info("-- 材質データ出力終了(%s)", len(list(pmx.materials.values())))
 
             # ボーンの数
             fout.write(struct.pack(TYPE_INT, len(list(pmx.bones.values()))))
@@ -276,7 +276,7 @@ class PmxWriter:
                             self.write_number(fout, TYPE_FLOAT, float(link.limit_max.y()))
                             self.write_number(fout, TYPE_FLOAT, float(link.limit_max.z()))
             
-            logger.debug(f"-- ボーンデータ出力終了({len(list(pmx.bones.values()))})")
+            logger.info("-- ボーンデータ出力終了(%s)", len(list(pmx.bones.values())))
 
             # モーフの数
             self.write_number(fout, TYPE_INT, len(list(pmx.org_morphs.values())))
@@ -353,7 +353,7 @@ class PmxWriter:
                         fout.write(struct.pack(morph_idx_type, offset.morph_index))
                         self.write_number(fout, TYPE_FLOAT, float(offset.value))
 
-            logger.debug(f"-- モーフデータ出力終了({len(list(pmx.morphs.values()))})")
+            logger.info("-- モーフデータ出力終了(%s)", len(list(pmx.morphs.values())))
 
             # 表示枠の数
             self.write_number(fout, TYPE_INT, len(list(pmx.display_slots.values())))
@@ -377,7 +377,7 @@ class PmxWriter:
                         # モーフIndex
                         fout.write(struct.pack(morph_idx_type, bone_idx))
 
-            logger.debug(f"-- 表示枠データ出力終了({len(list(pmx.display_slots.values()))})")
+            logger.info("-- 表示枠データ出力終了(%s)", len(list(pmx.display_slots.values())))
 
             # 剛体の数
             self.write_number(fout, TYPE_INT, len(list(pmx.rigidbodies.values())))
@@ -419,7 +419,7 @@ class PmxWriter:
                 # 1  : byte	| 剛体の物理演算 - 0:ボーン追従(static) 1:物理演算(dynamic) 2:物理演算 + Bone位置合わせ
                 fout.write(struct.pack(TYPE_BYTE, rigidbody.mode))
 
-            logger.debug(f"-- 剛体データ出力終了({len(list(pmx.rigidbodies.values()))})")
+            logger.info("-- 剛体データ出力終了(%s)", len(list(pmx.rigidbodies.values())))
             
             # ジョイントの数
             self.write_number(fout, TYPE_INT, len(list(pmx.joints.values())))
@@ -467,8 +467,8 @@ class PmxWriter:
                 self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_rotation.y()))
                 self.write_number(fout, TYPE_FLOAT, float(joint.spring_constant_rotation.z()))
 
-            logger.debug(f"-- ジョイントデータ出力終了({len(list(pmx.joints.values()))})")
-            
+            logger.info("-- ジョイントデータ出力終了(%s)", len(list(pmx.joints.values())))
+
     def define_index_size(self, size: int):
         if 32768 <= size:
             idx_size = 4

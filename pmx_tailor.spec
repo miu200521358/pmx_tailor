@@ -19,14 +19,14 @@ a = Analysis(['src\\executor.py'],
              noarchive=False)
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
-a.datas += [('.\\src\\pmx_tailor.ico','.\\src\\pmx_tailor.ico', 'Data')]
+a.datas += [('.\\src\\pmx_tailor.ico','.\\src\\pmx_tailor.ico', 'Data'), ('.\\src\\locale\\en_US\\messages.json','.\\src\\locale\\en_US\\messages.json', 'Data'), ('.\\src\\locale\\ja_JP\\messages.json','.\\src\\locale\\ja_JP\\messages.json', 'Data')]
 exe = EXE(pyz,
           a.scripts,
           a.binaries,
           a.zipfiles,
           a.datas,
           [],
-          name='PmxTailor_1.00.00_β17',
+          name='PmxTailor_1.00.00_β18',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,

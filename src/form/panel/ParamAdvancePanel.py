@@ -17,8 +17,8 @@ class ParamAdvancePanel(BasePanel):
         self.header_panel = wx.Panel(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL)
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.description_txt = wx.StaticText(self, wx.ID_ANY, u"パラ調整タブで材質を選択して、パラメーターを調整してください。\n" \
-                                             u"※パラ調整タブで変更した値は詳細タブに反映されますが、逆方向には反映されません", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("パラ調整タブで材質を選択して、パラメーターを調整してください。\n") + \
+                                             logger.transtext("※パラ調整タブで変更した値は詳細タブに反映されますが、逆方向には反映されません"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.header_sizer.Add(self.description_txt, 0, wx.ALL, 5)
 
         self.static_line01 = wx.StaticLine(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)

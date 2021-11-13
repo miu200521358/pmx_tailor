@@ -4,17 +4,15 @@
 import os
 import wx
 import sys
-import logging
 import argparse
 import numpy as np
-import traceback
 import multiprocessing
 
 from form.MainFrame import MainFrame
 from utils.MLogger import MLogger
 from utils import MFileUtils
 
-VERSION_NAME = "1.00.00_β17"
+VERSION_NAME = "1.00.00_β18"
 
 # 指数表記なし、有効小数点桁数6、30を超えると省略あり、一行の文字数200
 np.set_printoptions(suppress=True, precision=6, threshold=30, linewidth=200)
@@ -39,6 +37,7 @@ if __name__ == '__main__':
     else:
         parser = argparse.ArgumentParser()
         parser.add_argument("--verbose", default=20, type=int)
+        parser.add_argument("--log_mode", default=0, type=int)
         parser.add_argument("--out_log", default=0, type=int)
         parser.add_argument("--is_saving", default=1, type=int)
         parser.add_argument("--vroid", default=0, type=int)
@@ -51,27 +50,28 @@ if __name__ == '__main__':
         # Vroid2Pmx
         is_vroid = True if args.vroid == 1 else False
 
-        MLogger.initialize(level=args.verbose, is_file=False)
+        MLogger.initialize(level=args.verbose, is_file=False, mode=args.log_mode)
+        logger = MLogger(__name__)
 
         log_level_name = ""
         if args.verbose == MLogger.FULL:
             # フルデータの場合
-            log_level_name = "（全打ち版）"
+            log_level_name = logger.transtext("（全打ち版）")
         elif args.verbose == MLogger.DEBUG_FULL:
             # フルデータの場合
-            log_level_name = "（全打ちデバッグ版）"
+            log_level_name = logger.transtext("（全打ちデバッグ版）")
         elif args.verbose == MLogger.DEBUG:
             # テスト（デバッグ版）の場合
-            log_level_name = "（デバッグ版）"
+            log_level_name = logger.transtext("（デバッグ版）")
         elif args.verbose == MLogger.TIMER:
             # 時間計測の場合
-            log_level_name = "（タイマー版）"
+            log_level_name = logger.transtext("（タイマー版）")
         elif not is_saving:
             # 省エネOFFの場合
-            log_level_name = "（ハイスペック版）"
+            log_level_name = logger.transtext("（ハイスペック版）")
         elif is_out_log:
             # ログありの場合
-            log_level_name = "（ログあり版）"
+            log_level_name = logger.transtext("（ログあり版）")
 
         now_version_name = "{0}{1}".format(VERSION_NAME, log_level_name)
 

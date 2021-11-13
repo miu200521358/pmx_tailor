@@ -17,12 +17,12 @@ class ParamBonePanel(BasePanel):
         self.header_panel = wx.Panel(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL)
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.description_txt = wx.StaticText(self, wx.ID_ANY, u"パラ調整タブで選択された材質に既にボーンとウェイトが設定されている場合に、\n" \
-                                             u"ボーン構成を指定する事で物理設定（剛体・ジョイント）を設定する事が出来ます。\n" \
-                                             u"縦方向がボーンの親子関係、横がボーンの並び順で指定してください。\n" \
-                                             u"（スカートなどは水平方向の並び順、袖などは輪切り縦方向の並び順を横方向に並べてください）\n" \
-                                             u"ボーン名を指定すると、その子ボーンを自動設定します。（少しタイムラグがあります）\n" \
-                                             u"水平方向のボーン間が繋がっているかは、ウェイトを見て自動判定します。", wx.DefaultPosition, wx.DefaultSize, 0)
+        self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("パラ調整タブで選択された材質に既にボーンとウェイトが設定されている場合に、\n") + \
+                                             logger.transtext("ボーン構成を指定する事で物理設定（剛体・ジョイント）を設定する事が出来ます。\n") + \
+                                             logger.transtext("縦方向がボーンの親子関係、横がボーンの並び順で指定してください。\n") + \
+                                             logger.transtext("（スカートなどは水平方向の並び順、袖などは輪切り縦方向の並び順を横方向に並べてください）\n") + \
+                                             logger.transtext("ボーン名を指定すると、その子ボーンを自動設定します。（少しタイムラグがあります）\n") + \
+                                             logger.transtext("水平方向のボーン間が繋がっているかは、ウェイトを見て自動判定します。"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.header_sizer.Add(self.description_txt, 0, wx.ALL, 5)
 
         self.static_line01 = wx.StaticLine(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)

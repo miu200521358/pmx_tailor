@@ -8,5 +8,5 @@ cd /d %~dp0
 
 cls
 
-src\setup.bat && activate vmdsizing_cython && python src\executor.py --out_log 1 --verbose 10 --is_saving 1
+src\setup.bat && activate vmdsizing_cython && python src\executor.py --out_log 1 --verbose 10 --is_saving 1 --log_mode 0
 

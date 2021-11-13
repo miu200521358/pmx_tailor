@@ -19,8 +19,8 @@ class HistoryFilePickerCtrl(BaseFilePickerCtrl):
 
         # logger.test(self.frame.file_hitories)
 
-        self.histroy_btn_ctrl = wx.Button(parent, wx.ID_ANY, u"履歴", wx.DefaultPosition, wx.DefaultSize, 0)
-        self.histroy_btn_ctrl.SetToolTip(u"これまで指定された{0}を再指定できます。".format(title))
+        self.histroy_btn_ctrl = wx.Button(parent, wx.ID_ANY, logger.transtext("履歴"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.histroy_btn_ctrl.SetToolTip(logger.transtext("これまで指定された{0}を再指定できます。".format(title)))
 
         super().__init__(frame, parent, title, message, wildcard, style, tooltip, file_model_spacer=file_model_spacer, title_parts_ctrl=title_parts_ctrl, \
                          title_parts2_ctrl=title_parts2_ctrl, file_parts_ctrl=self.histroy_btn_ctrl, is_change_output=is_change_output, is_aster=is_aster, \
@@ -60,7 +60,7 @@ class HistoryFilePickerCtrl(BaseFilePickerCtrl):
         hs = copy.deepcopy(self.frame.file_hitories[self.file_histories_key])
         hs.extend(["" for x in range(self.frame.file_hitories["max"] + 1)])
 
-        with wx.SingleChoiceDialog(self.parent, "ファイルを選んでダブルクリック、またはOKボタンをクリックしてください。", caption="ファイル履歴選択",
+        with wx.SingleChoiceDialog(self.parent, logger.transtext("ファイルを選んでダブルクリック、またはOKボタンをクリックしてください。"), caption="ファイル履歴選択",
                                    choices=hs[:(self.frame.file_hitories["max"] + 1)],
                                    style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE) as choiceDialog:
 

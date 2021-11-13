@@ -5,6 +5,9 @@ import logging
 import traceback
 import threading
 import sys
+import os
+import json
+import locale
 
 import cython
 
@@ -30,10 +33,25 @@ class MLogger():
     ERROR = logging.ERROR
     CRITICAL = logging.CRITICAL
     
+    # 翻訳モード
+    # 読み取り専用：翻訳リストにない文字列は入力文字列をそのまま出力する
+    MODE_READONLY = 0
+    # 更新あり：翻訳リストにない文字列は出力する
+    MODE_UPDATE = 1
+
     total_level = logging.INFO
     is_file = False
+    mode = MODE_READONLY
     outout_datetime = ""
+
+    # 翻訳モード
+    mode = MODE_READONLY
+    # 翻訳言語優先順位
+    langs = ["en_US", "ja_JP"]
+    # 出力対象言語
+    target_lang = "ja_JP"
     
+    messages = {}
     logger = None
 
     def __init__(self, module_name, level=logging.INFO):
@@ -148,7 +166,7 @@ class MLogger():
         self.print_logger(msg, *args, **kwargs)
 
     # 実際に出力する実態
-    def print_logger(self, msg, *args, **kwargs):
+    def print_logger(self, org_msg, *args, **kwargs):
 
         if "is_killed" in threading.current_thread()._kwargs and threading.current_thread()._kwargs["is_killed"]:
             # 停止命令が出ている場合、エラー
@@ -174,6 +192,10 @@ class MLogger():
             # モジュール名を出力するよう追加
             extra_args = {}
             extra_args["module_name"] = self.module_name
+
+            # 翻訳有無で出力メッセージ取得
+            is_translate = kwargs.pop("translate", True)
+            msg = self.transtext(org_msg) if is_translate else org_msg
 
             # ログレコード生成
             if args and isinstance(args[0], Exception) or (args and len(args) > 1 and isinstance(args[0], Exception)):
@@ -264,17 +286,81 @@ class MLogger():
         
         return "\n".join(msg_block)
 
+    def transtext(self, msg):
+        trans_msg = msg
+        if msg in self.messages:
+            # メッセージがある場合、それで出力する
+            trans_msg = self.messages[msg]
+
+        if self.mode == MLogger.MODE_UPDATE:
+            # 更新モードである場合、辞書に追記
+            for lang in self.langs:
+                messages_path = self.get_message_path(lang)
+                try:
+                    with open(messages_path, 'r', encoding="utf-8") as f:
+                        msgs = json.load(f)
+
+                        if msg not in msgs:
+                            # ない場合、追加(オリジナル言語の場合、そのまま。違う場合は空欄)
+                            msgs[msg] = msg if self.target_lang == lang else ""
+
+                        with open(messages_path, 'w', encoding="utf-8") as f:
+                            json.dump(msgs, f, ensure_ascii=False)
+                except Exception:
+                    print("*** Message Update ERROR ***\n%s", traceback.format_exc())
+        
+        return trans_msg
+
     @classmethod
-    def initialize(cls, level=logging.INFO, is_file=False):
+    def initialize(cls, level=logging.INFO, is_file=False, mode=MODE_READONLY):
         # logging.basicConfig(level=level)
         logging.basicConfig(level=level, format=cls.DEFAULT_FORMAT)
         cls.total_level = level
         cls.is_file = is_file
+        cls.mode = mode
         cls.outout_datetime = "{0:%Y%m%d_%H%M%S}".format(datetime.now())
+
+        if mode == MLogger.MODE_UPDATE:
+            # 更新版の場合、必要なディレクトリ・ファイルを全部作成する
+            for lang in cls.langs:
+                messages_path = cls.get_message_path(lang)
+                os.makedirs(os.path.dirname(messages_path), exist_ok=True)
+                if not os.path.exists(messages_path):
+                    try:
+                        with open(messages_path, 'w', encoding="utf-8") as f:
+                            json.dump({}, f, ensure_ascii=False)
+                    except Exception:
+                        print("*** Message Dump ERROR ***\n%s", traceback.format_exc())
+
+        # 実行環境に応じたローカル言語
+        lang = locale.getdefaultlocale()[0]
+        if lang not in cls.langs:
+            # 実行環境言語に対応した言語が出力対象外である場合、第一言語を出力する
+            cls.target_lang = cls.langs[0]
+        else:
+            # 実行環境言語に対応した言語が出力対象である場合、その言語を出力する
+            # cls.target_lang = "ja_JP"
+            cls.target_lang = lang
+
+        # メッセージファイルパス
+        try:
+            with open(cls.get_message_path(cls.target_lang), 'r', encoding="utf-8") as f:
+                cls.messages = json.load(f)
+        except Exception:
+            print("*** Message Load ERROR ***\n%s", traceback.format_exc())
+
+    @classmethod
+    def get_message_path(cls, lang):
+        return resource_path(os.path.join("src", "locale", lang, "messages.json"))
+
+
+# リソースファイルのパス
+def resource_path(relative):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative)
+    return os.path.join(relative)
 
 
 @cython.ccall
 def print_message(msg: str, target_level: int):
     sys.stdout.write(msg + "\n", (target_level < MLogger.INFO))
-
-

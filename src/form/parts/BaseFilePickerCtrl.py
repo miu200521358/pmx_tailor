@@ -87,7 +87,7 @@ class BaseFilePickerCtrl():
         self.file_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.file_ctrl = wx.FilePickerCtrl(parent, wx.ID_ANY, wx.EmptyString, message, BaseFilePickerCtrl.WILDCARD_DICT[self.file_type], wx.DefaultPosition, wx.DefaultSize, style)
-        self.file_ctrl.GetPickerCtrl().SetLabel("開く")
+        self.file_ctrl.GetPickerCtrl().SetLabel(logger.transtext("開く"))
         self.file_ctrl.SetToolTip(tooltip)
 
         self.file_sizer.Add(self.file_ctrl, 1, wx.ALL | wx.EXPAND, 5)
@@ -180,7 +180,7 @@ class BaseFilePickerCtrl():
             # CSVとかのファイルは番号出力なし
             display_set_no = ""
         else:
-            display_set_no = "{0}番目の".format(self.set_no)
+            display_set_no = logger.transtext("{0}番目の").format(self.set_no)
 
         if self.is_aster and self.set_no <= 1:
             base_file_path = self.file_ctrl.GetPath()
@@ -350,7 +350,7 @@ class FileModelCtrl():
 
         width = 300 if self.set_no == 1 else 220
 
-        self.txt_ctrl = wx.TextCtrl(parent, wx.ID_ANY, "（未設定）", wx.DefaultPosition, (width, -1), wx.TE_READONLY | wx.BORDER_NONE | wx.WANTS_CHARS)
+        self.txt_ctrl = wx.TextCtrl(parent, wx.ID_ANY, logger.transtext("（未設定）"), wx.DefaultPosition, (width, -1), wx.TE_READONLY | wx.BORDER_NONE | wx.WANTS_CHARS)
         self.txt_ctrl.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_3DLIGHT))
         self.txt_ctrl.SetToolTip(u"{0}に記録されているモデル名です。\n文字列は選択＆コピー可能です。".format(title))
 
@@ -369,7 +369,7 @@ class FileModelCtrl():
                     file_path_list = [p for p in glob.glob(base_file_path) if os.path.isfile(p)]
 
                 if len(file_path_list) == 0:
-                    return "取得失敗"
+                    return logger.transtext("取得失敗")
 
                 file_path = file_path_list[0]
             else:
@@ -377,7 +377,7 @@ class FileModelCtrl():
 
             file_name, input_ext = os.path.splitext(os.path.basename(file_path))
 
-            model_name = "未設定"
+            model_name = logger.transtext("未設定")
             if input_ext.lower() == ".vmd":
                 reader = VmdReader(file_path)
             elif input_ext.lower() == ".vpd":
@@ -385,12 +385,12 @@ class FileModelCtrl():
             elif input_ext.lower() == ".pmx":
                 reader = PmxReader(file_path)
             else:
-                return "対象外拡張子"
+                return logger.transtext("対象外拡張子")
             
             try:
                 model_name = reader.read_model_name()
             except Exception:
-                model_name = "取得失敗"
+                model_name = logger.transtext("取得失敗")
 
             logger.test("model_name: %s, ", model_name)
 
@@ -398,7 +398,7 @@ class FileModelCtrl():
         except Exception as e:
             logger.test("get_model_name 失敗", e)
 
-            return "取得失敗"
+            return logger.transtext("取得失敗")
 
 
 class MFileDropTarget(wx.FileDropTarget):

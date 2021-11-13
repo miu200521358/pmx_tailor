@@ -1,4 +1,4 @@
-@echo off
+rem@echo off
 rem --- 
 rem ---  exeÇê∂ê¨
 rem --- 
@@ -10,5 +10,3 @@ cls
 
 activate vmdsizing_cython && src\setup_install.bat && pyinstaller --clean pmx_tailor.spec
 rem activate vmdsizing_cython && pyinstaller --clean pmx_tailor.spec
-
-
