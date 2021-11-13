@@ -102,6 +102,8 @@ cdef class MVector3D:
 
     cpdef double lengthSquared(self)
 
+    cpdef MVector3D round(self, decimals)
+
     cpdef MVector3D normalized(self)
 
     cpdef normalize(self)

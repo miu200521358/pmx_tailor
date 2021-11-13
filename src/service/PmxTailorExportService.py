@@ -247,17 +247,12 @@ class PmxTailorExportService():
                             key = (min(prev_above_bone_index, next_above_bone_index), max(prev_above_bone_index, next_above_bone_index))
                             if key not in weighted_bone_pairs:
                                 # ウェイトが乗ってなかった場合、2つ前のボーンと結合させる
-                                for nac in list(range(pac - 1, pac - 2, -1)):
-                                    next_above_bone_name = bone_grid[par][nac]
-                                    if next_above_bone_name:
-                                        next_above_bone_position = model.bones[next_above_bone_name].position
-                                        next_above_bone_index = model.bones[next_above_bone_name].index
-                                        break
-                                        # key = (min(prev_above_bone_index, next_above_bone_index), max(prev_above_bone_index, next_above_bone_index))
-                                        # if key in weighted_bone_pairs:
-                                        #     break
-                                        # else:
-                                        #     next_above_bone_name = None
+                                nac = pac - 1
+                                next_above_bone_name = bone_grid[par][nac]
+                                if next_above_bone_name:
+                                    next_above_bone_position = model.bones[next_above_bone_name].position
+                                    next_above_bone_index = model.bones[next_above_bone_name].index
+
                     next_below_bone_name = None
                     next_below_bone_position = None
                     nbr = par + 1
@@ -273,22 +268,50 @@ class PmxTailorExportService():
                         next_below_bone_name = next_above_bone_name
                         next_below_bone_position = next_above_bone_position + model.bones[next_above_bone_name].tail_position
 
-                    next_next_above_bone_name = None
-                    nnac = nac + 1
-                    if par in bone_grid and nnac in bone_grid[par]:
-                        next_next_above_bone_name = bone_grid[par][nnac]
+                    prev_prev_above_bone_name = None
+                    prev_prev_above_bone_position = None
+                    if pac > 0:
+                        # 左周りにボーンの連携をチェック
+                        ppac = pac - 1
+                        if par in bone_grid and ppac in bone_grid[par]:
+                            prev_prev_above_bone_name = bone_grid[par][ppac]
+                            if prev_prev_above_bone_name:
+                                prev_prev_above_bone_position = model.bones[prev_prev_above_bone_name].position
+                            else:
+                                # 隣がない場合、prev_aboveと同じにする
+                                prev_prev_above_bone_name = prev_above_bone_name
+                                prev_prev_above_bone_position = prev_above_bone_position
+                        else:
+                            prev_prev_above_bone_name = prev_above_bone_name
+                            prev_prev_above_bone_position = prev_above_bone_position
+                    else:
+                        # 一旦円周を描いてみる
+                        ppac = list(bone_grid[par].keys())[-1]
+                        prev_prev_above_bone_name = bone_grid[par][ppac]
+                        if prev_prev_above_bone_name:
+                            prev_prev_above_bone_position = model.bones[prev_prev_above_bone_name].position
+                            prev_prev_above_bone_index = model.bones[prev_prev_above_bone_name].index
+                            key = (min(next_above_bone_index, prev_prev_above_bone_index), max(next_above_bone_index, prev_prev_above_bone_index))
+                            if key not in weighted_bone_pairs:
+                                # ウェイトが乗ってなかった場合、prev_aboveと同じにする
+                                prev_prev_above_bone_name = prev_above_bone_name
+                                prev_prev_above_bone_position = prev_above_bone_position
+                        else:
+                            prev_prev_above_bone_name = prev_above_bone_name
+                            prev_prev_above_bone_position = prev_above_bone_position
 
                     if prev_above_bone_name and prev_below_bone_name and next_above_bone_name and next_below_bone_name:
                         bone_blocks[prev_above_bone_name] = {'prev_above': prev_above_bone_name, 'prev_below': prev_below_bone_name, \
                                                              'next_above': next_above_bone_name, 'next_below': next_below_bone_name, \
                                                              'prev_above_pos': prev_above_bone_position, 'prev_below_pos': prev_below_bone_position, \
                                                              'next_above_pos': next_above_bone_position, 'next_below_pos': next_below_bone_position, \
-                                                             'next_connect': (next_next_above_bone_name is not None), 'yi': par, 'xi': pac}
+                                                             'prev_prev_above': prev_prev_above_bone_name, 'prev_prev_above_pos': prev_prev_above_bone_position, \
+                                                             'yi': par, 'xi': pac}
                         logger.debug(f'prev_above: {prev_above_bone_name}, [{prev_above_bone_position.to_log()}], ' \
                                      + f'next_above: {next_above_bone_name}, [{next_above_bone_position.to_log()}], ' \
                                      + f'prev_below: {prev_below_bone_name}, [{prev_below_bone_position.to_log()}], ' \
                                      + f'next_below: {next_below_bone_name}, [{next_below_bone_position.to_log()}], ' \
-                                     + f'next_connect: {(next_next_above_bone_name is not None)}, [{next_next_above_bone_name}], ' \
+                                     + f'prev_prev_above: {prev_prev_above_bone_name}, [{prev_prev_above_bone_position.to_log()}], ' \
                                      + f'yi: {par}, xi: {pac}')
 
         return bone_blocks
@@ -508,6 +531,7 @@ class PmxTailorExportService():
             next_below_bone_name = bone_block['next_below']
             next_below_bone_position = bone_block['next_below_pos']
             yi = bone_block['yi']
+            xi = bone_block['xi']
 
             if yi == 0:
                 # ルート剛体と根元剛体を繋ぐジョイント
@@ -1256,6 +1280,7 @@ class PmxTailorExportService():
             model.joints[joint.name] = joint
 
     def create_rigidbody_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict):
+        bone_grid_cols = param_option["bone_grid_cols"]
         bone_grid_rows = param_option["bone_grid_rows"]
 
         # 剛体生成
@@ -1282,12 +1307,15 @@ class PmxTailorExportService():
         for bone_block in bone_blocks.values():
             prev_above_bone_name = bone_block['prev_above']
             prev_above_bone_position = bone_block['prev_above_pos']
-            prev_below_bone_name = bone_block['prev_below']
+            # prev_below_bone_name = bone_block['prev_below']
             prev_below_bone_position = bone_block['prev_below_pos']
-            next_above_bone_name = bone_block['next_above']
+            # next_above_bone_name = bone_block['next_above']
             next_above_bone_position = bone_block['next_above_pos']
-            next_below_bone_name = bone_block['next_below']
+            # next_below_bone_name = bone_block['next_below']
             next_below_bone_position = bone_block['next_below_pos']
+            # prev_prev_above_bone_name = bone_block['prev_prev_above']
+            prev_prev_above_bone_position = bone_block['prev_prev_above_pos']
+            xi = bone_block['xi']
             yi = bone_block['yi']
 
             if prev_above_bone_name in created_rigidbodies:
@@ -1298,10 +1326,17 @@ class PmxTailorExportService():
                 prev_above_bone_index = model.bones[prev_above_bone_name].index
 
             # 剛体の傾き
-            shape_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-            shape_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
-            shape_axis_up.setY(0)
-            shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).normalized()
+            shape_axis = (prev_below_bone_position - prev_above_bone_position).round(5).normalized()
+            if xi < bone_grid_cols - 1:
+                shape_axis_up = (next_above_bone_position - prev_prev_above_bone_position).round(5).normalized()
+            else:
+                shape_axis_up = (next_above_bone_position - prev_above_bone_position).round(5).normalized()
+            shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).round(5).normalized()
+
+            # if shape_axis_up.round(2) == MVector3D(1, 0, 0):
+            #     shape_rotation_qq = MQuaternion.fromEulerAngles(0, 180, 0)
+            # else:
+            #     shape_rotation_qq = MQuaternion.rotationTo(MVector3D(-1, 0, 0), shape_axis_up)
 
             shape_rotation_qq = MQuaternion.fromDirection(shape_axis, shape_axis_cross)
             if round(prev_below_bone_position.y(), 2) != round(prev_above_bone_position.y(), 2):
@@ -1448,6 +1483,14 @@ class PmxTailorExportService():
                 next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
                 next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
 
+                prev_prev_above_bone_position = None
+                if xi > 0:
+                    prev_prev_below_v_xidx = registed_bone_indexs[below_v_yidx][below_v_xidxs[xi - 1]]
+                    prev_prev_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - prev_prev_below_v_xidx)
+                    prev_prev_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if prev_prev_below_v_xidx == 0 else np.argmin(prev_prev_above_v_xidx_diff))]
+                    prev_prev_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, prev_prev_above_v_xidx + 1)
+                    prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
+
                 if prev_above_bone_name in created_rigidbodies:
                     continue
 
@@ -1456,10 +1499,12 @@ class PmxTailorExportService():
                     prev_above_bone_index = model.bones[prev_above_bone_name].index
 
                 # 剛体の傾き
-                shape_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                shape_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
-                shape_axis_up.setY(0)
-                shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).normalized()
+                shape_axis = (prev_below_bone_position - prev_above_bone_position).round(5).normalized()
+                if prev_prev_above_bone_position:
+                    shape_axis_up = (next_above_bone_position - prev_prev_above_bone_position).round(5).normalized()
+                else:
+                    shape_axis_up = (next_above_bone_position - prev_above_bone_position).round(5).normalized()
+                shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).round(5).normalized()
 
                 shape_rotation_qq = MQuaternion.fromDirection(shape_axis, shape_axis_cross)
                 if round(prev_below_bone_position.y(), 2) != round(prev_above_bone_position.y(), 2):
@@ -1590,10 +1635,10 @@ class PmxTailorExportService():
                         if vertex_idx < 0:
                             continue
 
-                        horizonal_distance = np.sum(b_h_distances[vi, 1:])
-                        v_horizonal_distance = np.sum(b_h_distances[vi, 1:(vhi + 1)])
-                        vertical_distance = np.sum(b_v_distances[1:, vhi])
-                        v_vertical_distance = np.sum(b_v_distances[1:(vi + 1), vhi])
+                        horizonal_distance = np.sum(b_h_distances[vi, :])
+                        v_horizonal_distance = np.sum(b_h_distances[vi, :(vhi + 1)]) - b_h_distances[vi, 0]
+                        vertical_distance = np.sum(b_v_distances[:, vhi])
+                        v_vertical_distance = np.sum(b_v_distances[:(vi + 1), vhi]) - b_v_distances[0, vhi]
 
                         prev_above_weight = max(0, ((horizonal_distance - v_horizonal_distance) / horizonal_distance) * ((vertical_distance - v_vertical_distance) / vertical_distance))
                         prev_below_weight = max(0, ((horizonal_distance - v_horizonal_distance) / horizonal_distance) * ((v_vertical_distance) / vertical_distance))
@@ -1793,7 +1838,7 @@ class PmxTailorExportService():
         all_bone_vertical_distances = {}
 
         for base_map_idx, vertex_map in enumerate(vertex_maps):
-            bone_horizonal_distances = np.zeros(vertex_map.shape)
+            bone_horizonal_distances = np.zeros((vertex_map.shape[0], vertex_map.shape[1] + 1))
             bone_vertical_distances = np.zeros(vertex_map.shape)
 
             # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
@@ -1807,6 +1852,11 @@ class PmxTailorExportService():
                         now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
                         prev_v_vec = now_v_vec if v_yidx == 0 else model.vertex_dict[vertex_map[v_yidx - 1, v_xidx]].position
                         bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx, 0] >= 0:
+                    # 輪を描いたのも入れとく(ウェイト対象取得の時に計算入るからここでは強制)
+                    now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
+                    prev_v_vec = model.vertex_dict[vertex_map[v_yidx, 0]].position
+                    bone_horizonal_distances[v_yidx, v_xidx + 1] = now_v_vec.distanceToPoint(prev_v_vec)
 
             all_bone_horizonal_distances[base_map_idx] = bone_horizonal_distances
             all_bone_vertical_distances[base_map_idx] = bone_vertical_distances

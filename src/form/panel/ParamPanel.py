@@ -1976,7 +1976,7 @@ class PhysicsParam():
             for r in range(max_link_num):
                 self.bone_grid.SetCellEditor(r, c, GridCellChoiceEditor(choices=all_bone_names))
             self.bone_grid.SetColLabelValue(c, str(c + 1))
-            self.bone_grid.SetColSize(c, int((self.bone_grid.GetCellFont(r, c).PointSize + 1) * max_bone_name_cnt))
+            self.bone_grid.SetColSize(c, int((self.bone_grid.GetCellFont(r, c).PointSize * 1.2) * max_bone_name_cnt))
         
         self.bone_grid.Bind(EVT_GRID_CELL_CHANGING, self.change_bone_grid)
 

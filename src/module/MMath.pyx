@@ -317,6 +317,9 @@ cdef class MVector3D:
 
     cpdef double lengthSquared(self):
         return float(np.linalg.norm(self.data(), ord=2)**2)
+    
+    cpdef MVector3D round(self, decimals):
+        return MVector3D(np.round(self.data(), decimals=decimals))
 
     cpdef MVector3D normalized(self):
         cdef np.ndarray[DTYPE_FLOAT_t, ndim=1] l2 = np.linalg.norm(self.data(), ord=2, axis=-1, keepdims=True)
