@@ -44,7 +44,7 @@ class PmxTailorExportService():
             logger.info(service_data_txt, translate=False, decoration=MLogger.DECORATION_BOX)
 
             model = self.options.pmx_model
-            model.comment += "\r\n\r\n物理: PmxTailor"
+            model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor"
 
             for pidx, param_option in enumerate(self.options.param_options):
                 if not self.create_physics(model, param_option):
@@ -55,7 +55,7 @@ class PmxTailorExportService():
 
             PmxWriter().write(model, self.options.output_path)
 
-            logger.info("出力終了: %s", os.path.basename(self.options.output_path), decoration=MLogger.DECORATION_BOX, title="成功")
+            logger.info("出力終了: %s", os.path.basename(self.options.output_path), decoration=MLogger.DECORATION_BOX, title=logger.transtext("成功"))
 
             return True
         except MKilledException:
@@ -68,20 +68,20 @@ class PmxTailorExportService():
             logging.shutdown()
 
     def create_physics(self, model: PmxModel, param_option: dict):
-        model.comment += f"\r\n材質: {param_option['material_name']} --------------"    # noqa
-        model.comment += f"\r\n　　剛体グループ: {param_option['rigidbody'].collision_group + 1}"    # noqa
-        model.comment += f"\r\n　　細かさ: {param_option['fineness']}"    # noqa
-        model.comment += f"\r\n　　質量: {param_option['mass']}"    # noqa
-        model.comment += f"\r\n　　空気抵抗: {param_option['air_resistance']}"    # noqa
-        model.comment += f"\r\n　　形状維持: {param_option['shape_maintenance']}"    # noqa
+        model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"    # noqa
+        model.comment += f"\r\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"    # noqa
+        model.comment += f"\r\n　　{logger.transtext('細かさ')}: {param_option['fineness']}"    # noqa
+        model.comment += f"\r\n　　{logger.transtext('質量')}: {param_option['mass']}"    # noqa
+        model.comment += f"\r\n　　{logger.transtext('柔らかさ')}: {param_option['air_resistance']}"    # noqa
+        model.comment += f"\r\n　　{logger.transtext('張り')}: {param_option['shape_maintenance']}"    # noqa
 
-        if param_option['exist_physics_clear'] in ['上書き', '再利用']:
+        if param_option['exist_physics_clear'] in [logger.transtext('上書き'), logger.transtext('再利用')]:
             # 既存材質削除フラグONの場合
             logger.info("【%s】既存材質削除", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
             model = self.clear_exist_physics(model, param_option, param_option['material_name'])
 
-        if param_option['exist_physics_clear'] == '再利用':
+        if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             logger.info("【%s】ボーンマップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
             bone_blocks = self.create_bone_blocks(model, param_option, param_option['material_name'])
@@ -1963,7 +1963,7 @@ class PmxTailorExportService():
 
         weighted_bone_indexes = {}
 
-        if param_option['exist_physics_clear'] == '再利用':
+        if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             # 再利用の場合、指定されている全ボーンを対象とする
             bone_grid = param_option["bone_grid"]
             bone_grid_cols = param_option["bone_grid_cols"]
@@ -2000,7 +2000,7 @@ class PmxTailorExportService():
                         weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
         
         not_delete_bone_names = []
-        if param_option['exist_physics_clear'] == '再利用':
+        if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             # 再利用する場合、ボーンは全部残す
             not_delete_bone_names = list(model.bones.keys())
         else:

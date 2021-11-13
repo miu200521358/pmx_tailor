@@ -342,6 +342,9 @@ class MLogger():
             # cls.target_lang = "ja_JP"
             cls.target_lang = lang
 
+        # # 英語固定
+        # cls.target_lang = cls.langs[0]
+
         # メッセージファイルパス
         try:
             with open(cls.get_message_path(cls.target_lang), 'r', encoding="utf-8") as f:
