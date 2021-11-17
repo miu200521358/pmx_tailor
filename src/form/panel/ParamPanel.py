@@ -12,6 +12,7 @@ import csv
 
 from form.panel.BasePanel import BasePanel
 from form.parts.FloatSliderCtrl import FloatSliderCtrl
+from form.parts.HistoryFilePickerCtrl import HistoryFilePickerCtrl
 from mmd.PmxData import RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef
 from module.MMath import MRect, MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
 from utils.MLogger import MLogger # noqa
@@ -32,10 +33,12 @@ class ParamPanel(BasePanel):
         self.header_panel = wx.Panel(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL)
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("材質を選択して、パラメーターを調整してください。"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("材質を選択して、パラメーターを調整してください。\n" \
+                                             + "スライダーパラメーターで調整した設定に基づいて詳細タブ内のMMD物理パラメーターを変更します。\n" \
+                                             + "物理を再利用したい場合は、ボーンパネルでボーンの並び順を指定してください。"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.header_sizer.Add(self.description_txt, 0, wx.ALL, 5)
 
-        self.static_line01 = wx.StaticLine(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
+        self.static_line01 = wx.StaticLine(self.header_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         self.header_sizer.Add(self.static_line01, 0, wx.EXPAND | wx.ALL, 5)
 
         self.btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -131,10 +134,13 @@ class ParamPanel(BasePanel):
             # ボーンリストクリア
             self.bone_list = []
             for bone in self.frame.file_panel_ctrl.org_model_file_ctrl.data.bones.values():
-                for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
-                    if bone.index == rigidbody.bone_index and rigidbody.mode == 0:
-                        self.bone_list.append(bone.name)
-                        break
+                if self.frame.is_vroid:
+                    self.bone_list.append(bone.name)
+                else:
+                    for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
+                        if bone.index == rigidbody.bone_index and rigidbody.mode == 0:
+                            self.bone_list.append(bone.name)
+                            break
             # セットクリア
             self.on_clear_set(event)
             # 1件追加
@@ -203,12 +209,12 @@ class PhysicsParam():
         self.simple_material_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.simple_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("物理材質 *"), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_material_txt.SetToolTip(logger.transtext("物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。"))
+        self.simple_material_txt.SetToolTip(logger.transtext("物理を設定する材質を選択してください。\n裾など一部にのみ物理を設定したい場合、頂点データCSVを指定してください。"))
         self.simple_material_txt.Wrap(-1)
         self.simple_material_sizer.Add(self.simple_material_txt, 0, wx.ALL, 5)
 
         self.simple_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
-        self.simple_material_ctrl.SetToolTip(logger.transtext("物理を設定する材質を選択してください。\n材質全体に物理を設定するため、裾など一部にのみ物理を設定したい場合、材質を一旦分離してください。"))
+        self.simple_material_ctrl.SetToolTip(logger.transtext("物理を設定する材質を選択してください。\n裾など一部にのみ物理を設定したい場合、頂点データCSVを指定してください。"))
         self.simple_material_ctrl.Bind(wx.EVT_CHOICE, self.set_material_name)
         self.simple_material_sizer.Add(self.simple_material_ctrl, 0, wx.ALL, 5)
 
@@ -216,7 +222,7 @@ class PhysicsParam():
 
         self.simple_parent_bone_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("親ボーン *"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_parent_bone_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("親ボーン *　"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_parent_bone_txt.SetToolTip(logger.transtext("材質物理の起点となる親ボーン\nボーン追従剛体を持っているボーンのみが対象となります。\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）"))
         self.simple_parent_bone_txt.Wrap(-1)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
@@ -244,7 +250,7 @@ class PhysicsParam():
         self.simple_group_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_group_txt, 0, wx.ALL, 5)
 
-        self.simple_group_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"])
+        self.simple_group_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=["", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"])
         self.simple_group_ctrl.SetToolTip(logger.transtext("剛体のグループ。初期設定では、自分自身のグループのみ非衝突として設定します。"))
         self.simple_header_grid_sizer.Add(self.simple_group_ctrl, 0, wx.ALL, 5)
 
@@ -283,19 +289,41 @@ class PhysicsParam():
 
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
+        self.simple_edge_material_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.simple_edge_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("裾材質　　"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_edge_material_txt.SetToolTip(logger.transtext("物理材質の裾にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます"))
+        self.simple_edge_material_txt.Wrap(-1)
+        self.simple_edge_material_sizer.Add(self.simple_edge_material_txt, 0, wx.ALL, 5)
+
+        self.simple_edge_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
+        self.simple_edge_material_ctrl.SetToolTip(logger.transtext("物理材質の裾にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます"))
+        self.simple_edge_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_edge_material_sizer.Add(self.simple_edge_material_ctrl, 0, wx.ALL, 5)
+
+        self.simple_param_sizer.Add(self.simple_edge_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
+
         self.simple_back_material_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.simple_back_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("裏面材質"), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_back_material_txt.SetToolTip(logger.transtext("物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます"))
+        self.simple_back_material_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("裏面材質　"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_back_material_txt.SetToolTip(logger.transtext("物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質の最も近い頂点ウェイトを転写します"))
         self.simple_back_material_txt.Wrap(-1)
         self.simple_back_material_sizer.Add(self.simple_back_material_txt, 0, wx.ALL, 5)
 
         self.simple_back_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
-        self.simple_back_material_ctrl.SetToolTip(logger.transtext("物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます"))
+        self.simple_back_material_ctrl.SetToolTip(logger.transtext("物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質の最も近い頂点ウェイトを転写します"))
         self.simple_back_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_back_material_sizer.Add(self.simple_back_material_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_back_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
+
+        # 頂点CSVファイルコントロール
+        self.vertices_csv_file_ctrl = HistoryFilePickerCtrl(main_frame, self.simple_window, logger.transtext("対象頂点CSV"), logger.transtext("対象頂点CSVファイルを開く"), ("csv"), wx.FLP_DEFAULT_STYLE, \
+                                                            logger.transtext("材質の中で物理を割り当てたい頂点を絞り込みたい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"), \
+                                                            file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="vertices_csv", \
+                                                            is_change_output=False, is_aster=False, is_save=False, set_no=0)
+        self.vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
 
@@ -1435,10 +1463,12 @@ class PhysicsParam():
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
             params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
+            params["edge_material_name"] = self.simple_edge_material_ctrl.GetStringSelection()
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["direction"] = self.simple_direction_ctrl.GetStringSelection()
             params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection()
+            params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
             params["similarity"] = self.simple_similarity_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -1530,6 +1560,10 @@ class PhysicsParam():
                 logger.error(logger.transtext("No.%sの%sに値が設定されていません。"), pidx + 1, '・'.join(empty_param_list), decoration=MLogger.DECORATION_BOX)
 
         return params
+    
+    def on_change_vertices_csv(self, event: wx.Event):
+        self.vertices_csv_file_ctrl.save()
+        self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def on_param_import(self, event: wx.Event):
         with wx.FileDialog(self.frame, logger.transtext("材質物理設定JSONを読み込む"), wildcard="JSONファイル (*.json)|*.json|すべてのファイル (*.*)|*.*",
@@ -2065,7 +2099,7 @@ class PhysicsParam():
             self.advance_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ベルベッド)"):
-            self.simple_mass_slider.SetValue(3.8)
+            self.simple_mass_slider.SetValue(3.0)
             self.simple_air_resistance_slider.SetValue(1.4)
             self.simple_shape_maintenance_slider.SetValue(1.9)
 
@@ -2204,6 +2238,7 @@ class PhysicsParam():
     def on_clear(self, event: wx.Event):
         self.simple_material_ctrl.SetStringSelection('')
         self.simple_back_material_ctrl.SetStringSelection('')
+        self.simple_edge_material_ctrl.SetStringSelection('')
         self.simple_primitive_ctrl.SetStringSelection('')
         self.simple_similarity_slider.SetValue(0.75)
         self.simple_fineness_slider.SetValue(3.4)

@@ -43,9 +43,15 @@ class MainFrame(wx.Frame):
 
         self.my_program = 'Vroid2Pmx' if self.is_vroid else 'PmxTailor'
 
+        frame_size = wx.Size(600, 650)
+        if logger.target_lang == "en_US":
+            frame_size = wx.Size(800, 650)
+        elif logger.target_lang == "zh_CN":
+            frame_size = wx.Size(700, 650)
+
         frame_title = logger.transtext(f'{self.my_program} ローカル版') + f' {self.version_name}'
         wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=frame_title, \
-                          pos=wx.DefaultPosition, size=wx.Size(600, 650), style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
+                          pos=wx.DefaultPosition, size=frame_size, style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
 
         # ファイル履歴読み込み
         self.file_hitories = MFileUtils.read_history(self.mydir_path)
@@ -81,20 +87,21 @@ class MainFrame(wx.Frame):
         self.file_panel_ctrl = FilePanel(self, self.note_ctrl, 0)
         self.note_ctrl.AddPage(self.file_panel_ctrl, logger.transtext("ファイル"), False)
 
-        # パラ調整タブ
-        self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
-        self.note_ctrl.AddPage(self.simple_param_panel_ctrl, logger.transtext("パラ調整"), False)
-        
-        # パラ調整(詳細)タブ
-        self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
-        self.note_ctrl.AddPage(self.advance_param_panel_ctrl, logger.transtext("パラ調整(詳細)"), False)
+        if not self.is_vroid:
+            # パラ調整タブ
+            self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
+            self.note_ctrl.AddPage(self.simple_param_panel_ctrl, logger.transtext("パラ調整"), False)
+            
+            # パラ調整(詳細)タブ
+            self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
+            self.note_ctrl.AddPage(self.advance_param_panel_ctrl, logger.transtext("パラ調整(詳細)"), False)
 
-        # パラ調整(ボーン)タブ
-        self.bone_param_panel_ctrl = ParamBonePanel(self, self.note_ctrl, 3)
-        self.note_ctrl.AddPage(self.bone_param_panel_ctrl, logger.transtext("パラ調整(ボーン)"), False)
+            # パラ調整(ボーン)タブ
+            self.bone_param_panel_ctrl = ParamBonePanel(self, self.note_ctrl, 3)
+            self.note_ctrl.AddPage(self.bone_param_panel_ctrl, logger.transtext("パラ調整(ボーン)"), False)
 
         # if self.is_vroid:
-        #     self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 4)
+        #     self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 1)
         #     self.note_ctrl.AddPage(self.vrm_panel_ctrl, "Vrm設定", False)
         
         # ---------------------------------------------
@@ -173,8 +180,10 @@ class MainFrame(wx.Frame):
     # タブ移動可
     def release_tab(self):
         self.file_panel_ctrl.release_tab()
-        self.simple_param_panel_ctrl.release_tab()
-        self.advance_param_panel_ctrl.release_tab()
+        if not self.is_vroid:
+            self.simple_param_panel_ctrl.release_tab()
+            self.advance_param_panel_ctrl.release_tab()
+            self.bone_param_panel_ctrl.release_tab()
 
     # フォーム入力可
     def enable(self):

@@ -26,7 +26,7 @@ def resource_path(relative):
 # ファイル履歴読み込み
 def read_history(mydir_path):
     # ファイル履歴
-    base_file_hitories = {"org_pmx": [], "org_vroid": [], "max": 50}
+    base_file_hitories = {"org_pmx": [], "org_vroid": [], "vertices_csv": [], "max": 50}
     file_hitories = cPickle.loads(cPickle.dumps(base_file_hitories, -1))
 
     # 履歴JSONファイルがあれば読み込み

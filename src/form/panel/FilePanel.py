@@ -23,12 +23,15 @@ class FilePanel(BasePanel):
 
         self.txt_exec = logger.transtext(f"{self.frame.my_program}実行")
         self.txt_stop = logger.transtext(f"{self.frame.my_program}停止")
-        self.model_type = "Vrm" if self.frame.is_vroid else "PMX"
 
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext(f"{self.model_type}モデルの指定された材質に物理を設定します。\n") \
-                                             + logger.transtext(f"{self.model_type}モデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。"), wx.DefaultPosition, wx.DefaultSize, 0)
+        if self.frame.is_vroid:
+            self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("VrmモデルをPmxモデルに変換します。\n") \
+                                                 + logger.transtext("物理を変えたい場合は、返還後のPmxデータをPmxTailorにかけてください。"), wx.DefaultPosition, wx.DefaultSize, 0)
+        else:
+            self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("PMXモデルの指定された材質に物理を設定します。\n") \
+                                                 + logger.transtext("PMXモデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.header_sizer.Add(self.description_txt, 0, wx.ALL, 5)
 
         self.static_line01 = wx.StaticLine(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
@@ -61,7 +64,10 @@ class FilePanel(BasePanel):
 
         # 変換変換実行ボタン
         self.export_btn_ctrl = wx.Button(self, wx.ID_ANY, self.txt_exec, wx.DefaultPosition, wx.Size(200, 50), 0)
-        self.export_btn_ctrl.SetToolTip(logger.transtext(f"{self.model_type}モデルに物理を設定します"))
+        if self.frame.is_vroid:
+            self.export_btn_ctrl.SetToolTip(logger.transtext("VrmモデルをPmxモデルに変換します"))
+        else:
+            self.export_btn_ctrl.SetToolTip(logger.transtext("Pmxモデルに物理を設定します"))
         self.export_btn_ctrl.Bind(wx.EVT_LEFT_DOWN, self.on_convert_export)
         self.export_btn_ctrl.Bind(wx.EVT_LEFT_DCLICK, self.on_doubleclick)
         btn_sizer.Add(self.export_btn_ctrl, 0, wx.ALL, 5)

@@ -47,7 +47,7 @@ class MLogger():
     # 翻訳モード
     mode = MODE_READONLY
     # 翻訳言語優先順位
-    langs = ["en_US", "ja_JP"]
+    langs = ["en_US", "ja_JP", "zh_CN"]
     # 出力対象言語
     target_lang = "ja_JP"
     
@@ -342,8 +342,8 @@ class MLogger():
             # cls.target_lang = "ja_JP"
             cls.target_lang = lang
 
-        # # 英語固定
-        # cls.target_lang = cls.langs[0]
+        # # 言語固定
+        # cls.target_lang = ["en_US", "ja_JP", "zh_CN"][0]
 
         # メッセージファイルパス
         try:

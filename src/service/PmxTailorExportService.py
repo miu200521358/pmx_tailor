@@ -8,7 +8,9 @@ import itertools
 import math
 import copy
 import bezier
+import csv
 
+from service.VroidExportService import BONE_PAIRS
 from module.MOptions import MExportOptions
 from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef, RigidBodyParam, IkLink, Ik, BoneMorphData # noqa
 from mmd.PmxWriter import PmxWriter
@@ -75,11 +77,23 @@ class PmxTailorExportService():
         model.comment += f"\r\n　　{logger.transtext('柔らかさ')}: {param_option['air_resistance']}"    # noqa
         model.comment += f"\r\n　　{logger.transtext('張り')}: {param_option['shape_maintenance']}"    # noqa
 
+        # 頂点CSVが指定されている場合、対象頂点リスト生成
+        if param_option['vertices_csv']:
+            target_vertices = []
+            with open(param_option['vertices_csv'], encoding='cp932', mode='r') as f:
+                reader = csv.reader(f)
+                next(reader)            # ヘッダーを読み飛ばす
+                for row in reader:
+                    if len(row) > 1 and int(row[1]) in model.material_vertices[param_option['material_name']]:
+                        target_vertices.append(int(row[1]))
+        else:
+            target_vertices = list(model.material_vertices[param_option['material_name']])
+
         if param_option['exist_physics_clear'] in [logger.transtext('上書き'), logger.transtext('再利用')]:
             # 既存材質削除フラグONの場合
             logger.info("【%s】既存材質削除", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
-            model = self.clear_exist_physics(model, param_option, param_option['material_name'])
+            model = self.clear_exist_physics(model, param_option, param_option['material_name'], param_option['edge_material_name'], param_option['back_material_name'], target_vertices)
 
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             logger.info("【%s】ボーンマップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
@@ -102,7 +116,7 @@ class PmxTailorExportService():
             logger.info("【%s】頂点マップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
             vertex_maps, vertex_connecteds, duplicate_vertices, registed_iidxs, duplicate_indices, index_combs_by_vpos \
-                = self.create_vertex_map(model, param_option, param_option['material_name'])
+                = self.create_vertex_map(model, param_option, param_option['material_name'], target_vertices)
             
             # 各頂点の有効INDEX数が最も多いものをベースとする
             map_cnt = []
@@ -120,24 +134,28 @@ class PmxTailorExportService():
             root_bone, tmp_all_bones, all_registed_bone_indexs, all_bone_horizonal_distances, all_bone_vertical_distances \
                 = self.create_bone(model, param_option, vertex_map_orders, vertex_maps, vertex_connecteds)
 
-            vertex_remaining_set = set(model.material_vertices[param_option['material_name']])
+            vertex_remaining_set = set(target_vertices)
 
             for base_map_idx in vertex_map_orders:
                 logger.info("【%s(No.%s)】ウェイト分布", param_option['material_name'], base_map_idx + 1, decoration=MLogger.DECORATION_LINE)
 
                 self.create_weight(model, param_option, vertex_maps[base_map_idx], vertex_connecteds[base_map_idx], duplicate_vertices, \
                                    all_registed_bone_indexs[base_map_idx], all_bone_horizonal_distances[base_map_idx], all_bone_vertical_distances[base_map_idx], \
-                                   vertex_remaining_set)
+                                   vertex_remaining_set, target_vertices)
 
             if len(list(vertex_remaining_set)) > 0:
                 logger.info("【%s】残ウェイト分布", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
                 
-                self.create_remaining_weight(model, param_option, vertex_maps, duplicate_vertices, all_registed_bone_indexs, all_bone_horizonal_distances, \
-                                             all_bone_vertical_distances, registed_iidxs, duplicate_indices, index_combs_by_vpos, vertex_remaining_set, vertex_map_orders, \
-                                             sorted(list(set(list(range(len(vertex_maps)))) - set(vertex_map_orders))))
+                self.create_remaining_weight(model, param_option, vertex_maps, vertex_remaining_set, vertex_map_orders, target_vertices)
     
+            if param_option['edge_material_name']:
+                logger.info("【%s】裾ウェイト分布", param_option['edge_material_name'], decoration=MLogger.DECORATION_LINE)
+
+                edge_vertices = set(model.material_vertices[param_option['edge_material_name']])
+                self.create_remaining_weight(model, param_option, vertex_maps, edge_vertices, vertex_map_orders, edge_vertices)
+        
             if param_option['back_material_name']:
-                logger.info("【%s】裏面ウェイト分布", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
+                logger.info("【%s】裏面ウェイト分布", param_option['back_material_name'], decoration=MLogger.DECORATION_LINE)
 
                 self.create_back_weight(model, param_option)
     
@@ -248,10 +266,11 @@ class PmxTailorExportService():
                             if key not in weighted_bone_pairs:
                                 # ウェイトが乗ってなかった場合、2つ前のボーンと結合させる
                                 nac = pac - 1
-                                next_above_bone_name = bone_grid[par][nac]
-                                if next_above_bone_name:
-                                    next_above_bone_position = model.bones[next_above_bone_name].position
-                                    next_above_bone_index = model.bones[next_above_bone_name].index
+                                if par in bone_grid and nac in bone_grid[par]:
+                                    next_above_bone_name = bone_grid[par][nac]
+                                    if next_above_bone_name:
+                                        next_above_bone_position = model.bones[next_above_bone_name].position
+                                        next_above_bone_index = model.bones[next_above_bone_name].index
 
                     next_below_bone_name = None
                     next_below_bone_position = None
@@ -1087,12 +1106,14 @@ class PmxTailorExportService():
 
                 prev_above_bone_name = tmp_all_bones[prev_below_bone_name]["parent"]
                 prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
-                prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
                 
-                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - registed_bone_indexs[below_v_yidx][next_below_v_xidx])
-                next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
-                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
+                next_above_bone_name = tmp_all_bones[next_below_bone_name]["parent"]
                 next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
+                
+                # next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - registed_bone_indexs[below_v_yidx][next_below_v_xidx])
+                # next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
+                # next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
+                # next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
 
                 if param_vertical_joint and prev_above_bone_name != prev_below_bone_name and prev_above_bone_name in model.rigidbodies and prev_below_bone_name in model.rigidbodies:
                     # 縦ジョイント
@@ -1299,10 +1320,18 @@ class PmxTailorExportService():
         rigidbody_limit_thicks = np.linspace(0.1, 0.3, bone_grid_rows)
 
         # 親ボーンに紐付く剛体がある場合、それを利用
+        parent_bone = model.bones[param_option['parent_bone_name']]
         root_rigidbody = None
         for rigidbody in model.rigidbodies.values():
-            if rigidbody.bone_index == model.bones[param_option['parent_bone_name']].index:
+            if rigidbody.bone_index == parent_bone.index:
                 root_rigidbody = rigidbody
+
+        if not root_rigidbody:
+            # 親ボーンに紐付く剛体がない場合、自前で作成
+            root_rigidbody = RigidBody(parent_bone.name, parent_bone.english_name, parent_bone.index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
+                                       0, MVector3D(1, 1, 1), parent_bone.position, MVector3D(), 1, 0.5, 0.5, 0, 0, 0)
+            root_rigidbody.index = len(model.rigidbodies)
+            model.rigidbodies[parent_bone.name] = root_rigidbody
         
         for bone_block in bone_blocks.values():
             prev_above_bone_name = bone_block['prev_above']
@@ -1446,7 +1475,7 @@ class PmxTailorExportService():
             root_rigidbody = RigidBody(root_bone.name, root_bone.english_name, root_bone.index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
                                        0, MVector3D(1, 1, 1), root_bone.position, MVector3D(), 1, 0.5, 0.5, 0, 0, 0)
             root_rigidbody.index = len(model.rigidbodies)
-            model.rigidbodies[root_rigidbody.name] = root_rigidbody
+            model.rigidbodies[root_bone.name] = root_rigidbody
 
         v_yidxs = list(reversed(list(registed_bone_indexs.keys())))
         rigidbody_limit_thicks = np.linspace(0.3, 0.1, len(v_yidxs))
@@ -1463,9 +1492,9 @@ class PmxTailorExportService():
                 below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[-2]]
             logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
 
-            for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
-                prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_v_xidx] + 1
-                next_below_v_xidx = registed_bone_indexs[below_v_yidx][next_below_v_xidx]
+            for xi, (prev_below_vxidx, next_below_vxidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
+                prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_vxidx] + 1
+                next_below_v_xidx = registed_bone_indexs[below_v_yidx][next_below_vxidx]
                 next_below_v_xno = next_below_v_xidx + 1
                 below_v_yno = below_v_yidx + 1
 
@@ -1474,21 +1503,31 @@ class PmxTailorExportService():
                 next_below_bone_name = self.get_bone_name(abb_name, below_v_yno, next_below_v_xno)
                 next_below_bone_position = tmp_all_bones[next_below_bone_name]["bone"].position
 
-                prev_above_bone_name = tmp_all_bones[prev_below_bone_name]["parent"]
+                prev_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[above_v_yidx].values())) - registed_bone_indexs[below_v_yidx][prev_below_vxidx])
+                prev_above_v_xidx = list(registed_bone_indexs[above_v_yidx].values())[(0 if prev_below_vxidx == 0 else np.argmin(prev_above_v_xidx_diff))]
+                prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_above_v_xidx + 1)
                 prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
-                prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
-    
-                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - next_below_v_xidx)
-                next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
-                next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
+                
+                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[above_v_yidx].values())) - registed_bone_indexs[below_v_yidx][next_below_vxidx])
+                next_above_v_xidx = list(registed_bone_indexs[above_v_yidx].values())[(0 if next_below_vxidx == 0 else np.argmin(next_above_v_xidx_diff))]
+                next_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, next_above_v_xidx + 1)
                 next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
+
+                # prev_above_bone_name = tmp_all_bones[prev_below_bone_name]["parent"]
+                # prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
+                # prev_above_v_yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+    
+                # next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - next_below_v_xidx)
+                # next_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if next_below_v_xidx == 0 else np.argmin(next_above_v_xidx_diff))]
+                # next_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, next_above_v_xidx + 1)
+                # next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
 
                 prev_prev_above_bone_position = None
                 if xi > 0:
                     prev_prev_below_v_xidx = registed_bone_indexs[below_v_yidx][below_v_xidxs[xi - 1]]
                     prev_prev_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - prev_prev_below_v_xidx)
                     prev_prev_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if prev_prev_below_v_xidx == 0 else np.argmin(prev_prev_above_v_xidx_diff))]
-                    prev_prev_above_bone_name = self.get_bone_name(abb_name, prev_above_v_yidx + 1, prev_prev_above_v_xidx + 1)
+                    prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
                     prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
 
                 if prev_above_bone_name in created_rigidbodies:
@@ -1588,7 +1627,7 @@ class PmxTailorExportService():
         return root_rigidbody
 
     def create_weight(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray, vertex_connected: dict, duplicate_vertices: dict, \
-                      registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict, vertex_remaining_set: set):
+                      registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict, vertex_remaining_set: set, target_vertices: list):
         # ウェイト分布
         prev_weight_cnt = 0
         weight_cnt = 0
@@ -1632,7 +1671,7 @@ class PmxTailorExportService():
                 
                 for vi, v_vertices in enumerate(v_map):
                     for vhi, vertex_idx in enumerate(v_vertices):
-                        if vertex_idx < 0:
+                        if vertex_idx < 0 or vertex_idx not in target_vertices:
                             continue
 
                         horizonal_distance = np.sum(b_h_distances[vi, :])
@@ -1685,31 +1724,32 @@ class PmxTailorExportService():
         
         return vertex_remaining_set
 
-    def create_remaining_weight(self, model: PmxModel, param_option: dict, vertex_maps: dict, duplicate_vertices: dict, all_registed_bone_indexs: dict, \
-                                all_bone_horizonal_distances: dict, all_bone_vertical_distances: dict, registed_iidxs: list, duplicate_indices: dict, \
-                                index_combs_by_vpos: dict, vertex_remaining_set: set, boned_base_map_idxs: list, base_map_idxs: list):
+    def create_remaining_weight(self, model: PmxModel, param_option: dict, vertex_maps: dict, \
+                                vertex_remaining_set: set, boned_base_map_idxs: list, target_vertices: list):
         # ウェイト分布
         prev_weight_cnt = 0
         weight_cnt = 0
 
+        vertex_distances = {}
+        for boned_map_idx in boned_base_map_idxs:
+            # 登録済み頂点との距離を測る（一番近いのと似たウェイト構成になるはず）
+            boned_vertex_map = vertex_maps[boned_map_idx]
+            for yi in range(boned_vertex_map.shape[0] - 1):
+                for xi in range(boned_vertex_map.shape[1] - 1):
+                    if boned_vertex_map[yi, xi] >= 0:
+                        vi = boned_vertex_map[yi, xi]
+                        vertex_distances[vi] = model.vertex_dict[vi].position.data()
+
         # 基準頂点マップ以外の頂点が残っていたら、それも割り当てる
         for vertex_idx in list(vertex_remaining_set):
             v = model.vertex_dict[vertex_idx]
-            if vertex_idx < 0:
+            if vertex_idx < 0 or vertex_idx not in target_vertices:
                 continue
             
-            vertex_distances = {}
-            for boned_map_idx in boned_base_map_idxs:
-                # 登録済み頂点との距離を測る（一番近いのと似たウェイト構成になるはず）
-                boned_vertex_map = vertex_maps[boned_map_idx]
+            # 各頂点の位置との差分から距離を測る
+            rv_distances = np.linalg.norm((np.array(list(vertex_distances.values())) - v.position.data()), ord=2, axis=1)
 
-                for yi in range(boned_vertex_map.shape[0] - 1):
-                    for xi in range(boned_vertex_map.shape[1] - 1):
-                        if boned_vertex_map[yi, xi] >= 0:
-                            vi = boned_vertex_map[yi, xi]
-                            vertex_distances[vi] = v.position.distanceToPoint(model.vertex_dict[vi].position)
-
-            nearest_vi = list(vertex_distances.keys())[np.argmin(list(vertex_distances.values()))]
+            nearest_vi = list(vertex_distances.keys())[np.argmin(rv_distances)]
             nearest_v = model.vertex_dict[nearest_vi]
             nearest_deform = nearest_v.deform
 
@@ -1726,21 +1766,16 @@ class PmxTailorExportService():
                 total_weights = np.array([bone1_distance / (bone1_distance + bone2_distance), bone2_distance / (bone1_distance + bone2_distance)])
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
+                
+                if np.count_nonzero(weights) == 1:
+                    v.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                elif np.count_nonzero(weights) == 2:
+                    v.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
+                else:
+                    v.deform = Bdef4(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, \
+                                     model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
+                                     weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
 
-                for vvidx in duplicate_vertices[v.position.to_log()]:
-                    vv = model.vertex_dict[vvidx]
-                    vv.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
-
-                    if vv.deform.index0 == model.bones[param_option['parent_bone_name']].index:
-                        # 重複頂点にも同じウェイトを割り当てる
-                        if np.count_nonzero(weights) == 1:
-                            vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
-                        elif np.count_nonzero(weights) == 2:
-                            vv.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
-                        else:
-                            vv.deform = Bdef4(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, \
-                                              model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
-                                              weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
             elif type(nearest_deform) is Bdef4:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -1758,20 +1793,14 @@ class PmxTailorExportService():
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
 
-                for vvidx in duplicate_vertices[v.position.to_log()]:
-                    vv = model.vertex_dict[vvidx]
-                    vv.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
-
-                    if vv.deform.index0 == model.bones[param_option['parent_bone_name']].index:
-                        # 重複頂点にも同じウェイトを割り当てる
-                        if np.count_nonzero(weights) == 1:
-                            vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
-                        elif np.count_nonzero(weights) == 2:
-                            vv.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
-                        else:
-                            vv.deform = Bdef4(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, \
-                                              model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
-                                              weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
+                if np.count_nonzero(weights) == 1:
+                    v.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                elif np.count_nonzero(weights) == 2:
+                    v.deform = Bdef2(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, weights[weight_idxs[-1]])
+                else:
+                    v.deform = Bdef4(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, \
+                                     model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
+                                     weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
 
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 100 > prev_weight_cnt:
@@ -1853,7 +1882,7 @@ class PmxTailorExportService():
                         prev_v_vec = now_v_vec if v_yidx == 0 else model.vertex_dict[vertex_map[v_yidx - 1, v_xidx]].position
                         bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
                 if vertex_map[v_yidx, v_xidx] >= 0 and vertex_map[v_yidx, 0] >= 0:
-                    # 輪を描いたのも入れとく(ウェイト対象取得の時に計算入るからここでは強制)
+                    # 輪を描いたのも入れとく(ウェイト対象取得の時に範囲指定入るからここでは強制)
                     now_v_vec = model.vertex_dict[vertex_map[v_yidx, v_xidx]].position
                     prev_v_vec = model.vertex_dict[vertex_map[v_yidx, 0]].position
                     bone_horizonal_distances[v_yidx, v_xidx + 1] = now_v_vec.distanceToPoint(prev_v_vec)
@@ -1873,7 +1902,7 @@ class PmxTailorExportService():
             prev_yi = 0
             v_yidxs = []
             for yi, bh in enumerate(bone_vertical_distances[:, median_x]):
-                if yi == 0 or np.sum(bone_vertical_distances[prev_yi:(yi + 1), median_x]) >= median_y_distance * param_option["vertical_bone_density"] * 0.9:
+                if yi == 0 or np.sum(bone_vertical_distances[prev_yi:(yi + 1), median_x]) >= median_y_distance * param_option["vertical_bone_density"] * 0.8:
                     v_yidxs.append(yi)
                     prev_yi = yi + 1
             if v_yidxs[-1] < vertex_map.shape[0] - 1:
@@ -1885,17 +1914,17 @@ class PmxTailorExportService():
             bone_horizonal_distances = all_bone_horizonal_distances[base_map_idx]
             full_ys = [y for i, y in enumerate(v_yidxs) if np.count_nonzero(bone_horizonal_distances[i, :]) == max(np.count_nonzero(bone_horizonal_distances, axis=1))]
             median_y = int(np.median(full_ys))
-            median_x_distance = np.mean(bone_horizonal_distances[median_y, :][np.nonzero(bone_horizonal_distances[median_y, :])])
+            median_x_distance = np.median(bone_horizonal_distances[median_y, :][np.nonzero(bone_horizonal_distances[median_y, :])])
 
             prev_xi = 0
             base_v_xidxs = []
             for xi, bh in enumerate(bone_horizonal_distances[median_y, :]):
-                if xi == 0 or np.sum(bone_horizonal_distances[median_y, prev_xi:(xi + 1)]) >= median_x_distance * param_option["horizonal_bone_density"] * 0.9:
+                if xi == 0 or np.sum(bone_horizonal_distances[median_y, prev_xi:(xi + 1)]) >= median_x_distance * param_option["horizonal_bone_density"] * 0.8:
                     base_v_xidxs.append(xi)
                     prev_xi = xi + 1
-            # if base_v_xidxs[-1] < vertex_map.shape[1] - 1:
-            #     # 右端は必ず登録
-            #     base_v_xidxs = base_v_xidxs + [vertex_map.shape[1] - 1]
+            if base_v_xidxs[-1] < vertex_map.shape[1] - 1:
+                # 右端は必ず登録
+                base_v_xidxs = base_v_xidxs + [vertex_map.shape[1] - 1]
             
             all_bone_indexes[base_map_idx] = {}
             for yi in range(vertex_map.shape[0]):
@@ -2008,8 +2037,12 @@ class PmxTailorExportService():
 
         return v_yidx, v_xidx
 
-    def clear_exist_physics(self, model: PmxModel, param_option: dict, material_name: str):
+    def clear_exist_physics(self, model: PmxModel, param_option: dict, material_name: str, edge_material_name: str, back_material_name: str, target_vertices: list):
         logger.info("%s: 削除対象抽出", material_name)
+
+        semi_standard_bone_names = []
+        for bpair in BONE_PAIRS.values():
+            semi_standard_bone_names.append(bpair['name'])
 
         weighted_bone_indexes = {}
 
@@ -2024,7 +2057,7 @@ class PmxTailorExportService():
                     if bone_grid[r][c]:
                         weighted_bone_indexes[bone_grid[r][c]] = model.bones[bone_grid[r][c]].index
         else:
-            for vertex_idx in model.material_vertices[material_name]:
+            for vertex_idx in target_vertices:
                 vertex = model.vertex_dict[vertex_idx]
                 if type(vertex.deform) is Bdef1:
                     if vertex.deform.index0 not in list(weighted_bone_indexes.values()):
@@ -2049,19 +2082,30 @@ class PmxTailorExportService():
                     if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
                         weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
         
+        # 非表示子ボーンも削除する
+        for bone in model.bones.values():
+            if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
+                    and model.bone_indexes[bone.parent_index] not in semi_standard_bone_names:
+                weighted_bone_indexes[bone.name] = bone.index
+
         not_delete_bone_names = []
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             # 再利用する場合、ボーンは全部残す
             not_delete_bone_names = list(model.bones.keys())
         else:
+            # 準標準ボーンまでは削除対象外
+            not_delete_bone_names.extend(semi_standard_bone_names)
             # 他の材質で該当ボーンにウェイト割り当てられている場合、ボーンの削除だけは避ける
             for bone_idx, vertices in model.vertices.items():
                 is_not_delete = False
                 if bone_idx in list(weighted_bone_indexes.values()) and len(vertices) > 0:
                     is_not_delete = False
                     for vertex in vertices:
-                        if vertex.index not in model.material_vertices[material_name]:
-                            is_not_delete = is_not_delete or True
+                        if vertex.index not in target_vertices \
+                                and (not edge_material_name or (edge_material_name and vertex.index not in model.material_vertices[edge_material_name])) \
+                                and (not back_material_name or (back_material_name and vertex.index not in model.material_vertices[back_material_name])):
+                            is_not_delete = True
+                            break
                 if is_not_delete:
                     not_delete_bone_names.append(model.bone_indexes[bone_idx])
         
@@ -2070,7 +2114,8 @@ class PmxTailorExportService():
 
         weighted_rigidbody_indexes = {}
         for rigidbody in model.rigidbodies.values():
-            if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()):
+            if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()) \
+                    and model.bone_indexes[rigidbody.bone_index] not in not_delete_bone_names:
                 weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
 
         logger.debug('weighted_rigidbody_indexes: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
@@ -2121,6 +2166,8 @@ class PmxTailorExportService():
         for rigidbody in model.rigidbodies.values():
             if rigidbody.bone_index in reset_bones:
                 rigidbody.bone_index = reset_bones[rigidbody.bone_index]['index']
+            else:
+                rigidbody.bone_index = -1
 
         for display_slot in model.display_slots.values():
             new_references = []
@@ -2140,6 +2187,9 @@ class PmxTailorExportService():
                         if offset.bone_index in reset_bones:
                             offset.bone_index = reset_bones[offset.bone_index]['index']
                             new_offsets.append(offset)
+                        else:
+                            offset.bone_index = -1
+                            new_offsets.append(offset)
                     else:
                         new_offsets.append(offset)
                 morph.offsets = new_offsets
@@ -2147,46 +2197,50 @@ class PmxTailorExportService():
         for bidx, bone in enumerate(model.bones.values()):
             if bone.parent_index in reset_bones:
                 bone.parent_index = reset_bones[bone.parent_index]['index']
+            else:
+                bone.parent_index = -1
 
-            if bone.getConnectionFlag() and bone.tail_index in reset_bones:
-                bone.tail_index = reset_bones[bone.tail_index]['index']
+            if bone.getConnectionFlag():
+                if bone.tail_index in reset_bones:
+                    bone.tail_index = reset_bones[bone.tail_index]['index']
+                else:
+                    bone.tail_index = -1
 
-            if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag() and bone.effect_index in reset_bones:
-                bone.effect_index = reset_bones[bone.effect_index]['index']
+            if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag():
+                if bone.effect_index in reset_bones:
+                    bone.effect_index = reset_bones[bone.effect_index]['index']
+                else:
+                    bone.effect_index = -1
 
-            if bone.getIkFlag() and bone.ik.target_index in reset_bones:
-                bone.ik.target_index = reset_bones[bone.ik.target_index]['index']
-                for link in bone.ik.link:
-                    link.bone_index = reset_bones[link.bone_index]['index']
+            if bone.getIkFlag():
+                if bone.ik.target_index in reset_bones:
+                    bone.ik.target_index = reset_bones[bone.ik.target_index]['index']
+                    for link in bone.ik.link:
+                        link.bone_index = reset_bones[link.bone_index]['index']
+                else:
+                    bone.ik.target_index = -1
+                    for link in bone.ik.link:
+                        link.bone_index = -1
 
         for vidx, vertex in enumerate(model.vertex_dict.values()):
             if type(vertex.deform) is Bdef1:
-                if vertex.deform.index0 in reset_bones:
-                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
             elif type(vertex.deform) is Bdef2:
-                if vertex.deform.index0 in reset_bones:
-                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
-                if vertex.deform.index1 in reset_bones:
-                    vertex.deform.index1 = reset_bones[vertex.deform.index1]['index']
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+                vertex.deform.index1 = reset_bones[vertex.deform.index1]['index'] if vertex.deform.index1 in reset_bones else -1
             elif type(vertex.deform) is Bdef4:
-                if vertex.deform.index0 in reset_bones:
-                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
-                if vertex.deform.index1 in reset_bones:
-                    vertex.deform.index1 = reset_bones[vertex.deform.index1]['index']
-                if vertex.deform.index2 in reset_bones:
-                    vertex.deform.index2 = reset_bones[vertex.deform.index2]['index']
-                if vertex.deform.index3 in reset_bones:
-                    vertex.deform.index3 = reset_bones[vertex.deform.index3]['index']
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+                vertex.deform.index1 = reset_bones[vertex.deform.index1]['index'] if vertex.deform.index1 in reset_bones else -1
+                vertex.deform.index2 = reset_bones[vertex.deform.index2]['index'] if vertex.deform.index2 in reset_bones else -1
+                vertex.deform.index3 = reset_bones[vertex.deform.index3]['index'] if vertex.deform.index3 in reset_bones else -1
             elif type(vertex.deform) is Sdef:
-                if vertex.deform.index0 in reset_bones:
-                    vertex.deform.index0 = reset_bones[vertex.deform.index0]['index']
-                if vertex.deform.index1 in reset_bones:
-                    vertex.deform.index1 = reset_bones[vertex.deform.index1]['index']
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+                vertex.deform.index1 = reset_bones[vertex.deform.index1]['index'] if vertex.deform.index1 in reset_bones else -1
 
         return model
 
     # 頂点を展開した図を作成
-    def create_vertex_map(self, model: PmxModel, param_option: dict, material_name: str):
+    def create_vertex_map(self, model: PmxModel, param_option: dict, material_name: str, target_vertices: list):
         logger.info("%s: 面の抽出", material_name)
 
         logger.info("%s: 面の抽出準備①", material_name)
@@ -2194,6 +2248,8 @@ class PmxTailorExportService():
         # 位置ベースで重複頂点の抽出
         duplicate_vertices = {}
         for vertex_idx in model.material_vertices[material_name]:
+            if vertex_idx not in target_vertices:
+                continue
             # 重複頂点の抽出
             vertex = model.vertex_dict[vertex_idx]
             key = vertex.position.to_log()
@@ -2207,6 +2263,7 @@ class PmxTailorExportService():
         
         logger.info("%s: 面の抽出準備②", material_name)
 
+        non_target_iidxs = []
         # 面組み合わせの生成
         indices_by_vidx = {}
         indices_by_vpos = {}
@@ -2221,6 +2278,11 @@ class PmxTailorExportService():
             v0 = model.vertex_dict[model.indices[index_idx][0]]
             v1 = model.vertex_dict[model.indices[index_idx][1]]
             v2 = model.vertex_dict[model.indices[index_idx][2]]
+            if v0.index not in target_vertices or v1.index not in target_vertices or v2.index not in target_vertices:
+                # 3つ揃ってない場合、スルー
+                non_target_iidxs.append(index_idx)
+                continue
+
             below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
             below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
             if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
@@ -2258,7 +2320,7 @@ class PmxTailorExportService():
         # 頂点マップ生成(最初の頂点が(0, 0))
         vertex_axis_maps = []
         vertex_coordinate_maps = []
-        registed_iidxs = []
+        registed_iidxs = copy.deepcopy(non_target_iidxs)
         vertical_iidxs = []
         prev_index_cnt = 0
 
@@ -2275,12 +2337,18 @@ class PmxTailorExportService():
                         v0 = model.vertex_dict[model.indices[index_idx][0]]
                         v1 = model.vertex_dict[model.indices[index_idx][1]]
                         v2 = model.vertex_dict[model.indices[index_idx][2]]
+                        if v0.index not in target_vertices or v1.index not in target_vertices or v2.index not in target_vertices:
+                            # 3つ揃ってない場合、スルー
+                            continue
+
                         below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
                         below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
                         if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
                             below_iidx = index_idx
                             max_below_x = below_x
                             max_below_size = below_size
+                if not below_iidx:
+                    break
                 logger.debug(f'below_iidx: {below_iidx}')
                 first_vertex_axis_map, first_vertex_coordinate_map = \
                     self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, {}, {}, below_iidx)
