@@ -240,10 +240,10 @@ class VroidExportService():
         return model
     
     def calc_normal(self, bone_mat: MMatrix4x4, normal: MVector3D):
-        # ボーン行列の3x3逆行列
+        # ボーン行列の3x3行列
         bone_invert_mat = bone_mat.data()[:3, :3]
 
-        return MVector3D(np.sum(normal.data() * bone_invert_mat, axis=1))
+        return MVector3D(np.sum(normal.data() * bone_invert_mat, axis=1)).normalized()
     
     def reconvert_bone(self, model: PmxModel):
         # 指先端の位置を計算して配置
@@ -421,27 +421,25 @@ class VroidExportService():
                         # 取れない場合はとりあえず空
                         skin_joints = []
                         
-                    # if "extras" not in primitive or "targetNames" not in primitive["extras"] or "targets" not in primitive:
-                    #     continue
+                    if "extras" in primitive and "targetNames" in primitive["extras"] and "targets" in primitive:
+                        for eidx, (extra, target) in enumerate(zip(primitive["extras"]["targetNames"], primitive["targets"])):
+                            # 位置データ
+                            extra_positions = self.read_from_accessor(model, target["POSITION"])
 
-                    # for eidx, (extra, target) in enumerate(zip(primitive["extras"]["targetNames"], primitive["targets"])):
-                    #     # 位置データ
-                    #     extra_positions = self.read_from_accessor(model, target["POSITION"])
+                            # 法線データ
+                            extra_normals = self.read_from_accessor(model, target["NORMAL"])
 
-                    #     # 法線データ
-                    #     extra_normals = self.read_from_accessor(model, target["NORMAL"])
+                            morph = Morph(extra, extra, 1, 1)
+                            morph.index = eidx
 
-                    #     morph = Morph(extra, extra, 1, 1)
-                    #     morph.index = eidx
+                            morph_vertex_idx = vertex_idx
+                            for vidx, (eposition, enormal) in enumerate(zip(extra_positions, extra_normals)):
+                                model_eposition = eposition * MIKU_METER * MVector3D(-1, 1, 1)
 
-                    #     morph_vertex_idx = vertex_idx
-                    #     for vidx, (eposition, enormal) in enumerate(zip(extra_positions, extra_normals)):
-                    #         model_eposition = eposition * MIKU_METER * MVector3D(-1, 1, 1)
+                                morph.offsets.append(VertexMorphOffset(morph_vertex_idx, model_eposition))
+                                morph_vertex_idx += 1
 
-                    #         morph.offsets.append(VertexMorphOffset(morph_vertex_idx, model_eposition))
-                    #         morph_vertex_idx += 1
-
-                    #     model.morphs[extra] = morph
+                            model.morphs[extra] = morph
 
                     for position, normal, uv, joint, weight in zip(positions, normals, uvs, joints, weights):
                         model_position = position * MIKU_METER * MVector3D(-1, 1, 1)
@@ -463,7 +461,7 @@ class VroidExportService():
                             # とりあえず除外
                             deform = Bdef1(0)
 
-                        vertex = Vertex(vertex_idx, model_position, normal * MVector3D(-1, 1, 1), uv, None, deform, 1)
+                        vertex = Vertex(vertex_idx, model_position, (normal * MVector3D(-1, 1, 1)).normalized(), uv, None, deform, 1)
 
                         model.vertex_dict[vertex_idx] = vertex
                         vertex_blocks[vertex_key]['vertices'].append(vertex_idx)

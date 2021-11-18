@@ -47,7 +47,7 @@ class PmxWriter:
             bone_idx_size, bone_idx_type = self.define_index_size(len(pmx.bones))
             fout.write(struct.pack(TYPE_BYTE, bone_idx_size))
             # モーフIndexサイズ | 1,2,4 のいずれか
-            morph_idx_size, morph_idx_type = self.define_index_size(len(pmx.org_morphs))
+            morph_idx_size, morph_idx_type = self.define_index_size(len(pmx.morphs))
             fout.write(struct.pack(TYPE_BYTE, morph_idx_size))
             # 剛体Indexサイズ | 1,2,4 のいずれか
             rigidbody_idx_size, rigidbody_idx_type = self.define_index_size(len(pmx.rigidbodies))
@@ -279,9 +279,9 @@ class PmxWriter:
             logger.info("-- ボーンデータ出力終了(%s)", len(list(pmx.bones.values())))
 
             # モーフの数
-            self.write_number(fout, TYPE_INT, len(list(pmx.org_morphs.values())))
+            self.write_number(fout, TYPE_INT, len(list(pmx.morphs.values())))
 
-            for midx, morph in enumerate(pmx.org_morphs.values()):
+            for midx, morph in enumerate(pmx.morphs.values()):
                 # モーフ名
                 self.write_text(fout, morph.name, f"Morph {midx}")
                 self.write_text(fout, morph.english_name, f"Morph {midx}")
