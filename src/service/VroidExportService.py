@@ -11,10 +11,9 @@ import shutil
 import numpy as np
 import re
 import math
-import urllib.parse
 
 from module.MOptions import MExportOptions
-from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, RigidBodyParam, IkLink, Ik # noqa
+from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef, RigidBodyParam, IkLink, Ik, BoneMorphData # noqa
 from mmd.PmxData import Bdef1, Bdef2, Bdef4, VertexMorphOffset, GroupMorphData # noqa
 from mmd.PmxWriter import PmxWriter
 from module.MMath import MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
@@ -90,14 +89,18 @@ class VroidExportService():
             if not model:
                 return False
 
-            model, bone_name_dict, node_name_dict = self.convert_bone(model)
+            model, bone_name_dict = self.convert_bone(model)
             if not model:
                 return False
 
-            model = self.convert_mesh(model, bone_name_dict, node_name_dict, tex_dir_path)
+            model = self.convert_mesh(model, bone_name_dict, tex_dir_path)
             if not model:
                 return False
-          
+            
+            model = self.reconvert_bone(model)
+            if not model:
+                return False
+            
             return model
         except MKilledException as ke:
             # 終了命令
@@ -109,8 +112,133 @@ class VroidExportService():
             import traceback
             logger.critical("Vroid2Pmx処理が意図せぬエラーで終了しました。\n\n%s", traceback.format_exc(), decoration=MLogger.DECORATION_BOX)
             raise e
+    
+    def reconvert_bone(self, model: PmxModel):
+        # 指先端の位置を計算して配置
+        finger_dict = {'左親指２': {'vertices': [], 'direction': -1, 'edge_name': '左親指先'}, '左人指３': {'vertices': [], 'direction': -1, 'edge_name': '左人指先'}, \
+                       '左中指３': {'vertices': [], 'direction': -1, 'edge_name': '左中指先'}, '左薬指３': {'vertices': [], 'direction': -1, 'edge_name': '左薬指先'}, \
+                       '左小指３': {'vertices': [], 'direction': -1, 'edge_name': '左小指先'}, '右親指２': {'vertices': [], 'direction': 1, 'edge_name': '右親指先'}, \
+                       '右人指３': {'vertices': [], 'direction': 1, 'edge_name': '右人指先'}, '右中指３': {'vertices': [], 'direction': 1, 'edge_name': '右中指先'}, \
+                       '右薬指３': {'vertices': [], 'direction': 1, 'edge_name': '右薬指先'}, '右小指３': {'vertices': [], 'direction': 1, 'edge_name': '右小指先'}}
+        # つま先の位置を計算して配置
+        toe_dict = {'左足先EX': {'vertices': [], 'edge_name': '左つま先', 'ik_name': '左つま先ＩＫ'}, '右足先EX': {'vertices': [], 'edge_name': '右つま先', 'ik_name': '右つま先ＩＫ'}}
+        
+        for vertex_idx, vertex in model.vertex_dict.items():
+            if type(vertex.deform) is Bdef1:
+                # 指先に相当する頂点位置をリスト化
+                for finger_name in finger_dict.keys():
+                    if model.bones[finger_name].index == vertex.deform.index0:
+                        finger_dict[finger_name]['vertices'].append(vertex.position)
+                # つま先に相当する頂点位置をリスト化
+                for toe_name in toe_dict.keys():
+                    if model.bones[toe_name].index == vertex.deform.index0:
+                        toe_dict[toe_name]['vertices'].append(vertex.position)
+        
+        for finger_name, finger_param in finger_dict.items():
+            if len(finger_param['vertices']) > 0:
+                # 末端頂点の位置を指先ボーンの位置として割り当て
+                finger_vertices = sorted(finger_param['vertices'], key=lambda v: v.x() * finger_param['direction'])
+                edge_vertex_pos = finger_vertices[0]
+                model.bones[finger_param['edge_name']].position = edge_vertex_pos
 
-    def convert_mesh(self, model: PmxModel, bone_name_dict: dict, node_name_dict: dict, tex_dir_path: str):
+        for toe_name, toe_param in toe_dict.items():
+            if len(toe_param['vertices']) > 0:
+                # 末端頂点の位置をつま先ボーンの位置として割り当て
+                toe_vertices = sorted(toe_param['vertices'], key=lambda v: v.z())
+                edge_vertex_pos = toe_vertices[0]
+                model.bones[toe_param['edge_name']].position = edge_vertex_pos
+                model.bones[toe_param['ik_name']].position = edge_vertex_pos
+
+        # 不要ボーンを削除
+        for bone_name in DELETE_BONES:
+            if bone_name in model.bones:
+                del model.bones[bone_name]
+        
+        reset_bones = {}
+        for bidx, (bone_name, bone) in enumerate(model.bones.items()):
+            reset_bones[bone.index] = {'name': bone_name, 'index': bidx}
+            model.bones[bone_name].index = bidx
+            model.bone_indexes[bidx] = bone_name
+
+        for rigidbody in model.rigidbodies.values():
+            if rigidbody.bone_index in reset_bones:
+                rigidbody.bone_index = reset_bones[rigidbody.bone_index]['index']
+            else:
+                rigidbody.bone_index = -1
+
+        for display_slot in model.display_slots.values():
+            new_references = []
+            for display_type, bone_idx in display_slot.references:
+                if display_type == 0:
+                    if bone_idx in reset_bones:
+                        new_references.append((display_type, reset_bones[bone_idx]['index']))
+                else:
+                    new_references.append((display_type, bone_idx))
+            display_slot.references = new_references
+
+        for morph in model.morphs.values():
+            if morph.morph_type == 2:
+                new_offsets = []
+                for offset in morph.offsets:
+                    if type(offset) is BoneMorphData:
+                        if offset.bone_index in reset_bones:
+                            offset.bone_index = reset_bones[offset.bone_index]['index']
+                            new_offsets.append(offset)
+                        else:
+                            offset.bone_index = -1
+                            new_offsets.append(offset)
+                    else:
+                        new_offsets.append(offset)
+                morph.offsets = new_offsets
+
+        for bidx, bone in enumerate(model.bones.values()):
+            if bone.parent_index in reset_bones:
+                bone.parent_index = reset_bones[bone.parent_index]['index']
+            else:
+                bone.parent_index = -1
+
+            if bone.getConnectionFlag():
+                if bone.tail_index in reset_bones:
+                    bone.tail_index = reset_bones[bone.tail_index]['index']
+                else:
+                    bone.tail_index = -1
+
+            if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag():
+                if bone.effect_index in reset_bones:
+                    bone.effect_index = reset_bones[bone.effect_index]['index']
+                else:
+                    bone.effect_index = -1
+
+            if bone.getIkFlag():
+                if bone.ik.target_index in reset_bones:
+                    bone.ik.target_index = reset_bones[bone.ik.target_index]['index']
+                    for link in bone.ik.link:
+                        link.bone_index = reset_bones[link.bone_index]['index']
+                else:
+                    bone.ik.target_index = -1
+                    for link in bone.ik.link:
+                        link.bone_index = -1
+
+        for vidx, vertex in enumerate(model.vertex_dict.values()):
+            if type(vertex.deform) is Bdef1:
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+            elif type(vertex.deform) is Bdef2:
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+                vertex.deform.index1 = reset_bones[vertex.deform.index1]['index'] if vertex.deform.index1 in reset_bones else -1
+            elif type(vertex.deform) is Bdef4:
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+                vertex.deform.index1 = reset_bones[vertex.deform.index1]['index'] if vertex.deform.index1 in reset_bones else -1
+                vertex.deform.index2 = reset_bones[vertex.deform.index2]['index'] if vertex.deform.index2 in reset_bones else -1
+                vertex.deform.index3 = reset_bones[vertex.deform.index3]['index'] if vertex.deform.index3 in reset_bones else -1
+            elif type(vertex.deform) is Sdef:
+                vertex.deform.index0 = reset_bones[vertex.deform.index0]['index'] if vertex.deform.index0 in reset_bones else -1
+                vertex.deform.index1 = reset_bones[vertex.deform.index1]['index'] if vertex.deform.index1 in reset_bones else -1
+
+        logger.info("-- ボーンデータ調整終了")
+
+        return model
+
+    def convert_mesh(self, model: PmxModel, bone_name_dict: dict, tex_dir_path: str):
         if 'meshes' not in model.json_data:
             logger.error("変換可能なメッシュ情報がないため、処理を中断します。", decoration=MLogger.DECORATION_BOX)
             return None
@@ -186,23 +314,22 @@ class VroidExportService():
                     for position, normal, uv, joint, weight in zip(positions, normals, uvs, joints, weights):
                         model_position = position * MIKU_METER * MVector3D(-1, 1, 1)
 
-                    #     # 有効なINDEX番号と実際のボーンINDEXを取得
-                    #     joint_idxs, weight_values = self.get_deform_index(vertex_idx, model, pmx_position, joint, skin_joints, node_pairs, weight)
-                    #     if len(joint_idxs) > 1:
-                    #         if len(joint_idxs) == 2:
-                    #             # ウェイトが2つの場合、Bdef2
-                    #             deform = Bdef2(joint_idxs[0], joint_idxs[1], weight_values[0])
-                    #         else:
-                    #             # それ以上の場合、Bdef4
-                    #             deform = Bdef4(joint_idxs[0], joint_idxs[1], joint_idxs[2], joint_idxs[3], \
-                    #                            weight_values[0], weight_values[1], weight_values[2], weight_values[3])
-                    #     elif len(joint_idxs) == 1:
-                    #         # ウェイトが1つのみの場合、Bdef1
-                    #         deform = Bdef1(joint_idxs[0])
-                    #     else:
-                    #         # とりあえず除外
-                    #         deform = Bdef1(0)
-                        deform = Bdef1(0)
+                        # 有効なINDEX番号と実際のボーンINDEXを取得
+                        joint_idxs, weight_values = self.get_deform_index(vertex_idx, model, model_position, joint, skin_joints, weight, bone_name_dict)
+                        if len(joint_idxs) > 1:
+                            if len(joint_idxs) == 2:
+                                # ウェイトが2つの場合、Bdef2
+                                deform = Bdef2(joint_idxs[0], joint_idxs[1], weight_values[0])
+                            else:
+                                # それ以上の場合、Bdef4
+                                deform = Bdef4(joint_idxs[0], joint_idxs[1], joint_idxs[2], joint_idxs[3], \
+                                               weight_values[0], weight_values[1], weight_values[2], weight_values[3])
+                        elif len(joint_idxs) == 1:
+                            # ウェイトが1つのみの場合、Bdef1
+                            deform = Bdef1(joint_idxs[0])
+                        else:
+                            # とりあえず除外
+                            deform = Bdef1(0)
 
                         vertex = Vertex(vertex_idx, model_position, normal * MVector3D(-1, 1, 1), uv, None, deform, 1)
 
@@ -382,13 +509,159 @@ class VroidExportService():
                             model.indices[index_idx] = [v2_idx, v1_idx, v0_idx]
                             index_idx += 1
 
+        logger.info("-- 頂点・面・材質データ解析終了")
+
         return model
+    
+    def get_deform_index(self, vertex_idx: int, model: PmxModel, vertex_pos: MVector3D, joint: MVector4D, skin_joints: list, node_weight: list, bone_name_dict: dict):
+        # まずは0じゃないデータ（何かしら有効なボーンINDEXがあるリスト）
+        valiable_joints = np.where(joint.data() > 0)[0].tolist()
+        # ウェイト
+        org_weights = node_weight.data()[np.where(joint.data() > 0)]
+        # ジョイント添え字からジョイントINDEXを取得(floatになってるのでint)
+        org_joint_idxs = joint.data()[valiable_joints].astype(np.int)
+        # 現行ボーンINDEXに置き換えたINDEX
+        dest_joint_list = []
+        for jidx in org_joint_idxs.tolist():
+            for node_name, bone_param in bone_name_dict.items():
+                if bone_param['node_index'] == skin_joints[jidx]:
+                    dest_joint_list.append(model.bones[bone_param['name']].index)
+        dest_joints = np.array(dest_joint_list)
+
+        # 腰は下半身に統合
+        dest_joints = np.where(dest_joints == model.bones["腰"].index, model.bones["下半身"].index, dest_joints)
+
+        # 下半身の上半身側は上半身に分散
+        if model.bones["下半身"].index in dest_joints:
+            trunk_distance = model.bones["上半身2"].position.y() - model.bones["上半身"].position.y()
+            vector_trunk_distance = vertex_pos.y() - model.bones["上半身"].position.y()
+
+            if np.sign(trunk_distance) == np.sign(vector_trunk_distance):
+                # 上半身側の場合
+                upper_trunk_factor = vector_trunk_distance / trunk_distance
+                upper_trunk_weight_joints = np.where(dest_joints == model.bones["下半身"].index)[0]
+                if len(upper_trunk_weight_joints) > 0:
+                    if upper_trunk_factor > 1:
+                        # 範囲より先の場合
+                        dest_joints[upper_trunk_weight_joints] = model.bones["上半身2"].index
+                    else:
+                        # 下半身のウェイト値
+                        dest_arm_weight = org_weights[upper_trunk_weight_joints]
+                        # 上半身のウェイトは距離による
+                        upper_weights = dest_arm_weight * upper_trunk_factor
+                        # 下半身のウェイト値は残り
+                        lower_weights = dest_arm_weight * (1 - upper_trunk_factor)
+
+                        # FROMのウェイトを載せ替える
+                        valiable_joints = valiable_joints + [model.bones["下半身"].index]
+                        dest_joints[upper_trunk_weight_joints] = model.bones["下半身"].index
+                        org_weights[upper_trunk_weight_joints] = lower_weights
+                        # 腕捩のウェイトを追加する
+                        valiable_joints = valiable_joints + [model.bones["上半身"].index]
+                        dest_joints = np.append(dest_joints, model.bones["上半身"].index)
+                        org_weights = np.append(org_weights, upper_weights)
+
+        for direction in ["右", "左"]:
+            # 足・ひざ・足首・つま先はそれぞれDに載せ替え
+            for dest_bone_name, src_bone_name in [(f'{direction}足', f'{direction}足D'), (f'{direction}ひざ', f'{direction}ひざD'), \
+                                                  (f'{direction}足首', f'{direction}足首D'), (f'{direction}つま先', f'{direction}足先EX')]:
+                dest_joints = np.where(dest_joints == model.bones[dest_bone_name].index, model.bones[src_bone_name].index, dest_joints)
+
+            for base_from_name, base_to_name, base_twist_name in [('腕', 'ひじ', '腕捩'), ('ひじ', '手首', '手捩')]:
+                dest_arm_bone_name = f'{direction}{base_from_name}'
+                dest_elbow_bone_name = f'{direction}{base_to_name}'
+                dest_arm_twist1_bone_name = f'{direction}{base_twist_name}1'
+                dest_arm_twist2_bone_name = f'{direction}{base_twist_name}2'
+                dest_arm_twist3_bone_name = f'{direction}{base_twist_name}3'
+
+                arm_elbow_distance = -1
+                vector_arm_distance = 1
+
+                # 腕捩に分散する
+                if model.bones[dest_arm_bone_name].index in dest_joints or model.bones[dest_arm_twist1_bone_name].index in dest_joints \
+                   or model.bones[dest_arm_twist2_bone_name].index in dest_joints or model.bones[dest_arm_twist3_bone_name].index in dest_joints:
+                    # 腕に割り当てられているウェイトの場合
+                    arm_elbow_distance = model.bones[dest_elbow_bone_name].position.x() - model.bones[dest_arm_bone_name].position.x()
+                    vector_arm_distance = vertex_pos.x() - model.bones[dest_arm_bone_name].position.x()
+                    twist_list = [(dest_arm_twist1_bone_name, dest_arm_bone_name), \
+                                  (dest_arm_twist2_bone_name, dest_arm_twist1_bone_name), \
+                                  (dest_arm_twist3_bone_name, dest_arm_twist2_bone_name)]
+
+                if np.sign(arm_elbow_distance) == np.sign(vector_arm_distance):
+                    for dest_to_bone_name, dest_from_bone_name in twist_list:
+                        # 腕からひじの間の頂点の場合
+                        twist_distance = model.bones[dest_to_bone_name].position.x() - model.bones[dest_from_bone_name].position.x()
+                        vector_distance = vertex_pos.x() - model.bones[dest_from_bone_name].position.x()
+                        if np.sign(twist_distance) == np.sign(vector_distance):
+                            # 腕から腕捩1の間にある頂点の場合
+                            arm_twist_factor = vector_distance / twist_distance
+                            # 腕が割り当てられているウェイトINDEX
+                            arm_twist_weight_joints = np.where(dest_joints == model.bones[dest_from_bone_name].index)[0]
+                            if len(arm_twist_weight_joints) > 0:
+                                if arm_twist_factor > 1:
+                                    # 範囲より先の場合
+                                    dest_joints[arm_twist_weight_joints] = model.bones[dest_to_bone_name].index
+                                else:
+                                    # 腕のウェイト値
+                                    dest_arm_weight = org_weights[arm_twist_weight_joints]
+                                    # 腕捩のウェイトはウェイト値の指定割合
+                                    arm_twist_weights = dest_arm_weight * arm_twist_factor
+                                    # 腕のウェイト値は残り
+                                    arm_weights = dest_arm_weight * (1 - arm_twist_factor)
+
+                                    # FROMのウェイトを載せ替える
+                                    valiable_joints = valiable_joints + [model.bones[dest_from_bone_name].index]
+                                    dest_joints[arm_twist_weight_joints] = model.bones[dest_from_bone_name].index
+                                    org_weights[arm_twist_weight_joints] = arm_weights
+                                    # 腕捩のウェイトを追加する
+                                    valiable_joints = valiable_joints + [model.bones[dest_to_bone_name].index]
+                                    dest_joints = np.append(dest_joints, model.bones[dest_to_bone_name].index)
+                                    org_weights = np.append(org_weights, arm_twist_weights)
+
+                                    logger.test("[%s] from: %s, to: %s, factor: %s, dest_joints: %s, org_weights: %s", \
+                                                vertex_idx, dest_from_bone_name, dest_to_bone_name, arm_twist_factor, dest_joints, org_weights)
+
+        # 載せ替えた事で、ジョイントが重複している場合があるので、調整する
+        joint_weights = {}
+        for j, w in zip(dest_joints, org_weights):
+            if j not in joint_weights:
+                joint_weights[j] = 0
+            joint_weights[j] += w
+
+        # 対象となるウェイト値
+        joint_values = list(joint_weights.keys())
+        # 正規化(合計して1になるように)
+        total_weights = np.array(list(joint_weights.values()))
+        weight_values = (total_weights / total_weights.sum(axis=0, keepdims=1)).tolist()
+
+        if len(joint_values) == 3:
+            # 3つの場合、0を入れ込む
+            return joint_values + [0], weight_values + [0]
+        elif len(joint_values) > 4:
+            # 4より多い場合、一番小さいのを捨てる（大体誤差）
+            remove_idx = np.argmin(np.array(weight_values)).T
+            del valiable_joints[remove_idx]
+            del joint_values[remove_idx]
+            del weight_values[remove_idx]
+
+            # 正規化(合計して1になるように)
+            total_weights = np.array(weight_values)
+            weight_values = (total_weights / total_weights.sum(axis=0, keepdims=1)).tolist()
+
+        return joint_values, weight_values
 
     def convert_bone(self, model: PmxModel):
         if 'nodes' not in model.json_data:
             logger.error("変換可能なボーン情報がないため、処理を中断します。", decoration=MLogger.DECORATION_BOX)
             return None, None
-        
+
+        # 表示枠 ------------------------
+        model.display_slots["全ての親"] = DisplaySlot("Root", "Root", 1, 1)
+        model.display_slots["全ての親"].references.append((0, 0))
+
+        # モーフの表示枠
+        model.display_slots["表情"] = DisplaySlot("表情", "Exp", 1, 1)
+
         node_dict = {}
         node_name_dict = {}
         for nidx, node in enumerate(model.json_data['nodes']):
@@ -421,10 +694,12 @@ class VroidExportService():
             parent_name = BONE_PAIRS[bone_param['parent']]['name'] if bone_param['parent'] else None
             parent_index = model.bones[parent_name].index if parent_name else -1
 
+            node_index = -1
             position = MVector3D()
             bone = Bone(bone_param['name'], node_name, position, parent_index, 0, bone_param['flag'])
             if parent_index >= 0:
                 if node_name in node_name_dict:
+                    node_index = node_name_dict[node_name]
                     position = node_dict[node_name_dict[node_name]]['position'].copy()
                 elif node_name == 'Center':
                     position = node_dict[node_name_dict['J_Bip_C_Hips']]['position'] * 0.7
@@ -480,15 +755,25 @@ class VroidExportService():
                     bone.effect_factor = 1
                     bone.layer = 1
                 elif 'toe_EX_' in node_name:
-                    position = node_dict[node_name_dict[f'J_Bip_{node_name[-1]}_Foot']]['position'] + \
-                                ((node_dict[node_name_dict[f'J_Bip_{node_name[-1]}_ToeBase']]['position'] - node_dict[node_name_dict[f'J_Bip_{node_name[-1]}_Foot']]['position']) * 0.8)   # noqa
+                    position = node_dict[node_name_dict[f'J_Bip_{node_name[-1]}_ToeBase']]['position'].copy()
                     bone.layer = 1
             bone.position = position
             bone.index = len(model.bones)
 
+            # 表示枠
+            if bone_param["display"]:
+                if bone_param["display"] not in model.display_slots:
+                    model.display_slots[bone_param["display"]] = DisplaySlot(bone_param["display"], bone_param["display"], 0, 0)
+                model.display_slots[bone_param["display"]].references.append((0, bone.index))
+
             model.bones[bone.name] = bone
-            bone_name_dict[node_name] = {'index': bone.index, 'name': bone.name}
+            bone_name_dict[node_name] = {'index': bone.index, 'name': bone.name, 'node_name': node_name, 'node_index': node_index}
         
+        if "髪" not in model.display_slots:
+            model.display_slots["髪"] = DisplaySlot("髪", "Hair", 0, 0)
+        if "その他" not in model.display_slots:
+            model.display_slots["その他"] = DisplaySlot("その他", "Other", 0, 0)
+
         # 人体以外のボーン
         for nidx, node_param in node_dict.items():
             if node_param['name'] not in bone_name_dict:
@@ -497,7 +782,12 @@ class VroidExportService():
                 bone.parent_index = parent_index
                 bone.index = len(model.bones)
                 model.bones[bone.name] = bone
-                bone_name_dict[node_param['name']] = {'index': bone.index, 'name': bone.name}
+                bone_name_dict[node_param['name']] = {'index': bone.index, 'name': bone.name, 'node_name': node_param['name'], 'node_index': node_name_dict[node_param['name']]}
+
+                if "Hair" in bone.name:
+                    model.display_slots["髪"].references.append((0, bone.index))
+                else:
+                    model.display_slots["その他"].references.append((0, bone.index))
 
         local_y_vector = MVector3D(0, -1, 0)
 
@@ -569,7 +859,9 @@ class VroidExportService():
                     bone.tail_index = tail_index
                     bone.flag |= 0x0001
 
-        return model, bone_name_dict, node_name_dict
+        logger.info("-- ボーンデータ解析終了")
+
+        return model, bone_name_dict
     
     def calc_bone_position(self, model: PmxModel, node_dict: dict, node_param: dict):
         if node_param['parent'] == -1:
@@ -783,24 +1075,33 @@ class VroidExportService():
         return result
 
 
+DELETE_BONES = [
+    'Face',
+    'Body',
+    'Hairs',
+    'Hair001',
+    'secondary',
+]
+
 BONE_PAIRS = {
-    'Root': {'name': '全ての親', 'parent': None, 'tail': 'Center', 'display': '全ての親', 'flag': 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010},
+    'Root': {'name': '全ての親', 'parent': None, 'tail': 'Center', 'display': None, 'flag': 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010},
     'Center': {'name': 'センター', 'parent': 'Root', 'tail': None, 'display': 'センター', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
     'Groove': {'name': 'グルーブ', 'parent': 'Center', 'tail': None, 'display': 'センター', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'J_Bip_C_Hips': {'name': '腰', 'parent': 'Groove', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010},
+    'J_Bip_C_Hips': {'name': '腰', 'parent': 'Groove', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
     'J_Bip_C_Spine': {'name': '下半身', 'parent': 'J_Bip_C_Hips', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010},
     'J_Bip_C_Spine2': {'name': '上半身', 'parent': 'J_Bip_C_Hips', 'tail': 'J_Bip_C_Chest', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_Chest': {'name': '上半身2', 'parent': 'J_Bip_C_Spine2', 'tail': 'J_Bip_C_Neck', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_Neck': {'name': '首', 'parent': 'J_Bip_C_Chest', 'tail': 'J_Bip_C_Head', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
+    'J_Bip_C_Chest': {'name': '上半身2', 'parent': 'J_Bip_C_Spine2', 'tail': 'J_Bip_C_UpperChest', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
+    'J_Bip_C_UpperChest': {'name': '上半身3', 'parent': 'J_Bip_C_Chest', 'tail': 'J_Bip_C_Neck', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
+    'J_Bip_C_Neck': {'name': '首', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Bip_C_Head', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_C_Head': {'name': '頭', 'parent': 'J_Bip_C_Neck', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010},
     'J_Adj_FaceEye': {'name': '両目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010},
     'J_Adj_L_FaceEye': {'name': '左目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010},
     'J_Adj_R_FaceEye': {'name': '右目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Sec_L_Bust1': {'name': '左胸', 'parent': 'J_Bip_C_Chest', 'tail': 'J_Sec_L_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
+    'J_Sec_L_Bust1': {'name': '左胸', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Sec_L_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Sec_L_Bust2': {'name': '左胸先', 'parent': 'J_Sec_L_Bust1', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Sec_R_Bust1': {'name': '右胸', 'parent': 'J_Bip_C_Chest', 'tail': 'J_Sec_R_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
+    'J_Sec_R_Bust1': {'name': '右胸', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Sec_R_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Sec_R_Bust2': {'name': '右胸先', 'parent': 'J_Sec_R_Bust1', 'tail': None, 'display': None, 'flag': 0x0002},
-    'shoulderP_L': {'name': '左肩P', 'parent': 'J_Bip_C_Chest', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010},
+    'shoulderP_L': {'name': '左肩P', 'parent': 'J_Bip_C_UpperChest', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010},
     'J_Bip_L_Shoulder': {'name': '左肩', 'parent': 'shoulderP_L', 'tail': 'J_Bip_L_UpperArm', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
     'shoulderC_L': {'name': '左肩C', 'parent': 'J_Bip_L_Shoulder', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
     'J_Bip_L_UpperArm': {'name': '左腕', 'parent': 'shoulderC_L', 'tail': 'J_Bip_L_LowerArm', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
@@ -834,7 +1135,7 @@ BONE_PAIRS = {
     'J_Bip_L_Little2': {'name': '左小指２', 'parent': 'J_Bip_L_Little1', 'tail': 'J_Bip_L_Little3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
     'J_Bip_L_Little3': {'name': '左小指３', 'parent': 'J_Bip_L_Little2', 'tail': 'J_Bip_L_Little3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
     'J_Bip_L_Little3_end': {'name': '左小指先', 'parent': 'J_Bip_L_Little3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'shoulderP_R': {'name': '右肩P', 'parent': 'J_Bip_C_Chest', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010},
+    'shoulderP_R': {'name': '右肩P', 'parent': 'J_Bip_C_UpperChest', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010},
     'J_Bip_R_Shoulder': {'name': '右肩', 'parent': 'shoulderP_R', 'tail': 'J_Bip_R_UpperArm', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
     'shoulderC_R': {'name': '右肩C', 'parent': 'J_Bip_R_Shoulder', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
     'J_Bip_R_UpperArm': {'name': '右腕', 'parent': 'shoulderC_R', 'tail': 'J_Bip_R_LowerArm', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
@@ -874,7 +1175,7 @@ BONE_PAIRS = {
     'J_Bip_L_Foot': {'name': '左足首', 'parent': 'J_Bip_L_LowerLeg', 'tail': 'J_Bip_L_ToeBase', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_L_ToeBase': {'name': '左つま先', 'parent': 'J_Bip_L_Foot', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0008 | 0x0010},
     'leg_IK_Parent_L': {'name': '左足IK親', 'parent': 'Root', 'tail': 'leg_IK_L', 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'leg_IK_L': {'name': '左足ＩＫ', 'parent': 'leg_IK_Parent_L', 'tail': MVector3D(0, 0, -1), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
+    'leg_IK_L': {'name': '左足ＩＫ', 'parent': 'leg_IK_Parent_L', 'tail': MVector3D(0, 0, 1), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'toe_IK_L': {'name': '左つま先ＩＫ', 'parent': 'leg_IK_L', 'tail': MVector3D(0, -1, 0), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'waistCancel_R': {'name': '腰キャンセル右', 'parent': 'J_Bip_C_Spine', 'tail': None, 'display': None, 'flag': 0x0002},
     'J_Bip_R_UpperLeg': {'name': '右足', 'parent': 'waistCancel_R', 'tail': 'J_Bip_R_LowerLeg', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
@@ -882,7 +1183,7 @@ BONE_PAIRS = {
     'J_Bip_R_Foot': {'name': '右足首', 'parent': 'J_Bip_R_LowerLeg', 'tail': 'J_Bip_R_ToeBase', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_R_ToeBase': {'name': '右つま先', 'parent': 'J_Bip_R_Foot', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0008 | 0x0010},
     'leg_IK_Parent_R': {'name': '右足IK親', 'parent': 'Root', 'tail': 'leg_IK_R', 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'leg_IK_R': {'name': '右足ＩＫ', 'parent': 'leg_IK_Parent_R', 'tail': MVector3D(0, 0, -1), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
+    'leg_IK_R': {'name': '右足ＩＫ', 'parent': 'leg_IK_Parent_R', 'tail': MVector3D(0, 0, 1), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'toe_IK_R': {'name': '右つま先ＩＫ', 'parent': 'leg_IK_R', 'tail': MVector3D(0, -1, 0), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'leg_D_L': {'name': '左足D', 'parent': 'waistCancel_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
     'knee_D_L': {'name': '左ひざD', 'parent': 'leg_D_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},

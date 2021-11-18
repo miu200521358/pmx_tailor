@@ -195,7 +195,7 @@ class MLogger():
 
             # 翻訳有無で出力メッセージ取得
             is_translate = kwargs.pop("translate", True)
-            msg = self.transtext(org_msg) if is_translate else org_msg
+            msg = self.transtext(org_msg) if is_translate and target_level >= self.INFO else org_msg
 
             # ログレコード生成
             if args and isinstance(args[0], Exception) or (args and len(args) > 1 and isinstance(args[0], Exception)):

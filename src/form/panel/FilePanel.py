@@ -28,7 +28,7 @@ class FilePanel(BasePanel):
 
         if self.frame.is_vroid:
             self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("VrmモデルをPmxモデルに変換します。\n") \
-                                                 + logger.transtext("物理を変えたい場合は、返還後のPmxデータをPmxTailorにかけてください。"), wx.DefaultPosition, wx.DefaultSize, 0)
+                                                 + logger.transtext("物理を変えたい場合は、変換後のPmxデータをPmxTailorにかけてください。"), wx.DefaultPosition, wx.DefaultSize, 0)
         else:
             self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("PMXモデルの指定された材質に物理を設定します。\n") \
                                                  + logger.transtext("PMXモデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。"), wx.DefaultPosition, wx.DefaultSize, 0)

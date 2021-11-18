@@ -240,7 +240,8 @@ class PmxTailorExportService():
 
                     next_above_bone_name = None
                     next_above_bone_position = None
-                    if pac < bone_grid_cols - 1:
+                    nnac = [k for k, v in bone_grid[par].items() if v][-1]
+                    if pac < nnac:
                         # 右周りにボーンの連携をチェック
                         nac = pac + 1
                         if par in bone_grid and nac in bone_grid[par]:
@@ -305,12 +306,12 @@ class PmxTailorExportService():
                             prev_prev_above_bone_position = prev_above_bone_position
                     else:
                         # 一旦円周を描いてみる
-                        ppac = list(bone_grid[par].keys())[-1]
+                        ppac = [k for k, v in bone_grid[par].items() if v][-1]
                         prev_prev_above_bone_name = bone_grid[par][ppac]
                         if prev_prev_above_bone_name:
                             prev_prev_above_bone_position = model.bones[prev_prev_above_bone_name].position
                             prev_prev_above_bone_index = model.bones[prev_prev_above_bone_name].index
-                            key = (min(next_above_bone_index, prev_prev_above_bone_index), max(next_above_bone_index, prev_prev_above_bone_index))
+                            key = (min(prev_above_bone_index, prev_prev_above_bone_index), max(prev_above_bone_index, prev_prev_above_bone_index))
                             if key not in weighted_bone_pairs:
                                 # ウェイトが乗ってなかった場合、prev_aboveと同じにする
                                 prev_prev_above_bone_name = prev_above_bone_name
@@ -337,13 +338,13 @@ class PmxTailorExportService():
     
     def create_joint_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict, root_rigidbody: RigidBody):
         bone_grid_rows = param_option["bone_grid_rows"]
-        bone_grid_cols = param_option["bone_grid_cols"]
+        # bone_grid_cols = param_option["bone_grid_cols"]
 
         # ジョイント生成
         created_joints = {}
 
-        # 略称
-        abb_name = param_option['abb_name']
+        # # 略称
+        # abb_name = param_option['abb_name']
         # 縦ジョイント情報
         param_vertical_joint = param_option['vertical_joint']
         # 横ジョイント情報
@@ -550,7 +551,7 @@ class PmxTailorExportService():
             next_below_bone_name = bone_block['next_below']
             next_below_bone_position = bone_block['next_below_pos']
             yi = bone_block['yi']
-            xi = bone_block['xi']
+            # xi = bone_block['xi']
 
             if yi == 0:
                 # ルート剛体と根元剛体を繋ぐジョイント
@@ -1062,7 +1063,7 @@ class PmxTailorExportService():
                         # 未登録のみ追加
                         
                         joint_vec = np.mean([prev_below_below_bone_position, prev_below_bone_position, \
-                                            next_below_below_bone_position, next_below_bone_position])
+                                             next_below_below_bone_position, next_below_bone_position])
 
                         # 回転量
                         joint_axis = (next_below_bone_position - prev_below_bone_position).normalized()
@@ -1301,8 +1302,9 @@ class PmxTailorExportService():
             model.joints[joint.name] = joint
 
     def create_rigidbody_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict):
-        bone_grid_cols = param_option["bone_grid_cols"]
+        # bone_grid_cols = param_option["bone_grid_cols"]
         bone_grid_rows = param_option["bone_grid_rows"]
+        bone_grid = param_option["bone_grid"]
 
         # 剛体生成
         created_rigidbodies = {}
@@ -1356,10 +1358,7 @@ class PmxTailorExportService():
 
             # 剛体の傾き
             shape_axis = (prev_below_bone_position - prev_above_bone_position).round(5).normalized()
-            if xi < bone_grid_cols - 1:
-                shape_axis_up = (next_above_bone_position - prev_prev_above_bone_position).round(5).normalized()
-            else:
-                shape_axis_up = (next_above_bone_position - prev_above_bone_position).round(5).normalized()
+            shape_axis_up = (next_above_bone_position - prev_prev_above_bone_position).round(5).normalized()
             shape_axis_cross = MVector3D.crossProduct(shape_axis, shape_axis_up).round(5).normalized()
 
             # if shape_axis_up.round(2) == MVector3D(1, 0, 0):
@@ -1523,13 +1522,19 @@ class PmxTailorExportService():
                 # next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
 
                 prev_prev_above_bone_position = None
-                if xi > 0:
+                if 0 == xi:
+                    # 先頭の場合、繋がっていたら最後のを加える
+                    if vertex_connected[below_v_yidx]:
+                        prev_prev_above_v_xidx = list(registed_bone_indexs[below_v_yidx].keys())[-1]
+                        prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
+                        prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
+                else:
                     prev_prev_below_v_xidx = registed_bone_indexs[below_v_yidx][below_v_xidxs[xi - 1]]
                     prev_prev_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - prev_prev_below_v_xidx)
                     prev_prev_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if prev_prev_below_v_xidx == 0 else np.argmin(prev_prev_above_v_xidx_diff))]
                     prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
                     prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
-
+                
                 if prev_above_bone_name in created_rigidbodies:
                     continue
 

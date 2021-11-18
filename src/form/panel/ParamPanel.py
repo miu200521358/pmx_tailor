@@ -1409,6 +1409,12 @@ class PhysicsParam():
         self.bone_btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # インポートボタン
+        self.bone_import_btn_ctrl = wx.Button(self.bone_window, wx.ID_ANY, logger.transtext("設定クリア"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.bone_import_btn_ctrl.SetToolTip(logger.transtext("ボーン設定データ全てクリアします。"))
+        self.bone_import_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_bone_clear)
+        self.bone_btn_sizer.Add(self.bone_import_btn_ctrl, 0, wx.ALL, 5)
+
+        # インポートボタン
         self.bone_import_btn_ctrl = wx.Button(self.bone_window, wx.ID_ANY, logger.transtext("インポート ..."), wx.DefaultPosition, wx.DefaultSize, 0)
         self.bone_import_btn_ctrl.SetToolTip(logger.transtext("ボーン設定データをcsvファイルから読み込みます。\nファイル選択ダイアログが開きます。"))
         self.bone_import_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_bone_import)
@@ -1830,6 +1836,11 @@ class PhysicsParam():
                 dialog = wx.MessageDialog(self.frame, logger.transtext("材質物理設定JSONが保存できませんでした '{0}'\n\n{1}").format(target_physics_path, traceback.format_exc()), style=wx.OK)
                 dialog.ShowModal()
                 dialog.Destroy()
+    
+    def on_bone_clear(self, event: wx.Event):
+        for r in range(self.bone_grid.GetNumberRows()):
+            for c in range(self.bone_grid.GetNumberCols()):
+                self.bone_grid.GetTable().SetValue(r, c, "")
 
     def on_bone_import(self, event: wx.Event):
         with wx.FileDialog(self.frame, logger.transtext("ボーン設定CSVを読み込む"), wildcard="CSVファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*",
