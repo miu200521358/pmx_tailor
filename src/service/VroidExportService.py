@@ -103,6 +103,10 @@ class VroidExportService():
             if not model:
                 return False
 
+            model = self.convert_morph(model)
+            if not model:
+                return False
+
             model = self.transfer_astance(model)
             if not model:
                 return False
@@ -245,6 +249,59 @@ class VroidExportService():
 
         return MVector3D(np.sum(normal.data() * bone_invert_mat, axis=1)).normalized()
     
+    def convert_morph(self, model: PmxModel):
+        # グループモーフ定義
+        if "extensions" not in model.json_data or "VRM" not in model.json_data["extensions"] \
+                or "blendShapeMaster" not in model.json_data["extensions"]["VRM"] or "blendShapeGroups" not in model.json_data["extensions"]["VRM"]["blendShapeMaster"]:
+            return model
+
+        # # 定義済みグループモーフ
+        # for sidx, shape in enumerate(model.json_data["extensions"]["VRM"]["blendShapeMaster"]["blendShapeGroups"]):
+        #     if len(shape["binds"]) == 0:
+        #         continue
+
+        #     morph_name = shape["name"]
+        #     morph_panel = 4
+        #     if shape["name"] in MORPH_PAIRS:
+        #         morph_name = MORPH_PAIRS[shape["name"]]["name"]
+        #         morph_panel = MORPH_PAIRS[shape["name"]]["panel"]
+        #     morph = Morph(morph_name, shape["name"], morph_panel, 0)
+        #     morph.index = len(model.morphs)
+            
+        #     if shape["name"] in MORPH_PAIRS and "binds" in MORPH_PAIRS[shape["name"]]:
+        #         for bind in MORPH_PAIRS[shape["name"]]["binds"]:
+        #             morph.offsets.append(GroupMorphData(model.morphs[bind].index, 1))
+        #     else:
+        #         for bind in shape["binds"]:
+        #             morph.offsets.append(GroupMorphData(bind["index"], bind["weight"] / 100))
+        #     model.morphs[morph_name] = morph
+        #     model.display_slots["表情"].references.append((1, morph.index))
+
+        # 自前グループモーフ
+        for sidx, (morph_name, morph_pair) in enumerate(MORPH_PAIRS.items()):
+            if "binds" in morph_pair:
+                morph = Morph(morph_pair["name"], morph_pair["name"], morph_pair["panel"], 0)
+                morph.index = len(model.morphs)
+                for bind_name in morph_pair["binds"]:
+                    if bind_name in model.morphs:
+                        bind_morph = model.morphs[bind_name]
+                        for group_morph in bind_morph.offsets:
+                            morph.offsets.append(GroupMorphData(group_morph.morph_index, group_morph.value))
+                model.morphs[morph_pair["name"]] = morph
+                model.display_slots["表情"].references.append((1, morph.index))
+            else:
+                if morph_name in model.morphs:
+                    morph = Morph(morph_pair["name"], morph_pair["name"], morph_pair["panel"], 0)
+                    morph.index = len(model.morphs)
+                    morph.offsets.append(GroupMorphData(model.morphs[morph_name].index, 1))
+
+                    model.morphs[morph_pair["name"]] = morph
+                    model.display_slots["表情"].references.append((1, morph.index))
+
+        logger.info('-- グループモーフデータ解析')
+
+        return model
+
     def reconvert_bone(self, model: PmxModel):
         # 指先端の位置を計算して配置
         finger_dict = {'左親指２': {'vertices': [], 'direction': -1, 'edge_name': '左親指先'}, '左人指３': {'vertices': [], 'direction': -1, 'edge_name': '左人指先'}, \
@@ -280,6 +337,44 @@ class VroidExportService():
                 edge_vertex_pos = toe_vertices[0]
                 model.bones[toe_param['edge_name']].position = edge_vertex_pos
                 model.bones[toe_param['ik_name']].position = edge_vertex_pos
+
+        # 人体以外のボーン
+        hair_blocks = {}
+        other_blocks = {}
+        for bidx, bone in enumerate(model.bones.values()):
+            if '_' in bone.name:
+                if "Hair" in bone.name:
+                    node_names = bone.name.split('-')
+                    if len(node_names[-1]) <= 2:
+                        node_block_name = bone.name[:-len(node_names[-1])]
+                    else:
+                        node_names = bone.name.split('_')
+                        node_block_name = node_names[0]
+                else:
+                    node_names = bone.name.split('_')
+                    node_block_name = node_names[0]
+                bone_block = None
+                bone_name = None
+
+                if node_block_name in hair_blocks:
+                    bone_block = hair_blocks[node_block_name]
+                    hair_blocks[node_block_name]['size'] += 1
+                elif node_block_name in other_blocks:
+                    bone_block = other_blocks[node_block_name]
+                    other_blocks[node_block_name]['size'] += 1
+                else:
+                    if "Hair" in bone.name:
+                        bone_block = {"bone_block_name": f"髪_{(len(hair_blocks) + 1):02d}", "size": 1}
+                        hair_blocks[node_block_name] = bone_block
+                    else:
+                        bone_block = {"bone_block_name": f"装飾_{(len(other_blocks) + 1):02d}", "size": 1}
+                        other_blocks[node_block_name] = bone_block
+                bone_name = f'{bone_block["bone_block_name"]}-{bone_block["size"]:02d}'
+
+                if "Hair" not in bone.name and len(node_names) > 1:
+                    bone_name += bone.name[len(node_names[0]):]
+
+                bone.name = bone_name
 
         # 不要ボーンを削除
         for bone_name in DELETE_BONES:
@@ -1277,7 +1372,7 @@ BONE_PAIRS = {
     'J_Bip_L_UpperLeg': {'name': '左足', 'parent': 'waistCancel_L', 'tail': 'J_Bip_L_LowerLeg', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_L_LowerLeg': {'name': '左ひざ', 'parent': 'J_Bip_L_UpperLeg', 'tail': 'J_Bip_L_Foot', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_L_Foot': {'name': '左足首', 'parent': 'J_Bip_L_LowerLeg', 'tail': 'J_Bip_L_ToeBase', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_L_ToeBase': {'name': '左つま先', 'parent': 'J_Bip_L_Foot', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0008 | 0x0010},
+    'J_Bip_L_ToeBase': {'name': '左つま先', 'parent': 'J_Bip_L_Foot', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010},
     'leg_IK_Parent_L': {'name': '左足IK親', 'parent': 'Root', 'tail': 'leg_IK_L', 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
     'leg_IK_L': {'name': '左足ＩＫ', 'parent': 'leg_IK_Parent_L', 'tail': MVector3D(0, 0, 1), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'toe_IK_L': {'name': '左つま先ＩＫ', 'parent': 'leg_IK_L', 'tail': MVector3D(0, -1, 0), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
@@ -1285,8 +1380,8 @@ BONE_PAIRS = {
     'J_Bip_R_UpperLeg': {'name': '右足', 'parent': 'waistCancel_R', 'tail': 'J_Bip_R_LowerLeg', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_R_LowerLeg': {'name': '右ひざ', 'parent': 'J_Bip_R_UpperLeg', 'tail': 'J_Bip_R_Foot', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
     'J_Bip_R_Foot': {'name': '右足首', 'parent': 'J_Bip_R_LowerLeg', 'tail': 'J_Bip_R_ToeBase', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_R_ToeBase': {'name': '右つま先', 'parent': 'J_Bip_R_Foot', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0008 | 0x0010},
-    'leg_IK_Parent_R': {'name': '右足IK親', 'parent': 'Root', 'tail': 'leg_IK_R', 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
+    'J_Bip_R_ToeBase': {'name': '右つま先', 'parent': 'J_Bip_R_Foot', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010},
+    'leg_IK_Parent_R': {'name': '右足IK親', 'parent': 'Root', 'tail': 'leg_IK_R', 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
     'leg_IK_R': {'name': '右足ＩＫ', 'parent': 'leg_IK_Parent_R', 'tail': MVector3D(0, 0, 1), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'toe_IK_R': {'name': '右つま先ＩＫ', 'parent': 'leg_IK_R', 'tail': MVector3D(0, -1, 0), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
     'leg_D_L': {'name': '左足D', 'parent': 'waistCancel_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
@@ -1297,4 +1392,149 @@ BONE_PAIRS = {
     'knee_D_R': {'name': '右ひざD', 'parent': 'leg_D_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
     'ankle_D_R': {'name': '右足首D', 'parent': 'knee_D_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
     'toe_EX_R': {'name': '右足先EX', 'parent': 'ankle_D_R', 'tail': MVector3D(0, 0, -1), 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010},
+}
+
+MORPH_EYEBROW = 1
+MORPH_EYE = 2
+MORPH_LIP = 3
+MORPH_OTHER = 4
+
+MORPH_PAIRS = {
+    "Fcl_BRW_Fun": {"name": "眉にっこり", "panel": MORPH_EYEBROW},
+    "Fcl_BRW_Joy": {"name": "眉にこり", "panel": MORPH_EYEBROW},
+    "Fcl_BRW_Sorrow": {"name": "／＼", "panel": MORPH_EYEBROW},
+    "Fcl_BRW_Angry": {"name": "＼／", "panel": MORPH_EYEBROW},
+    "Fcl_BRW_Surprised": {"name": "眉驚き", "panel": MORPH_EYEBROW},
+    # "": {"name": "眉きょとん", "panel": MORPH_EYEBROW},
+    # "": {"name": "眉下左", "panel": MORPH_EYEBROW},
+    # "": {"name": "眉下右", "panel": MORPH_EYEBROW},
+    # "": {"name": "眉下", "panel": MORPH_EYEBROW, "binds": ["眉下左", "眉下右"]},
+    # "": {"name": "眉はんっ左", "panel": MORPH_EYEBROW},
+    # "": {"name": "眉はんっ右", "panel": MORPH_EYEBROW},
+    # "": {"name": "眉はんっ", "panel": MORPH_EYEBROW, "binds": ["はんっ左", "はんっ右"]},
+
+    "Fcl_EYE_Natural": {"name": "ナチュラル", "panel": MORPH_EYE},
+    "Fcl_EYE_Close": {"name": "まばたき", "panel": MORPH_EYE},
+    "Fcl_EYE_Close_R": {"name": "まばたき右", "panel": MORPH_EYE},
+    "Fcl_EYE_Close_L": {"name": "まばたき左", "panel": MORPH_EYE},
+    "Fcl_EYE_Joy_L": {"name": "ウィンク", "panel": MORPH_EYE},
+    "Fcl_EYE_Joy_R": {"name": "ウィンク右", "panel": MORPH_EYE},
+    "Fcl_EYE_Fun": {"name": "喜び", "panel": MORPH_EYE},
+    "Fcl_EYE_Angry": {"name": "キリッ", "panel": MORPH_EYE},
+    "Fcl_EYE_Sorrow": {"name": "ジト目", "panel": MORPH_EYE},
+    "Fcl_EYE_Spread": {"name": "見開く", "panel": MORPH_EYE},
+    "Fcl_EYE_Surprised": {"name": "なぬ", "panel": MORPH_EYE},
+    "Fcl_EYE_Iris_Hide": {"name": "白目", "panel": MORPH_EYE},
+    "Fcl_EYE_Highlight_Hide": {"name": "ハイライトなし", "panel": MORPH_EYE},
+    # "": {"name": "目上左", "panel": MORPH_EYE},
+    # "": {"name": "目上右", "panel": MORPH_EYE},
+    # "": {"name": "目上", "panel": MORPH_EYE, "binds": ["目上左", "目上右"]},
+    # "": {"name": "目下左", "panel": MORPH_EYE},
+    # "": {"name": "目下右", "panel": MORPH_EYE},
+    # "": {"name": "目下", "panel": MORPH_EYE, "binds": ["目下左", "目下右"]},
+    # "": {"name": "目頭広左", "panel": MORPH_EYE},
+    # "": {"name": "目頭広右", "panel": MORPH_EYE},
+    # "": {"name": "目頭広", "panel": MORPH_EYE, "binds": ["目頭広左", "目頭広右"]},
+    # "": {"name": "目尻広左", "panel": MORPH_EYE},
+    # "": {"name": "目尻広右", "panel": MORPH_EYE},
+    # "": {"name": "目尻広", "panel": MORPH_EYE, "binds": ["目尻広左", "目尻広右"]},
+    # "": {"name": "にんまり左", "panel": MORPH_EYE},
+    # "": {"name": "にんまり右", "panel": MORPH_EYE},
+    # "": {"name": "にんまり", "panel": MORPH_EYE, "binds": ["にんまり左", "にんまり右"]},
+    # "": {"name": "びっくり左", "panel": MORPH_EYE},
+    # "": {"name": "びっくり右", "panel": MORPH_EYE},
+    # "": {"name": "びっくり", "panel": MORPH_EYE, "binds": ["びっくり左", "びっくり右"]},
+    # "": {"name": "ムッ左", "panel": MORPH_EYE},
+    # "": {"name": "ムッ右", "panel": MORPH_EYE},
+    # "": {"name": "ムッ", "panel": MORPH_EYE, "binds": ["ムッ右", "ムッ左"]},
+    # "": {"name": "白目下左", "panel": MORPH_EYE},
+    # "": {"name": "白目下右", "panel": MORPH_EYE},
+    # "": {"name": "白目下", "panel": MORPH_EYE, "binds": ["白目下左", "白目下右"]},
+    # "": {"name": "＞＜", "panel": MORPH_EYE},
+
+    "Fcl_MTH_A": {"name": "あ", "panel": MORPH_LIP},
+    "Fcl_MTH_I": {"name": "い", "panel": MORPH_LIP},
+    "Fcl_MTH_U": {"name": "う", "panel": MORPH_LIP},
+    "Fcl_MTH_E": {"name": "え", "panel": MORPH_LIP},
+    "Fcl_MTH_O": {"name": "お", "panel": MORPH_LIP},
+    "Fcl_MTH_Neutral": {"name": "穏やか", "panel": MORPH_LIP},
+    "Fcl_MTH_Up": {"name": "口上", "panel": MORPH_LIP},
+    "Fcl_MTH_Down": {"name": "口下", "panel": MORPH_LIP},
+    "Fcl_MTH_Angry": {"name": "へ", "panel": MORPH_LIP},
+    "Fcl_MTH_Small": {"name": "すぼめる", "panel": MORPH_LIP},
+    "Fcl_MTH_Large": {"name": "いー", "panel": MORPH_LIP},
+    "Fcl_MTH_Fun": {"name": "にんまり", "panel": MORPH_LIP},
+    "Fcl_MTH_Joy": {"name": "あー", "panel": MORPH_LIP},
+    "Fcl_MTH_Sorrow": {"name": "△", "panel": MORPH_LIP},
+    "Fcl_MTH_Surprised": {"name": "わー", "panel": MORPH_LIP},
+    
+    # "": {"name": "あはは", "panel": MORPH_LIP},
+    # "": {"name": "すぼめる", "panel": MORPH_LIP},
+    # "": {"name": "にやり左", "panel": MORPH_LIP},
+    # "": {"name": "にやり右", "panel": MORPH_LIP},
+    # "": {"name": "にやり", "panel": MORPH_LIP, "binds": ["にやり左", "にやり右"]},
+    # "": {"name": "上唇んむー", "panel": MORPH_LIP},
+    # "": {"name": "下唇んむー", "panel": MORPH_LIP},
+    # "": {"name": "んむー", "panel": MORPH_LIP, "binds": ["上唇んむー", "下唇んむー"]},
+    # "": {"name": "上唇にこり", "panel": MORPH_LIP},
+    # "": {"name": "下唇にこり", "panel": MORPH_LIP},
+    # "": {"name": "にこり", "panel": MORPH_LIP, "binds": ["上唇にこり", "下唇にこり"]},
+    # "": {"name": "にっこり左", "panel": MORPH_LIP},
+    # "": {"name": "にっこり右", "panel": MORPH_LIP},
+    # "": {"name": "にっこり", "panel": MORPH_LIP, "binds": ["にっこり右", "にっこり左"]},
+    # "": {"name": "むっ左", "panel": MORPH_LIP},
+    # "": {"name": "むっ右", "panel": MORPH_LIP},
+    # "": {"name": "むっ", "panel": MORPH_LIP, "binds": ["むっ左", "むっ右"]},
+    # "": {"name": "いー左", "panel": MORPH_LIP},
+    # "": {"name": "いー右", "panel": MORPH_LIP},
+    # "": {"name": "いー", "panel": MORPH_LIP, "binds": ["いー左", "いー右"]},
+    # "": {"name": "ちっ左", "panel": MORPH_LIP},
+    # "": {"name": "ちっ右", "panel": MORPH_LIP},
+    # "": {"name": "ちっ", "panel": MORPH_LIP, "binds": ["ちっ右", "ちっ左"]},
+    # "": {"name": "にこ左", "panel": MORPH_LIP},
+    # "": {"name": "にこ右", "panel": MORPH_LIP},
+    # "": {"name": "にこ", "panel": MORPH_LIP, "binds": ["にこ左", "にこ右"]},
+    # "": {"name": "にこり2左", "panel": MORPH_LIP},
+    # "": {"name": "にこり2右", "panel": MORPH_LIP},
+    # "": {"name": "にこり2", "panel": MORPH_LIP, "binds": ["にこり2左", "にこり2右"]},
+    # "": {"name": "むー左", "panel": MORPH_LIP},
+    # "": {"name": "むー右", "panel": MORPH_LIP},
+    # "": {"name": "むー", "panel": MORPH_LIP, "binds": ["むー右", "むー左"]},
+    # "": {"name": "舌", "panel": MORPH_LIP},
+    # "": {"name": "いいー左", "panel": MORPH_LIP},
+    # "": {"name": "いいー右", "panel": MORPH_LIP},
+    # "": {"name": "いいー", "panel": MORPH_LIP, "binds": ["いいー左", "いいー右"]},
+    # "": {"name": "突き出す", "panel": MORPH_LIP},
+    # "": {"name": "ぷくー", "panel": MORPH_LIP},
+    # "": {"name": "にやり左", "panel": MORPH_LIP},
+    # "": {"name": "にやり右", "panel": MORPH_LIP},
+    # "": {"name": "にやり", "panel": MORPH_LIP, "binds": ["にやり左", "にやり右"]},
+    # "": {"name": "顎開", "panel": MORPH_LIP},
+    # "": {"name": "顎前", "panel": MORPH_LIP},
+    # "": {"name": "顎左", "panel": MORPH_LIP},
+    # "": {"name": "顎右", "panel": MORPH_LIP},
+
+    "Fcl_MTH_SkinFung": {"name": "肌牙", "panel": MORPH_LIP},
+    "Fcl_MTH_SkinFung_L": {"name": "肌牙左", "panel": MORPH_LIP},
+    "Fcl_MTH_SkinFung_R": {"name": "肌牙右", "panel": MORPH_LIP},
+    "Fcl_HA_Fung1": {"name": "牙", "panel": MORPH_LIP},
+    "Fcl_HA_Fung1_Up": {"name": "牙上", "panel": MORPH_LIP},
+    "Fcl_HA_Fung1_Low": {"name": "牙下", "panel": MORPH_LIP},
+    "Fcl_HA_Fung2": {"name": "ギザ歯", "panel": MORPH_LIP},
+    "Fcl_HA_Fung2_Up": {"name": "ギザ歯上", "panel": MORPH_LIP},
+    "Fcl_HA_Fung2_Low": {"name": "ギザ歯下", "panel": MORPH_LIP},
+    "Fcl_HA_Fung3": {"name": "真ん中牙", "panel": MORPH_LIP},
+    "Fcl_HA_Fung3_Up": {"name": "真ん中牙上", "panel": MORPH_LIP},
+    "Fcl_HA_Fung3_Low": {"name": "真ん中牙下", "panel": MORPH_LIP},
+    "Fcl_HA_Hide": {"name": "歯隠", "panel": MORPH_LIP},
+    "Fcl_HA_Short": {"name": "歯短", "panel": MORPH_LIP},
+    "Fcl_HA_Short_Up": {"name": "歯短上", "panel": MORPH_LIP},
+    "Fcl_HA_Short_Low": {"name": "歯短下", "panel": MORPH_LIP},
+
+    "Fcl_ALL_Neutral": {"name": "ニュートラル", "panel": MORPH_OTHER},
+    "Fcl_ALL_Angry": {"name": "怒", "panel": MORPH_OTHER},
+    "Fcl_ALL_Fun": {"name": "楽", "panel": MORPH_OTHER},
+    "Fcl_ALL_Joy": {"name": "喜", "panel": MORPH_OTHER},
+    "Fcl_ALL_Sorrow": {"name": "哀", "panel": MORPH_OTHER},
+    "Fcl_ALL_Surprised": {"name": "驚", "panel": MORPH_OTHER},
 }
