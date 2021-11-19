@@ -53,16 +53,6 @@ class VroidExportService():
             service_data_txt = "{service_data_txt}　元モデル: {pmx_model}\n".format(service_data_txt=service_data_txt,
                                     pmx_model=os.path.basename(self.options.pmx_model.path)) # noqa
 
-            for pidx, param_option in enumerate(self.options.param_options):
-                service_data_txt = f"{service_data_txt}\n　【No.{pidx + 1}】 --------- "    # noqa
-                service_data_txt = f"{service_data_txt}\n　　材質: {param_option['material_name']}"    # noqa
-                service_data_txt = f"{service_data_txt}\n　　剛体グループ: {param_option['rigidbody'].collision_group + 1}"    # noqa
-                service_data_txt = f"{service_data_txt}\n　　検出度: {param_option['similarity']}"    # noqa
-                service_data_txt = f"{service_data_txt}\n　　細かさ: {param_option['fineness']}"    # noqa
-                service_data_txt = f"{service_data_txt}\n　　質量: {param_option['mass']}"    # noqa
-                service_data_txt = f"{service_data_txt}\n　　柔らかさ: {param_option['air_resistance']}"    # noqa
-                service_data_txt = f"{service_data_txt}\n　　張り: {param_option['shape_maintenance']}"    # noqa
-
             logger.info(service_data_txt, decoration=MLogger.DECORATION_BOX)
 
             model = self.vroid2pmx()
@@ -95,7 +85,7 @@ class VroidExportService():
             if not model:
                 return False
 
-            model = self.convert_mesh(model, bone_name_dict, tex_dir_path)
+            model, vertices_by_materials = self.convert_mesh(model, bone_name_dict, tex_dir_path)
             if not model:
                 return False
             
@@ -111,6 +101,13 @@ class VroidExportService():
             if not model:
                 return False
             
+            bone_vertices = self.create_bone_vertices(model, vertices_by_materials)
+
+            model = self.create_body_physics(model, bone_vertices)
+            if not model:
+                return False
+            
+
             return model
         except MKilledException as ke:
             # 終了命令
@@ -122,6 +119,143 @@ class VroidExportService():
             import traceback
             logger.critical("Vroid2Pmx処理が意図せぬエラーで終了しました。\n\n%s", traceback.format_exc(), decoration=MLogger.DECORATION_BOX)
             raise e
+    
+    def create_body_physics(self, model: PmxModel, bone_vertices: dict):
+        for bone_name, bone in model.bones.items():
+            if bone.index not in bone_vertices or bone.english_name not in BONE_PAIRS or (bone.english_name in BONE_PAIRS and BONE_PAIRS[bone.english_name]['rigidbodyGroup'] < 0):
+                # ボーンに紐付く頂点がないか、人体ボーンで対象外の場合、スルー
+                continue
+
+            rigidbody_shape = BONE_PAIRS[bone.english_name]['rigidbodyShape']
+            rigidbody_mode = BONE_PAIRS[bone.english_name]['rigidbodyMode']
+            collision_group = BONE_PAIRS[bone.english_name]['rigidbodyGroup']
+            no_collision_group_list = BONE_PAIRS[bone.english_name]['rigidbodyNoColl']
+
+            no_collision_group = 0
+            for nc in range(16):
+                if nc not in no_collision_group_list:
+                    no_collision_group |= 1 << nc
+
+            # 剛体生成対象の場合のみ作成
+            vertex_list = []
+            normal_list = []
+            for vertex in bone_vertices[bone.index]:
+                vertex_list.append(vertex.position.data().tolist())
+                normal_list.append(vertex.normal.data().tolist())
+            vertex_ary = np.array(vertex_list)
+            # 法線の平均値
+            mean_normal = np.mean(np.array(vertex_list), axis=0)
+            # 最小
+            min_vertex = np.min(vertex_ary, axis=0)
+            # 最大
+            max_vertex = np.max(vertex_ary, axis=0)
+            # 中央
+            center_vertex = np.median(vertex_ary, axis=0)
+
+            # ボーンの向き先に沿う
+            tail_bone = None
+            if bone.tail_index > 0:
+                tail_bone = [b for b in model.bones.values() if bone.tail_index == b.index][0]
+                tail_position = tail_bone.position
+            else:
+                tail_position = bone.tail_position + bone.position
+
+            # サイズ
+            diff_size = np.abs(max_vertex - min_vertex)
+            shape_size = MVector3D()
+            shape_rotation = MVector3D()
+            if rigidbody_shape == 0:
+                # 球体
+                if "頭" == bone.name:
+                    # 頭はエルフ耳がある場合があるので、両目の間隔を使う
+                    eye_length = model.bones["右目"].position.distanceToPoint(model.bones["左目"].position) * 3
+                    center_vertex[0] = bone.position.x()
+                    center_vertex[1] = min_vertex[1] + (max_vertex[1] - min_vertex[1]) / 2
+                    center_vertex[2] = bone.position.z()
+                    shape_size = MVector3D(eye_length, eye_length, eye_length)
+                else:
+                    # それ以外（胸とか）はそのまま
+                    max_size = np.max(diff_size / 2)
+                    shape_size = MVector3D(max_size, max_size, max_size)
+                    center_vertex = bone.position + (tail_position - bone.position) / 2
+            else:
+                # カプセルと箱
+                axis_vec = tail_position - bone.position
+                tail_pos = axis_vec.normalized()
+                tail_vec = tail_pos.data()
+                
+                # 回転量
+                to_vec = MVector3D.crossProduct(MVector3D(mean_normal), MVector3D(tail_vec)).normalized()
+                if rigidbody_shape == 1:
+                    # 箱
+                    rot = MQuaternion.rotationTo(MVector3D(0, 1 * np.sign(tail_vec[1]), 0), tail_pos)
+                    rot *= MQuaternion.rotationTo(MVector3D(1 * np.sign(tail_vec[0]), 0, 0), to_vec.normalized())
+                else:
+                    # カプセル
+                    rot = MQuaternion.rotationTo(MVector3D(0, 1, 0), tail_pos)
+                    if '上' in bone.name or '下' in bone.name:
+                        # 体幹は横に倒しておく
+                        rot *= MQuaternion.fromEulerAngles(0, 0, 90)
+                shape_euler = rot.toEulerAngles()
+                shape_rotation = MVector3D(math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z()))
+
+                # 軸の長さ
+                if rigidbody_shape == 1:
+                    # 箱
+                    if (tail_bone and tail_bone.tail_index == -1):
+                        # 末端の場合、頂点の距離感で決める
+                        shape_size = MVector3D(diff_size[0] * 0.7, diff_size[1] * 0.7, diff_size[2] * 0.15)
+                    else:
+                        # 途中の場合、ボーンの距離感で決める
+                        shape_size = MVector3D(diff_size[0] * 0.7, (bone.position.y() - tail_position.y()) * 0.7, diff_size[2] * 0.15)
+                        center_vertex = bone.position + (tail_position - bone.position) / 2
+                else:
+                    # カプセル
+                    if ('左' in bone.name or '右' in bone.name) and ('腕' in bone.name or 'ひじ' in bone.name or '手首' in bone.name):
+                        # 腕の場合 / 半径：Y, 高さ：X
+                        shape_size = MVector3D(diff_size[1] * 0.3, abs(axis_vec.x() * 1), diff_size[2])
+                    elif '上' in bone.name or '下' in bone.name:
+                        # 体幹の場合 / 半径：X, 高さ：Y
+                        shape_size = MVector3D(diff_size[0] * 0.3, abs(axis_vec.y() * 0.5), diff_size[2])
+                    else:
+                        # 足の場合 / 半径：X, 高さ：Y
+                        shape_size = MVector3D(diff_size[0] * 0.3, abs(axis_vec.y() * 1), diff_size[2])
+
+                    center_vertex = bone.position + (tail_position - bone.position) / 2
+
+            logger.debug("bone: %s, min: %s, max: %s, center: %s, size: %s", bone.name, min_vertex, max_vertex, center_vertex, shape_size.to_log())
+            rigidbody = RigidBody(bone.name, bone.english_name, bone.index, collision_group, no_collision_group, \
+                                  rigidbody_shape, shape_size, MVector3D(center_vertex), shape_rotation, 1, 0.5, 0.5, 0, 0.5, rigidbody_mode)
+            rigidbody.index = len(model.rigidbodies)
+            model.rigidbodies[rigidbody.name] = rigidbody
+
+        logger.info("-- 身体剛体設定終了")
+
+        return model
+    
+    def create_bone_vertices(self, model: PmxModel, vertices_by_materials: dict):
+        bone_vertices = {}
+        for vertex in model.vertex_dict.values():
+            for bone_idx in vertex.deform.get_idx_list(0.3):
+                if bone_idx not in bone_vertices:
+                    bone_vertices[bone_idx] = []
+                bone = [b for b in model.bones.values() if bone_idx == b.index][0]
+
+                # if is_target:
+                bone_vertices[bone_idx].append(vertex)
+
+                if "捩" in bone.name:
+                    # 捩りは親に入れる
+                    if bone.parent_index not in bone_vertices:
+                        bone_vertices[bone.parent_index] = []
+                    bone_vertices[bone.parent_index].append(vertex)
+                elif bone.getExternalRotationFlag():
+                    # 回転付与の場合、付与親に入れる
+                    if bone.effect_index not in bone_vertices:
+                        bone_vertices[bone.effect_index] = []
+                    bone_vertices[bone.effect_index].append(vertex)
+
+        return bone_vertices
     
     def transfer_astance(self, model: PmxModel):
         # 各頂点
@@ -174,13 +308,13 @@ class VroidExportService():
         local_y_vector = MVector3D(0, -1, 0)
         for bone_name, bone_mat in trans_bone_mats.items():
             bone = model.bones[bone_name]
-            # ローカル軸
             direction = bone.name[0]
             arm_bone_name = f'{direction}腕'
             elbow_bone_name = f'{direction}ひじ'
             wrist_bone_name = f'{direction}手首'
             finger_bone_name = f'{direction}中指１'
             
+            # ローカル軸
             if bone.name in ['右肩', '左肩'] and arm_bone_name in model.bones:
                 bone.local_x_vector = (model.bones[arm_bone_name].position - model.bones[bone.name].position).normalized()
                 bone.local_z_vector = MVector3D.crossProduct(bone.local_x_vector, local_y_vector)
@@ -723,6 +857,7 @@ class VroidExportService():
                 logger.info('-- 面・材質データ解析[%s-%s]', index_accessor, material_accessor)
         
         # 材質を不透明(OPAQUE)→透明順(BLEND)に並べ替て設定
+        vertices_by_materials = {}
         index_idx = 0
         for material_type in ["OPAQUE", "MASK", "BLEND", "FaceBrow", "Eyeline", "Eyelash", "EyeWhite", "EyeIris", "EyeHighlight", "Lens"]:
             if material_type in materials_by_type:
@@ -734,9 +869,21 @@ class VroidExportService():
                             model.indices[index_idx] = [v2_idx, v1_idx, v0_idx]
                             index_idx += 1
 
+                            if v0_idx not in vertices_by_materials:
+                                vertices_by_materials[v0_idx] = []
+                            vertices_by_materials[v0_idx].append(material.name)
+
+                            if v1_idx not in vertices_by_materials:
+                                vertices_by_materials[v1_idx] = []
+                            vertices_by_materials[v1_idx].append(material.name)
+
+                            if v2_idx not in vertices_by_materials:
+                                vertices_by_materials[v2_idx] = []
+                            vertices_by_materials[v2_idx].append(material.name)
+
         logger.info("-- 頂点・面・材質データ解析終了")
 
-        return model
+        return model, vertices_by_materials
     
     def get_deform_index(self, vertex_idx: int, model: PmxModel, vertex_pos: MVector3D, joint: MVector4D, skin_joints: list, node_weight: list, bone_name_dict: dict):
         # まずは0じゃないデータ（何かしら有効なボーンINDEXがあるリスト）
@@ -1283,115 +1430,224 @@ DELETE_BONES = [
 ]
 
 BONE_PAIRS = {
-    'Root': {'name': '全ての親', 'parent': None, 'tail': 'Center', 'display': None, 'flag': 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'Center': {'name': 'センター', 'parent': 'Root', 'tail': None, 'display': 'センター', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'Groove': {'name': 'グルーブ', 'parent': 'Center', 'tail': None, 'display': 'センター', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'J_Bip_C_Hips': {'name': '腰', 'parent': 'Groove', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'J_Bip_C_Spine': {'name': '下半身', 'parent': 'J_Bip_C_Hips', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_Spine2': {'name': '上半身', 'parent': 'J_Bip_C_Hips', 'tail': 'J_Bip_C_Chest', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_Chest': {'name': '上半身2', 'parent': 'J_Bip_C_Spine2', 'tail': 'J_Bip_C_UpperChest', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_UpperChest': {'name': '上半身3', 'parent': 'J_Bip_C_Chest', 'tail': 'J_Bip_C_Neck', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_Neck': {'name': '首', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Bip_C_Head', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_C_Head': {'name': '頭', 'parent': 'J_Bip_C_Neck', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Adj_FaceEye': {'name': '両目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Adj_L_FaceEye': {'name': '左目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Adj_R_FaceEye': {'name': '右目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Sec_L_Bust1': {'name': '左胸', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Sec_L_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Sec_L_Bust2': {'name': '左胸先', 'parent': 'J_Sec_L_Bust1', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Sec_R_Bust1': {'name': '右胸', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Sec_R_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Sec_R_Bust2': {'name': '右胸先', 'parent': 'J_Sec_R_Bust1', 'tail': None, 'display': None, 'flag': 0x0002},
-    'shoulderP_L': {'name': '左肩P', 'parent': 'J_Bip_C_UpperChest', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_L_Shoulder': {'name': '左肩', 'parent': 'shoulderP_L', 'tail': 'J_Bip_L_UpperArm', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'shoulderC_L': {'name': '左肩C', 'parent': 'J_Bip_L_Shoulder', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'J_Bip_L_UpperArm': {'name': '左腕', 'parent': 'shoulderC_L', 'tail': 'J_Bip_L_LowerArm', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'arm_twist_L': {'name': '左腕捩', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800 | 0x0800},
-    'arm_twist_1L': {'name': '左腕捩1', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'arm_twist_2L': {'name': '左腕捩2', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'arm_twist_3L': {'name': '左腕捩3', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'J_Bip_L_LowerArm': {'name': '左ひじ', 'parent': 'arm_twist_L', 'tail': 'J_Bip_L_Hand', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'wrist_twist_L': {'name': '左手捩', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800},
-    'wrist_twist_1L': {'name': '左手捩1', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'wrist_twist_2L': {'name': '左手捩2', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'wrist_twist_3L': {'name': '左手捩3', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'J_Bip_L_Hand': {'name': '左手首', 'parent': 'wrist_twist_L', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Thumb1': {'name': '左親指０', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Thumb2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Thumb2': {'name': '左親指１', 'parent': 'J_Bip_L_Thumb1', 'tail': 'J_Bip_L_Thumb3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Thumb3': {'name': '左親指２', 'parent': 'J_Bip_L_Thumb2', 'tail': 'J_Bip_L_Thumb3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Thumb3_end': {'name': '左親指先', 'parent': 'J_Bip_L_Thumb3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_L_Index1': {'name': '左人指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Index2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Index2': {'name': '左人指２', 'parent': 'J_Bip_L_Index1', 'tail': 'J_Bip_L_Index3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Index3': {'name': '左人指３', 'parent': 'J_Bip_L_Index2', 'tail': 'J_Bip_L_Index3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Index3_end': {'name': '左人指先', 'parent': 'J_Bip_L_Index3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_L_Middle1': {'name': '左中指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Middle2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Middle2': {'name': '左中指２', 'parent': 'J_Bip_L_Middle1', 'tail': 'J_Bip_L_Middle3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Middle3': {'name': '左中指３', 'parent': 'J_Bip_L_Middle2', 'tail': 'J_Bip_L_Middle3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Middle3_end': {'name': '左中指先', 'parent': 'J_Bip_L_Middle3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_L_Ring1': {'name': '左薬指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Ring2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Ring2': {'name': '左薬指２', 'parent': 'J_Bip_L_Ring1', 'tail': 'J_Bip_L_Ring3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Ring3': {'name': '左薬指３', 'parent': 'J_Bip_L_Ring2', 'tail': 'J_Bip_L_Ring3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Ring3_end': {'name': '左薬指先', 'parent': 'J_Bip_L_Ring3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_L_Little1': {'name': '左小指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Little2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Little2': {'name': '左小指２', 'parent': 'J_Bip_L_Little1', 'tail': 'J_Bip_L_Little3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Little3': {'name': '左小指３', 'parent': 'J_Bip_L_Little2', 'tail': 'J_Bip_L_Little3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_L_Little3_end': {'name': '左小指先', 'parent': 'J_Bip_L_Little3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'shoulderP_R': {'name': '右肩P', 'parent': 'J_Bip_C_UpperChest', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_R_Shoulder': {'name': '右肩', 'parent': 'shoulderP_R', 'tail': 'J_Bip_R_UpperArm', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'shoulderC_R': {'name': '右肩C', 'parent': 'J_Bip_R_Shoulder', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'J_Bip_R_UpperArm': {'name': '右腕', 'parent': 'shoulderC_R', 'tail': 'J_Bip_R_LowerArm', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'arm_twist_R': {'name': '右腕捩', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800},
-    'arm_twist_1R': {'name': '右腕捩1', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'arm_twist_2R': {'name': '右腕捩2', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'arm_twist_3R': {'name': '右腕捩3', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'J_Bip_R_LowerArm': {'name': '右ひじ', 'parent': 'arm_twist_R', 'tail': 'J_Bip_R_Hand', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'wrist_twist_R': {'name': '右手捩', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800},
-    'wrist_twist_1R': {'name': '右手捩1', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'wrist_twist_2R': {'name': '右手捩2', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'wrist_twist_3R': {'name': '右手捩3', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100},
-    'J_Bip_R_Hand': {'name': '右手首', 'parent': 'wrist_twist_R', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Thumb1': {'name': '右親指０', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Thumb2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Thumb2': {'name': '右親指１', 'parent': 'J_Bip_R_Thumb1', 'tail': 'J_Bip_R_Thumb3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Thumb3': {'name': '右親指２', 'parent': 'J_Bip_R_Thumb2', 'tail': 'J_Bip_R_Thumb3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Thumb3_end': {'name': '右親指先', 'parent': 'J_Bip_R_Thumb3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_R_Index1': {'name': '右人指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Index2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Index2': {'name': '右人指２', 'parent': 'J_Bip_R_Index1', 'tail': 'J_Bip_R_Index3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Index3': {'name': '右人指３', 'parent': 'J_Bip_R_Index2', 'tail': 'J_Bip_R_Index3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Index3_end': {'name': '右人指先', 'parent': 'J_Bip_R_Index3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_R_Middle1': {'name': '右中指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Middle2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Middle2': {'name': '右中指２', 'parent': 'J_Bip_R_Middle1', 'tail': 'J_Bip_R_Middle3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Middle3': {'name': '右中指３', 'parent': 'J_Bip_R_Middle2', 'tail': 'J_Bip_R_Middle3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Middle3_end': {'name': '右中指先', 'parent': 'J_Bip_R_Middle3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_R_Ring1': {'name': '右薬指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Ring2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Ring2': {'name': '右薬指２', 'parent': 'J_Bip_R_Ring1', 'tail': 'J_Bip_R_Ring3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Ring3': {'name': '右薬指３', 'parent': 'J_Bip_R_Ring2', 'tail': 'J_Bip_R_Ring3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Ring3_end': {'name': '右薬指先', 'parent': 'J_Bip_R_Ring3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_R_Little1': {'name': '右小指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Little2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Little2': {'name': '右小指２', 'parent': 'J_Bip_R_Little1', 'tail': 'J_Bip_R_Little3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Little3': {'name': '右小指３', 'parent': 'J_Bip_R_Little2', 'tail': 'J_Bip_R_Little3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800},
-    'J_Bip_R_Little3_end': {'name': '右小指先', 'parent': 'J_Bip_R_Little3', 'tail': None, 'display': None, 'flag': 0x0002},
-    'waistCancel_L': {'name': '腰キャンセル左', 'parent': 'J_Bip_C_Spine', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_L_UpperLeg': {'name': '左足', 'parent': 'waistCancel_L', 'tail': 'J_Bip_L_LowerLeg', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_L_LowerLeg': {'name': '左ひざ', 'parent': 'J_Bip_L_UpperLeg', 'tail': 'J_Bip_L_Foot', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_L_Foot': {'name': '左足首', 'parent': 'J_Bip_L_LowerLeg', 'tail': 'J_Bip_L_ToeBase', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_L_ToeBase': {'name': '左つま先', 'parent': 'J_Bip_L_Foot', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'leg_IK_Parent_L': {'name': '左足IK親', 'parent': 'Root', 'tail': 'leg_IK_L', 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'leg_IK_L': {'name': '左足ＩＫ', 'parent': 'leg_IK_Parent_L', 'tail': MVector3D(0, 0, 1), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
-    'toe_IK_L': {'name': '左つま先ＩＫ', 'parent': 'leg_IK_L', 'tail': MVector3D(0, -1, 0), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
-    'waistCancel_R': {'name': '腰キャンセル右', 'parent': 'J_Bip_C_Spine', 'tail': None, 'display': None, 'flag': 0x0002},
-    'J_Bip_R_UpperLeg': {'name': '右足', 'parent': 'waistCancel_R', 'tail': 'J_Bip_R_LowerLeg', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_R_LowerLeg': {'name': '右ひざ', 'parent': 'J_Bip_R_UpperLeg', 'tail': 'J_Bip_R_Foot', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_R_Foot': {'name': '右足首', 'parent': 'J_Bip_R_LowerLeg', 'tail': 'J_Bip_R_ToeBase', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010},
-    'J_Bip_R_ToeBase': {'name': '右つま先', 'parent': 'J_Bip_R_Foot', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'leg_IK_Parent_R': {'name': '右足IK親', 'parent': 'Root', 'tail': 'leg_IK_R', 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010},
-    'leg_IK_R': {'name': '右足ＩＫ', 'parent': 'leg_IK_Parent_R', 'tail': MVector3D(0, 0, 1), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
-    'toe_IK_R': {'name': '右つま先ＩＫ', 'parent': 'leg_IK_R', 'tail': MVector3D(0, -1, 0), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020},
-    'leg_D_L': {'name': '左足D', 'parent': 'waistCancel_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
-    'knee_D_L': {'name': '左ひざD', 'parent': 'leg_D_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
-    'ankle_D_L': {'name': '左足首D', 'parent': 'knee_D_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
-    'toe_EX_L': {'name': '左足先EX', 'parent': 'ankle_D_L', 'tail': MVector3D(0, 0, -1), 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010},
-    'leg_D_R': {'name': '右足D', 'parent': 'waistCancel_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
-    'knee_D_R': {'name': '右ひざD', 'parent': 'leg_D_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
-    'ankle_D_R': {'name': '右足首D', 'parent': 'knee_D_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100},
-    'toe_EX_R': {'name': '右足先EX', 'parent': 'ankle_D_R', 'tail': MVector3D(0, 0, -1), 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010},
+    'Root': {'name': '全ての親', 'parent': None, 'tail': 'Center', 'display': None, 'flag': 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010, \
+             'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'Center': {'name': 'センター', 'parent': 'Root', 'tail': None, 'display': 'センター', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010, \
+               'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'Groove': {'name': 'グルーブ', 'parent': 'Center', 'tail': None, 'display': 'センター', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010, \
+               'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_C_Hips': {'name': '腰', 'parent': 'Groove', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_C_Spine': {'name': '下半身', 'parent': 'J_Bip_C_Hips', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                      'rigidbodyGroup': 0, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_C_Spine2': {'name': '上半身', 'parent': 'J_Bip_C_Hips', 'tail': 'J_Bip_C_Chest', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                       'rigidbodyGroup': 0, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_C_Chest': {'name': '上半身2', 'parent': 'J_Bip_C_Spine2', 'tail': 'J_Bip_C_UpperChest', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                      'rigidbodyGroup': 0, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_C_UpperChest': {'name': '上半身3', 'parent': 'J_Bip_C_Chest', 'tail': 'J_Bip_C_Neck', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                           'rigidbodyGroup': 0, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_C_Neck': {'name': '首', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Bip_C_Head', 'display': '体幹', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                     'rigidbodyGroup': 0, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_C_Head': {'name': '頭', 'parent': 'J_Bip_C_Neck', 'tail': None, 'display': '体幹', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                     'rigidbodyGroup': 0, 'rigidbodyShape': 0, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Adj_FaceEye': {'name': '両目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Adj_L_FaceEye': {'name': '左目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Adj_R_FaceEye': {'name': '右目', 'parent': 'J_Bip_C_Head', 'tail': None, 'display': '顔', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Sec_L_Bust1': {'name': '左胸', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Sec_L_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                      'rigidbodyGroup': 0, 'rigidbodyShape': 0, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Sec_L_Bust2': {'name': '左胸先', 'parent': 'J_Sec_L_Bust1', 'tail': None, 'display': None, 'flag': 0x0002, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Sec_R_Bust1': {'name': '右胸', 'parent': 'J_Bip_C_UpperChest', 'tail': 'J_Sec_R_Bust2', 'display': '胸', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                      'rigidbodyGroup': 0, 'rigidbodyShape': 0, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Sec_R_Bust2': {'name': '右胸先', 'parent': 'J_Sec_R_Bust1', 'tail': None, 'display': None, 'flag': 0x0002, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'shoulderP_L': {'name': '左肩P', 'parent': 'J_Bip_C_UpperChest', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                    'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Shoulder': {'name': '左肩', 'parent': 'shoulderP_L', 'tail': 'J_Bip_L_UpperArm', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'shoulderC_L': {'name': '左肩C', 'parent': 'J_Bip_L_Shoulder', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                    'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_UpperArm': {'name': '左腕', 'parent': 'shoulderC_L', 'tail': 'J_Bip_L_LowerArm', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'arm_twist_L': {'name': '左腕捩', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800 | 0x0800, \
+                    'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'arm_twist_1L': {'name': '左腕捩1', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'arm_twist_2L': {'name': '左腕捩2', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'arm_twist_3L': {'name': '左腕捩3', 'parent': 'J_Bip_L_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_LowerArm': {'name': '左ひじ', 'parent': 'arm_twist_L', 'tail': 'J_Bip_L_Hand', 'display': '左手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'wrist_twist_L': {'name': '左手捩', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'wrist_twist_1L': {'name': '左手捩1', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'wrist_twist_2L': {'name': '左手捩2', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'wrist_twist_3L': {'name': '左手捩3', 'parent': 'J_Bip_L_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Hand': {'name': '左手首', 'parent': 'wrist_twist_L', 'tail': None, 'display': '左手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                     'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_L_Thumb1': {'name': '左親指０', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Thumb2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Thumb2': {'name': '左親指１', 'parent': 'J_Bip_L_Thumb1', 'tail': 'J_Bip_L_Thumb3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Thumb3': {'name': '左親指２', 'parent': 'J_Bip_L_Thumb2', 'tail': 'J_Bip_L_Thumb3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Thumb3_end': {'name': '左親指先', 'parent': 'J_Bip_L_Thumb3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                           'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Index1': {'name': '左人指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Index2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Index2': {'name': '左人指２', 'parent': 'J_Bip_L_Index1', 'tail': 'J_Bip_L_Index3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Index3': {'name': '左人指３', 'parent': 'J_Bip_L_Index2', 'tail': 'J_Bip_L_Index3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Index3_end': {'name': '左人指先', 'parent': 'J_Bip_L_Index3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                           'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Middle1': {'name': '左中指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Middle2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Middle2': {'name': '左中指２', 'parent': 'J_Bip_L_Middle1', 'tail': 'J_Bip_L_Middle3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Middle3': {'name': '左中指３', 'parent': 'J_Bip_L_Middle2', 'tail': 'J_Bip_L_Middle3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Middle3_end': {'name': '左中指先', 'parent': 'J_Bip_L_Middle3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                            'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Ring1': {'name': '左薬指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Ring2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Ring2': {'name': '左薬指２', 'parent': 'J_Bip_L_Ring1', 'tail': 'J_Bip_L_Ring3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Ring3': {'name': '左薬指３', 'parent': 'J_Bip_L_Ring2', 'tail': 'J_Bip_L_Ring3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Ring3_end': {'name': '左薬指先', 'parent': 'J_Bip_L_Ring3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                          'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Little1': {'name': '左小指１', 'parent': 'J_Bip_L_Hand', 'tail': 'J_Bip_L_Little2', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Little2': {'name': '左小指２', 'parent': 'J_Bip_L_Little1', 'tail': 'J_Bip_L_Little3', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Little3': {'name': '左小指３', 'parent': 'J_Bip_L_Little2', 'tail': 'J_Bip_L_Little3_end', 'display': '左指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_Little3_end': {'name': '左小指先', 'parent': 'J_Bip_L_Little3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                            'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'shoulderP_R': {'name': '右肩P', 'parent': 'J_Bip_C_UpperChest', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                    'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Shoulder': {'name': '右肩', 'parent': 'shoulderP_R', 'tail': 'J_Bip_R_UpperArm', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'shoulderC_R': {'name': '右肩C', 'parent': 'J_Bip_R_Shoulder', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                    'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_UpperArm': {'name': '右腕', 'parent': 'shoulderC_R', 'tail': 'J_Bip_R_LowerArm', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'arm_twist_R': {'name': '右腕捩', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800, \
+                    'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'arm_twist_1R': {'name': '右腕捩1', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'arm_twist_2R': {'name': '右腕捩2', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'arm_twist_3R': {'name': '右腕捩3', 'parent': 'J_Bip_R_UpperArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                     'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_LowerArm': {'name': '右ひじ', 'parent': 'arm_twist_R', 'tail': 'J_Bip_R_Hand', 'display': '右手', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'wrist_twist_R': {'name': '右手捩', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0400 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'wrist_twist_1R': {'name': '右手捩1', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'wrist_twist_2R': {'name': '右手捩2', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'wrist_twist_3R': {'name': '右手捩3', 'parent': 'J_Bip_R_LowerArm', 'tail': None, 'display': None, 'flag': 0x0002 | 0x0100, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Hand': {'name': '右手首', 'parent': 'wrist_twist_R', 'tail': None, 'display': '右手', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                     'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_R_Thumb1': {'name': '右親指０', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Thumb2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Thumb2': {'name': '右親指１', 'parent': 'J_Bip_R_Thumb1', 'tail': 'J_Bip_R_Thumb3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Thumb3': {'name': '右親指２', 'parent': 'J_Bip_R_Thumb2', 'tail': 'J_Bip_R_Thumb3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Thumb3_end': {'name': '右親指先', 'parent': 'J_Bip_R_Thumb3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                           'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Index1': {'name': '右人指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Index2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Index2': {'name': '右人指２', 'parent': 'J_Bip_R_Index1', 'tail': 'J_Bip_R_Index3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Index3': {'name': '右人指３', 'parent': 'J_Bip_R_Index2', 'tail': 'J_Bip_R_Index3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                       'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Index3_end': {'name': '右人指先', 'parent': 'J_Bip_R_Index3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                           'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Middle1': {'name': '右中指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Middle2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Middle2': {'name': '右中指２', 'parent': 'J_Bip_R_Middle1', 'tail': 'J_Bip_R_Middle3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Middle3': {'name': '右中指３', 'parent': 'J_Bip_R_Middle2', 'tail': 'J_Bip_R_Middle3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Middle3_end': {'name': '右中指先', 'parent': 'J_Bip_R_Middle3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                            'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Ring1': {'name': '右薬指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Ring2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Ring2': {'name': '右薬指２', 'parent': 'J_Bip_R_Ring1', 'tail': 'J_Bip_R_Ring3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Ring3': {'name': '右薬指３', 'parent': 'J_Bip_R_Ring2', 'tail': 'J_Bip_R_Ring3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Ring3_end': {'name': '右薬指先', 'parent': 'J_Bip_R_Ring3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                          'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Little1': {'name': '右小指１', 'parent': 'J_Bip_R_Hand', 'tail': 'J_Bip_R_Little2', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Little2': {'name': '右小指２', 'parent': 'J_Bip_R_Little1', 'tail': 'J_Bip_R_Little3', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Little3': {'name': '右小指３', 'parent': 'J_Bip_R_Little2', 'tail': 'J_Bip_R_Little3_end', 'display': '右指', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010 | 0x0800, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_Little3_end': {'name': '右小指先', 'parent': 'J_Bip_R_Little3', 'tail': None, 'display': None, 'flag': 0x0002, \
+                            'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'waistCancel_L': {'name': '腰キャンセル左', 'parent': 'J_Bip_C_Spine', 'tail': None, 'display': None, 'flag': 0x0002, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_L_UpperLeg': {'name': '左足', 'parent': 'waistCancel_L', 'tail': 'J_Bip_L_LowerLeg', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_L_LowerLeg': {'name': '左ひざ', 'parent': 'J_Bip_L_UpperLeg', 'tail': 'J_Bip_L_Foot', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_L_Foot': {'name': '左足首', 'parent': 'J_Bip_L_LowerLeg', 'tail': 'J_Bip_L_ToeBase', 'display': '左足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                     'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_L_ToeBase': {'name': '左つま先', 'parent': 'J_Bip_L_Foot', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'leg_IK_Parent_L': {'name': '左足IK親', 'parent': 'Root', 'tail': 'leg_IK_L', 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'leg_IK_L': {'name': '左足ＩＫ', 'parent': 'leg_IK_Parent_L', 'tail': MVector3D(0, 0, 1), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'toe_IK_L': {'name': '左つま先ＩＫ', 'parent': 'leg_IK_L', 'tail': MVector3D(0, -1, 0), 'display': '左足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'waistCancel_R': {'name': '腰キャンセル右', 'parent': 'J_Bip_C_Spine', 'tail': None, 'display': None, 'flag': 0x0002, \
+                      'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'J_Bip_R_UpperLeg': {'name': '右足', 'parent': 'waistCancel_R', 'tail': 'J_Bip_R_LowerLeg', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_R_LowerLeg': {'name': '右ひざ', 'parent': 'J_Bip_R_UpperLeg', 'tail': 'J_Bip_R_Foot', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                         'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_R_Foot': {'name': '右足首', 'parent': 'J_Bip_R_LowerLeg', 'tail': 'J_Bip_R_ToeBase', 'display': '右足', 'flag': 0x0001 | 0x0002 | 0x0008 | 0x0010, \
+                     'rigidbodyGroup': 1, 'rigidbodyShape': 2, 'rigidbodyMode': 0, 'rigidbodyNoColl': [0, 1]},
+    'J_Bip_R_ToeBase': {'name': '右つま先', 'parent': 'J_Bip_R_Foot', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'leg_IK_Parent_R': {'name': '右足IK親', 'parent': 'Root', 'tail': 'leg_IK_R', 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010, \
+                        'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'leg_IK_R': {'name': '右足ＩＫ', 'parent': 'leg_IK_Parent_R', 'tail': MVector3D(0, 0, 1), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'toe_IK_R': {'name': '右つま先ＩＫ', 'parent': 'leg_IK_R', 'tail': MVector3D(0, -1, 0), 'display': '右足', 'flag': 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'leg_D_L': {'name': '左足D', 'parent': 'waistCancel_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100, \
+                'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'knee_D_L': {'name': '左ひざD', 'parent': 'leg_D_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'ankle_D_L': {'name': '左足首D', 'parent': 'knee_D_L', 'tail': None, 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100, \
+                  'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'toe_EX_L': {'name': '左足先EX', 'parent': 'ankle_D_L', 'tail': MVector3D(0, 0, -1), 'display': '左足', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'leg_D_R': {'name': '右足D', 'parent': 'waistCancel_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100, \
+                'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'knee_D_R': {'name': '右ひざD', 'parent': 'leg_D_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'ankle_D_R': {'name': '右足首D', 'parent': 'knee_D_R', 'tail': None, 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010 | 0x0100, \
+                  'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
+    'toe_EX_R': {'name': '右足先EX', 'parent': 'ankle_D_R', 'tail': MVector3D(0, 0, -1), 'display': '右足', 'flag': 0x0002 | 0x0008 | 0x0010, \
+                 'rigidbodyGroup': -1, 'rigidbodyShape': -1, 'rigidbodyMode': 0, 'rigidbodyNoColl': None},
 }
 
 MORPH_EYEBROW = 1
