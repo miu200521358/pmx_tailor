@@ -1947,7 +1947,7 @@ class PmxTailorExportService():
 
             prev_yi = 0
             v_yidxs = []
-            for yi, bh in enumerate(bone_vertical_distances[:, median_x]):
+            for yi, bh in enumerate(bone_vertical_distances[1:, median_x]):
                 if yi == 0 or np.sum(bone_vertical_distances[prev_yi:(yi + 1), median_x]) >= median_y_distance * param_option["vertical_bone_density"] * 0.8:
                     v_yidxs.append(yi)
                     prev_yi = yi + 1
@@ -1964,7 +1964,7 @@ class PmxTailorExportService():
 
             prev_xi = 0
             base_v_xidxs = []
-            for xi, bh in enumerate(bone_horizonal_distances[median_y, :]):
+            for xi, bh in enumerate(bone_horizonal_distances[median_y, 1:]):
                 if xi == 0 or np.sum(bone_horizonal_distances[median_y, prev_xi:(xi + 1)]) >= median_x_distance * param_option["horizonal_bone_density"] * 0.8:
                     base_v_xidxs.append(xi)
                     prev_xi = xi + 1
