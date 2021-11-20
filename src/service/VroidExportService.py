@@ -75,7 +75,7 @@ class VroidExportService():
 
     def vroid2pmx(self):
         try:
-            model, tex_dir_path = self.convert_texture(PmxModel())
+            model, tex_dir_path = self.create_model()
             if not model:
                 return False
 
@@ -120,7 +120,7 @@ class VroidExportService():
             import traceback
             logger.critical("Vroid2Pmx処理が意図せぬエラーで終了しました。\n\n%s", traceback.format_exc(), decoration=MLogger.DECORATION_BOX)
             raise e
-    
+
     def create_cloth_physics(self, model: PmxModel, bone_vertices: dict):
         cloth_bones = {}
         for bone_name, bone in model.bones.items():
@@ -1262,7 +1262,9 @@ class VroidExportService():
 
         return node_param['relative_position'] + self.calc_bone_position(model, node_dict, node_dict[node_param['parent']])
 
-    def convert_texture(self, model: PmxModel):
+    def create_model(self):
+        model = PmxModel()
+
         # テクスチャ用ディレクトリ
         tex_dir_path = os.path.join(str(Path(self.options.output_path).resolve().parents[0]), "tex")
         os.makedirs(tex_dir_path, exist_ok=True)
@@ -1286,6 +1288,55 @@ class VroidExportService():
             jf = open(os.path.join(glft_dir_path, "gltf.json"), "w", encoding='utf-8')
             json.dump(model.json_data, jf, ensure_ascii=False, indent=4, sort_keys=True, separators=(',', ': '))
             logger.info("-- JSON出力終了")
+
+            if "extensions" not in model.json_data or 'VRM' not in model.json_data['extensions'] or 'exporterVersion' not in model.json_data['extensions']['VRM']:
+                logger.error("出力ソフト情報がないため、処理を中断します。", decoration=MLogger.DECORATION_BOX)
+                return None
+
+            if "VRoid Studio-1.0." not in model.json_data['extensions']['VRM']['exporterVersion']:
+                logger.error("VRoid Studio 1.0.x で出力されたvrmデータではないため、処理を中断します。", decoration=MLogger.DECORATION_BOX)
+                return None
+
+            if "extensions" not in model.json_data or 'VRM' not in model.json_data['extensions'] or 'meta' not in model.json_data['extensions']['VRM']:
+                logger.error("メタ情報がないため、処理を中断します。", decoration=MLogger.DECORATION_BOX)
+                return None
+
+            if 'title' in model.json_data['extensions']['VRM']['meta']:
+                model.name = model.json_data['extensions']['VRM']['meta']['title']
+                model.english_name = model.json_data['extensions']['VRM']['meta']['title']
+
+            model.comment += f"{logger.transtext('PMX出力')}: Vroid2Pmx\r\n"
+
+            model.comment += f"\r\n{logger.transtext('アバター情報')} -------\r\n"
+
+            if 'author' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('作者')}: {model.json_data['extensions']['VRM']['meta']['author']}\r\n"
+            if 'contactInformation' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('連絡先')}: {model.json_data['extensions']['VRM']['meta']['contactInformation']}\r\n"
+            if 'reference' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('参照')}: {model.json_data['extensions']['VRM']['meta']['reference']}\r\n"
+            if 'version' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('バージョン')}: {model.json_data['extensions']['VRM']['meta']['version']}\r\n"
+
+            model.comment += f"\r\n{logger.transtext('アバターの人格に関する許諾範囲')} -------\r\n"
+
+            if 'allowedUserName' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('アバターに人格を与えることの許諾範囲')}: {model.json_data['extensions']['VRM']['meta']['allowedUserName']}\r\n"
+            if 'violentUssageName' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('このアバターを用いて暴力表現を演じることの許可')}: {model.json_data['extensions']['VRM']['meta']['violentUssageName']}\r\n"
+            if 'sexualUssageName' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('このアバターを用いて性的表現を演じることの許可')}: {model.json_data['extensions']['VRM']['meta']['sexualUssageName']}\r\n"
+            if 'commercialUssageName' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('商用利用の許可')}: {model.json_data['extensions']['VRM']['meta']['commercialUssageName']}\r\n"
+            if 'otherPermissionUrl' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('その他のライセンス条件')}: {model.json_data['extensions']['VRM']['meta']['otherPermissionUrl']}\r\n"
+
+            model.comment += f"\r\n{logger.transtext('再配布・改変に関する許諾範囲')} -------\r\n"
+
+            if 'licenseName' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('ライセンスタイプ')}: {model.json_data['extensions']['VRM']['meta']['licenseName']}\r\n"
+            if 'otherPermissionUrl' in model.json_data['extensions']['VRM']['meta']:
+                model.comment += f"{logger.transtext('その他のライセンス条件')}: {model.json_data['extensions']['VRM']['meta']['otherPermissionUrl']}\r\n"
 
             # binデータ
             bin_buf_size = self.unpack(8, "L")
