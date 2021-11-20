@@ -15,6 +15,7 @@ from form.parts.FloatSliderCtrl import FloatSliderCtrl
 from form.parts.HistoryFilePickerCtrl import HistoryFilePickerCtrl
 from mmd.PmxData import RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef
 from module.MMath import MRect, MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4 # noqa
+from utils import MFileUtils
 from utils.MLogger import MLogger # noqa
 
 logger = MLogger(__name__)
@@ -44,7 +45,7 @@ class ParamPanel(BasePanel):
         self.btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # 材質設定クリアボタン
-        self.clear_btn_ctrl = wx.Button(self.header_panel, wx.ID_ANY, logger.transtext("材質設定クリア"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.clear_btn_ctrl = wx.Button(self.header_panel, wx.ID_ANY, logger.transtext("物理設定クリア"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.clear_btn_ctrl.SetToolTip(logger.transtext("既に入力されたデータをすべて空にします。"))
         self.clear_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_clear_set)
         self.btn_sizer.Add(self.clear_btn_ctrl, 0, wx.ALL, 5)
@@ -318,7 +319,7 @@ class PhysicsParam():
         self.simple_param_sizer.Add(self.simple_back_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
         # 頂点CSVファイルコントロール
-        self.vertices_csv_file_ctrl = HistoryFilePickerCtrl(main_frame, self.simple_window, logger.transtext("対象頂点CSV"), logger.transtext("対象頂点CSVファイルを開く"), ("csv"), wx.FLP_DEFAULT_STYLE, \
+        self.vertices_csv_file_ctrl = HistoryFilePickerCtrl(self.main_frame, self.simple_window, logger.transtext("対象頂点CSV"), logger.transtext("対象頂点CSVファイルを開く"), ("csv"), wx.FLP_DEFAULT_STYLE, \
                                                             logger.transtext("材質の中で物理を割り当てたい頂点を絞り込みたい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"), \
                                                             file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="vertices_csv", \
                                                             is_change_output=False, is_aster=False, is_save=False, set_no=0)
@@ -1466,6 +1467,9 @@ class PhysicsParam():
                 params["bone_grid_rows"] = 0
                 params["bone_grid_cols"] = 0
 
+            self.vertices_csv_file_ctrl.save()
+            MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
+
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
             params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
@@ -1568,7 +1572,6 @@ class PhysicsParam():
         return params
     
     def on_change_vertices_csv(self, event: wx.Event):
-        self.vertices_csv_file_ctrl.save()
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def on_param_import(self, event: wx.Event):

@@ -30,7 +30,7 @@ class PmxTailorExportService():
         logging.basicConfig(level=self.options.logging_level, format="%(message)s [%(module_name)s]")
 
         try:
-            service_data_txt = f"{logger.transtext('PmxTailor変換処理実行')}\n------------------------\nexeバージョン: {self.options.version_name}\n"
+            service_data_txt = f"{logger.transtext('PmxTailor変換処理実行')}\n------------------------\n{logger.transtext('exeバージョン')}: {self.options.version_name}\n"
             service_data_txt = f"{service_data_txt}　{logger.transtext('元モデル')}: {os.path.basename(self.options.pmx_model.path)}\n"
 
             for pidx, param_option in enumerate(self.options.param_options):
@@ -1701,6 +1701,8 @@ class PmxTailorExportService():
                             # ウェイト
                             total_weights = np.array([prev_above_weight, next_above_weight, prev_below_weight, next_below_weight])
 
+                        logger.debug(f'vertex_idx: {vertex_idx}, weight_names: [{weight_names}], total_weights: [{total_weights}]')
+
                         if len(np.nonzero(total_weights)[0]) > 0:
                             weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                             weight_idxs = np.argsort(weights)
@@ -1754,7 +1756,8 @@ class PmxTailorExportService():
             # 各頂点の位置との差分から距離を測る
             rv_distances = np.linalg.norm((np.array(list(vertex_distances.values())) - v.position.data()), ord=2, axis=1)
 
-            nearest_vi = list(vertex_distances.keys())[np.argmin(rv_distances)]
+            # まったく同じ位置のはウェイト置き換えても上手くいかないのでちょっとでも離れてるヤツの中から直近
+            nearest_vi = list(vertex_distances.keys())[np.argmin(rv_distances[rv_distances > 0])]
             nearest_v = model.vertex_dict[nearest_vi]
             nearest_deform = nearest_v.deform
 
@@ -2460,12 +2463,14 @@ class PmxTailorExportService():
             # それぞれの出現回数から大体全部埋まってるのを抽出。その中の最大と最小を選ぶ
             xu, x_counts = np.unique(xs, return_counts=True)
             full_xs = [i for i, x in zip(xu, x_counts) if x >= max(x_counts) * 0.6]
+            logger.debug(f'絶対axis_range: xu[{xu}], x_counts[{x_counts}], full_xs[{full_xs}]')
 
             min_x = min(full_xs)
             max_x = max(full_xs)
 
             yu, y_counts = np.unique(ys, return_counts=True)
-            full_ys = [i for i, y in zip(yu, y_counts) if y >= max(y_counts) * 0.6]
+            full_ys = [i for i, y in zip(yu, y_counts) if y >= max(y_counts) * 0.2]
+            logger.debug(f'絶対axis_range: yu[{yu}], y_counts[{y_counts}], full_ys[{full_ys}]')
 
             min_y = min(full_ys)
             max_y = max(full_ys)
@@ -2928,7 +2933,7 @@ class PmxTailorExportService():
                         v1v = v1.position.y()
                         v2v = v2.position.y()
 
-                    if abs(v1v - v0v) < abs(v2v - v0v):
+                    if abs(v1v - v0v) < abs(v2v - v0v) and abs(v0v - v1v) < abs(v2v - v1v):
                         # v1は横展開とみなす
                         if v0v < v2v:
                             # 上にあがる場合、v1は左方向
@@ -2946,12 +2951,12 @@ class PmxTailorExportService():
                             vx = 0
                         else:
                             # v2の方がv0に近い場合、v1は斜めと見なす
-                            if abs(v1v - v0v) <= abs(v2v - v0v):
-                                # ＼の場合、v1は左方向
-                                vx = -1
-                            else:
+                            if abs(v0v - v1v) < abs(v2v - v1v):
                                 # ／の場合、v1は右方向
-                                vx = 1
+                                vx = 1 if vy == -1 else -1
+                            else:
+                                # ＼の場合、v1は左方向
+                                vx = -1 if vy == -1 else 1
 
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': vx, 'y': vy, 'position': model.vertex_dict[vidx].position, 'duplicate': duplicate_vertices[model.vertex_dict[vidx].position.to_log()]}
             vertex_coordinate_map[(vx, vy)] = vs_duplicated[v1.index]

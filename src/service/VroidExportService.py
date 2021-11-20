@@ -48,12 +48,10 @@ class VroidExportService():
         logging.basicConfig(level=self.options.logging_level, format="%(message)s [%(module_name)s]")
 
         try:
-            service_data_txt = "Vroid2Pmx処理実行\n------------------------\nexeバージョン: {version_name}\n".format(version_name=self.options.version_name) \
+            service_data_txt = f"{logger.transtext('Vroid2Pmx処理実行')}\n------------------------\n{logger.transtext('exeバージョン')}: {self.options.version_name}\n"
+            service_data_txt = f"{service_data_txt}　{logger.transtext('元モデル')}: {os.path.basename(self.options.pmx_model.path)}\n"
 
-            service_data_txt = "{service_data_txt}　元モデル: {pmx_model}\n".format(service_data_txt=service_data_txt,
-                                    pmx_model=os.path.basename(self.options.pmx_model.path)) # noqa
-
-            logger.info(service_data_txt, decoration=MLogger.DECORATION_BOX)
+            logger.info(service_data_txt, translate=False, decoration=MLogger.DECORATION_BOX)
 
             model = self.vroid2pmx()
 
@@ -85,7 +83,7 @@ class VroidExportService():
             if not model:
                 return False
 
-            model, vertices_by_materials = self.convert_mesh(model, bone_name_dict, tex_dir_path)
+            model = self.convert_mesh(model, bone_name_dict, tex_dir_path)
             if not model:
                 return False
             
@@ -101,13 +99,16 @@ class VroidExportService():
             if not model:
                 return False
             
-            bone_vertices = self.create_bone_vertices(model, vertices_by_materials)
+            bone_vertices = self.create_bone_vertices(model)
 
             model = self.create_body_physics(model, bone_vertices)
             if not model:
                 return False
-            
 
+            # model = self.create_cloth_physics(model, bone_vertices)
+            # if not model:
+            #     return False
+            
             return model
         except MKilledException as ke:
             # 終了命令
@@ -119,6 +120,57 @@ class VroidExportService():
             import traceback
             logger.critical("Vroid2Pmx処理が意図せぬエラーで終了しました。\n\n%s", traceback.format_exc(), decoration=MLogger.DECORATION_BOX)
             raise e
+    
+    def create_cloth_physics(self, model: PmxModel, bone_vertices: dict):
+        cloth_bones = {}
+        for bone_name, bone in model.bones.items():
+            if '装飾_' in bone_name and '_end' in bone_name:
+                cloth_name = bone_name[:7]
+                if cloth_name not in cloth_bones:
+                    cloth_bones[cloth_name] = []
+                cloth_bones[cloth_name].append(bone_name)
+        
+        cloth_sorted_bone_name_parts = [('_L_', 'Front'), ('_L_', 'Side'), ('_L_', 'Back'), ('_R_', 'Back'), ('_R_', 'Side'), ('_R_', 'Front')]
+
+        for cloth_names in cloth_bones.items():
+            cloth_vertices = []
+            cloth_sorted_bone_names = []
+            max_yi = 0
+            for cname in cloth_names:
+                (cs_direction, cs_part_name) = cloth_sorted_bone_name_parts[len(cloth_sorted_bone_names)]
+                if cs_direction in cname and cs_part_name in cname:
+                    # 末端ボーンなので、親を取ってくる
+                    cloth_bones = []
+                    cloth_links = model.create_link_2_top_one(cname, is_defined=False)
+                    for clink_name in cloth_links.all().keys():
+                        if cname[:7] in clink_name:
+                            # 装飾系のボーン名である場合、追加
+                            cloth_bones.append(clink_name)
+                            if model.bones[clink_name].index in bone_vertices:
+                                cloth_vertices.extend(bone_vertices[model.bones[clink_name].index])
+                    max_yi = len(cloth_bones) if len(cloth_bones) > max_yi else max_yi
+                    cloth_sorted_bone_names.append(cloth_bones)
+            
+            target_material_name = None
+            for material_name, material_vertices in model.material_vertices.items():
+                if len(set(material_vertices) & set(cloth_vertices)) > 0:
+                    target_material_name = material_name
+                    break
+        
+            cloth_bone_map = np.full((len(cloth_sorted_bone_names), max_yi), '')
+            for xi, cbone_names in enumerate(cloth_sorted_bone_names):
+                for yi, cname in enumerate(cbone_names):
+                    cloth_bone_map[xi, yi] = cname
+            
+            if target_material_name and len(cloth_sorted_bone_names) > 0:
+                param_option = {}
+                param_option['material_name'] = target_material_name
+                param_option['bone_grid'] = cloth_bone_map
+                param_option['bone_grid_cols'] = len(cloth_sorted_bone_names)
+                param_option['bone_grid_rows'] = max_yi
+
+
+        return model
     
     def create_body_physics(self, model: PmxModel, bone_vertices: dict):
         for bone_name, bone in model.bones.items():
@@ -233,15 +285,13 @@ class VroidExportService():
 
         return model
     
-    def create_bone_vertices(self, model: PmxModel, vertices_by_materials: dict):
+    def create_bone_vertices(self, model: PmxModel):
         bone_vertices = {}
         for vertex in model.vertex_dict.values():
             for bone_idx in vertex.deform.get_idx_list(0.3):
                 if bone_idx not in bone_vertices:
                     bone_vertices[bone_idx] = []
                 bone = [b for b in model.bones.values() if bone_idx == b.index][0]
-
-                # if is_target:
                 bone_vertices[bone_idx].append(vertex)
 
                 if "捩" in bone.name:
@@ -857,33 +907,30 @@ class VroidExportService():
                 logger.info('-- 面・材質データ解析[%s-%s]', index_accessor, material_accessor)
         
         # 材質を不透明(OPAQUE)→透明順(BLEND)に並べ替て設定
-        vertices_by_materials = {}
         index_idx = 0
         for material_type in ["OPAQUE", "MASK", "BLEND", "FaceBrow", "Eyeline", "Eyelash", "EyeWhite", "EyeIris", "EyeHighlight", "Lens"]:
             if material_type in materials_by_type:
                 for material_name, material in materials_by_type[material_type].items():
                     model.materials[material.name] = material
+                    model.material_vertices[material.name] = []
                     for index_accessor, indices in indices_by_materials[material.name].items():
                         for v0_idx, v1_idx, v2_idx in zip(indices[:-2:3], indices[1:-1:3], indices[2::3]):
                             # 面の貼り方がPMXは逆
                             model.indices[index_idx] = [v2_idx, v1_idx, v0_idx]
                             index_idx += 1
 
-                            if v0_idx not in vertices_by_materials:
-                                vertices_by_materials[v0_idx] = []
-                            vertices_by_materials[v0_idx].append(material.name)
+                            if v0_idx not in model.material_vertices[material.name]:
+                                model.material_vertices[material.name].append(v0_idx)
 
-                            if v1_idx not in vertices_by_materials:
-                                vertices_by_materials[v1_idx] = []
-                            vertices_by_materials[v1_idx].append(material.name)
+                            if v1_idx not in model.material_vertices[material.name]:
+                                model.material_vertices[material.name].append(v1_idx)
 
-                            if v2_idx not in vertices_by_materials:
-                                vertices_by_materials[v2_idx] = []
-                            vertices_by_materials[v2_idx].append(material.name)
+                            if v2_idx not in model.material_vertices[material.name]:
+                                model.material_vertices[material.name].append(v2_idx)
 
         logger.info("-- 頂点・面・材質データ解析終了")
 
-        return model, vertices_by_materials
+        return model
     
     def get_deform_index(self, vertex_idx: int, model: PmxModel, vertex_pos: MVector3D, joint: MVector4D, skin_joints: list, node_weight: list, bone_name_dict: dict):
         # まずは0じゃないデータ（何かしら有効なボーンINDEXがあるリスト）
