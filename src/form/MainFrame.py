@@ -6,7 +6,6 @@ import wx
 import threading
 
 from form.panel.FilePanel import FilePanel
-from form.panel.VrmPanel import VrmPanel
 from form.panel.ParamPanel import ParamPanel
 from form.panel.ParamAdvancePanel import ParamAdvancePanel
 from form.panel.ParamBonePanel import ParamBonePanel
@@ -28,12 +27,11 @@ logger = MLogger(__name__)
 
 class MainFrame(wx.Frame):
 
-    def __init__(self, parent, mydir_path: str, version_name: str, logging_level: int, is_saving: bool, is_out_log: bool, is_vroid: bool):
+    def __init__(self, parent, mydir_path: str, version_name: str, logging_level: int, is_saving: bool, is_out_log: bool):
         self.version_name = version_name
         self.logging_level = logging_level
         self.is_out_log = is_out_log
         self.is_saving = is_saving
-        self.is_vroid = is_vroid
         self.mydir_path = mydir_path
         self.elapsed_time = 0
         self.popuped_finger_warning = False
@@ -41,7 +39,7 @@ class MainFrame(wx.Frame):
         self.worker = None
         self.load_worker = None
 
-        self.my_program = 'Vroid2Pmx' if self.is_vroid else 'PmxTailor'
+        self.my_program = 'PmxTailor'
 
         frame_size = wx.Size(600, 650)
         if logger.target_lang == "en_US":
@@ -87,22 +85,17 @@ class MainFrame(wx.Frame):
         self.file_panel_ctrl = FilePanel(self, self.note_ctrl, 0)
         self.note_ctrl.AddPage(self.file_panel_ctrl, logger.transtext("ファイル"), False)
 
-        if not self.is_vroid:
-            # パラ調整タブ
-            self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
-            self.note_ctrl.AddPage(self.simple_param_panel_ctrl, logger.transtext("パラ調整"), False)
-            
-            # パラ調整(詳細)タブ
-            self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
-            self.note_ctrl.AddPage(self.advance_param_panel_ctrl, logger.transtext("パラ調整(詳細)"), False)
+        # パラ調整タブ
+        self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
+        self.note_ctrl.AddPage(self.simple_param_panel_ctrl, logger.transtext("パラ調整"), False)
+        
+        # パラ調整(詳細)タブ
+        self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
+        self.note_ctrl.AddPage(self.advance_param_panel_ctrl, logger.transtext("パラ調整(詳細)"), False)
 
-            # パラ調整(ボーン)タブ
-            self.bone_param_panel_ctrl = ParamBonePanel(self, self.note_ctrl, 3)
-            self.note_ctrl.AddPage(self.bone_param_panel_ctrl, logger.transtext("パラ調整(ボーン)"), False)
-
-        # if self.is_vroid:
-        #     self.vrm_panel_ctrl = VrmPanel(self, self.note_ctrl, 1)
-        #     self.note_ctrl.AddPage(self.vrm_panel_ctrl, "Vrm設定", False)
+        # パラ調整(ボーン)タブ
+        self.bone_param_panel_ctrl = ParamBonePanel(self, self.note_ctrl, 3)
+        self.note_ctrl.AddPage(self.bone_param_panel_ctrl, logger.transtext("パラ調整(ボーン)"), False)
         
         # ---------------------------------------------
 
@@ -180,10 +173,9 @@ class MainFrame(wx.Frame):
     # タブ移動可
     def release_tab(self):
         self.file_panel_ctrl.release_tab()
-        if not self.is_vroid:
-            self.simple_param_panel_ctrl.release_tab()
-            self.advance_param_panel_ctrl.release_tab()
-            self.bone_param_panel_ctrl.release_tab()
+        self.simple_param_panel_ctrl.release_tab()
+        self.advance_param_panel_ctrl.release_tab()
+        self.bone_param_panel_ctrl.release_tab()
 
     # フォーム入力可
     def enable(self):
@@ -258,7 +250,7 @@ class MainFrame(wx.Frame):
         return result
 
     def is_loaded_valid(self):
-        return self.is_vroid or len(self.simple_param_panel_ctrl.get_param_options(is_show_error=True)) > 0
+        return len(self.simple_param_panel_ctrl.get_param_options(is_show_error=True)) > 0
 
     # 読み込み完了処理
     def on_load_result(self, event: wx.Event):

@@ -26,29 +26,18 @@ class FilePanel(BasePanel):
 
         self.header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        if self.frame.is_vroid:
-            self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("VrmモデルをPmxモデルに変換します。\n") \
-                                                 + logger.transtext("物理を設定したい場合は、変換後のPmxデータをPmxTailorにかけてください。"), wx.DefaultPosition, wx.DefaultSize, 0)
-        else:
-            self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("PMXモデルの指定された材質に物理を設定します。\n") \
-                                                 + logger.transtext("PMXモデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.description_txt = wx.StaticText(self, wx.ID_ANY, logger.transtext("PMXモデルの指定された材質に物理を設定します。\n") \
+                                             + logger.transtext("PMXモデルを読み込んだ後、パラ調整タブで物理の設定を行ってください。"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.header_sizer.Add(self.description_txt, 0, wx.ALL, 5)
 
         self.static_line01 = wx.StaticLine(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         self.header_sizer.Add(self.static_line01, 0, wx.EXPAND | wx.ALL, 5)
 
-        if self.frame.is_vroid:
-            # 対象Vrmファイルコントロール
-            self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, logger.transtext("対象モデル"), logger.transtext("対象モデルVrmファイルを開く"), ("vrm"), wx.FLP_DEFAULT_STYLE, \
-                                                             logger.transtext("変換したいVrmファイルパスを指定してください\nVroid Studio 正式版(1.0.0)以降のみ対応しています。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"), \
-                                                             file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_vroid", \
-                                                             is_change_output=True, is_aster=False, is_save=False, set_no=1)
-        else:
-            # 対象Pmxファイルコントロール
-            self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, logger.transtext("対象モデル"), logger.transtext("対象モデルPMXファイルを開く"), ("pmx"), wx.FLP_DEFAULT_STYLE, \
-                                                             logger.transtext("変換したいPMXファイルパスを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"), \
-                                                             file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_pmx", \
-                                                             is_change_output=True, is_aster=False, is_save=False, set_no=1)
+        # 対象Pmxファイルコントロール
+        self.org_model_file_ctrl = HistoryFilePickerCtrl(self.frame, self, logger.transtext("対象モデル"), logger.transtext("対象モデルPMXファイルを開く"), ("pmx"), wx.FLP_DEFAULT_STYLE, \
+                                                         logger.transtext("変換したいPMXファイルパスを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"), \
+                                                         file_model_spacer=0, title_parts_ctrl=None, title_parts2_ctrl=None, file_histories_key="org_pmx", \
+                                                         is_change_output=True, is_aster=False, is_save=False, set_no=1)
         self.header_sizer.Add(self.org_model_file_ctrl.sizer, 1, wx.EXPAND, 0)
 
         # 出力先Pmxファイルコントロール
@@ -64,10 +53,7 @@ class FilePanel(BasePanel):
 
         # 変換変換実行ボタン
         self.export_btn_ctrl = wx.Button(self, wx.ID_ANY, self.txt_exec, wx.DefaultPosition, wx.Size(200, 50), 0)
-        if self.frame.is_vroid:
-            self.export_btn_ctrl.SetToolTip(logger.transtext("VrmモデルをPmxモデルに変換します"))
-        else:
-            self.export_btn_ctrl.SetToolTip(logger.transtext("Pmxモデルに物理を設定します"))
+        self.export_btn_ctrl.SetToolTip(logger.transtext("Pmxモデルに物理を設定します"))
         self.export_btn_ctrl.Bind(wx.EVT_LEFT_DOWN, self.on_convert_export)
         self.export_btn_ctrl.Bind(wx.EVT_LEFT_DCLICK, self.on_doubleclick)
         btn_sizer.Add(self.export_btn_ctrl, 0, wx.ALL, 5)
@@ -95,14 +81,9 @@ class FilePanel(BasePanel):
     
     # サイジングとかと同じ処理なので、VMD出力みたいだけど、PMXパス
     def set_output_vmd_path(self, event, is_force=False):
-        if self.frame.is_vroid:
-            output_pmx_path = MFileUtils.get_output_vrm_path(
-                self.org_model_file_ctrl.file_ctrl.GetPath(),
-                self.output_pmx_file_ctrl.file_ctrl.GetPath(), is_force)
-        else:
-            output_pmx_path = MFileUtils.get_output_pmx_path(
-                self.org_model_file_ctrl.file_ctrl.GetPath(),
-                self.output_pmx_file_ctrl.file_ctrl.GetPath(), is_force)
+        output_pmx_path = MFileUtils.get_output_pmx_path(
+            self.org_model_file_ctrl.file_ctrl.GetPath(),
+            self.output_pmx_file_ctrl.file_ctrl.GetPath(), is_force)
 
         self.output_pmx_file_ctrl.file_ctrl.SetPath(output_pmx_path)
 

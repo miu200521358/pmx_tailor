@@ -135,13 +135,10 @@ class ParamPanel(BasePanel):
             # ボーンリストクリア
             self.bone_list = []
             for bone in self.frame.file_panel_ctrl.org_model_file_ctrl.data.bones.values():
-                if self.frame.is_vroid:
-                    self.bone_list.append(bone.name)
-                else:
-                    for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
-                        if bone.index == rigidbody.bone_index and rigidbody.mode == 0:
-                            self.bone_list.append(bone.name)
-                            break
+                for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
+                    if bone.index == rigidbody.bone_index and rigidbody.mode == 0:
+                        self.bone_list.append(bone.name)
+                        break
             # セットクリア
             self.on_clear_set(event)
             # 1件追加
@@ -159,19 +156,25 @@ class ParamPanel(BasePanel):
     def get_param_options(self, is_show_error=False):
         params = []
         param_material_names = []
+        param_abb_names = []
 
         if self.frame.file_panel_ctrl.org_model_file_ctrl.data and self.org_model_digest == self.frame.file_panel_ctrl.org_model_file_ctrl.data.digest:
             for pidx, physics_param in enumerate(self.physics_list):
                 param = physics_param.get_param_options(pidx, is_show_error)
                 if param:
-                    if param['material_name'] in param_material_names:
+                    if f"{param['material_name']}:{param['vertices_csv']}" in param_material_names:
                         logger.error(logger.transtext("同じ材質に対して複数の物理設定が割り当てられています"), decoration=MLogger.DECORATION_BOX)
                         return []
 
+                    if param['abb_name'] in param_abb_names:
+                        logger.error(logger.transtext("同じ略称が複数の物理設定が割り当てられています"), decoration=MLogger.DECORATION_BOX)
+                        return []
+
                     params.append(param)
-                    param_material_names.append(param['material_name'])
+                    param_material_names.append(f"{param['material_name']}:{param['vertices_csv']}")
+                    param_abb_names.append(param['abb_name'])
         
-        if len(params) == 0 and not self.frame.is_vroid:
+        if len(params) == 0:
             logger.error(logger.transtext("有効な物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。"), decoration=MLogger.DECORATION_BOX)
             return []
 
@@ -243,7 +246,8 @@ class PhysicsParam():
 
         self.simple_abb_ctrl = wx.TextCtrl(self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1))
         self.simple_abb_ctrl.SetToolTip(logger.transtext("ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）"))
-        self.simple_abb_ctrl.SetMaxLength(5)
+        self.simple_abb_ctrl.SetMaxLength(6)
+        self.simple_abb_ctrl.Bind(wx.EVT_TEXT, self.set_abb_name)
         self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
         self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("剛体グループ *"), wx.DefaultPosition, wx.DefaultSize, 0)
@@ -283,7 +287,8 @@ class PhysicsParam():
         self.simple_header_grid_sizer.Add(self.simple_primitive_txt, 0, wx.ALL, 5)
 
         self.simple_primitive_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=[logger.transtext("布(コットン)"), logger.transtext("布(シルク)"), \
-                                               logger.transtext("布(ベルベッド)"), logger.transtext("布(レザー)"), logger.transtext("布(デニム)")])
+                                               logger.transtext("布(ベルベッド)"), logger.transtext("布(レザー)"), logger.transtext("布(デニム)"), \
+                                               logger.transtext("布(袖)")])
         self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット"))
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
@@ -485,12 +490,12 @@ class PhysicsParam():
 
         # 物理タイプ
         self.physics_type_txt = wx.StaticText(self.advance_window, wx.ID_ANY, logger.transtext("物理タイプ"), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.physics_type_txt.SetToolTip(logger.transtext("物理タイプ"))
+        self.physics_type_txt.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n袖: カプセル剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
         self.physics_type_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.physics_type_txt, 0, wx.ALL, 5)
 
-        self.physics_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('布')])
-        self.physics_type_ctrl.SetToolTip(logger.transtext("物理タイプ"))
+        self.physics_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('布'), logger.transtext('袖'), logger.transtext('髪')])
+        self.physics_type_ctrl.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n袖: カプセル剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
         self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
 
@@ -1443,7 +1448,7 @@ class PhysicsParam():
 
         if self.simple_material_ctrl.GetStringSelection() and self.simple_parent_bone_ctrl.GetStringSelection() and self.simple_group_ctrl.GetStringSelection() \
            and self.simple_abb_ctrl.GetValue():
-            if not self.main_frame.is_vroid and self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.material_indices[self.simple_material_ctrl.GetStringSelection()] == 0:
+            if self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.material_indices[self.simple_material_ctrl.GetStringSelection()] == 0:
                 logger.error(logger.transtext("頂点のない材質が指定されています。"), decoration=MLogger.DECORATION_BOX)
                 return params
 
@@ -1503,6 +1508,7 @@ class PhysicsParam():
                                             MVector3D(), self.rigidbody_mass_spin.GetValue(), self.rigidbody_linear_damping_spin.GetValue(), self.rigidbody_angular_damping_spin.GetValue(), \
                                             self.rigidbody_restitution_spin.GetValue(), self.rigidbody_friction_spin.GetValue(), 0)
             params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
+            params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
 
             params["vertical_joint"] = None
             if self.advance_vertical_joint_valid_check.GetValue():
@@ -1555,7 +1561,7 @@ class PhysicsParam():
                           MVector3D(self.reverse_joint_spring_rot_x_spin.GetValue(), self.reverse_joint_spring_rot_y_spin.GetValue(), self.reverse_joint_spring_rot_z_spin.GetValue())
                           )
             params['reverse_joint_coefficient'] = self.advance_reverse_joint_coefficient_spin.GetValue()
-        elif not self.main_frame.is_vroid:
+        else:
             if is_show_error:
                 empty_param_list = []
                 if not self.simple_material_ctrl.GetStringSelection():
@@ -1994,10 +2000,14 @@ class PhysicsParam():
         self.advance_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
         self.bone_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
         # バイト長を加味してスライス
-        self.simple_abb_ctrl.SetValue(truncate_double_byte_str(self.simple_material_ctrl.GetStringSelection(), 6))
+        self.simple_abb_ctrl.SetValue(self.simple_material_ctrl.GetStringSelection())
 
         # 設定ボーンパネル初期化
         self.initialize_bone_param(event)
+    
+    def set_abb_name(self, event: wx.Event):
+        # バイト長を加味してスライス
+        self.simple_abb_ctrl.ChangeValue(truncate_double_byte_str(event.GetEventObject().GetValue(), 6))
 
     def initialize_bone_param(self, event: wx.Event):
         # ウェイトボーンリンク生成
@@ -2086,11 +2096,16 @@ class PhysicsParam():
     
     def set_simple_primitive(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        if logger.transtext('布') in self.simple_primitive_ctrl.GetStringSelection():
-            self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('箱'))
-        elif logger.transtext('髪') in self.simple_primitive_ctrl.GetStringSelection():
+
+        if logger.transtext('袖') in self.simple_primitive_ctrl.GetStringSelection():
+            self.physics_type_ctrl.SetStringSelection(logger.transtext('袖'))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
-        self.physics_type_ctrl.SetStringSelection(self.simple_primitive_ctrl.GetStringSelection()[0])
+        elif logger.transtext('髪') in self.simple_primitive_ctrl.GetStringSelection():
+            self.physics_type_ctrl.SetStringSelection(logger.transtext('髪'))
+            self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
+        else:
+            self.physics_type_ctrl.SetStringSelection(logger.transtext('布'))
+            self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('箱'))
 
         if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(コットン)"):
             self.simple_mass_slider.SetValue(2)
@@ -2141,6 +2156,16 @@ class PhysicsParam():
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
             self.advance_reverse_joint_valid_check.SetValue(1)
+
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(袖)"):
+            self.simple_mass_slider.SetValue(1.7)
+            self.simple_air_resistance_slider.SetValue(2.5)
+            self.simple_shape_maintenance_slider.SetValue(2.8)
+
+            self.advance_vertical_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(1)
+            self.advance_diagonal_joint_valid_check.SetValue(1)
+            self.advance_reverse_joint_valid_check.SetValue(0)
 
         self.set_mass(event)
         self.set_air_resistance(event)

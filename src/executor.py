@@ -40,15 +40,12 @@ if __name__ == '__main__':
         parser.add_argument("--log_mode", default=0, type=int)
         parser.add_argument("--out_log", default=0, type=int)
         parser.add_argument("--is_saving", default=1, type=int)
-        parser.add_argument("--vroid", default=0, type=int)
         args = parser.parse_args()
         
         # ロギングレベル
         is_out_log = True if args.out_log == 1 else False
         # 省エネモード
         is_saving = True if args.is_saving == 1 else False
-        # Vroid2Pmx
-        is_vroid = True if args.vroid == 1 else False
 
         MLogger.initialize(level=args.verbose, is_file=False, mode=args.log_mode)
         logger = MLogger(__name__)
@@ -77,11 +74,8 @@ if __name__ == '__main__':
 
         # 引数指定がない場合、通常起動
         app = wx.App(False)
-        if is_vroid:
-            icon = wx.Icon(MFileUtils.resource_path('src/vroid2pmx.ico'), wx.BITMAP_TYPE_ICO)
-        else:
-            icon = wx.Icon(MFileUtils.resource_path('src/pmx_tailor.ico'), wx.BITMAP_TYPE_ICO)
-        frame = MainFrame(None, mydir_path, now_version_name, args.verbose, is_saving, is_out_log, is_vroid)
+        icon = wx.Icon(MFileUtils.resource_path('src/pmx_tailor.ico'), wx.BITMAP_TYPE_ICO)
+        frame = MainFrame(None, mydir_path, now_version_name, args.verbose, is_saving, is_out_log)
         frame.SetIcon(icon)
         frame.Show(True)
         app.MainLoop()

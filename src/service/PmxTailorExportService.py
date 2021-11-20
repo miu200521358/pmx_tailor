@@ -10,7 +10,6 @@ import copy
 import bezier
 import csv
 
-from service.VroidExportService import BONE_PAIRS
 from module.MOptions import MExportOptions
 from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef, RigidBodyParam, IkLink, Ik, BoneMorphData # noqa
 from mmd.PmxWriter import PmxWriter
@@ -48,8 +47,11 @@ class PmxTailorExportService():
             model = self.options.pmx_model
             model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor"
 
+            # 保持ボーンは全設定を確認する
+            saved_bone_names = self.get_saved_bone_names(model)
+
             for pidx, param_option in enumerate(self.options.param_options):
-                if not self.create_physics(model, param_option):
+                if not self.create_physics(model, param_option, saved_bone_names):
                     return False
 
             # 最後に出力
@@ -69,7 +71,7 @@ class PmxTailorExportService():
         finally:
             logging.shutdown()
 
-    def create_physics(self, model: PmxModel, param_option: dict):
+    def create_physics(self, model: PmxModel, param_option: dict, saved_bone_names: list):
         model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"    # noqa
         model.comment += f"\r\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"    # noqa
         model.comment += f"\r\n　　{logger.transtext('細かさ')}: {param_option['fineness']}"    # noqa
@@ -93,7 +95,7 @@ class PmxTailorExportService():
             # 既存材質削除フラグONの場合
             logger.info("【%s】既存材質削除", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
-            model = self.clear_exist_physics(model, param_option, param_option['material_name'], param_option['edge_material_name'], param_option['back_material_name'], target_vertices)
+            model = self.clear_exist_physics(model, param_option, param_option['material_name'], target_vertices, saved_bone_names)
 
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             logger.info("【%s】ボーンマップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
@@ -1318,6 +1320,10 @@ class PmxTailorExportService():
         param_rigidbody = param_option['rigidbody']
         # 剛体係数
         coefficient = param_option['rigidbody_coefficient']
+        # 剛体形状
+        rigidbody_shape_type = param_option["rigidbody_shape_type"]
+        # 物理タイプ
+        physics_type = param_option["physics_type"]
 
         rigidbody_limit_thicks = np.linspace(0.1, 0.3, bone_grid_rows)
 
@@ -1380,9 +1386,22 @@ class PmxTailorExportService():
             shape_rotation_radians = MVector3D(math.radians(shape_rotation_euler.x()), math.radians(shape_rotation_euler.y()), math.radians(shape_rotation_euler.z()))
 
             # 剛体の大きさ
-            x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
-            y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
-            shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+            if rigidbody_shape_type == 0:
+                x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position), \
+                                    prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+                ball_size = max(0.25, x_size * 0.5)
+                shape_size = MVector3D(ball_size, ball_size, ball_size)
+            elif rigidbody_shape_type == 2:
+                x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
+                y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+                if physics_type == logger.transtext('袖'):
+                    shape_size = MVector3D(x_size * 0.4, max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+                else:
+                    shape_size = MVector3D(x_size * 0.5, max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+            else:
+                x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
+                y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+                shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
 
             # 剛体の位置
             rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
@@ -1462,6 +1481,10 @@ class PmxTailorExportService():
         param_rigidbody = param_option['rigidbody']
         # 剛体係数
         coefficient = param_option['rigidbody_coefficient']
+        # 剛体形状
+        rigidbody_shape_type = param_option["rigidbody_shape_type"]
+        # 物理タイプ
+        physics_type = param_option["physics_type"]
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         root_rigidbody = None
@@ -1564,9 +1587,22 @@ class PmxTailorExportService():
                 shape_rotation_radians = MVector3D(math.radians(shape_rotation_euler.x()), math.radians(shape_rotation_euler.y()), math.radians(shape_rotation_euler.z()))
 
                 # 剛体の大きさ
-                x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
-                y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
-                shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+                if rigidbody_shape_type == 0:
+                    x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position), \
+                                     prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+                    ball_size = max(0.25, x_size * 0.5)
+                    shape_size = MVector3D(ball_size, ball_size, ball_size)
+                elif rigidbody_shape_type == 2:
+                    x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
+                    y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+                    if physics_type == logger.transtext('袖'):
+                        shape_size = MVector3D(x_size * 0.4, max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+                    else:
+                        shape_size = MVector3D(x_size * 0.5, max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
+                else:
+                    x_size = np.max([prev_below_bone_position.distanceToPoint(next_below_bone_position), prev_above_bone_position.distanceToPoint(next_above_bone_position)])
+                    y_size = np.max([prev_below_bone_position.distanceToPoint(prev_above_bone_position), next_below_bone_position.distanceToPoint(next_above_bone_position)])
+                    shape_size = MVector3D(max(0.25, x_size * 0.5), max(0.25, y_size * 0.5), rigidbody_limit_thicks[yi])
 
                 # 剛体の位置
                 rigidbody_vertical_vec = ((prev_below_bone_position - prev_above_bone_position) / 2)
@@ -1852,9 +1888,11 @@ class PmxTailorExportService():
         abb_name = param_option['abb_name']
         # 材質名
         material_name = param_option['material_name']
+        # 表示枠名
+        display_name = f"{abb_name}:{material_name}"
 
         # 表示枠定義
-        model.display_slots[material_name] = DisplaySlot(material_name, material_name, 0, 0)
+        model.display_slots[display_name] = DisplaySlot(display_name, display_name, 0, 0)
 
         root_bone = Bone(f'{abb_name}中心', f'{abb_name}中心', model.bones[param_option['parent_bone_name']].position, \
                          model.bones[param_option['parent_bone_name']].index, 0, 0x0000 | 0x0002 | 0x0004 | 0x0008 | 0x0010)
@@ -1864,7 +1902,7 @@ class PmxTailorExportService():
         model.bones[root_bone.name] = root_bone
         model.bone_indexes[root_bone.index] = root_bone.name
         # 表示枠
-        model.display_slots[material_name].references.append((0, model.bones[root_bone.name].index))
+        model.display_slots[display_name].references.append((0, model.bones[root_bone.name].index))
 
         tmp_all_bones = {}
         all_yidxs = {}
@@ -2017,7 +2055,7 @@ class PmxTailorExportService():
 
                             # 表示枠
                             parent_bone.flag |= 0x0008 | 0x0010
-                            model.display_slots[material_name].references.append((0, parent_bone.index))
+                            model.display_slots[display_name].references.append((0, parent_bone.index))
 
                         model.bones[bone.name] = bone
                         model.bone_indexes[bone.index] = bone.name
@@ -2044,16 +2082,101 @@ class PmxTailorExportService():
         v_yidx = int(bone_name[-7:-4]) - 1
 
         return v_yidx, v_xidx
+    
+    def get_saved_bone_names(self, model: PmxModel):
+        saved_bone_names = []
+        # 準標準ボーンまでは削除対象外
+        saved_bone_names.extend(SEMI_STANDARD_BONE_NAMES)
 
-    def clear_exist_physics(self, model: PmxModel, param_option: dict, material_name: str, edge_material_name: str, back_material_name: str, target_vertices: list):
+        for pidx, param_option in enumerate(self.options.param_options):
+            if param_option['exist_physics_clear'] == logger.transtext('そのまま'):
+                continue
+
+            edge_material_name = param_option['edge_material_name']
+            back_material_name = param_option['back_material_name']
+            weighted_bone_indexes = {}
+
+            # 頂点CSVが指定されている場合、対象頂点リスト生成
+            if param_option['vertices_csv']:
+                target_vertices = []
+                with open(param_option['vertices_csv'], encoding='cp932', mode='r') as f:
+                    reader = csv.reader(f)
+                    next(reader)            # ヘッダーを読み飛ばす
+                    for row in reader:
+                        if len(row) > 1 and int(row[1]) in model.material_vertices[param_option['material_name']]:
+                            target_vertices.append(int(row[1]))
+            else:
+                target_vertices = list(model.material_vertices[param_option['material_name']])
+
+            if param_option['exist_physics_clear'] == logger.transtext('再利用'):
+                # 再利用の場合、指定されている全ボーンを対象とする
+                bone_grid = param_option["bone_grid"]
+                bone_grid_cols = param_option["bone_grid_cols"]
+                bone_grid_rows = param_option["bone_grid_rows"]
+
+                for r in range(bone_grid_rows):
+                    for c in range(bone_grid_cols):
+                        if bone_grid[r][c]:
+                            weighted_bone_indexes[bone_grid[r][c]] = model.bones[bone_grid[r][c]].index
+            else:
+                for vertex_idx in target_vertices:
+                    vertex = model.vertex_dict[vertex_idx]
+                    if type(vertex.deform) is Bdef1:
+                        if vertex.deform.index0 not in list(weighted_bone_indexes.values()):
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                    elif type(vertex.deform) is Bdef2:
+                        if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                        if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                    elif type(vertex.deform) is Bdef4:
+                        if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                        if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight1 > 0:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+                        if vertex.deform.index2 not in list(weighted_bone_indexes.values()) and vertex.deform.weight2 > 0:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index2]] = vertex.deform.index2
+                        if vertex.deform.index3 not in list(weighted_bone_indexes.values()) and vertex.deform.weight3 > 0:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index3]] = vertex.deform.index3
+                    elif type(vertex.deform) is Sdef:
+                        if vertex.deform.index0 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 > 0:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index0]] = vertex.deform.index0
+                        if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
+                            weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
+            
+            # 非表示子ボーンも削除する
+            for bone in model.bones.values():
+                if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
+                        and model.bone_indexes[bone.parent_index] not in SEMI_STANDARD_BONE_NAMES:
+                    weighted_bone_indexes[bone.name] = bone.index
+
+            if param_option['exist_physics_clear'] == logger.transtext('再利用'):
+                # 再利用する場合、ボーンは全部残す
+                saved_bone_names.extend(list(model.bones.keys()))
+            else:
+                # 他の材質で該当ボーンにウェイト割り当てられている場合、ボーンの削除だけは避ける
+                for bone_idx, vertices in model.vertices.items():
+                    is_not_delete = False
+                    if bone_idx in list(weighted_bone_indexes.values()) and len(vertices) > 0:
+                        is_not_delete = False
+                        for vertex in vertices:
+                            if vertex.index not in target_vertices \
+                                    and (not edge_material_name or (edge_material_name and vertex.index not in model.material_vertices[edge_material_name])) \
+                                    and (not back_material_name or (back_material_name and vertex.index not in model.material_vertices[back_material_name])):
+                                is_not_delete = True
+                                break
+                    if is_not_delete:
+                        saved_bone_names.append(model.bone_indexes[bone_idx])
+            
+            logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
+            logger.debug('saved_bone_names: %s', ", ".join(saved_bone_names))
+
+        return saved_bone_names
+
+    def clear_exist_physics(self, model: PmxModel, param_option: dict, material_name: str, target_vertices: list, saved_bone_names: list):
         logger.info("%s: 削除対象抽出", material_name)
 
-        semi_standard_bone_names = []
-        for bpair in BONE_PAIRS.values():
-            semi_standard_bone_names.append(bpair['name'])
-
         weighted_bone_indexes = {}
-
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             # 再利用の場合、指定されている全ボーンを対象とする
             bone_grid = param_option["bone_grid"]
@@ -2093,37 +2216,13 @@ class PmxTailorExportService():
         # 非表示子ボーンも削除する
         for bone in model.bones.values():
             if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
-                    and model.bone_indexes[bone.parent_index] not in semi_standard_bone_names:
+                    and model.bone_indexes[bone.parent_index] not in SEMI_STANDARD_BONE_NAMES:
                 weighted_bone_indexes[bone.name] = bone.index
-
-        not_delete_bone_names = []
-        if param_option['exist_physics_clear'] == logger.transtext('再利用'):
-            # 再利用する場合、ボーンは全部残す
-            not_delete_bone_names = list(model.bones.keys())
-        else:
-            # 準標準ボーンまでは削除対象外
-            not_delete_bone_names.extend(semi_standard_bone_names)
-            # 他の材質で該当ボーンにウェイト割り当てられている場合、ボーンの削除だけは避ける
-            for bone_idx, vertices in model.vertices.items():
-                is_not_delete = False
-                if bone_idx in list(weighted_bone_indexes.values()) and len(vertices) > 0:
-                    is_not_delete = False
-                    for vertex in vertices:
-                        if vertex.index not in target_vertices \
-                                and (not edge_material_name or (edge_material_name and vertex.index not in model.material_vertices[edge_material_name])) \
-                                and (not back_material_name or (back_material_name and vertex.index not in model.material_vertices[back_material_name])):
-                            is_not_delete = True
-                            break
-                if is_not_delete:
-                    not_delete_bone_names.append(model.bone_indexes[bone_idx])
-        
-        logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
-        logger.debug('not_delete_bone_names: %s', ", ".join(not_delete_bone_names))
 
         weighted_rigidbody_indexes = {}
         for rigidbody in model.rigidbodies.values():
             if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()) \
-                    and model.bone_indexes[rigidbody.bone_index] not in not_delete_bone_names:
+                    and model.bone_indexes[rigidbody.bone_index] not in saved_bone_names:
                 weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
 
         logger.debug('weighted_rigidbody_indexes: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
@@ -2147,7 +2246,7 @@ class PmxTailorExportService():
             del model.rigidbodies[rigidbody_name]
 
         for bone_name in weighted_bone_indexes.keys():
-            if bone_name not in not_delete_bone_names:
+            if bone_name not in saved_bone_names:
                 del model.bones[bone_name]
 
         logger.info("%s: INDEX振り直し", material_name)
@@ -2944,9 +3043,19 @@ class PmxTailorExportService():
                         vy = 0
                     else:
                         vy = -1 if v0v < v1v else 1
-                        v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
-                        v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
-                        if v1dot > v2dot:
+                        if param_option['direction'] == '上':
+                            v1dot = MVector3D.dotProduct(MVector3D(0, vy, 0), (v1.position - v0.position).normalized())
+                            v2dot = MVector3D.dotProduct(MVector3D(0, vy, 0), (v2.position - v0.position).normalized())
+                        elif param_option['direction'] == '右':
+                            v1dot = MVector3D.dotProduct(MVector3D(-1, 0, 0), (v1.position - v0.position).normalized())
+                            v2dot = MVector3D.dotProduct(MVector3D(-1, 0, 0), (v2.position - v0.position).normalized())
+                        elif param_option['direction'] == '左':
+                            v1dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v1.position - v0.position).normalized())
+                            v2dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v2.position - v0.position).normalized())
+                        else:
+                            v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
+                            v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
+                        if abs(v1dot) > abs(v2dot):
                             # v1の方がv0に近い場合、v1は縦展開とみなす
                             vx = 0
                         else:
@@ -3065,3 +3174,115 @@ def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax
     # https://qastack.jp/programming/929103/convert-a-number-range-to-another-range-maintaining-ratio
     # NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
     return (((ratio - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
+
+SEMI_STANDARD_BONE_NAMES = [
+    "全ての親",
+    "センター",
+    "グルーブ",
+    "腰",
+    "下半身",
+    "上半身",
+    "上半身2",
+    "上半身3",
+    "首",
+    "頭",
+    "両目",
+    "左目",
+    "右目",
+    "左胸",
+    "左胸先",
+    "右胸",
+    "右胸先",
+    "左肩P",
+    "左肩",
+    "左肩C",
+    "左腕",
+    "左腕捩",
+    "左腕捩1",
+    "左腕捩2",
+    "左腕捩3",
+    "左ひじ",
+    "左手捩",
+    "左手捩1",
+    "左手捩2",
+    "左手捩3",
+    "左手首",
+    "左親指０",
+    "左親指１",
+    "左親指２",
+    "左親指先",
+    "左人指１",
+    "左人指２",
+    "左人指３",
+    "左人指先",
+    "左中指１",
+    "左中指２",
+    "左中指３",
+    "左中指先",
+    "左薬指１",
+    "左薬指２",
+    "左薬指３",
+    "左薬指先",
+    "左小指１",
+    "左小指２",
+    "左小指３",
+    "左小指先",
+    "右肩P",
+    "右肩",
+    "右肩C",
+    "右腕",
+    "右腕捩",
+    "右腕捩1",
+    "右腕捩2",
+    "右腕捩3",
+    "右ひじ",
+    "右手捩",
+    "右手捩1",
+    "右手捩2",
+    "右手捩3",
+    "右手首",
+    "右親指０",
+    "右親指１",
+    "右親指２",
+    "右親指先",
+    "右人指１",
+    "右人指２",
+    "右人指３",
+    "右人指先",
+    "右中指１",
+    "右中指２",
+    "右中指３",
+    "右中指先",
+    "右薬指１",
+    "右薬指２",
+    "右薬指３",
+    "右薬指先",
+    "右小指１",
+    "右小指２",
+    "右小指３",
+    "右小指先",
+    "腰キャンセル左",
+    "左足",
+    "左ひざ",
+    "左足首",
+    "左つま先",
+    "左足IK親",
+    "左足ＩＫ",
+    "左つま先ＩＫ",
+    "腰キャンセル右",
+    "右足",
+    "右ひざ",
+    "右足首",
+    "右つま先",
+    "右足IK親",
+    "右足ＩＫ",
+    "右つま先ＩＫ",
+    "左足D",
+    "左ひざD",
+    "左足首D",
+    "左足先EX",
+    "右足D",
+    "右ひざD",
+    "右足首D",
+    "右足先EX",
+]

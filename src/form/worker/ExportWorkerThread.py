@@ -7,10 +7,8 @@ import os
 import wx
 import time
 import gc
-from pathlib import Path
 
 from form.worker.BaseWorkerThread import BaseWorkerThread, task_takes_time
-from service.VroidExportService import VroidExportService
 from service.PmxTailorExportService import PmxTailorExportService
 from module.MOptions import MExportOptions
 from utils.MLogger import MLogger # noqa
@@ -38,38 +36,23 @@ class ExportWorkerThread(BaseWorkerThread):
 
             self.result = self.frame.file_panel_ctrl.org_model_file_ctrl.load() and self.result
 
-            if self.result:                
-                if self.frame.is_vroid:
-                    self.options = MExportOptions(\
-                        version_name=self.frame.version_name, \
-                        logging_level=self.frame.logging_level, \
-                        pmx_model=self.frame.file_panel_ctrl.org_model_file_ctrl.data.copy(), \
-                        output_path=self.frame.file_panel_ctrl.output_pmx_file_ctrl.file_ctrl.GetPath(), \
-                        param_options={}, \
-                        monitor=self.frame.file_panel_ctrl.console_ctrl, \
-                        is_file=False, \
-                        outout_datetime=logger.outout_datetime, \
-                        max_workers=(1 if self.is_exec_saving else min(5, 32, os.cpu_count() + 4)))
+            if self.result:
+                self.options = MExportOptions(\
+                    version_name=self.frame.version_name, \
+                    logging_level=self.frame.logging_level, \
+                    pmx_model=self.frame.file_panel_ctrl.org_model_file_ctrl.data.copy(), \
+                    output_path=self.frame.file_panel_ctrl.output_pmx_file_ctrl.file_ctrl.GetPath(), \
+                    param_options=self.frame.simple_param_panel_ctrl.get_param_options(), \
+                    monitor=self.frame.file_panel_ctrl.console_ctrl, \
+                    is_file=False, \
+                    outout_datetime=logger.outout_datetime, \
+                    max_workers=(1 if self.is_exec_saving else min(5, 32, os.cpu_count() + 4)))
 
-                    self.result = VroidExportService(self.options).execute() and self.result
-                else:
-                    self.options = MExportOptions(\
-                        version_name=self.frame.version_name, \
-                        logging_level=self.frame.logging_level, \
-                        pmx_model=self.frame.file_panel_ctrl.org_model_file_ctrl.data.copy(), \
-                        output_path=self.frame.file_panel_ctrl.output_pmx_file_ctrl.file_ctrl.GetPath(), \
-                        param_options=self.frame.simple_param_panel_ctrl.get_param_options(), \
-                        monitor=self.frame.file_panel_ctrl.console_ctrl, \
-                        is_file=False, \
-                        outout_datetime=logger.outout_datetime, \
-                        max_workers=(1 if self.is_exec_saving else min(5, 32, os.cpu_count() + 4)))
-
-                    self.result = PmxTailorExportService(self.options).execute() and self.result
+                self.result = PmxTailorExportService(self.options).execute() and self.result
 
             self.elapsed_time = time.time() - start
         except Exception as e:
-            process_name = 'Vroid2Pmx' if self.frame.is_vroid else 'PmxTailor変換'
-            logger.critical(f"{process_name}処理が意図せぬエラーで終了しました。", e, decoration=MLogger.DECORATION_BOX)
+            logger.critical("PmxTailor変換処理が意図せぬエラーで終了しました。", e, decoration=MLogger.DECORATION_BOX)
         finally:
             try:
                 logger.debug("★★★result: %s, is_killed: %s", self.result, self.is_killed)
