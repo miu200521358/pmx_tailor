@@ -288,7 +288,7 @@ class PhysicsParam():
 
         self.simple_primitive_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=[logger.transtext("布(コットン)"), logger.transtext("布(シルク)"), \
                                                logger.transtext("布(ベルベッド)"), logger.transtext("布(レザー)"), logger.transtext("布(デニム)"), \
-                                               logger.transtext("布(袖)")])
+                                               logger.transtext("布(袖)"), logger.transtext("髪(ショート)"), logger.transtext("髪(ロング)"), logger.transtext("髪(アホ毛)")])
         self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット"))
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
@@ -1456,17 +1456,21 @@ class PhysicsParam():
                 logger.error(logger.transtext("物理材質と同じ材質が裏面に指定されています。"), decoration=MLogger.DECORATION_BOX)
                 return params
 
+            if self.physics_type_ctrl.GetStringSelection() == logger.transtext('髪') and self.simple_exist_physics_clear_ctrl.GetStringSelection() != logger.transtext('再利用'):
+                logger.error(logger.transtext("髪物理を設定する時には、"), decoration=MLogger.DECORATION_BOX)
+                return params
+
             bone_grid, bone_grid_rows, bone_grid_cols, is_boned = self.get_bone_grid()
             if self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext('再利用'):
                 if not is_boned:
-                    logger.error("既存物理を再利用する場合、「パラ調整(ボーン)」画面でボーン並び順を指定してください。", decoration=MLogger.DECORATION_BOX)
+                    logger.error("既存設定を再利用する場合、「パラ調整(ボーン)」画面でボーン並び順を指定してください。", decoration=MLogger.DECORATION_BOX)
                     return {}
                 params["bone_grid"] = bone_grid
                 params["bone_grid_rows"] = bone_grid_rows
                 params["bone_grid_cols"] = bone_grid_cols
             else:
                 if self.simple_exist_physics_clear_ctrl.GetStringSelection() != logger.transtext('再利用') and is_boned:
-                    logger.error("「パラ調整(ボーン)」画面でボーン並び順を指定した場合、既存物理は「再利用」を指定してください。", decoration=MLogger.DECORATION_BOX)
+                    logger.error("「パラ調整(ボーン)」画面でボーン並び順を指定した場合、既存設定は「再利用」を指定してください。", decoration=MLogger.DECORATION_BOX)
                     return {}
                 params["bone_grid"] = {}
                 params["bone_grid_rows"] = 0
@@ -2103,6 +2107,7 @@ class PhysicsParam():
         elif logger.transtext('髪') in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext('髪'))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
+            self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext('再利用'))
         else:
             self.physics_type_ctrl.SetStringSelection(logger.transtext('布'))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('箱'))
@@ -2167,6 +2172,36 @@ class PhysicsParam():
             self.advance_diagonal_joint_valid_check.SetValue(1)
             self.advance_reverse_joint_valid_check.SetValue(0)
 
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
+            self.simple_mass_slider.SetValue(1.5)
+            self.simple_air_resistance_slider.SetValue(3.2)
+            self.simple_shape_maintenance_slider.SetValue(3.5)
+
+            self.advance_vertical_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(0)
+            self.advance_diagonal_joint_valid_check.SetValue(0)
+            self.advance_reverse_joint_valid_check.SetValue(0)
+
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
+            self.simple_mass_slider.SetValue(1.5)
+            self.simple_air_resistance_slider.SetValue(2.5)
+            self.simple_shape_maintenance_slider.SetValue(2.8)
+
+            self.advance_vertical_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(0)
+            self.advance_diagonal_joint_valid_check.SetValue(0)
+            self.advance_reverse_joint_valid_check.SetValue(0)
+            
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
+            self.simple_mass_slider.SetValue(1.5)
+            self.simple_air_resistance_slider.SetValue(3.5)
+            self.simple_shape_maintenance_slider.SetValue(3.8)
+
+            self.advance_vertical_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(0)
+            self.advance_diagonal_joint_valid_check.SetValue(0)
+            self.advance_reverse_joint_valid_check.SetValue(0)
+
         self.set_mass(event)
         self.set_air_resistance(event)
         self.set_shape_maintenance(event)
@@ -2195,6 +2230,12 @@ class PhysicsParam():
 
         base_joint_val = ((self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()) * \
                           (self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()))
+
+        if self.physics_type_ctrl.GetStringSelection == logger.transtext('髪'):
+            # 髪の毛の場合、ジョイントの制限はきつめに
+            base_joint_val *= 0.6
+            # 髪の毛の場合、ばね値を大きくしておく
+            base_spring_val *= 2
 
         self.advance_vertical_joint_coefficient_spin.SetValue(base_joint_val * 20)
 
