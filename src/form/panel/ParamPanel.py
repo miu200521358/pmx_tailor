@@ -162,7 +162,8 @@ class ParamPanel(BasePanel):
             for pidx, physics_param in enumerate(self.physics_list):
                 param = physics_param.get_param_options(pidx, is_show_error)
                 if param:
-                    if f"{param['material_name']}:{param['vertices_csv']}" in param_material_names:
+                    material_key = f"{param['material_name']}:{param['abb_name']}:{param['vertices_csv']}"
+                    if material_key in param_material_names:
                         logger.error(logger.transtext("同じ材質に対して複数の物理設定が割り当てられています"), decoration=MLogger.DECORATION_BOX)
                         return []
 
@@ -171,7 +172,7 @@ class ParamPanel(BasePanel):
                         return []
 
                     params.append(param)
-                    param_material_names.append(f"{param['material_name']}:{param['vertices_csv']}")
+                    param_material_names.append(material_key)
                     param_abb_names.append(param['abb_name'])
         
         if len(params) == 0:
@@ -2217,6 +2218,12 @@ class PhysicsParam():
         self.rigidbody_angular_damping_spin.SetValue(
             max(0, min(0.9999, 1 - (((1 - self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()) \
                 * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())) * 1.5))))
+
+        if self.physics_type_ctrl.GetStringSelection == logger.transtext('髪'):
+            # 髪の毛の場合、減衰をちょっと大きく（元に戻りやすく）
+            self.rigidbody_linear_damping_spin.SetValue(max(0, min(0.9999, self.rigidbody_linear_damping_spin.GetValue() * 1.2)))
+            self.rigidbody_angular_damping_spin.SetValue(max(0, min(0.9999, self.rigidbody_angular_damping_spin.GetValue() * 1.2)))
+
         # 摩擦力を設定
         self.rigidbody_friction_spin.SetValue(
             max(0, min(0.9999, (self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax() * 0.7))))
