@@ -585,7 +585,7 @@ class PhysicsParam():
 
         self.advance_rigidbody_balancer_ctrl = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("バランサー剛体"))
         self.advance_rigidbody_balancer_ctrl.SetToolTip(logger.transtext("バランサー剛体を作成するか否か"))
-        self.advance_rigidbody_balancer_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_rigidbody_balancer_ctrl.Bind(wx.EVT_CHECKBOX, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_balancer_ctrl, 0, wx.ALL, 5)
 
         self.advance_rigidbody_sizer.Add(self.advance_rigidbody_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
