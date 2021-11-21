@@ -556,7 +556,16 @@ class PmxTailorExportService():
                                               joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
                                               MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
                                 created_joints[joint_key] = joint
-                
+
+                                # バランサー補助剛体
+                                balancer_prev_above_bone_name = f'B-{prev_above_bone_name}'
+                                joint_name = f'BS|{balancer_prev_above_bone_name}|{balancer_prev_below_bone_name}'
+                                joint_key = f'9:{model.rigidbodies[balancer_prev_above_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
+                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                                              MVector3D(), MVector3D(), MVector3D(-50, -50, -50), MVector3D(50, 50, 50), MVector3D(math.radians(1), math.radians(1), math.radians(1)), \
+                                              MVector3D(),MVector3D(), MVector3D())   # noqa
+                                created_joints[joint_key] = joint
+                                
             for joint_key in sorted(created_joints.keys()):
                 # ジョイントを登録
                 joint = created_joints[joint_key]

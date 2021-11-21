@@ -270,7 +270,7 @@ class PhysicsParam():
         self.simple_direction_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_direction_txt, 0, wx.ALL, 5)
 
-        self.simple_direction_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=[logger.transtext("下"), logger.transtext("上"), logger.transtext("右"), logger.transtext("左")])
+        self.simple_direction_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=[logger.transtext("下"), logger.transtext("右"), logger.transtext("左")])
         self.simple_direction_ctrl.SetToolTip(logger.transtext("物理材質の向き(例：左腕側の物理を設定したい場合に「左」を設定して、物理が流れる方向を左方向に伸ばす)"))
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_direction_ctrl, 0, wx.ALL, 5)
