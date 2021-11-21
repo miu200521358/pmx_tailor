@@ -98,7 +98,7 @@ class PmxTailorExportService():
             model = self.clear_exist_physics(model, param_option, param_option['material_name'], target_vertices, saved_bone_names)
 
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
-            if param_option['physics_type'] == logger.transtext('髪'):
+            if param_option['physics_type'] in [logger.transtext('髪'), logger.transtext('単一揺')]:
                 logger.info("【%s】ボーンマップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
                 logger.info("【%s】剛体生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
@@ -487,6 +487,27 @@ class PmxTailorExportService():
                                       MVector3D(vertical_spring_constant_rot_xs[par], vertical_spring_constant_rot_ys[par], vertical_spring_constant_rot_zs[par]))   # noqa
                         created_joints[f'0:{root_rigidbody.index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'] = joint
 
+                        # バランサー剛体が必要な場合
+                        if param_option["rigidbody_balancer"]:
+                            balancer_prev_below_bone_name = f'B-{prev_above_bone_name}'
+                            joint_name = f'B|{prev_above_bone_name}|{balancer_prev_below_bone_name}'
+                            joint_key = f'8:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
+
+                            joint_vec = model.rigidbodies[prev_above_bone_name].shape_position
+
+                            # 回転量
+                            joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis_up = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
+                            joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                            joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                            joint_euler = joint_rotation_qq.toEulerAngles()
+                            joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
+
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                                          joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
+                                          MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
+                            created_joints[joint_key] = joint
+            
                     if param_vertical_joint and prev_above_bone_name != prev_below_bone_name and prev_above_bone_name in model.rigidbodies and prev_below_bone_name in model.rigidbodies:
                         # 縦ジョイント
                         joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
@@ -515,6 +536,27 @@ class PmxTailorExportService():
                                           MVector3D(vertical_spring_constant_rot_xs[par], vertical_spring_constant_rot_ys[par], vertical_spring_constant_rot_zs[par]))   # noqa
                             created_joints[joint_key] = joint
 
+                            # バランサー剛体が必要な場合
+                            if param_option["rigidbody_balancer"]:
+                                balancer_prev_below_bone_name = f'B-{prev_below_bone_name}'
+                                joint_name = f'B|{prev_below_bone_name}|{balancer_prev_below_bone_name}'
+                                joint_key = f'8:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
+
+                                joint_vec = model.rigidbodies[prev_below_bone_name].shape_position
+
+                                # 回転量
+                                joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
+                                joint_axis_up = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
+                                joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                                joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                                joint_euler = joint_rotation_qq.toEulerAngles()
+                                joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
+
+                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                                              joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
+                                              MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
+                                created_joints[joint_key] = joint
+                
             for joint_key in sorted(created_joints.keys()):
                 # ジョイントを登録
                 joint = created_joints[joint_key]
@@ -1503,10 +1545,6 @@ class PmxTailorExportService():
         param_rigidbody = param_option['rigidbody']
         # 剛体係数
         coefficient = param_option['rigidbody_coefficient']
-        # 剛体形状
-        rigidbody_shape_type = param_option["rigidbody_shape_type"]
-        # 物理タイプ
-        physics_type = param_option["physics_type"]
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         parent_bone = model.bones[param_option['parent_bone_name']]
@@ -1522,7 +1560,9 @@ class PmxTailorExportService():
             root_rigidbody.index = len(model.rigidbodies)
             model.rigidbodies[parent_bone.name] = root_rigidbody
         
+        target_rigidbodies = {}
         for pac in range(bone_grid_cols):
+            target_rigidbodies[pac] = []
             # 剛体生成
             created_rigidbodies = {}
             # 剛体の質量
@@ -1556,6 +1596,8 @@ class PmxTailorExportService():
                         prev_below_bone_position = prev_above_bone_position + model.bones[prev_above_bone_name].tail_position
 
                 if prev_above_bone_position and prev_below_bone_position:
+                    target_rigidbodies[pac].append(prev_above_bone_name)
+
                     bone = model.bones[prev_above_bone_name]
                     # 剛体生成対象の場合のみ作成
                     vertex_list = []
@@ -1608,16 +1650,128 @@ class PmxTailorExportService():
                 rigidbody.index = len(model.rigidbodies)
 
                 # 質量と減衰は面積に応じた値に変換
-                rigidbody.param.mass = calc_ratio(rigidbody.param.mass, max_mass, min_mass, param_rigidbody.param.mass, param_rigidbody.param.mass * coefficient)
-                rigidbody.param.linear_damping = calc_ratio(rigidbody.param.linear_damping, max_linear_damping, min_linear_damping, param_rigidbody.param.linear_damping, \
-                    min(0.9999999, param_rigidbody.param.linear_damping * coefficient))     # noqa
-                rigidbody.param.angular_damping = calc_ratio(rigidbody.param.angular_damping, max_angular_damping, min_angular_damping, param_rigidbody.param.angular_damping, \
-                    min(0.9999999, param_rigidbody.param.angular_damping * coefficient))    # noqa
+                if min_mass != max_mass:
+                    rigidbody.param.mass = calc_ratio(rigidbody.param.mass, max_mass, min_mass, param_rigidbody.param.mass, param_rigidbody.param.mass * coefficient)
+                if min_linear_damping != max_linear_damping:
+                    rigidbody.param.linear_damping = calc_ratio(rigidbody.param.linear_damping, max_linear_damping, min_linear_damping, param_rigidbody.param.linear_damping, \
+                        min(0.9999999, param_rigidbody.param.linear_damping * coefficient))     # noqa
+                if min_angular_damping != max_angular_damping:
+                    rigidbody.param.angular_damping = calc_ratio(rigidbody.param.angular_damping, max_angular_damping, min_angular_damping, param_rigidbody.param.angular_damping, \
+                        min(0.9999999, param_rigidbody.param.angular_damping * coefficient))    # noqa
                 
                 model.rigidbodies[rigidbody.name] = rigidbody
             
             prev_rigidbody_cnt += len(created_rigidbodies)
 
+        # バランサー剛体が必要な場合
+        if param_option["rigidbody_balancer"]:
+            # すべて非衝突対象
+            balancer_no_collision_group = 0
+            # 剛体生成
+            created_rigidbodies = {}
+            # ボーン生成
+            created_bones = {}
+
+            for rigidbody_params in target_rigidbodies.values():
+                rigidbody_mass = 0
+                rigidbody_volume = MVector3D()
+                for org_rigidbody_name in reversed(rigidbody_params):
+                    org_rigidbody = model.rigidbodies[org_rigidbody_name]
+                    org_bone = model.bones[model.bone_indexes[org_rigidbody.bone_index]]
+                    org_tail_position = org_bone.tail_position
+                    if org_bone.tail_index >= 0:
+                        org_tail_position = model.bones[model.bone_indexes[org_bone.tail_index]].position
+                    org_axis = (org_tail_position - org_bone.position).normalized()
+
+                    if rigidbody_mass > 0:
+                        # 中間は子の1.5倍
+                        org_rigidbody.param.mass = rigidbody_mass * 1.5
+                    org_rigidbody_qq = MQuaternion.fromEulerAngles(math.degrees(org_rigidbody.shape_rotation.x()), math.degrees(org_rigidbody.shape_rotation.y()), math.degrees(org_rigidbody.shape_rotation.z()))
+
+                    # 名前にバランサー追加
+                    rigidbody_name = f'B-{org_rigidbody_name}'
+                    # 質量は子の1.5倍
+                    rigidbody_mass = org_rigidbody.param.mass
+
+                    if org_axis.y() < 0:
+                        # 下を向いてたらY方向に反転
+                        rigidbody_qq = MQuaternion.fromEulerAngles(0, 180, 0)
+                        rigidbody_qq *= org_rigidbody_qq
+                    else:
+                        # 上を向いてたらX方向に反転
+                        rigidbody_qq = org_rigidbody_qq
+                        rigidbody_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+
+                    shape_euler = rigidbody_qq.toEulerAngles()
+                    shape_rotation_radians = MVector3D(math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z()))
+
+                    # 剛体の位置は剛体の上端から反対向き
+                    mat = MMatrix4x4()
+                    mat.setToIdentity()
+                    mat.translate(org_rigidbody.shape_position)
+                    mat.rotate(org_rigidbody_qq)
+                    # X方向に反転
+                    mat.rotate(MQuaternion.fromEulerAngles(180, 0, 0))
+
+                    edge_pos = MVector3D()
+                    if org_rigidbody.shape_type == 0:
+                        # 球の場合、半径分移動
+                        edge_pos = MVector3D(0, org_rigidbody.shape_size.x(), 0)
+                    elif org_rigidbody.shape_type == 1:
+                        # 箱の場合、高さの半分移動
+                        edge_pos = MVector3D(0, org_rigidbody.shape_size.y() / 2, 0)
+                    elif org_rigidbody.shape_type == 2:
+                        # カプセルの場合、高さの半分 + 半径
+                        edge_pos = MVector3D(0, org_rigidbody.shape_size.y() / 2 + org_rigidbody.shape_size.x(), 0)
+
+                    mat.translate(edge_pos)
+                    
+                    # 元剛体の先端位置
+                    org_rigidbody_pos = mat * MVector3D()
+
+                    mat2 = MMatrix4x4()
+                    mat2.setToIdentity()
+                    # 元剛体の先端位置
+                    mat2.translate(org_rigidbody_pos)
+                    if org_axis.y() < 0:
+                        # 下を向いてたらY方向に反転
+                        mat2.rotate(MQuaternion.fromEulerAngles(0, 180, 0))
+                        mat2.rotate(org_rigidbody_qq)
+                    else:
+                        # 上を向いてたらX方向に反転
+                        mat2.rotate(org_rigidbody_qq)
+                        mat2.rotate(MQuaternion.fromEulerAngles(180, 0, 0))
+
+                    # バランサー剛体の位置
+                    shape_position = mat2 * (edge_pos + rigidbody_volume * 2)
+
+                    # バランサー剛体のサイズ
+                    shape_size = org_rigidbody.shape_size + (rigidbody_volume * 4)
+
+                    # バランサー剛体用のボーン
+                    balancer_bone = Bone(rigidbody_name, rigidbody_name, shape_position, org_rigidbody.bone_index, 0, 0x0002)
+                    created_bones[balancer_bone.name] = balancer_bone
+
+                    rigidbody = RigidBody(rigidbody_name, rigidbody_name, -1, org_rigidbody.collision_group, balancer_no_collision_group, \
+                                          org_rigidbody.shape_type, shape_size, shape_position, shape_rotation_radians, \
+                                          rigidbody_mass, org_rigidbody.param.linear_damping, org_rigidbody.param.angular_damping, \
+                                          org_rigidbody.param.restitution, org_rigidbody.param.friction, 1)
+                    created_rigidbodies[rigidbody.name] = rigidbody
+                    # 子剛体のサイズを保持
+                    rigidbody_volume += edge_pos
+
+            for rigidbody_name in sorted(created_rigidbodies.keys()):
+                # ボーンを登録
+                bone = created_bones[rigidbody_name]
+                bone.index = len(model.bones)
+                model.bones[bone.name] = bone
+
+                # 剛体を登録
+                rigidbody = created_rigidbodies[rigidbody_name]
+                rigidbody.bone_index = bone.index
+                rigidbody.index = len(model.rigidbodies)
+                model.rigidbodies[rigidbody.name] = rigidbody
+   
         logger.info("-- 剛体: %s個目:終了", prev_rigidbody_cnt)
 
         return root_rigidbody
@@ -1866,8 +2020,8 @@ class PmxTailorExportService():
                 prev_prev_above_bone_position = None
                 if 0 == xi:
                     # 先頭の場合、繋がっていたら最後のを加える
-                    if vertex_connected[below_v_yidx]:
-                        prev_prev_above_v_xidx = list(registed_bone_indexs[below_v_yidx].keys())[-1]
+                    if vertex_connected[above_v_yidx]:
+                        prev_prev_above_v_xidx = list(registed_bone_indexs[above_v_yidx].keys())[-1]
                         prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
                         prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
                 else:

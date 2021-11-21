@@ -160,23 +160,28 @@ class ParamPanel(BasePanel):
 
         if self.frame.file_panel_ctrl.org_model_file_ctrl.data and self.org_model_digest == self.frame.file_panel_ctrl.org_model_file_ctrl.data.digest:
             for pidx, physics_param in enumerate(self.physics_list):
-                param = physics_param.get_param_options(pidx, is_show_error)
-                if param:
+                param, result = physics_param.get_param_options(pidx, is_show_error)
+                if param and result:
                     material_key = f"{param['material_name']}:{param['abb_name']}:{param['vertices_csv']}"
                     if material_key in param_material_names:
-                        logger.error(logger.transtext("同じ材質に対して複数の物理設定が割り当てられています"), decoration=MLogger.DECORATION_BOX)
+                        logger.error("同じ材質に対して複数の物理設定が割り当てられています\n" \
+                                     + "既存物理再利用などで異なる箇所に物理を割り当てたい場合、略称が違っているか確認してください。", decoration=MLogger.DECORATION_BOX)
                         return []
 
                     if param['abb_name'] in param_abb_names:
-                        logger.error(logger.transtext("同じ略称が複数の物理設定が割り当てられています"), decoration=MLogger.DECORATION_BOX)
+                        logger.error("同じ略称が複数の物理設定が割り当てられています", decoration=MLogger.DECORATION_BOX)
                         return []
 
                     params.append(param)
                     param_material_names.append(material_key)
                     param_abb_names.append(param['abb_name'])
-        
+                else:
+                    if not result:
+                        logger.error("一部無効な物理設定が設定されています。\n物理設定を見直してください。", decoration=MLogger.DECORATION_BOX)
+                        return []
+       
         if len(params) == 0:
-            logger.error(logger.transtext("有効な物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。"), decoration=MLogger.DECORATION_BOX)
+            logger.error("有効な物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
             return []
 
         return params
@@ -289,8 +294,8 @@ class PhysicsParam():
 
         self.simple_primitive_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=[logger.transtext("布(コットン)"), logger.transtext("布(シルク)"), \
                                                logger.transtext("布(ベルベッド)"), logger.transtext("布(レザー)"), logger.transtext("布(デニム)"), \
-                                               logger.transtext("布(袖)"), logger.transtext("髪(ショート)"), logger.transtext("髪(ロング)"), logger.transtext("髪(アホ毛)")])
-        self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット"))
+                                               logger.transtext("髪(ショート)"), logger.transtext("髪(ロング)"), logger.transtext("髪(アホ毛)"), logger.transtext("単一揺れ物")])
+        self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"))
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
 
@@ -491,12 +496,12 @@ class PhysicsParam():
 
         # 物理タイプ
         self.physics_type_txt = wx.StaticText(self.advance_window, wx.ID_ANY, logger.transtext("物理タイプ"), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.physics_type_txt.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n袖: カプセル剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
+        self.physics_type_txt.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)\n袖: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
         self.physics_type_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.physics_type_txt, 0, wx.ALL, 5)
 
-        self.physics_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('布'), logger.transtext('袖'), logger.transtext('髪')])
-        self.physics_type_ctrl.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n袖: カプセル剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
+        self.physics_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('布'), logger.transtext('髪'), logger.transtext('単一揺')])
+        self.physics_type_ctrl.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)\n袖: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
         self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
 
@@ -577,6 +582,11 @@ class PhysicsParam():
         self.advance_rigidbody_shape_type_ctrl.SetToolTip(logger.transtext("剛体の形状"))
         self.advance_rigidbody_shape_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_shape_type_ctrl, 0, wx.ALL, 5)
+
+        self.advance_rigidbody_balancer_ctrl = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("バランサー剛体"))
+        self.advance_rigidbody_balancer_ctrl.SetToolTip(logger.transtext("バランサー剛体を作成するか否か"))
+        self.advance_rigidbody_balancer_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_balancer_ctrl, 0, wx.ALL, 5)
 
         self.advance_rigidbody_sizer.Add(self.advance_rigidbody_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_rigidbody_sizer, 0, wx.ALL, 5)
@@ -1450,29 +1460,33 @@ class PhysicsParam():
         if self.simple_material_ctrl.GetStringSelection() and self.simple_parent_bone_ctrl.GetStringSelection() and self.simple_group_ctrl.GetStringSelection() \
            and self.simple_abb_ctrl.GetValue():
             if self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.material_indices[self.simple_material_ctrl.GetStringSelection()] == 0:
-                logger.error(logger.transtext("頂点のない材質が指定されています。"), decoration=MLogger.DECORATION_BOX)
-                return params
+                logger.error("頂点のない材質が指定されています。", decoration=MLogger.DECORATION_BOX)
+                return params, False
 
             if self.simple_material_ctrl.GetStringSelection() == self.simple_back_material_ctrl.GetStringSelection():
-                logger.error(logger.transtext("物理材質と同じ材質が裏面に指定されています。"), decoration=MLogger.DECORATION_BOX)
-                return params
+                logger.error("物理材質と同じ材質が裏面に指定されています。", decoration=MLogger.DECORATION_BOX)
+                return params, False
 
             if self.physics_type_ctrl.GetStringSelection() == logger.transtext('髪') and self.simple_exist_physics_clear_ctrl.GetStringSelection() != logger.transtext('再利用'):
-                logger.error(logger.transtext("髪物理を設定する時には、"), decoration=MLogger.DECORATION_BOX)
-                return params
+                logger.error("髪物理を設定する時には、既存設定は「再利用」を指定してください。", decoration=MLogger.DECORATION_BOX)
+                return params, False
+
+            if self.physics_type_ctrl.GetStringSelection() == logger.transtext('単一揺') and self.simple_exist_physics_clear_ctrl.GetStringSelection() != logger.transtext('再利用'):
+                logger.error("単一揺れ物物理を設定する時には、既存設定は「再利用」を指定してください。", decoration=MLogger.DECORATION_BOX)
+                return params, False
 
             bone_grid, bone_grid_rows, bone_grid_cols, is_boned = self.get_bone_grid()
             if self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext('再利用'):
                 if not is_boned:
                     logger.error("既存設定を再利用する場合、「パラ調整(ボーン)」画面でボーン並び順を指定してください。", decoration=MLogger.DECORATION_BOX)
-                    return {}
+                    return params, False
                 params["bone_grid"] = bone_grid
                 params["bone_grid_rows"] = bone_grid_rows
                 params["bone_grid_cols"] = bone_grid_cols
             else:
                 if self.simple_exist_physics_clear_ctrl.GetStringSelection() != logger.transtext('再利用') and is_boned:
                     logger.error("「パラ調整(ボーン)」画面でボーン並び順を指定した場合、既存設定は「再利用」を指定してください。", decoration=MLogger.DECORATION_BOX)
-                    return {}
+                    return params, False
                 params["bone_grid"] = {}
                 params["bone_grid_rows"] = 0
                 params["bone_grid_cols"] = 0
@@ -1514,6 +1528,7 @@ class PhysicsParam():
                                             self.rigidbody_restitution_spin.GetValue(), self.rigidbody_friction_spin.GetValue(), 0)
             params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
             params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
+            params["rigidbody_balancer"] = self.advance_rigidbody_balancer_ctrl.GetValue()
 
             params["vertical_joint"] = None
             if self.advance_vertical_joint_valid_check.GetValue():
@@ -1577,10 +1592,12 @@ class PhysicsParam():
                     empty_param_list.append(logger.transtext("剛体グループ"))
                 if not self.simple_abb_ctrl.GetValue():
                     empty_param_list.append(logger.transtext("材質略称"))
+                
+                if len(empty_param_list) < 4:
+                    logger.error("No.%sの%sに値が設定されていません。", pidx + 1, '・'.join(empty_param_list), decoration=MLogger.DECORATION_BOX)
+                    return params, False
 
-                logger.error(logger.transtext("No.%sの%sに値が設定されていません。"), pidx + 1, '・'.join(empty_param_list), decoration=MLogger.DECORATION_BOX)
-
-        return params
+        return params, True
     
     def on_change_vertices_csv(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
@@ -2101,10 +2118,12 @@ class PhysicsParam():
     
     def set_simple_primitive(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
+        self.advance_rigidbody_balancer_ctrl.SetValue(0)
 
-        if logger.transtext('袖') in self.simple_primitive_ctrl.GetStringSelection():
-            self.physics_type_ctrl.SetStringSelection(logger.transtext('袖'))
+        if logger.transtext('単一揺れ物') in self.simple_primitive_ctrl.GetStringSelection():
+            self.physics_type_ctrl.SetStringSelection(logger.transtext('単一揺'))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
+            self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext('再利用'))
         elif logger.transtext('髪') in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext('髪'))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
@@ -2163,14 +2182,14 @@ class PhysicsParam():
             self.advance_diagonal_joint_valid_check.SetValue(1)
             self.advance_reverse_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(袖)"):
-            self.simple_mass_slider.SetValue(1.7)
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("単一揺れ物"):
+            self.simple_mass_slider.SetValue(2.3)
             self.simple_air_resistance_slider.SetValue(2.5)
             self.simple_shape_maintenance_slider.SetValue(2.8)
 
             self.advance_vertical_joint_valid_check.SetValue(1)
-            self.advance_horizonal_joint_valid_check.SetValue(1)
-            self.advance_diagonal_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(0)
+            self.advance_diagonal_joint_valid_check.SetValue(0)
             self.advance_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
@@ -2194,14 +2213,16 @@ class PhysicsParam():
             self.advance_reverse_joint_valid_check.SetValue(0)
             
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
-            self.simple_mass_slider.SetValue(1.5)
-            self.simple_air_resistance_slider.SetValue(3.5)
-            self.simple_shape_maintenance_slider.SetValue(3.8)
+            self.simple_mass_slider.SetValue(0.8)
+            self.simple_air_resistance_slider.SetValue(2.7)
+            self.simple_shape_maintenance_slider.SetValue(3.0)
 
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
             self.advance_diagonal_joint_valid_check.SetValue(0)
             self.advance_reverse_joint_valid_check.SetValue(0)
+
+            self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
         self.set_mass(event)
         self.set_air_resistance(event)
