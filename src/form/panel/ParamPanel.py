@@ -204,13 +204,13 @@ class PhysicsParam():
 
         # インポートボタン
         self.import_btn_ctrl = wx.Button(self.simple_window, wx.ID_ANY, logger.transtext("インポート ..."), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.import_btn_ctrl.SetToolTip(logger.transtext("材質設定データをjsonファイルから読み込みます。\nファイル選択ダイアログが開きます。"))
+        self.import_btn_ctrl.SetToolTip(logger.transtext("物理設定データをjsonファイルから読み込みます。\nファイル選択ダイアログが開きます。"))
         self.import_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_param_import)
         self.simple_btn_sizer.Add(self.import_btn_ctrl, 0, wx.ALL, 5)
 
         # エクスポートボタン
         self.export_btn_ctrl = wx.Button(self.simple_window, wx.ID_ANY, logger.transtext("エクスポート ..."), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.export_btn_ctrl.SetToolTip(logger.transtext("材質設定データをjsonファイルに出力します。\n出力先を指定できます。"))
+        self.export_btn_ctrl.SetToolTip(logger.transtext("物理設定データをjsonファイルに出力します。\n（ボーン等モデルに対する情報はエクスポートできません）\n出力先を指定できます。"))
         self.export_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_param_export)
         self.simple_btn_sizer.Add(self.export_btn_ctrl, 0, wx.ALL, 5)
 

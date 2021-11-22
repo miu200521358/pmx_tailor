@@ -1364,8 +1364,8 @@ class PmxTailorExportService():
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
-                                        joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
-                                        MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
+                                      joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
+                                      MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
                         created_joints[joint_key] = joint
 
                 # 横ジョイント
@@ -1729,7 +1729,10 @@ class PmxTailorExportService():
 
                     # サイズ
                     diff_size = np.abs(max_vertex - min_vertex)
-                    shape_size = MVector3D(diff_size[0] * 0.4, abs(axis_vec.y() * 0.8), diff_size[2])
+                    if par == 0:
+                        shape_size = MVector3D(diff_size[0] * 0.2, abs(axis_vec.y() * 0.8), diff_size[2])
+                    else:
+                        shape_size = MVector3D(diff_size[0] * 0.3, abs(axis_vec.y() * 0.8), diff_size[2])
                     shape_position = bone.position + (prev_below_bone_position - bone.position) / 2
 
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
@@ -1746,6 +1749,9 @@ class PmxTailorExportService():
                     created_rigidbody_masses[rigidbody.name] = mass
                     created_rigidbody_linear_dampinges[rigidbody.name] = linear_damping
                     created_rigidbody_angular_dampinges[rigidbody.name] = angular_damping
+            
+            if len(created_rigidbodies) == 0:
+                continue
 
             min_mass = np.min(list(created_rigidbody_masses.values()))
             min_linear_damping = np.min(list(created_rigidbody_linear_dampinges.values()))
@@ -2211,39 +2217,45 @@ class PmxTailorExportService():
 
         target_rigidbodies = {}
         for yi, (above_v_yidx, below_v_yidx) in enumerate(zip(v_yidxs[1:], v_yidxs[:-1])):
-            below_v_xidxs = list(registed_bone_indexs[below_v_yidx].keys())
-            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
+            above_v_xidxs = list(registed_bone_indexs[above_v_yidx].keys())
+            logger.debug(f"yi: {yi}, above_v_xidxs: {above_v_xidxs}")
 
-            if below_v_yidx < len(vertex_connected) and vertex_connected[below_v_yidx]:
+            if above_v_yidx < len(vertex_connected) and vertex_connected[above_v_yidx]:
                 # 繋がってる場合、最後に最初のボーンを追加する
-                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[0]]
-            elif len(registed_bone_indexs[below_v_yidx]) > 2:
+                above_v_xidxs += [list(registed_bone_indexs[above_v_yidx].keys())[0]]
+            elif len(registed_bone_indexs[above_v_yidx]) > 2:
                 # 繋がってない場合、最後に最後のひとつ前のボーンを追加する
-                below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[-2]]
-            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
+                above_v_xidxs += [list(registed_bone_indexs[above_v_yidx].keys())[-2]]
+            logger.debug(f"yi: {yi}, above_v_xidxs: {above_v_xidxs}")
 
             target_rigidbodies[yi] = []
 
-            for xi, (prev_below_vxidx, next_below_vxidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
-                prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_vxidx] + 1
-                next_below_v_xidx = registed_bone_indexs[below_v_yidx][next_below_vxidx]
-                next_below_v_xno = next_below_v_xidx + 1
-                below_v_yno = below_v_yidx + 1
+            for xi, (prev_above_vxidx, next_above_vxidx) in enumerate(zip(above_v_xidxs[:-1], above_v_xidxs[1:])):
+                prev_above_v_xidx = registed_bone_indexs[above_v_yidx][prev_above_vxidx]
+                prev_above_v_xno = prev_above_v_xidx + 1
+                next_above_v_xidx = registed_bone_indexs[above_v_yidx][next_above_vxidx]
+                next_above_v_xno = next_above_v_xidx + 1
+                above_v_yno = above_v_yidx + 1
 
-                prev_below_bone_name = self.get_bone_name(abb_name, below_v_yno, prev_below_v_xno)
-                prev_below_bone_position = tmp_all_bones[prev_below_bone_name]["bone"].position
-                next_below_bone_name = self.get_bone_name(abb_name, below_v_yno, next_below_v_xno)
-                next_below_bone_position = tmp_all_bones[next_below_bone_name]["bone"].position
-
-                prev_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[above_v_yidx].values())) - registed_bone_indexs[below_v_yidx][prev_below_vxidx])
-                prev_above_v_xidx = list(registed_bone_indexs[above_v_yidx].values())[(0 if prev_below_vxidx == 0 else np.argmin(prev_above_v_xidx_diff))]
-                prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_above_v_xidx + 1)
+                prev_above_bone_name = self.get_bone_name(abb_name, above_v_yno, prev_above_v_xno)
                 prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
-                
-                next_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[above_v_yidx].values())) - registed_bone_indexs[below_v_yidx][next_below_vxidx])
-                next_above_v_xidx = list(registed_bone_indexs[above_v_yidx].values())[(0 if next_below_vxidx == 0 else np.argmin(next_above_v_xidx_diff))]
-                next_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, next_above_v_xidx + 1)
+                next_above_bone_name = self.get_bone_name(abb_name, above_v_yno, next_above_v_xno)
                 next_above_bone_position = tmp_all_bones[next_above_bone_name]["bone"].position
+
+                prev_below_bone_name = self.get_bone_name(abb_name, below_v_yidx + 1, prev_above_v_xidx + 1)
+                if prev_below_bone_name not in tmp_all_bones:
+                    prev_below_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[below_v_yidx].values())) - registed_bone_indexs[above_v_yidx][prev_above_vxidx])
+                    prev_below_v_xidx = list(registed_bone_indexs[below_v_yidx].values())[(0 if prev_above_vxidx == 0 else np.argmin(prev_below_v_xidx_diff))]
+                    prev_below_bone_name = self.get_bone_name(abb_name, below_v_yidx + 1, prev_below_v_xidx + 1)
+                prev_below_bone_position = tmp_all_bones[prev_below_bone_name]["bone"].position
+                
+                next_below_bone_name = self.get_bone_name(abb_name, below_v_yidx + 1, next_above_v_xidx + 1)
+                if next_below_bone_name not in tmp_all_bones:
+                    next_below_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[below_v_yidx].values())) - registed_bone_indexs[above_v_yidx][next_above_vxidx])
+                    next_below_v_xidx = list(registed_bone_indexs[below_v_yidx].values())[(0 if next_above_vxidx == 0 else np.argmin(next_below_v_xidx_diff))]
+                    next_below_bone_name = self.get_bone_name(abb_name, below_v_yidx + 1, next_below_v_xidx + 1)
+
+                next_below_bone_position = tmp_all_bones[next_below_bone_name]["bone"].position
 
                 # prev_above_bone_name = tmp_all_bones[prev_below_bone_name]["parent"]
                 # prev_above_bone_position = tmp_all_bones[prev_above_bone_name]["bone"].position
@@ -2262,13 +2274,11 @@ class PmxTailorExportService():
                         prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
                         prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
                 else:
-                    prev_prev_below_v_xidx = registed_bone_indexs[below_v_yidx][below_v_xidxs[xi - 1]]
-                    prev_prev_above_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi + 1]].values())) - prev_prev_below_v_xidx)
-                    prev_prev_above_v_xidx = list(registed_bone_indexs[v_yidxs[yi + 1]].values())[(0 if prev_prev_below_v_xidx == 0 else np.argmin(prev_prev_above_v_xidx_diff))]
+                    prev_prev_above_v_xidx = registed_bone_indexs[above_v_yidx][above_v_xidxs[xi - 1]]
                     prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
                     prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
                 
-                if prev_above_bone_name in created_rigidbodies:
+                if prev_above_bone_name in created_rigidbodies or (prev_above_bone_name in model.bones and not model.bones[prev_above_bone_name].getVisibleFlag()):
                     continue
 
                 prev_above_bone_index = -1
@@ -2555,16 +2565,29 @@ class PmxTailorExportService():
                         if below_v_yidx == v_yidxs[0]:
                             # 最下段は末端ボーンにウェイトを振らない
                             # 処理対象全ボーン名
-                            weight_names = np.array([prev_above_bone.name, next_above_bone.name])
+                            weight_bones = [prev_above_bone, next_above_bone]
                             # ウェイト
-                            total_weights = np.array([prev_above_weight + prev_below_weight, next_above_weight + next_below_weight])
+                            total_weights = [prev_above_weight + prev_below_weight, next_above_weight + next_below_weight]
                         else:
-                            # 処理対象全ボーン名
-                            weight_names = np.array([prev_above_bone.name, next_above_bone.name, prev_below_bone.name, next_below_bone.name])
+                            # 全処理対象ボーン名
+                            weight_bones = [prev_above_bone, next_above_bone, prev_below_bone, next_below_bone]
                             # ウェイト
-                            total_weights = np.array([prev_above_weight, next_above_weight, prev_below_weight, next_below_weight])
+                            total_weights = [prev_above_weight, next_above_weight, prev_below_weight, next_below_weight]
 
-                        logger.debug(f'vertex_idx: {vertex_idx}, weight_names: [{weight_names}], total_weights: [{total_weights}]')
+                        bone_weights = {}
+                        for b, w in zip(weight_bones, total_weights):
+                            if b and b.getVisibleFlag():
+                                if b not in bone_weights:
+                                    bone_weights[b.name] = 0
+                                bone_weights[b.name] += w
+                        
+                        if len(bone_weights) > 2:
+                            for _ in range(len(bone_weights), 5):
+                                bone_weights[param_option['parent_bone_name']] = 0
+
+                        # 対象となるウェイト値
+                        weight_names = list(bone_weights.keys())
+                        total_weights = np.array(list(bone_weights.values()))
 
                         if len(np.nonzero(total_weights)[0]) > 0:
                             weights = total_weights / total_weights.sum(axis=0, keepdims=1)
@@ -2574,6 +2597,9 @@ class PmxTailorExportService():
 
                             for vvidx in duplicate_vertices[v.position.to_log()]:
                                 vv = model.vertex_dict[vvidx]
+
+                                logger.debug(f'vertex_idx: {vvidx}, weight_names: [{weight_names}], total_weights: [{total_weights}]')
+
                                 if vv.deform.index0 == model.bones[param_option['parent_bone_name']].index:
                                     # 重複頂点にも同じウェイトを割り当てる
                                     if np.count_nonzero(weights) == 1:
@@ -2619,12 +2645,20 @@ class PmxTailorExportService():
             # 各頂点の位置との差分から距離を測る
             rv_distances = np.linalg.norm((np.array(list(vertex_distances.values())) - v.position.data()), ord=2, axis=1)
 
-            # まったく同じ位置のはウェイト置き換えても上手くいかないのでちょっとでも離れてるヤツの中から直近
-            nearest_vi = list(vertex_distances.keys())[np.argmin(rv_distances[rv_distances > 0])]
-            nearest_v = model.vertex_dict[nearest_vi]
-            nearest_deform = nearest_v.deform
+            # 近い頂点のうち、親ボーンにウェイトが乗ってないのを選択
+            for nearest_vi in np.argsort(rv_distances):
+                nearest_vidx = list(vertex_distances.keys())[nearest_vi]
+                nearest_v = model.vertex_dict[nearest_vidx]
+                nearest_deform = nearest_v.deform
+                if type(nearest_deform) is Bdef1 and nearest_deform.index0 == model.bones[param_option['parent_bone_name']].index:
+                    # 直近が親ボーンの場合、一旦スルー
+                    continue
+                else:
+                    break
 
             if type(nearest_deform) is Bdef1:
+                logger.debug(f'remaining vertex_idx: {v.index}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]')
+
                 v.deform = Bdef1(nearest_deform.index0)
             elif type(nearest_deform) is Bdef2:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
@@ -2637,6 +2671,8 @@ class PmxTailorExportService():
                 total_weights = np.array([bone1_distance / (bone1_distance + bone2_distance), bone2_distance / (bone1_distance + bone2_distance)])
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
+
+                logger.debug(f'remaining vertex_idx: {v.index}, weight_names: [{weight_names}], total_weights: [{total_weights}]')
                 
                 if np.count_nonzero(weights) == 1:
                     v.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
@@ -2664,6 +2700,8 @@ class PmxTailorExportService():
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
 
+                logger.debug(f'remaining vertex_idx: {v.index}, weight_names: [{weight_names}], total_weights: [{total_weights}]')
+
                 if np.count_nonzero(weights) == 1:
                     v.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
                 elif np.count_nonzero(weights) == 2:
@@ -2672,7 +2710,7 @@ class PmxTailorExportService():
                     v.deform = Bdef4(model.bones[weight_names[weight_idxs[-1]]].index, model.bones[weight_names[weight_idxs[-2]]].index, \
                                      model.bones[weight_names[weight_idxs[-3]]].index, model.bones[weight_names[weight_idxs[-4]]].index, \
                                      weights[weight_idxs[-1]], weights[weight_idxs[-2]], weights[weight_idxs[-3]], weights[weight_idxs[-4]])
-
+            
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 100 > prev_weight_cnt:
                 logger.info("-- 残頂点ウェイト: %s個目:終了", weight_cnt)
@@ -3043,12 +3081,15 @@ class PmxTailorExportService():
         # 非表示子ボーンも削除する
         for bone in model.bones.values():
             if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
-                    and model.bone_indexes[bone.parent_index] not in SEMI_STANDARD_BONE_NAMES:
+                    and model.bone_indexes[bone.parent_index] not in saved_bone_names:
                 weighted_bone_indexes[bone.name] = bone.index
+
+        logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
 
         weighted_rigidbody_indexes = {}
         for rigidbody in model.rigidbodies.values():
-            if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()):
+            if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()) \
+               and model.bone_indexes[rigidbody.bone_index] not in saved_bone_names:
                 weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
 
         logger.debug('weighted_rigidbody_indexes: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
@@ -3112,7 +3153,7 @@ class PmxTailorExportService():
                     new_references.append((display_type, bone_idx))
             display_slot.references = new_references
 
-        for morph in model.morphs.values():
+        for morph in model.org_morphs.values():
             if morph.morph_type == 2:
                 new_offsets = []
                 for offset in morph.offsets:
