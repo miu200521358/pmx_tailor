@@ -2272,11 +2272,13 @@ class PmxTailorExportService():
                     if vertex_connected[above_v_yidx]:
                         prev_prev_above_v_xidx = list(registed_bone_indexs[above_v_yidx].keys())[-1]
                         prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
-                        prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
+                        if prev_prev_above_bone_name in tmp_all_bones:
+                            prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
                 else:
                     prev_prev_above_v_xidx = registed_bone_indexs[above_v_yidx][above_v_xidxs[xi - 1]]
                     prev_prev_above_bone_name = self.get_bone_name(abb_name, above_v_yidx + 1, prev_prev_above_v_xidx + 1)
-                    prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
+                    if prev_prev_above_bone_name in tmp_all_bones:
+                        prev_prev_above_bone_position = tmp_all_bones[prev_prev_above_bone_name]["bone"].position
                 
                 if prev_above_bone_name in created_rigidbodies or (prev_above_bone_name in model.bones and not model.bones[prev_above_bone_name].getVisibleFlag()):
                     continue
