@@ -1953,7 +1953,7 @@ class PhysicsParam():
     
     def on_horizonal_joint(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        self.advance_horizonal_joint_coefficient_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
+        self.advance_horizonal_joint_coefficient_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
         self.horizonal_joint_mov_x_min_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
         self.horizonal_joint_mov_x_max_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
         self.horizonal_joint_mov_y_min_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
@@ -2447,10 +2447,15 @@ class PhysicsParam():
         self.weighted_bone_names = {}
         for tail_bone_idx in sorted(list(target_bone_names.keys())):
             self.weighted_bone_names[tail_bone_idx] = []
-            for bone_name in target_bone_names[tail_bone_idx]:
+            is_regist = False
+            for bone_name in reversed(target_bone_names[tail_bone_idx]):
                 if bone_name not in registed_bone_names:
-                    self.weighted_bone_names[tail_bone_idx].append(bone_name)
-                    registed_bone_names.append(bone_name)
+                    is_regist = True
+            if is_regist:
+                for bone_name in target_bone_names[tail_bone_idx]:
+                    if bone_name not in registed_bone_names:
+                        self.weighted_bone_names[tail_bone_idx].append(bone_name)
+                        registed_bone_names.append(bone_name)
             logger.debug("weighted_bone_names[%s]: %s", tail_bone_idx, self.weighted_bone_names[tail_bone_idx])
 
 

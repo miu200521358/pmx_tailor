@@ -2826,6 +2826,8 @@ class PmxTailorExportService():
             # 中央あたりの横幅中央値ベースで横の割りを決める
             bone_horizonal_distances = all_bone_horizonal_distances[base_map_idx]
             full_ys = [y for i, y in enumerate(v_yidxs) if np.count_nonzero(bone_horizonal_distances[i, :]) == max(np.count_nonzero(bone_horizonal_distances, axis=1))]
+            if not full_ys:
+                full_ys = v_yidxs
             median_y = int(np.median(full_ys))
             median_x_distance = np.median(bone_horizonal_distances[median_y, :][np.nonzero(bone_horizonal_distances[median_y, :])])
 
@@ -3223,6 +3225,7 @@ class PmxTailorExportService():
 
         # 位置ベースで重複頂点の抽出
         duplicate_vertices = {}
+        ybase_vertices = {}
         for vertex_idx in model.material_vertices[material_name]:
             if vertex_idx not in target_vertices:
                 continue
@@ -3234,9 +3237,19 @@ class PmxTailorExportService():
             if vertex.index not in duplicate_vertices[key]:
                 duplicate_vertices[key].append(vertex.index)
 
+            key = round(vertex.position.y(), 3)
+            if key not in ybase_vertices:
+                ybase_vertices[key] = []
+            if vertex.index not in ybase_vertices[key]:
+                ybase_vertices[key].append(vertex.index)
+
             # 一旦ルートボーンにウェイトを一括置換
             vertex.deform = Bdef1(model.bones[param_option['parent_bone_name']].index)
         
+        ymin = np.min(np.array(list(ybase_vertices.keys())))
+        ymax = np.max(np.array(list(ybase_vertices.keys())))
+        ymedian = np.median(np.array(list(ybase_vertices.keys())))
+
         logger.info("%s: 面の抽出準備②", material_name)
 
         non_target_iidxs = []
@@ -3261,7 +3274,7 @@ class PmxTailorExportService():
 
             below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
             below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
-            if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
+            if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6 and ymin + ((ymedian - ymin) / 2) < v0.position.y() < ymedian + ((ymax - ymedian) / 2):
                 below_iidx = index_idx
                 max_below_x = below_x
                 max_below_size = below_size
