@@ -232,7 +232,8 @@ class PmxTailorExportService():
                 prev_above_bone_name = bone_grid[par][pac]
                 if not prev_above_bone_name:
                     continue
-
+                
+                is_above_connected = True
                 prev_above_bone_position = model.bones[prev_above_bone_name].position
                 prev_above_bone_index = model.bones[prev_above_bone_name].index
                 if prev_above_bone_name:
@@ -269,6 +270,7 @@ class PmxTailorExportService():
                                 if next_above_bone_name:
                                     next_above_bone_position = model.bones[next_above_bone_name].position
                                     next_above_bone_index = model.bones[next_above_bone_name].index
+                                    is_above_connected = False
                     else:
                         # 一旦円周を描いてみる
                         next_above_bone_name = bone_grid[par][0]
@@ -285,6 +287,7 @@ class PmxTailorExportService():
                                     if next_above_bone_name:
                                         next_above_bone_position = model.bones[next_above_bone_name].position
                                         next_above_bone_index = model.bones[next_above_bone_name].index
+                                        is_above_connected = False
 
                     next_below_bone_name = None
                     next_below_bone_position = None
@@ -339,13 +342,13 @@ class PmxTailorExportService():
                                                              'prev_above_pos': prev_above_bone_position, 'prev_below_pos': prev_below_bone_position, \
                                                              'next_above_pos': next_above_bone_position, 'next_below_pos': next_below_bone_position, \
                                                              'prev_prev_above': prev_prev_above_bone_name, 'prev_prev_above_pos': prev_prev_above_bone_position, \
-                                                             'yi': par, 'xi': pac}
+                                                             'yi': par, 'xi': pac, 'is_above_connected': is_above_connected}
                         logger.debug(f'prev_above: {prev_above_bone_name}, [{prev_above_bone_position.to_log()}], ' \
                                      + f'next_above: {next_above_bone_name}, [{next_above_bone_position.to_log()}], ' \
                                      + f'prev_below: {prev_below_bone_name}, [{prev_below_bone_position.to_log()}], ' \
                                      + f'next_below: {next_below_bone_name}, [{next_below_bone_position.to_log()}], ' \
                                      + f'prev_prev_above: {prev_prev_above_bone_name}, [{prev_prev_above_bone_position.to_log()}], ' \
-                                     + f'yi: {par}, xi: {pac}')
+                                     + f'yi: {par}, xi: {pac}, is_above_connected: {is_above_connected}')
 
         return bone_blocks
     
@@ -1710,15 +1713,24 @@ class PmxTailorExportService():
                     target_rigidbodies[pac].append(prev_above_bone_name)
 
                     bone = model.bones[prev_above_bone_name]
-                    # 剛体生成対象の場合のみ作成
-                    vertex_list = []
-                    normal_list = []
-                    for vertex in model.vertices[bone.index]:
-                        vertex_list.append(vertex.position.data().tolist())
-                        normal_list.append(vertex.normal.data().tolist())
-                    vertex_ary = np.array(vertex_list)
-                    min_vertex = np.min(vertex_ary, axis=0)
-                    max_vertex = np.max(vertex_ary, axis=0)
+                    if bone.index not in model.vertices:
+                        if bone.tail_index in model.bone_indexes:
+                            # ウェイトが乗っていない場合、ボーンの長さで見る
+                            min_vertex = model.bones[model.bone_indexes[bone.tail_index]].position.data()
+                        else:
+                            min_vertex = np.array([0, 0, 0])
+                        max_vertex = bone.position.data()
+                        max_vertex[0] = 1
+                    else:
+                        # 剛体生成対象の場合のみ作成
+                        vertex_list = []
+                        normal_list = []
+                        for vertex in model.vertices[bone.index]:
+                            vertex_list.append(vertex.position.data().tolist())
+                            normal_list.append(vertex.normal.data().tolist())
+                        vertex_ary = np.array(vertex_list)
+                        min_vertex = np.min(vertex_ary, axis=0)
+                        max_vertex = np.max(vertex_ary, axis=0)
 
                     axis_vec = prev_below_bone_position - bone.position
                     
@@ -1938,7 +1950,7 @@ class PmxTailorExportService():
             prev_above_bone_position = bone_block['prev_above_pos']
             # prev_below_bone_name = bone_block['prev_below']
             prev_below_bone_position = bone_block['prev_below_pos']
-            # next_above_bone_name = bone_block['next_above']
+            next_above_bone_name = bone_block['next_above']
             next_above_bone_position = bone_block['next_above_pos']
             # next_below_bone_name = bone_block['next_below']
             next_below_bone_position = bone_block['next_below_pos']
@@ -1946,6 +1958,7 @@ class PmxTailorExportService():
             prev_prev_above_bone_position = bone_block['prev_prev_above_pos']
             xi = bone_block['xi']
             yi = bone_block['yi']
+            is_above_connected = bone_block['is_above_connected']
 
             if prev_above_bone_name in created_rigidbodies:
                 continue
@@ -1975,7 +1988,8 @@ class PmxTailorExportService():
             if round(prev_below_bone_position.y(), 2) != round(prev_above_bone_position.y(), 2):
                 shape_rotation_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
                 shape_rotation_qq *= MQuaternion.fromEulerAngles(-90, 0, 0)
-                shape_rotation_qq *= MQuaternion.fromEulerAngles(0, -90, 0)
+                if is_above_connected:
+                    shape_rotation_qq *= MQuaternion.fromEulerAngles(0, -90, 0)
 
             shape_rotation_euler = shape_rotation_qq.toEulerAngles()
 
@@ -3085,7 +3099,7 @@ class PmxTailorExportService():
         # 非表示子ボーンも削除する
         for bone in model.bones.values():
             if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
-                    and model.bone_indexes[bone.parent_index] not in saved_bone_names:
+                    and model.bone_indexes[bone.parent_index] not in SEMI_STANDARD_BONE_NAMES:
                 weighted_bone_indexes[bone.name] = bone.index
 
         logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
@@ -3093,7 +3107,7 @@ class PmxTailorExportService():
         weighted_rigidbody_indexes = {}
         for rigidbody in model.rigidbodies.values():
             if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()) \
-               and model.bone_indexes[rigidbody.bone_index] not in saved_bone_names:
+               and model.bone_indexes[rigidbody.bone_index] not in SEMI_STANDARD_BONE_NAMES:
                 weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
 
         logger.debug('weighted_rigidbody_indexes: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
