@@ -474,8 +474,8 @@ class PmxTailorExportService():
                         joint_vec = prev_above_bone_position
 
                         # 回転量
-                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (root_rigidbody.shape_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (root_rigidbody.shape_position - prev_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -499,8 +499,8 @@ class PmxTailorExportService():
                             joint_vec = model.rigidbodies[prev_above_bone_name].shape_position
 
                             # 回転量
-                            joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                            joint_axis_up = (model.rigidbodies[balancer_prev_above_bone_name].shape_position - prev_above_bone_position).normalized()
+                            joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis = (model.rigidbodies[balancer_prev_above_bone_name].shape_position - prev_above_bone_position).normalized()
                             joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                             joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                             joint_euler = joint_rotation_qq.toEulerAngles()
@@ -523,8 +523,8 @@ class PmxTailorExportService():
                             joint_vec = prev_below_bone_position
 
                             # 回転量
-                            joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                            joint_axis_up = (prev_below_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis = (prev_below_below_bone_position - prev_above_bone_position).normalized()
                             joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                             joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                             joint_euler = joint_rotation_qq.toEulerAngles()
@@ -548,8 +548,8 @@ class PmxTailorExportService():
                                 joint_vec = model.rigidbodies[prev_below_bone_name].shape_position
 
                                 # 回転量
-                                joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                                joint_axis_up = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
+                                joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                                joint_axis = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
                                 joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                                 joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                                 joint_euler = joint_rotation_qq.toEulerAngles()
@@ -806,8 +806,8 @@ class PmxTailorExportService():
                 joint_vec = prev_above_bone_position
 
                 # 回転量
-                joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                joint_axis_up = (root_rigidbody.shape_position - prev_above_bone_position).normalized()
+                joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                joint_axis = (root_rigidbody.shape_position - prev_above_bone_position).normalized()
                 joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                 joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                 joint_euler = joint_rotation_qq.toEulerAngles()
@@ -831,8 +831,8 @@ class PmxTailorExportService():
                     joint_vec = model.rigidbodies[prev_above_bone_name].shape_position
 
                     # 回転量
-                    joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                    joint_axis_up = (model.rigidbodies[balancer_prev_above_bone_name].shape_position - prev_above_bone_position).normalized()
+                    joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis = (model.rigidbodies[balancer_prev_above_bone_name].shape_position - prev_above_bone_position).normalized()
                     joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                     joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                     joint_euler = joint_rotation_qq.toEulerAngles()
@@ -855,8 +855,8 @@ class PmxTailorExportService():
                     joint_vec = prev_below_bone_position
 
                     # 回転量
-                    joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                    joint_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+                    joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis = (next_above_bone_position - prev_above_bone_position).normalized()
                     joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                     joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                     joint_euler = joint_rotation_qq.toEulerAngles()
@@ -904,8 +904,8 @@ class PmxTailorExportService():
                         joint_vec = model.rigidbodies[prev_below_bone_name].shape_position
 
                         # 回転量
-                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -938,8 +938,8 @@ class PmxTailorExportService():
                                              next_above_bone_position, next_below_bone_position])
 
                         # 回転量
-                        joint_axis = (next_above_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -992,8 +992,8 @@ class PmxTailorExportService():
                     joint_vec = np.mean([prev_below_bone_position, next_below_bone_position])
 
                     # 回転量
-                    joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
-                    joint_axis_up = (prev_below_bone_position - next_above_bone_position).normalized()
+                    joint_axis_up = (next_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
                     joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                     joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                     joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1022,8 +1022,8 @@ class PmxTailorExportService():
                     # ／ジョイント
 
                     # 回転量
-                    joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
-                    joint_axis_up = (next_below_bone_position - prev_above_bone_position).normalized()
+                    joint_axis_up = (prev_below_bone_position - next_above_bone_position).normalized()
+                    joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
                     joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                     joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                     joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1333,8 +1333,8 @@ class PmxTailorExportService():
                         joint_vec = prev_below_bone_position
 
                         # 回転量
-                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (next_below_bone_position - prev_below_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (next_below_bone_position - prev_below_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1359,8 +1359,8 @@ class PmxTailorExportService():
                         joint_vec = model.rigidbodies[prev_below_bone_name].shape_position
 
                         # 回転量
-                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1383,8 +1383,8 @@ class PmxTailorExportService():
                                              next_below_below_bone_position, next_below_bone_position])
 
                         # 回転量
-                        joint_axis = (next_below_bone_position - prev_below_bone_position).normalized()
-                        joint_axis_up = (prev_below_below_bone_position - prev_below_bone_position).normalized()
+                        joint_axis_up = (next_below_bone_position - prev_below_bone_position).normalized()
+                        joint_axis = (prev_below_below_bone_position - prev_below_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1445,8 +1445,8 @@ class PmxTailorExportService():
                         joint_vec = prev_below_bone_position
 
                         # 回転量
-                        joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (next_above_bone_position - prev_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1496,8 +1496,8 @@ class PmxTailorExportService():
                             joint_vec = model.rigidbodies[prev_below_bone_name].shape_position
 
                             # 回転量
-                            joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
-                            joint_axis_up = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
+                            joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis = (model.rigidbodies[balancer_prev_below_bone_name].shape_position - prev_above_bone_position).normalized()
                             joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                             joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                             joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1530,8 +1530,8 @@ class PmxTailorExportService():
                                                  next_above_bone_position, next_below_bone_position])
 
                             # 回転量
-                            joint_axis = (next_above_bone_position - prev_above_bone_position).normalized()
-                            joint_axis_up = (prev_below_bone_position - prev_above_bone_position).normalized()
+                            joint_axis_up = (next_above_bone_position - prev_above_bone_position).normalized()
+                            joint_axis = (prev_below_bone_position - prev_above_bone_position).normalized()
                             joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                             joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                             joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1585,8 +1585,8 @@ class PmxTailorExportService():
                         joint_vec = np.mean([prev_below_bone_position, next_below_bone_position])
 
                         # 回転量
-                        joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
-                        joint_axis_up = (prev_below_bone_position - next_above_bone_position).normalized()
+                        joint_axis_up = (next_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1618,8 +1618,8 @@ class PmxTailorExportService():
                         # ／ジョイント
 
                         # 回転量
-                        joint_axis = (prev_below_bone_position - next_above_bone_position).normalized()
-                        joint_axis_up = (next_below_bone_position - prev_above_bone_position).normalized()
+                        joint_axis_up = (prev_below_bone_position - next_above_bone_position).normalized()
+                        joint_axis = (next_below_bone_position - prev_above_bone_position).normalized()
                         joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                         joint_rotation_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
                         joint_euler = joint_rotation_qq.toEulerAngles()
@@ -1741,10 +1741,7 @@ class PmxTailorExportService():
 
                     # サイズ
                     diff_size = np.abs(max_vertex - min_vertex)
-                    if par == 0:
-                        shape_size = MVector3D(diff_size[0] * 0.2, abs(axis_vec.y() * 0.8), diff_size[2])
-                    else:
-                        shape_size = MVector3D(diff_size[0] * 0.3, abs(axis_vec.y() * 0.8), diff_size[2])
+                    shape_size = MVector3D(diff_size[0] * 0.3, abs(axis_vec.y() * 0.8), diff_size[2])
                     shape_position = bone.position + (prev_below_bone_position - bone.position) / 2
 
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
@@ -3286,9 +3283,9 @@ class PmxTailorExportService():
                 non_target_iidxs.append(index_idx)
                 continue
 
-            below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
+            below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(0, -1, 0))
             below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
-            if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6 and ymin + ((ymedian - ymin) / 2) < v0.position.y() < ymedian + ((ymax - ymedian) / 2):
+            if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6 and ymin + ((ymedian - ymin) * 0.1) < v0.position.y() < ymax - ((ymax - ymedian) * 0.1):
                 below_iidx = index_idx
                 max_below_x = below_x
                 max_below_size = below_size
@@ -3344,7 +3341,7 @@ class PmxTailorExportService():
                             # 3つ揃ってない場合、スルー
                             continue
 
-                        below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(1, 0, 0))
+                        below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(0, -1, 0))
                         below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
                         if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
                             below_iidx = index_idx
@@ -3474,7 +3471,7 @@ class PmxTailorExportService():
             
             # 存在しない頂点INDEXで二次元配列初期化
             vertex_map = np.full((max_y - min_y + 1, max_x - min_x + 1), -1)
-            vertex_display_map = np.full((max_y - min_y + 1, max_x - min_x + 1), 'None')
+            vertex_display_map = np.full((max_y - min_y + 1, max_x - min_x + 1), ' None ')
             vertex_connected = []
             logger.debug(f'vertex_map.shape: {vertex_map.shape}')
 
@@ -3527,7 +3524,7 @@ class PmxTailorExportService():
         now_iidxs = []
         first_vidxs = None
         second_vidxs = None
-        for first_y in range(min_y + int((max_y - min_y) / 2), max_y + 1):
+        for first_y in range(min_y + int((max_y - min_y) / 2), min_y - 1, -1):
             if (first_x, first_y) in vertex_coordinate_map:
                 first_vidxs = vertex_coordinate_map[(first_x, first_y)]
                 break
