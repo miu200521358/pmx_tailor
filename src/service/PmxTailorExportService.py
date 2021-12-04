@@ -9,6 +9,8 @@ import math
 import copy
 import bezier
 import csv
+import random
+import string
 
 from module.MOptions import MExportOptions
 from mmd.PmxData import PmxModel, Vertex, Material, Bone, Morph, DisplaySlot, RigidBody, Joint, Bdef1, Bdef2, Bdef4, Sdef, RigidBodyParam, IkLink, Ik, BoneMorphData # noqa
@@ -74,10 +76,10 @@ class PmxTailorExportService():
     def create_physics(self, model: PmxModel, param_option: dict, saved_bone_names: list):
         model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"    # noqa
         model.comment += f"\r\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"    # noqa
-        model.comment += f"\r\n　　{logger.transtext('細かさ')}: {param_option['fineness']}"    # noqa
-        model.comment += f"\r\n　　{logger.transtext('質量')}: {param_option['mass']}"    # noqa
-        model.comment += f"\r\n　　{logger.transtext('柔らかさ')}: {param_option['air_resistance']}"    # noqa
-        model.comment += f"\r\n　　{logger.transtext('張り')}: {param_option['shape_maintenance']}"    # noqa
+        model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"    # noqa
+        model.comment += f", {logger.transtext('質量')}: {param_option['mass']}"    # noqa
+        model.comment += f", {logger.transtext('柔らかさ')}: {param_option['air_resistance']}"    # noqa
+        model.comment += f", {logger.transtext('張り')}: {param_option['shape_maintenance']}"    # noqa
 
         # 頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option['vertices_csv']:
@@ -98,16 +100,16 @@ class PmxTailorExportService():
             model = self.clear_exist_physics(model, param_option, param_option['material_name'], target_vertices, saved_bone_names)
 
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
-            if param_option['physics_type'] in [logger.transtext('髪'), logger.transtext('単一揺')]:
+            if param_option['physics_type'] in [logger.transtext('髪'), logger.transtext('単一揺'), logger.transtext('胸')]:
                 logger.info("【%s】ボーンマップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
                 logger.info("【%s】剛体生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
-                root_rigidbody = self.create_hair_rigidbody(model, param_option)
+                root_rigidbody, registed_rigidbodies = self.create_hair_rigidbody(model, param_option)
 
                 logger.info("【%s】ジョイント生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
-                self.create_hair_joint(model, param_option, root_rigidbody)
+                self.create_hair_joint(model, param_option, root_rigidbody, registed_rigidbodies)
             else:
                 logger.info("【%s】ボーンマップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
@@ -119,11 +121,11 @@ class PmxTailorExportService():
 
                 logger.info("【%s】剛体生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
-                root_rigidbody = self.create_rigidbody_by_bone_blocks(model, param_option, bone_blocks)
+                root_rigidbody, registed_rigidbodies = self.create_rigidbody_by_bone_blocks(model, param_option, bone_blocks)
 
                 logger.info("【%s】ジョイント生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
-                self.create_joint_by_bone_blocks(model, param_option, bone_blocks, root_rigidbody)
+                self.create_joint_by_bone_blocks(model, param_option, bone_blocks, root_rigidbody, registed_rigidbodies)
 
         else:
             logger.info("【%s】頂点マップ生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
@@ -175,11 +177,11 @@ class PmxTailorExportService():
             for base_map_idx in vertex_map_orders:
                 logger.info("【%s(No.%s)】剛体生成", param_option['material_name'], base_map_idx + 1, decoration=MLogger.DECORATION_LINE)
 
-                root_rigidbody = self.create_rigidbody(model, param_option, vertex_connecteds[base_map_idx], tmp_all_bones, all_registed_bone_indexs[base_map_idx], root_bone)
+                root_rigidbody, registed_rigidbodies = self.create_rigidbody(model, param_option, vertex_connecteds[base_map_idx], tmp_all_bones, all_registed_bone_indexs[base_map_idx], root_bone)
 
                 logger.info("【%s(No.%s)】ジョイント生成", param_option['material_name'], base_map_idx + 1, decoration=MLogger.DECORATION_LINE)
 
-                self.create_joint(model, param_option, vertex_connecteds[base_map_idx], tmp_all_bones, all_registed_bone_indexs[base_map_idx], root_rigidbody)
+                self.create_joint(model, param_option, vertex_connecteds[base_map_idx], tmp_all_bones, all_registed_bone_indexs[base_map_idx], root_rigidbody, registed_rigidbodies)
 
         return True
 
@@ -352,7 +354,7 @@ class PmxTailorExportService():
 
         return bone_blocks
     
-    def create_hair_joint(self, model: PmxModel, param_option: dict, root_rigidbody: RigidBody):
+    def create_hair_joint(self, model: PmxModel, param_option: dict, root_rigidbody: RigidBody, registed_rigidbodies: dict):
         bone_grid_cols = param_option["bone_grid_cols"]
         bone_grid_rows = param_option["bone_grid_rows"]
         bone_grid = param_option["bone_grid"]
@@ -468,7 +470,7 @@ class PmxTailorExportService():
 
                     if par == 0:
                         # ルート剛体と根元剛体を繋ぐジョイント
-                        joint_name = f'↓|{root_rigidbody.name}|{prev_above_bone_name}'
+                        joint_name = f'↓|{root_rigidbody.name}|{registed_rigidbodies[prev_above_bone_name]}'
 
                         # 縦ジョイント
                         joint_vec = prev_above_bone_position
@@ -481,14 +483,14 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        joint = Joint(joint_name, joint_name, 0, root_rigidbody.index, model.rigidbodies[prev_above_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, root_rigidbody.index, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[par], vertical_limit_min_mov_ys[par], vertical_limit_min_mov_zs[par]), \
                                       MVector3D(vertical_limit_max_mov_xs[par], vertical_limit_max_mov_ys[par], vertical_limit_max_mov_zs[par]),
                                       MVector3D(math.radians(vertical_limit_min_rot_xs[par]), math.radians(vertical_limit_min_rot_ys[par]), math.radians(vertical_limit_min_rot_zs[par])),
                                       MVector3D(math.radians(vertical_limit_max_rot_xs[par]), math.radians(vertical_limit_max_rot_ys[par]), math.radians(vertical_limit_max_rot_zs[par])),
                                       MVector3D(vertical_spring_constant_mov_xs[par], vertical_spring_constant_mov_ys[par], vertical_spring_constant_mov_zs[par]), \
-                                      MVector3D(vertical_spring_constant_rot_xs[par], vertical_spring_constant_rot_ys[par], vertical_spring_constant_rot_zs[par]))   # noqa
-                        created_joints[f'0:{root_rigidbody.index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'] = joint
+                                      MVector3D(vertical_spring_constant_rot_xs[par], vertical_spring_constant_rot_ys[par], vertical_spring_constant_rot_zs[par]))
+                        created_joints[f'0:{root_rigidbody.index:05d}:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}'] = joint
 
                         # バランサー剛体が必要な場合
                         if param_option["rigidbody_balancer"]:
@@ -513,8 +515,8 @@ class PmxTailorExportService():
             
                     if param_vertical_joint and prev_above_bone_name != prev_below_bone_name and prev_above_bone_name in model.rigidbodies and prev_below_bone_name in model.rigidbodies:
                         # 縦ジョイント
-                        joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
-                        joint_key = f'0:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[prev_below_bone_name].index:05d}'
+                        joint_name = f'↓|{registed_rigidbodies[prev_above_bone_name]}|{prev_below_bone_name}'
+                        joint_key = f'0:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}'   # noqa
 
                         if joint_key not in created_joints:
                             # 未登録のみ追加
@@ -530,13 +532,14 @@ class PmxTailorExportService():
                             joint_euler = joint_rotation_qq.toEulerAngles()
                             joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                          model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index,
                                           joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[par], vertical_limit_min_mov_ys[par], vertical_limit_min_mov_zs[par]), \
                                           MVector3D(vertical_limit_max_mov_xs[par], vertical_limit_max_mov_ys[par], vertical_limit_max_mov_zs[par]),
                                           MVector3D(math.radians(vertical_limit_min_rot_xs[par]), math.radians(vertical_limit_min_rot_ys[par]), math.radians(vertical_limit_min_rot_zs[par])),
                                           MVector3D(math.radians(vertical_limit_max_rot_xs[par]), math.radians(vertical_limit_max_rot_ys[par]), math.radians(vertical_limit_max_rot_zs[par])),
                                           MVector3D(vertical_spring_constant_mov_xs[par], vertical_spring_constant_mov_ys[par], vertical_spring_constant_mov_zs[par]), \
-                                          MVector3D(vertical_spring_constant_rot_xs[par], vertical_spring_constant_rot_ys[par], vertical_spring_constant_rot_zs[par]))   # noqa
+                                          MVector3D(vertical_spring_constant_rot_xs[par], vertical_spring_constant_rot_ys[par], vertical_spring_constant_rot_zs[par]))
                             created_joints[joint_key] = joint
 
                             # バランサー剛体が必要な場合
@@ -555,7 +558,8 @@ class PmxTailorExportService():
                                 joint_euler = joint_rotation_qq.toEulerAngles()
                                 joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, \
+                                              model.rigidbodies[balancer_prev_below_bone_name].index,
                                               joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
                                               MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
                                 created_joints[joint_key] = joint
@@ -563,8 +567,9 @@ class PmxTailorExportService():
                                 # バランサー補助剛体
                                 balancer_prev_above_bone_name = f'B-{prev_above_bone_name}'
                                 joint_name = f'BS|{balancer_prev_above_bone_name}|{balancer_prev_below_bone_name}'
-                                joint_key = f'9:{model.rigidbodies[balancer_prev_above_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
-                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                                joint_key = f'9:{model.rigidbodies[balancer_prev_above_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'  # noqa
+                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, \
+                                              model.rigidbodies[balancer_prev_below_bone_name].index,
                                               MVector3D(), MVector3D(), MVector3D(-50, -50, -50), MVector3D(50, 50, 50), MVector3D(math.radians(1), math.radians(1), math.radians(1)), \
                                               MVector3D(),MVector3D(), MVector3D())   # noqa
                                 created_joints[joint_key] = joint
@@ -573,6 +578,11 @@ class PmxTailorExportService():
                 # ジョイントを登録
                 joint = created_joints[joint_key]
                 joint.index = len(model.joints)
+
+                if joint.name in model.joints:
+                    logger.warning("同じジョイント名が既に登録されているため、末尾に乱数を追加します。 既存ジョイント名: %s", joint.name)
+                    joint.name += randomname(3)
+
                 model.joints[joint.name] = joint
 
             prev_joint_cnt += len(created_joints)
@@ -581,7 +591,7 @@ class PmxTailorExportService():
                             
         return root_rigidbody
     
-    def create_joint_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict, root_rigidbody: RigidBody):
+    def create_joint_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict, root_rigidbody: RigidBody, registed_rigidbodies: dict):
         bone_grid_rows = param_option["bone_grid_rows"]
         # bone_grid_cols = param_option["bone_grid_cols"]
 
@@ -800,7 +810,7 @@ class PmxTailorExportService():
 
             if yi == 0:
                 # ルート剛体と根元剛体を繋ぐジョイント
-                joint_name = f'↓|{root_rigidbody.name}|{prev_above_bone_name}'
+                joint_name = f'↓|{root_rigidbody.name}|{registed_rigidbodies[prev_above_bone_name]}'
 
                 # 縦ジョイント
                 joint_vec = prev_above_bone_position
@@ -813,14 +823,14 @@ class PmxTailorExportService():
                 joint_euler = joint_rotation_qq.toEulerAngles()
                 joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                joint = Joint(joint_name, joint_name, 0, root_rigidbody.index, model.rigidbodies[prev_above_bone_name].index,
+                joint = Joint(joint_name, joint_name, 0, root_rigidbody.index, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index,
                               joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yi], vertical_limit_min_mov_ys[yi], vertical_limit_min_mov_zs[yi]), \
                               MVector3D(vertical_limit_max_mov_xs[yi], vertical_limit_max_mov_ys[yi], vertical_limit_max_mov_zs[yi]),
                               MVector3D(math.radians(vertical_limit_min_rot_xs[yi]), math.radians(vertical_limit_min_rot_ys[yi]), math.radians(vertical_limit_min_rot_zs[yi])),
                               MVector3D(math.radians(vertical_limit_max_rot_xs[yi]), math.radians(vertical_limit_max_rot_ys[yi]), math.radians(vertical_limit_max_rot_zs[yi])),
                               MVector3D(vertical_spring_constant_mov_xs[yi], vertical_spring_constant_mov_ys[yi], vertical_spring_constant_mov_zs[yi]), \
                               MVector3D(vertical_spring_constant_rot_xs[yi], vertical_spring_constant_rot_ys[yi], vertical_spring_constant_rot_zs[yi]))   # noqa
-                created_joints[f'0:{root_rigidbody.index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'] = joint
+                created_joints[f'0:{root_rigidbody.index:05d}:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}'] = joint
 
                 # バランサー剛体が必要な場合
                 if param_option["rigidbody_balancer"]:
@@ -845,8 +855,8 @@ class PmxTailorExportService():
     
             if param_vertical_joint and prev_above_bone_name != prev_below_bone_name and prev_above_bone_name in model.rigidbodies and prev_below_bone_name in model.rigidbodies:
                 # 縦ジョイント
-                joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
-                joint_key = f'0:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[prev_below_bone_name].index:05d}'
+                joint_name = f'↓|{registed_rigidbodies[prev_above_bone_name]}|{registed_rigidbodies[prev_below_bone_name]}'
+                joint_key = f'0:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}'
 
                 if joint_key not in created_joints:
                     # 未登録のみ追加
@@ -862,7 +872,8 @@ class PmxTailorExportService():
                     joint_euler = joint_rotation_qq.toEulerAngles()
                     joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
+                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                  model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index,
                                   joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yi], vertical_limit_min_mov_ys[yi], vertical_limit_min_mov_zs[yi]), \
                                   MVector3D(vertical_limit_max_mov_xs[yi], vertical_limit_max_mov_ys[yi], vertical_limit_max_mov_zs[yi]),
                                   MVector3D(math.radians(vertical_limit_min_rot_xs[yi]), math.radians(vertical_limit_min_rot_ys[yi]), math.radians(vertical_limit_min_rot_zs[yi])),
@@ -877,18 +888,19 @@ class PmxTailorExportService():
                     
                     if param_reverse_joint and prev_below_bone_name in model.rigidbodies and prev_above_bone_name in model.rigidbodies:
                         # 逆ジョイント
-                        joint_name = f'↑|{prev_below_bone_name}|{prev_above_bone_name}'
-                        joint_key = f'1:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'
+                        joint_name = f'↑|{registed_rigidbodies[prev_below_bone_name]}|{registed_rigidbodies[prev_above_bone_name]}'
+                        joint_key = f'1:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}'
 
                         if joint_key not in created_joints:
                             # 未登録のみ追加
-                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index, \
+                                          model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index,
                                           joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
                                           MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
                                           MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
                                           MVector3D(math.radians(reverse_limit_max_rot_xs[yi]), math.radians(reverse_limit_max_rot_ys[yi]), math.radians(reverse_limit_max_rot_zs[yi])),
                                           MVector3D(reverse_spring_constant_mov_xs[yi], reverse_spring_constant_mov_ys[yi], reverse_spring_constant_mov_zs[yi]), \
-                                          MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))  # noqa
+                                          MVector3D(reverse_spring_constant_rot_xs[yi], reverse_spring_constant_rot_ys[yi], reverse_spring_constant_rot_zs[yi]))
                             created_joints[joint_key] = joint
 
                             if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -911,25 +923,27 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, \
+                                      model.rigidbodies[balancer_prev_below_bone_name].index,
                                       joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
-                                      MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
+                                      MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))
                         created_joints[joint_key] = joint
 
                         # バランサー補助剛体
                         balancer_prev_above_bone_name = f'B-{prev_above_bone_name}'
                         joint_name = f'BS|{balancer_prev_above_bone_name}|{balancer_prev_below_bone_name}'
                         joint_key = f'9:{model.rigidbodies[balancer_prev_above_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
-                                        MVector3D(), MVector3D(), MVector3D(-50, -50, -50), MVector3D(50, 50, 50), MVector3D(math.radians(1), math.radians(1), math.radians(1)), \
-                                        MVector3D(),MVector3D(), MVector3D())   # noqa
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, \
+                                      model.rigidbodies[balancer_prev_below_bone_name].index,
+                                      MVector3D(), MVector3D(), MVector3D(-50, -50, -50), MVector3D(50, 50, 50), MVector3D(math.radians(1), math.radians(1), math.radians(1)), \
+                                      MVector3D(), MVector3D(), MVector3D())
                         created_joints[joint_key] = joint
                                                     
             if param_horizonal_joint and prev_above_bone_name in model.rigidbodies and next_above_bone_name in model.rigidbodies:
                 # 横ジョイント
                 if prev_above_bone_name != next_above_bone_name:
-                    joint_name = f'→|{prev_above_bone_name}|{next_above_bone_name}'
-                    joint_key = f'2:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[next_above_bone_name].index:05d}'
+                    joint_name = f'→|{registed_rigidbodies[prev_above_bone_name]}|{registed_rigidbodies[next_above_bone_name]}'
+                    joint_key = f'2:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index:05d}'
 
                     if joint_key not in created_joints:
                         # 未登録のみ追加
@@ -945,7 +959,8 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_above_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                      model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi], horizonal_limit_min_mov_ys[yi], horizonal_limit_min_mov_zs[yi]), \
                                       MVector3D(horizonal_limit_max_mov_xs[yi], horizonal_limit_max_mov_ys[yi], horizonal_limit_max_mov_zs[yi]),
                                       MVector3D(math.radians(horizonal_limit_min_rot_xs[yi]), math.radians(horizonal_limit_min_rot_ys[yi]), math.radians(horizonal_limit_min_rot_zs[yi])),
@@ -960,13 +975,14 @@ class PmxTailorExportService():
                         
                     if param_reverse_joint and prev_above_bone_name in model.rigidbodies and next_above_bone_name in model.rigidbodies:
                         # 横逆ジョイント
-                        joint_name = f'←|{next_above_bone_name}|{prev_above_bone_name}'
-                        joint_key = f'3:{model.rigidbodies[next_above_bone_name].index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'
+                        joint_name = f'←|{registed_rigidbodies[next_above_bone_name]}|{registed_rigidbodies[prev_above_bone_name]}'
+                        joint_key = f'3:{model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}'
 
                         if joint_key not in created_joints:
                             # 未登録のみ追加
                             
-                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[next_above_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index, \
+                                          model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index,
                                           joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yi], reverse_limit_min_mov_ys[yi], reverse_limit_min_mov_zs[yi]), \
                                           MVector3D(reverse_limit_max_mov_xs[yi], reverse_limit_max_mov_ys[yi], reverse_limit_max_mov_zs[yi]),
                                           MVector3D(math.radians(reverse_limit_min_rot_xs[yi]), math.radians(reverse_limit_min_rot_ys[yi]), math.radians(reverse_limit_min_rot_zs[yi])),
@@ -982,8 +998,8 @@ class PmxTailorExportService():
             if param_diagonal_joint and prev_above_bone_name in model.rigidbodies and next_below_bone_name in model.rigidbodies and \
                     prev_below_bone_name in model.rigidbodies and next_below_bone_name in model.rigidbodies:                                # noqa
                 # ＼ジョイント
-                joint_name = f'＼|{prev_above_bone_name}|{next_below_bone_name}'
-                joint_key = f'4:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[next_below_bone_name].index:05d}'
+                joint_name = f'＼|{registed_rigidbodies[prev_above_bone_name]}|{registed_rigidbodies[next_below_bone_name]}'
+                joint_key = f'4:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index:05d}'
 
                 if joint_key not in created_joints:
                     # 未登録のみ追加
@@ -999,7 +1015,8 @@ class PmxTailorExportService():
                     joint_euler = joint_rotation_qq.toEulerAngles()
                     joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_below_bone_name].index,
+                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                  model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index,
                                   joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yi], diagonal_limit_min_mov_ys[yi], diagonal_limit_min_mov_zs[yi]), \
                                   MVector3D(diagonal_limit_max_mov_xs[yi], diagonal_limit_max_mov_ys[yi], diagonal_limit_max_mov_zs[yi]),
                                   MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
@@ -1013,8 +1030,8 @@ class PmxTailorExportService():
                         prev_joint_cnt = len(created_joints) // 200
                     
                 # ／ジョイント ---------------
-                joint_name = f'／|{prev_below_bone_name}|{next_above_bone_name}'
-                joint_key = f'5:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[next_above_bone_name].index:05d}'
+                joint_name = f'／|{registed_rigidbodies[prev_below_bone_name]}|{registed_rigidbodies[next_above_bone_name]}'
+                joint_key = f'5:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index:05d}'
 
                 if joint_key not in created_joints:
                     # 未登録のみ追加
@@ -1029,7 +1046,8 @@ class PmxTailorExportService():
                     joint_euler = joint_rotation_qq.toEulerAngles()
                     joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[next_above_bone_name].index,
+                    joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index, \
+                                  model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index,
                                   joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yi], diagonal_limit_min_mov_ys[yi], diagonal_limit_min_mov_zs[yi]), \
                                   MVector3D(diagonal_limit_max_mov_xs[yi], diagonal_limit_max_mov_ys[yi], diagonal_limit_max_mov_zs[yi]),
                                   MVector3D(math.radians(diagonal_limit_min_rot_xs[yi]), math.radians(diagonal_limit_min_rot_ys[yi]), math.radians(diagonal_limit_min_rot_zs[yi])),
@@ -1048,9 +1066,14 @@ class PmxTailorExportService():
             # ジョイントを登録
             joint = created_joints[joint_key]
             joint.index = len(model.joints)
+
+            if joint.name in model.joints:
+                logger.warning("同じジョイント名が既に登録されているため、末尾に乱数を追加します。 既存ジョイント名: %s", joint.name)
+                joint.name += randomname(3)
+
             model.joints[joint.name] = joint
 
-    def create_joint(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict, root_rigidbody: RigidBody):
+    def create_joint(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict, root_rigidbody: RigidBody, registed_rigidbodies: dict):
         # ジョイント生成
         created_joints = {}
 
@@ -1322,9 +1345,9 @@ class PmxTailorExportService():
                 next_below_below_bone_name = self.get_bone_name(abb_name, below_below_v_yidx + 1, next_below_below_v_xidx + 1)
                 next_below_below_bone_position = tmp_all_bones[next_below_below_bone_name]["bone"].position
 
-                joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
+                joint_name = f'↓|{prev_above_bone_name}|{registed_rigidbodies[prev_below_bone_name]}'
                 if prev_above_bone_name in model.rigidbodies and prev_below_bone_name in model.rigidbodies:
-                    joint_key = f'0:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[prev_below_bone_name].index:05d}'
+                    joint_key = f'0:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}'
 
                     if joint_key not in created_joints:
                         # 未登録のみ追加
@@ -1341,7 +1364,8 @@ class PmxTailorExportService():
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yidx = 0
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, \
+                                      model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yidx], vertical_limit_min_mov_ys[yidx], vertical_limit_min_mov_zs[yidx]), \
                                       MVector3D(vertical_limit_max_mov_xs[yidx], vertical_limit_max_mov_ys[yidx], vertical_limit_max_mov_zs[yidx]),
                                       MVector3D(math.radians(vertical_limit_min_rot_xs[yidx]), math.radians(vertical_limit_min_rot_ys[yidx]), math.radians(vertical_limit_min_rot_zs[yidx])),
@@ -1366,15 +1390,16 @@ class PmxTailorExportService():
                         joint_euler = joint_rotation_qq.toEulerAngles()
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, \
+                                      model.rigidbodies[balancer_prev_below_bone_name].index,
                                       joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
                                       MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
                         created_joints[joint_key] = joint
 
                 # 横ジョイント
-                joint_name = f'→|{prev_below_bone_name}|{next_below_bone_name}'
+                joint_name = f'→|{registed_rigidbodies[prev_below_bone_name]}|{registed_rigidbodies[next_below_bone_name]}'
                 if prev_below_bone_name in model.rigidbodies and next_below_bone_name in model.rigidbodies:
-                    joint_key = f'2:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[next_below_bone_name].index:05d}'
+                    joint_key = f'2:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index:05d}'
 
                     if joint_key not in created_joints:
                         # 未登録のみ追加
@@ -1391,7 +1416,8 @@ class PmxTailorExportService():
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yidx = 0
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[next_below_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index, \
+                                      model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi, xi], horizonal_limit_min_mov_ys[yi, xi], horizonal_limit_min_mov_zs[yi, xi]), \
                                       MVector3D(horizonal_limit_max_mov_xs[yi, xi], horizonal_limit_max_mov_ys[yi, xi], horizonal_limit_max_mov_zs[yi, xi]),
                                       MVector3D(math.radians(horizonal_limit_min_rot_xs[yidx]), math.radians(horizonal_limit_min_rot_ys[yidx]), math.radians(horizonal_limit_min_rot_zs[yidx])),
@@ -1435,8 +1461,8 @@ class PmxTailorExportService():
 
                 if param_vertical_joint and prev_above_bone_name != prev_below_bone_name and prev_above_bone_name in model.rigidbodies and prev_below_bone_name in model.rigidbodies:
                     # 縦ジョイント
-                    joint_name = f'↓|{prev_above_bone_name}|{prev_below_bone_name}'
-                    joint_key = f'0:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[prev_below_bone_name].index:05d}'
+                    joint_name = f'↓|{registed_rigidbodies[prev_above_bone_name]}|{registed_rigidbodies[prev_below_bone_name]}'
+                    joint_key = f'0:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}'
 
                     if joint_key not in created_joints:
                         # 未登録のみ追加
@@ -1454,7 +1480,8 @@ class PmxTailorExportService():
 
                         yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
 
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[prev_below_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                      model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(vertical_limit_min_mov_xs[yidx], vertical_limit_min_mov_ys[yidx], vertical_limit_min_mov_zs[yidx]), \
                                       MVector3D(vertical_limit_max_mov_xs[yidx], vertical_limit_max_mov_ys[yidx], vertical_limit_max_mov_zs[yidx]),
                                       MVector3D(math.radians(vertical_limit_min_rot_xs[yidx]), math.radians(vertical_limit_min_rot_ys[yidx]), math.radians(vertical_limit_min_rot_zs[yidx])),
@@ -1469,12 +1496,13 @@ class PmxTailorExportService():
                         
                         if param_reverse_joint:
                             # 逆ジョイント
-                            joint_name = f'↑|{prev_below_bone_name}|{prev_above_bone_name}'
-                            joint_key = f'1:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'
+                            joint_name = f'↑|{registed_rigidbodies[prev_below_bone_name]}|{registed_rigidbodies[prev_above_bone_name]}'
+                            joint_key = f'1:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}'
 
                             if not (joint_key in created_joints or prev_below_bone_name not in model.rigidbodies or prev_above_bone_name not in model.rigidbodies):
                                 # 未登録のみ追加
-                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
+                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index, \
+                                              model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index,
                                               joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yidx], reverse_limit_min_mov_ys[yidx], reverse_limit_min_mov_zs[yidx]), \
                                               MVector3D(reverse_limit_max_mov_xs[yidx], reverse_limit_max_mov_ys[yidx], reverse_limit_max_mov_zs[yidx]),
                                               MVector3D(math.radians(reverse_limit_min_rot_xs[yidx]), math.radians(reverse_limit_min_rot_ys[yidx]), math.radians(reverse_limit_min_rot_zs[yidx])),
@@ -1491,7 +1519,7 @@ class PmxTailorExportService():
                         if param_option["rigidbody_balancer"]:
                             balancer_prev_below_bone_name = f'B-{prev_below_bone_name}'
                             joint_name = f'B|{prev_below_bone_name}|{balancer_prev_below_bone_name}'
-                            joint_key = f'8:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
+                            joint_key = f'8:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'   # noqa
 
                             joint_vec = model.rigidbodies[prev_below_bone_name].shape_position
 
@@ -1503,25 +1531,27 @@ class PmxTailorExportService():
                             joint_euler = joint_rotation_qq.toEulerAngles()
                             joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, \
+                                          model.rigidbodies[balancer_prev_below_bone_name].index,
                                           joint_vec, joint_radians, MVector3D(), MVector3D(), MVector3D(), MVector3D(),
-                                          MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))   # noqa
+                                          MVector3D(100000, 100000, 100000), MVector3D(100000, 100000, 100000))
                             created_joints[joint_key] = joint
 
                             # バランサー補助剛体
                             balancer_prev_above_bone_name = f'B-{prev_above_bone_name}'
                             joint_name = f'BS|{balancer_prev_above_bone_name}|{balancer_prev_below_bone_name}'
                             joint_key = f'9:{model.rigidbodies[balancer_prev_above_bone_name].index:05d}:{model.rigidbodies[balancer_prev_below_bone_name].index:05d}'
-                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, model.rigidbodies[balancer_prev_below_bone_name].index,
-                                            MVector3D(), MVector3D(), MVector3D(-50, -50, -50), MVector3D(50, 50, 50), MVector3D(math.radians(1), math.radians(1), math.radians(1)), \
-                                            MVector3D(),MVector3D(), MVector3D())   # noqa
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[balancer_prev_above_bone_name].index, \
+                                          model.rigidbodies[balancer_prev_below_bone_name].index,
+                                          MVector3D(), MVector3D(), MVector3D(-50, -50, -50), MVector3D(50, 50, 50), MVector3D(math.radians(1), math.radians(1), math.radians(1)), \
+                                          MVector3D(), MVector3D(), MVector3D())
                             created_joints[joint_key] = joint
                                                                             
                 if param_horizonal_joint and prev_above_bone_name in model.rigidbodies and next_above_bone_name in model.rigidbodies:
                     # 横ジョイント
                     if xi < len(below_v_xidxs) - 1 and prev_above_bone_name != next_above_bone_name:
-                        joint_name = f'→|{prev_above_bone_name}|{next_above_bone_name}'
-                        joint_key = f'2:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[next_above_bone_name].index:05d}'
+                        joint_name = f'→|{registed_rigidbodies[prev_above_bone_name]}|{registed_rigidbodies[next_above_bone_name]}'
+                        joint_key = f'2:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index:05d}'
 
                         if joint_key not in created_joints:
                             # 未登録のみ追加
@@ -1539,13 +1569,14 @@ class PmxTailorExportService():
 
                             yidx, xidx = self.disassemble_bone_name(prev_above_bone_name)
 
-                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_above_bone_name].index,
+                            joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                          model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index,
                                           joint_vec, joint_radians, MVector3D(horizonal_limit_min_mov_xs[yi, xi], horizonal_limit_min_mov_ys[yi, xi], horizonal_limit_min_mov_zs[yi, xi]), \
                                           MVector3D(horizonal_limit_max_mov_xs[yi, xi], horizonal_limit_max_mov_ys[yi, xi], horizonal_limit_max_mov_zs[yi, xi]),
                                           MVector3D(math.radians(horizonal_limit_min_rot_xs[yidx]), math.radians(horizonal_limit_min_rot_ys[yidx]), math.radians(horizonal_limit_min_rot_zs[yidx])),
                                           MVector3D(math.radians(horizonal_limit_max_rot_xs[yidx]), math.radians(horizonal_limit_max_rot_ys[yidx]), math.radians(horizonal_limit_max_rot_zs[yidx])),
                                           MVector3D(horizonal_spring_constant_mov_xs[yidx], horizonal_spring_constant_mov_ys[yidx], horizonal_spring_constant_mov_zs[yidx]), \
-                                          MVector3D(horizonal_spring_constant_rot_xs[yidx], horizonal_spring_constant_rot_ys[yidx], horizonal_spring_constant_rot_zs[yidx]))    # noqa
+                                          MVector3D(horizonal_spring_constant_rot_xs[yidx], horizonal_spring_constant_rot_ys[yidx], horizonal_spring_constant_rot_zs[yidx]))
                             created_joints[joint_key] = joint
 
                             if len(created_joints) > 0 and len(created_joints) // 200 > prev_joint_cnt:
@@ -1554,13 +1585,14 @@ class PmxTailorExportService():
                             
                         if param_reverse_joint:
                             # 横逆ジョイント
-                            joint_name = f'←|{next_above_bone_name}|{prev_above_bone_name}'
-                            joint_key = f'3:{model.rigidbodies[next_above_bone_name].index:05d}:{model.rigidbodies[prev_above_bone_name].index:05d}'
+                            joint_name = f'←|{registed_rigidbodies[next_above_bone_name]}|{registed_rigidbodies[prev_above_bone_name]}'
+                            joint_key = f'3:{model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}'
 
                             if not (joint_key in created_joints or prev_above_bone_name not in model.rigidbodies or next_above_bone_name not in model.rigidbodies):
                                 # 未登録のみ追加
                                 
-                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[next_above_bone_name].index, model.rigidbodies[prev_above_bone_name].index,
+                                joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index, \
+                                              model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index,
                                               joint_vec, joint_radians, MVector3D(reverse_limit_min_mov_xs[yidx], reverse_limit_min_mov_ys[yidx], reverse_limit_min_mov_zs[yidx]), \
                                               MVector3D(reverse_limit_max_mov_xs[yidx], reverse_limit_max_mov_ys[yidx], reverse_limit_max_mov_zs[yidx]),
                                               MVector3D(math.radians(reverse_limit_min_rot_xs[yidx]), math.radians(reverse_limit_min_rot_ys[yidx]), math.radians(reverse_limit_min_rot_zs[yidx])),
@@ -1575,8 +1607,8 @@ class PmxTailorExportService():
                                 
                 if param_diagonal_joint and prev_above_bone_name in model.rigidbodies and next_below_bone_name in model.rigidbodies:
                     # ＼ジョイント
-                    joint_name = f'＼|{prev_above_bone_name}|{next_below_bone_name}'
-                    joint_key = f'4:{model.rigidbodies[prev_above_bone_name].index:05d}:{model.rigidbodies[next_below_bone_name].index:05d}'
+                    joint_name = f'＼|{registed_rigidbodies[prev_above_bone_name]}|{registed_rigidbodies[next_below_bone_name]}'
+                    joint_key = f'4:{model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index:05d}'
 
                     if joint_key not in created_joints:
                         # 未登録のみ追加
@@ -1594,7 +1626,8 @@ class PmxTailorExportService():
 
                         yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
 
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_above_bone_name].index, model.rigidbodies[next_below_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
+                                      model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yidx], diagonal_limit_min_mov_ys[yidx], diagonal_limit_min_mov_zs[yidx]), \
                                       MVector3D(diagonal_limit_max_mov_xs[yidx], diagonal_limit_max_mov_ys[yidx], diagonal_limit_max_mov_zs[yidx]),
                                       MVector3D(math.radians(diagonal_limit_min_rot_xs[yidx]), math.radians(diagonal_limit_min_rot_ys[yidx]), math.radians(diagonal_limit_min_rot_zs[yidx])),
@@ -1609,8 +1642,8 @@ class PmxTailorExportService():
                         
                 if param_diagonal_joint and prev_below_bone_name in model.rigidbodies and next_above_bone_name in model.rigidbodies:    # noqa
                     # ／ジョイント ---------------
-                    joint_name = f'／|{prev_below_bone_name}|{next_above_bone_name}'
-                    joint_key = f'5:{model.rigidbodies[prev_below_bone_name].index:05d}:{model.rigidbodies[next_above_bone_name].index:05d}'
+                    joint_name = f'／|{registed_rigidbodies[prev_below_bone_name]}|{registed_rigidbodies[next_above_bone_name]}'
+                    joint_key = f'5:{model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index:05d}:{model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index:05d}'
 
                     if joint_key not in created_joints:
                         # 未登録のみ追加
@@ -1627,7 +1660,8 @@ class PmxTailorExportService():
 
                         yidx, _ = self.disassemble_bone_name(prev_below_bone_name)
 
-                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[prev_below_bone_name].index, model.rigidbodies[next_above_bone_name].index,
+                        joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index, \
+                                      model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index,
                                       joint_vec, joint_radians, MVector3D(diagonal_limit_min_mov_xs[yidx], diagonal_limit_min_mov_ys[yidx], diagonal_limit_min_mov_zs[yidx]), \
                                       MVector3D(diagonal_limit_max_mov_xs[yidx], diagonal_limit_max_mov_ys[yidx], diagonal_limit_max_mov_zs[yidx]),
                                       MVector3D(math.radians(diagonal_limit_min_rot_xs[yidx]), math.radians(diagonal_limit_min_rot_ys[yidx]), math.radians(diagonal_limit_min_rot_zs[yidx])),
@@ -1646,6 +1680,11 @@ class PmxTailorExportService():
             # ジョイントを登録
             joint = created_joints[joint_key]
             joint.index = len(model.joints)
+
+            if joint.name in model.joints:
+                logger.warning("同じジョイント名が既に登録されているため、末尾に乱数を追加します。 既存ジョイント名: %s", joint.name)
+                joint.name += randomname(3)
+
             model.joints[joint.name] = joint
     
     def create_hair_rigidbody(self, model: PmxModel, param_option: dict):
@@ -1655,6 +1694,8 @@ class PmxTailorExportService():
 
         prev_rigidbody_cnt = 0
 
+        registed_rigidbodies = {}
+
         # 剛体情報
         param_rigidbody = param_option['rigidbody']
         # 剛体係数
@@ -1662,16 +1703,21 @@ class PmxTailorExportService():
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         parent_bone = model.bones[param_option['parent_bone_name']]
-        root_rigidbody = None
-        for rigidbody in model.rigidbodies.values():
-            if rigidbody.bone_index == parent_bone.index:
-                root_rigidbody = rigidbody
+        root_rigidbody = self.get_rigidbody(model, parent_bone.name)
 
         if not root_rigidbody:
             # 親ボーンに紐付く剛体がない場合、自前で作成
             root_rigidbody = RigidBody(parent_bone.name, parent_bone.english_name, parent_bone.index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
                                        0, MVector3D(1, 1, 1), parent_bone.position, MVector3D(), 1, 0.5, 0.5, 0, 0, 0)
             root_rigidbody.index = len(model.rigidbodies)
+
+            if root_rigidbody.name in model.rigidbodies:
+                logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", root_rigidbody.name)
+                root_rigidbody.name += randomname(3)
+            
+            # 登録したボーン名と剛体の対比表を保持
+            registed_rigidbodies[model.bone_indexes[root_rigidbody.bone_index]] = root_rigidbody.name
+
             model.rigidbodies[parent_bone.name] = root_rigidbody
         
         target_rigidbodies = {}
@@ -1747,9 +1793,9 @@ class PmxTailorExportService():
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                     mode = 2 if par == 0 else 1
                     shape_type = param_rigidbody.shape_type
-                    mass = param_rigidbody.param.mass * shape_size.x() * shape_size.y() * shape_size.z()
-                    linear_damping = param_rigidbody.param.linear_damping * shape_size.x() * shape_size.y() * shape_size.z()
-                    angular_damping = param_rigidbody.param.angular_damping * shape_size.x() * shape_size.y() * shape_size.z()
+                    mass = param_rigidbody.param.mass
+                    linear_damping = param_rigidbody.param.linear_damping
+                    angular_damping = param_rigidbody.param.angular_damping
                     rigidbody = RigidBody(prev_above_bone_name, prev_above_bone_name, prev_above_bone_index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
                                           shape_type, shape_size, shape_position, shape_rotation_radians, \
                                           mass, linear_damping, angular_damping, param_rigidbody.param.restitution, param_rigidbody.param.friction, mode)
@@ -1785,6 +1831,13 @@ class PmxTailorExportService():
                     rigidbody.param.angular_damping = calc_ratio(rigidbody.param.angular_damping, max_angular_damping, min_angular_damping, param_rigidbody.param.angular_damping, \
                         min(0.9999999, param_rigidbody.param.angular_damping * coefficient))    # noqa
                 
+                if rigidbody.name in model.rigidbodies:
+                    logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                    rigidbody.name += randomname(3)
+            
+                # 登録したボーン名と剛体の対比表を保持
+                registed_rigidbodies[model.bone_indexes[rigidbody.bone_index]] = rigidbody.name
+
                 model.rigidbodies[rigidbody.name] = rigidbody
             
             prev_rigidbody_cnt += len(created_rigidbodies)
@@ -1897,11 +1950,19 @@ class PmxTailorExportService():
                 rigidbody = created_rigidbodies[rigidbody_name]
                 rigidbody.bone_index = bone.index
                 rigidbody.index = len(model.rigidbodies)
+
+                if rigidbody.name in model.rigidbodies:
+                    logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                    rigidbody.name += randomname(3)
+
+                # 登録したボーン名と剛体の対比表を保持
+                registed_rigidbodies[rigidbody_name] = rigidbody.name
+
                 model.rigidbodies[rigidbody.name] = rigidbody
    
         logger.info("-- 剛体: %s個目:終了", prev_rigidbody_cnt)
 
-        return root_rigidbody
+        return root_rigidbody, registed_rigidbodies
 
     def create_rigidbody_by_bone_blocks(self, model: PmxModel, param_option: dict, bone_blocks: dict):
         # bone_grid_cols = param_option["bone_grid_cols"]
@@ -1909,6 +1970,7 @@ class PmxTailorExportService():
         # bone_grid = param_option["bone_grid"]
 
         # 剛体生成
+        registed_rigidbodies = {}
         created_rigidbodies = {}
         # 剛体の質量
         created_rigidbody_masses = {}
@@ -1929,16 +1991,21 @@ class PmxTailorExportService():
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         parent_bone = model.bones[param_option['parent_bone_name']]
-        root_rigidbody = None
-        for rigidbody in model.rigidbodies.values():
-            if rigidbody.bone_index == parent_bone.index:
-                root_rigidbody = rigidbody
+        root_rigidbody = self.get_rigidbody(model, parent_bone.name)
 
         if not root_rigidbody:
             # 親ボーンに紐付く剛体がない場合、自前で作成
             root_rigidbody = RigidBody(parent_bone.name, parent_bone.english_name, parent_bone.index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
                                        0, MVector3D(1, 1, 1), parent_bone.position, MVector3D(), 1, 0.5, 0.5, 0, 0, 0)
             root_rigidbody.index = len(model.rigidbodies)
+
+            if root_rigidbody.name in model.rigidbodies:
+                logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", root_rigidbody.name)
+                root_rigidbody.name += randomname(3)
+            
+            # 登録したボーン名と剛体の対比表を保持
+            registed_rigidbodies[model.bone_indexes[root_rigidbody.bone_index]] = root_rigidbody.name
+            
             model.rigidbodies[parent_bone.name] = root_rigidbody
         
         target_rigidbodies = {}
@@ -1947,7 +2014,7 @@ class PmxTailorExportService():
             prev_above_bone_position = bone_block['prev_above_pos']
             # prev_below_bone_name = bone_block['prev_below']
             prev_below_bone_position = bone_block['prev_below_pos']
-            next_above_bone_name = bone_block['next_above']
+            # next_above_bone_name = bone_block['next_above']
             next_above_bone_position = bone_block['next_above_pos']
             # next_below_bone_name = bone_block['next_below']
             next_below_bone_position = bone_block['next_below_pos']
@@ -2069,6 +2136,13 @@ class PmxTailorExportService():
                 min(0.9999999, param_rigidbody.param.linear_damping * coefficient))     # noqa
             rigidbody.param.angular_damping = calc_ratio(rigidbody.param.angular_damping, max_angular_damping, min_angular_damping, param_rigidbody.param.angular_damping, \
                 min(0.9999999, param_rigidbody.param.angular_damping * coefficient))    # noqa
+
+            if rigidbody.name in model.rigidbodies:
+                logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                rigidbody.name += randomname(3)
+
+            # 登録したボーン名と剛体の対比表を保持
+            registed_rigidbodies[model.bone_indexes[rigidbody.bone_index]] = rigidbody.name
             
             model.rigidbodies[rigidbody.name] = rigidbody
 
@@ -2184,14 +2258,23 @@ class PmxTailorExportService():
                 rigidbody = created_rigidbodies[rigidbody_name]
                 rigidbody.bone_index = bone.index
                 rigidbody.index = len(model.rigidbodies)
+
+                if rigidbody.name in model.rigidbodies:
+                    logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                    rigidbody.name += randomname(3)
+
+                # 登録したボーン名と剛体の対比表を保持
+                registed_rigidbodies[rigidbody_name] = rigidbody.name
+                
                 model.rigidbodies[rigidbody.name] = rigidbody
 
         logger.info("-- 剛体: %s個目:終了", len(created_rigidbodies))
 
-        return root_rigidbody
+        return root_rigidbody, registed_rigidbodies
 
     def create_rigidbody(self, model: PmxModel, param_option: dict, vertex_connected: dict, tmp_all_bones: dict, registed_bone_indexs: dict, root_bone: Bone):
         # 剛体生成
+        registed_rigidbodies = {}
         created_rigidbodies = {}
         # 剛体の質量
         created_rigidbody_masses = {}
@@ -2211,16 +2294,21 @@ class PmxTailorExportService():
         physics_type = param_option["physics_type"]
 
         # 親ボーンに紐付く剛体がある場合、それを利用
-        root_rigidbody = None
-        for rigidbody in model.rigidbodies.values():
-            if rigidbody.bone_index == model.bones[param_option['parent_bone_name']].index:
-                root_rigidbody = rigidbody
+        root_rigidbody = self.get_rigidbody(model, param_option['parent_bone_name'])
         
         if not root_rigidbody:
             # 親ボーンに紐付く剛体がない場合、自前で作成
             root_rigidbody = RigidBody(root_bone.name, root_bone.english_name, root_bone.index, param_rigidbody.collision_group, param_rigidbody.no_collision_group, \
                                        0, MVector3D(1, 1, 1), root_bone.position, MVector3D(), 1, 0.5, 0.5, 0, 0, 0)
             root_rigidbody.index = len(model.rigidbodies)
+
+            if root_rigidbody.name in model.rigidbodies:
+                logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", root_rigidbody.name)
+                root_rigidbody.name += randomname(3)
+
+            # 登録したボーン名と剛体の対比表を保持
+            registed_rigidbodies[model.bone_indexes[root_rigidbody.bone_index]] = root_rigidbody.name
+
             model.rigidbodies[root_bone.name] = root_rigidbody
 
         v_yidxs = list(reversed(list(registed_bone_indexs.keys())))
@@ -2395,6 +2483,13 @@ class PmxTailorExportService():
                 min(0.9999999, param_rigidbody.param.linear_damping * coefficient))     # noqa
             rigidbody.param.angular_damping = calc_ratio(rigidbody.param.angular_damping, max_angular_damping, min_angular_damping, param_rigidbody.param.angular_damping, \
                 min(0.9999999, param_rigidbody.param.angular_damping * coefficient))    # noqa
+
+            if rigidbody.name in model.rigidbodies:
+                logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                rigidbody.name += randomname(3)
+
+            # 登録したボーン名と剛体の対比表を保持
+            registed_rigidbodies[model.bone_indexes[rigidbody.bone_index]] = rigidbody.name
             
             model.rigidbodies[rigidbody.name] = rigidbody
 
@@ -2511,11 +2606,19 @@ class PmxTailorExportService():
                 rigidbody = created_rigidbodies[rigidbody_name]
                 rigidbody.bone_index = bone.index
                 rigidbody.index = len(model.rigidbodies)
+
+                if rigidbody.name in model.rigidbodies:
+                    logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                    rigidbody.name += randomname(3)
+
+                # 登録したボーン名と剛体の対比表を保持
+                registed_rigidbodies[rigidbody_name] = rigidbody.name
+                
                 model.rigidbodies[rigidbody.name] = rigidbody
 
         logger.info("-- 剛体: %s個目:終了", len(created_rigidbodies))
 
-        return root_rigidbody
+        return root_rigidbody, registed_rigidbodies
 
     def create_weight(self, model: PmxModel, param_option: dict, vertex_map: np.ndarray, vertex_connected: dict, duplicate_vertices: dict, \
                       registed_bone_indexs: dict, bone_horizonal_distances: dict, bone_vertical_distances: dict, vertex_remaining_set: set, target_vertices: list):
@@ -3284,8 +3387,8 @@ class PmxTailorExportService():
                 continue
 
             below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(0, -1, 0))
-            below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
-            if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6 and ymin + ((ymedian - ymin) * 0.1) < v0.position.y() < ymax - ((ymax - ymedian) * 0.1):
+            below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
+            if below_x > max_below_x * 0.9 and below_size > max_below_size * 0.6 and ymin + ((ymedian - ymin) * 0.1) < v0.position.y() < ymax - ((ymax - ymedian) * 0.1):
                 below_iidx = index_idx
                 max_below_x = below_x
                 max_below_size = below_size
@@ -3342,8 +3445,8 @@ class PmxTailorExportService():
                             continue
 
                         below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(0, -1, 0))
-                        below_size = v0.position.distanceToPoint(v1.position) + v1.position.distanceToPoint(v2.position) + v2.position.distanceToPoint(v0.position)
-                        if below_x > max_below_x * 0.8 and below_size > max_below_size * 0.6:
+                        below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
+                        if below_x > max_below_x * 0.9 and below_size > max_below_size * 0.6:
                             below_iidx = index_idx
                             max_below_x = below_x
                             max_below_size = below_size
@@ -4062,11 +4165,25 @@ class PmxTailorExportService():
         
         return remaining_x, remaining_y
 
+    def get_rigidbody(self, model: PmxModel, bone_name: str):
+        if bone_name not in model.bones:
+            return None
+
+        for rigidbody in model.rigidbodies.values():
+            if rigidbody.bone_index == model.bones[bone_name].index:
+                return rigidbody
+        
+        return None
+
 
 def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax: float):
     # https://qastack.jp/programming/929103/convert-a-number-range-to-another-range-maintaining-ratio
     # NewValue = (((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin
     return (((ratio - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
+
+
+def randomname(n) -> str:
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=n))
 
 
 SEMI_STANDARD_BONE_NAMES = [
