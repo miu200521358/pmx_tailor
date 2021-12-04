@@ -294,7 +294,8 @@ class PhysicsParam():
 
         self.simple_primitive_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=[logger.transtext("布(コットン)"), logger.transtext("布(シルク)"), \
                                                logger.transtext("布(ベルベッド)"), logger.transtext("布(レザー)"), logger.transtext("布(デニム)"), \
-                                               logger.transtext("髪(ショート)"), logger.transtext("髪(ロング)"), logger.transtext("髪(アホ毛)"), logger.transtext("単一揺れ物")])
+                                               logger.transtext("髪(ショート)"), logger.transtext("髪(ロング)"), logger.transtext("髪(アホ毛)"), \
+                                               logger.transtext("胸(小)"), logger.transtext("胸(大)"), logger.transtext("単一揺れ物")])
         self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"))
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
@@ -399,7 +400,7 @@ class PhysicsParam():
         self.simple_grid_sizer.Add(self.simple_mass_min_label, 0, wx.ALL, 5)
 
         self.simple_mass_slider = \
-            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 1.5, 0.01, 5, 0.01, self.simple_mass_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
+            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 1.5, 0.01, 10, 0.01, self.simple_mass_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
         self.simple_mass_slider.Bind(wx.EVT_SCROLL_CHANGED, self.set_mass)
         self.simple_grid_sizer.Add(self.simple_mass_slider, 1, wx.ALL | wx.EXPAND, 5)
 
@@ -500,7 +501,7 @@ class PhysicsParam():
         self.physics_type_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.physics_type_txt, 0, wx.ALL, 5)
 
-        self.physics_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('布'), logger.transtext('髪'), logger.transtext('単一揺')])
+        self.physics_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('布'), logger.transtext('髪'), logger.transtext('胸'), logger.transtext('単一揺')])
         self.physics_type_ctrl.SetToolTip(logger.transtext("布: 板剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)\n袖: カプセル剛体で縦を繋ぐ(※要ボーン定義)"))
         self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
@@ -1636,6 +1637,7 @@ class PhysicsParam():
                     self.rigidbody_restitution_spin.SetValue(params["rigidbody_restitution"])
                     self.rigidbody_friction_spin.SetValue(params["rigidbody_friction"])
                     self.rigidbody_coefficient_spin.SetValue(params["rigidbody_coefficient"])
+                    self.advance_rigidbody_balancer_ctrl.SetValue(params["rigidbody_balancer"])
 
                     # 縦ジョイント -----------
                     self.advance_vertical_joint_valid_check.SetValue(params["vertical_joint_valid"])
@@ -1734,6 +1736,30 @@ class PhysicsParam():
                 dialog.Destroy()
 
     def on_param_export(self, event: wx.Event):
+        params = self.get_param_export_data(event)
+
+        with wx.FileDialog(self.frame, logger.transtext("材質物理設定JSONを保存する"), wildcard="JSONファイル (*.json)|*.json|すべてのファイル (*.*)|*.*",
+                           defaultDir=os.path.dirname(self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.path),
+                           style=wx.FD_SAVE) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return     # the user changed their mind
+
+            # Proceed loading the file chosen by the user
+            target_physics_path = fileDialog.GetPath()
+            try:
+                with open(target_physics_path, 'w') as f:
+                    json.dump(params, f, ensure_ascii=False, indent=4, sort_keys=True, separators=(',', ': '))
+                
+                dialog = wx.MessageDialog(self.frame, logger.transtext("材質物理設定JSONのエクスポートに成功しました \n{0}").format(target_physics_path), style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+            except Exception:
+                dialog = wx.MessageDialog(self.frame, logger.transtext("材質物理設定JSONが保存できませんでした '{0}'\n\n{1}").format(target_physics_path, traceback.format_exc()), style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+    
+    def get_param_export_data(self, event: wx.Event):
         params = {}
 
         # 簡易版オプションデータ -------------
@@ -1758,6 +1784,7 @@ class PhysicsParam():
         params["rigidbody_restitution"] = self.rigidbody_restitution_spin.GetValue()
         params["rigidbody_friction"] = self.rigidbody_friction_spin.GetValue()
         params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
+        params["rigidbody_balancer"] = self.advance_rigidbody_balancer_ctrl.GetValue()
 
         # 縦ジョイント -----------
         params["vertical_joint_valid"] = self.advance_vertical_joint_valid_check.GetValue()
@@ -1847,27 +1874,8 @@ class PhysicsParam():
         params["reverse_joint_spring_rot_z"] = self.reverse_joint_spring_rot_z_spin.GetValue()
         params['reverse_joint_coefficient'] = self.advance_reverse_joint_coefficient_spin.GetValue()
 
-        with wx.FileDialog(self.frame, logger.transtext("材質物理設定JSONを保存する"), wildcard="JSONファイル (*.json)|*.json|すべてのファイル (*.*)|*.*",
-                           defaultDir=os.path.dirname(self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.path),
-                           style=wx.FD_SAVE) as fileDialog:
+        return params
 
-            if fileDialog.ShowModal() == wx.ID_CANCEL:
-                return     # the user changed their mind
-
-            # Proceed loading the file chosen by the user
-            target_physics_path = fileDialog.GetPath()
-            try:
-                with open(target_physics_path, 'w') as f:
-                    json.dump(params, f, ensure_ascii=False, indent=4, sort_keys=True, separators=(',', ': '))
-                
-                dialog = wx.MessageDialog(self.frame, logger.transtext("材質物理設定JSONのエクスポートに成功しました \n{0}").format(target_physics_path), style=wx.OK)
-                dialog.ShowModal()
-                dialog.Destroy()
-            except Exception:
-                dialog = wx.MessageDialog(self.frame, logger.transtext("材質物理設定JSONが保存できませんでした '{0}'\n\n{1}").format(target_physics_path, traceback.format_exc()), style=wx.OK)
-                dialog.ShowModal()
-                dialog.Destroy()
-    
     def on_bone_clear(self, event: wx.Event):
         for r in range(self.bone_grid.GetNumberRows()):
             for c in range(self.bone_grid.GetNumberCols()):
@@ -2019,9 +2027,7 @@ class PhysicsParam():
     
     def set_material_name(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        self.advance_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
-        self.bone_material_ctrl.SetLabelText(self.simple_material_ctrl.GetStringSelection())
-        # バイト長を加味してスライス
+        # setValueでそのままset_abb_nameを起動する
         self.simple_abb_ctrl.SetValue(self.simple_material_ctrl.GetStringSelection())
 
         # 設定ボーンパネル初期化
@@ -2030,6 +2036,11 @@ class PhysicsParam():
     def set_abb_name(self, event: wx.Event):
         # バイト長を加味してスライス
         self.simple_abb_ctrl.ChangeValue(truncate_double_byte_str(event.GetEventObject().GetValue(), 6))
+
+        # ラベル設定
+        label_text = f'{self.simple_material_ctrl.GetStringSelection()}:{self.simple_abb_ctrl.GetValue()}'
+        self.advance_material_ctrl.SetLabelText(label_text)
+        self.bone_material_ctrl.SetLabelText(label_text)
 
     def initialize_bone_param(self, event: wx.Event):
         # ウェイトボーンリンク生成
@@ -2122,6 +2133,10 @@ class PhysicsParam():
 
         if logger.transtext('単一揺れ物') in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext('単一揺'))
+            self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
+            self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext('再利用'))
+        elif logger.transtext('胸') in self.simple_primitive_ctrl.GetStringSelection():
+            self.physics_type_ctrl.SetStringSelection(logger.transtext('胸'))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('カプセル'))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext('再利用'))
         elif logger.transtext('髪') in self.simple_primitive_ctrl.GetStringSelection():
@@ -2224,6 +2239,30 @@ class PhysicsParam():
 
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(小)"):
+            self.simple_mass_slider.SetValue(2.8)
+            self.simple_air_resistance_slider.SetValue(3.3)
+            self.simple_shape_maintenance_slider.SetValue(2.7)
+
+            self.advance_vertical_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(0)
+            self.advance_diagonal_joint_valid_check.SetValue(0)
+            self.advance_reverse_joint_valid_check.SetValue(0)
+
+            self.advance_rigidbody_balancer_ctrl.SetValue(1)
+
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
+            self.simple_mass_slider.SetValue(3.2)
+            self.simple_air_resistance_slider.SetValue(2.3)
+            self.simple_shape_maintenance_slider.SetValue(2.0)
+
+            self.advance_vertical_joint_valid_check.SetValue(1)
+            self.advance_horizonal_joint_valid_check.SetValue(0)
+            self.advance_diagonal_joint_valid_check.SetValue(0)
+            self.advance_reverse_joint_valid_check.SetValue(0)
+
+            self.advance_rigidbody_balancer_ctrl.SetValue(1)
+
         self.set_mass(event)
         self.set_air_resistance(event)
         self.set_shape_maintenance(event)
@@ -2259,11 +2298,15 @@ class PhysicsParam():
         base_joint_val = ((self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()) * \
                           (self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()))
 
-        if self.physics_type_ctrl.GetStringSelection == logger.transtext('髪'):
-            # 髪の毛の場合、ジョイントの制限はきつめに
-            base_joint_val *= 0.6
-            # 髪の毛の場合、ばね値を大きくしておく
-            base_spring_val *= 2
+        if self.physics_type_ctrl.GetStringSelection() == logger.transtext('髪'):
+            # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を大きくしておく
+            base_joint_val *= 1.2
+            base_spring_val *= 1.2
+
+        elif self.physics_type_ctrl.GetStringSelection() == logger.transtext('胸'):
+            # 胸の場合、よりジョイントの制限はきつめに・ばね値を大きくしておく
+            base_joint_val *= 1.2
+            base_spring_val *= 3
 
         self.advance_vertical_joint_coefficient_spin.SetValue(base_joint_val * 20)
 

@@ -41,11 +41,11 @@ class MainFrame(wx.Frame):
 
         self.my_program = 'PmxTailor'
 
-        frame_size = wx.Size(600, 650)
+        frame_size = wx.Size(600, 700)
         if logger.target_lang == "en_US":
-            frame_size = wx.Size(800, 650)
+            frame_size = wx.Size(800, 700)
         elif logger.target_lang == "zh_CN":
-            frame_size = wx.Size(700, 650)
+            frame_size = wx.Size(700, 700)
 
         frame_title = logger.transtext(f'{self.my_program} ローカル版') + f' {self.version_name}'
         wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=frame_title, \
