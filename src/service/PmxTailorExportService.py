@@ -3385,10 +3385,17 @@ class PmxTailorExportService():
                 # 3つ揃ってない場合、スルー
                 non_target_iidxs.append(index_idx)
                 continue
+            
+            # 軸の傾き度合いを取得する
+            v_axis = (v1.position - v0.position).normalized()
+            mat = MMatrix4x4()
+            mat.setToIdentity()
+            mat.rotate(MQuaternion.rotationTo(MVector3D(0, -1, 0), v_axis))
+            below_axis = mat * v_axis
 
-            below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(0, -1, 0))
+            below_x = MVector3D.dotProduct(below_axis, MVector3D(0, -1, 0))
             below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
-            if below_x > max_below_x * 0.9 and below_size > max_below_size * 0.6 and ymin + ((ymedian - ymin) * 0.1) < v0.position.y() < ymax - ((ymax - ymedian) * 0.1):
+            if below_x > max_below_x * 0.9 and below_size > max_below_size * 0.8 and ymin + ((ymedian - ymin) * 0.1) < v0.position.y() < ymax - ((ymax - ymedian) * 0.1):
                 below_iidx = index_idx
                 max_below_x = below_x
                 max_below_size = below_size
@@ -3444,9 +3451,16 @@ class PmxTailorExportService():
                             # 3つ揃ってない場合、スルー
                             continue
 
-                        below_x = MVector3D.dotProduct((v1.position - v0.position).normalized(), MVector3D(0, -1, 0))
+                        # 軸の傾き度合いを取得する
+                        v_axis = (v1.position - v0.position).normalized()
+                        mat = MMatrix4x4()
+                        mat.setToIdentity()
+                        mat.rotate(MQuaternion.rotationTo(MVector3D(0, -1, 0), v_axis))
+                        below_axis = mat * v_axis
+
+                        below_x = MVector3D.dotProduct(below_axis, MVector3D(0, -1, 0))
                         below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
-                        if below_x > max_below_x * 0.9 and below_size > max_below_size * 0.6:
+                        if below_x > max_below_x * 0.9 and below_size > max_below_size * 0.8:
                             below_iidx = index_idx
                             max_below_x = below_x
                             max_below_size = below_size
@@ -3666,9 +3680,10 @@ class PmxTailorExportService():
                                 if vidx not in vertex_axis_map:
                                     is_regist = True
                                     vertex_axis_map[vidx] = {'vidx': vidx, 'x': iv1_map[0], 'y': iv1_map[1], 'position': model.vertex_dict[vidx].position}
+                                    logger.debug(f"fill_horizonal_now_idxs: vidx[{vidx}], axis[{vertex_axis_map[vidx]}]")
                             if is_regist:
                                 vertex_coordinate_map[iv1_map] = remaining_vidxs
-                                logger.debug(f"fill_horizonal_now_idxs: key[{iv1_map}], v[{remaining_vidxs}]")
+                                logger.debug(f"fill_horizonal_now_idxs: key[{iv1_map}], v[{remaining_vidxs}], axis[{vertex_axis_map[vidx]}]")
                             now_iidxs.append(index_idx)
                         
                         if len(now_iidxs) > 0:
@@ -3864,6 +3879,7 @@ class PmxTailorExportService():
 
             full_d = [i for i, d in enumerate(horizonaled_duplicate_dots) if np.round(d, decimals=5) == np.max(np.round(horizonaled_duplicate_dots, decimals=5))]  # noqa
             not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.05]  # noqa
+            # not_full_d = []
             if full_d:
                 if not_full_d:
                     # 平行辺の内積より一定以上近い内積のINDEX組合せがあった場合、臨時採用
@@ -3884,9 +3900,10 @@ class PmxTailorExportService():
                             if below_vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
                                 is_regist = True
                                 vertex_axis_map[below_vidx] = {'vidx': below_vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[below_vidx].position}
+                                logger.debug(f"fill_vertical1: vidx[{below_vidx}], axis[{vertex_axis_map[below_vidx]}]")
                         if is_regist:
                             vertex_coordinate_map[(remaining_x, remaining_y)] = duplicate_vertices[remaining_v.position.to_log()]
-                            logger.debug(f"fill_vertical1: key[{(remaining_x, remaining_y)}], v[{duplicate_vertices[remaining_v.position.to_log()]}]")
+                            logger.debug(f"fill_vertical1: key[{(remaining_x, remaining_y)}], v[{duplicate_vertices[remaining_v.position.to_log()]}], axis[{vertex_axis_map[below_vidx]}]")
 
                         now_iidxs.append(duplicate_index_idx)
                 else:
@@ -3907,9 +3924,10 @@ class PmxTailorExportService():
                         if below_vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
                             is_regist = True
                             vertex_axis_map[below_vidx] = {'vidx': below_vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[below_vidx].position}
+                            logger.debug(f"fill_vertical1: vidx[{below_vidx}], axis[{vertex_axis_map[below_vidx]}]")
                     if is_regist:
                         vertex_coordinate_map[(remaining_x, remaining_y)] = duplicate_vertices[remaining_v.position.to_log()]
-                        logger.debug(f"fill_vertical1: key[{(remaining_x, remaining_y)}], v[{duplicate_vertices[remaining_v.position.to_log()]}]")
+                        logger.debug(f"fill_vertical1: key[{(remaining_x, remaining_y)}], v[{duplicate_vertices[remaining_v.position.to_log()]}], axis[{vertex_axis_map[below_vidx]}]")
 
                     now_iidxs.append(duplicate_index_idx)
 
@@ -3929,9 +3947,10 @@ class PmxTailorExportService():
                                 if vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
                                     is_regist = True
                                     vertex_axis_map[vidx] = {'vidx': vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[vidx].position}
+                                    logger.debug(f"fill_vertical2: vidx[{vidx}], axis[{vertex_axis_map[vidx]}]")
                             if is_regist:
                                 vertex_coordinate_map[(remaining_x, remaining_y)] = duplicate_vertices[remaining_v.position.to_log()]
-                                logger.debug(f"fill_vertical2: key[{(remaining_x, remaining_y)}], v[{duplicate_vertices[remaining_v.position.to_log()]}]")
+                                logger.debug(f"fill_vertical2: key[{(remaining_x, remaining_y)}], v[{duplicate_vertices[remaining_v.position.to_log()]}], axis[{vertex_axis_map[vidx]}]")
 
                         # 斜めが埋められそうなら埋める
                         vertex_axis_map, vertex_coordinate_map, registed_iidxs, now_iidxs = \
@@ -4040,18 +4059,31 @@ class PmxTailorExportService():
                     else:
                         vy = -1 if v0v < v1v else 1
                         if param_option['direction'] == '上':
-                            v1dot = MVector3D.dotProduct(MVector3D(0, vy, 0), (v1.position - v0.position).normalized())
-                            v2dot = MVector3D.dotProduct(MVector3D(0, vy, 0), (v2.position - v0.position).normalized())
+                            base_vertical_axis = MVector3D(0, 1, 0)
                         elif param_option['direction'] == '右':
-                            v1dot = MVector3D.dotProduct(MVector3D(-1, 0, 0), (v1.position - v0.position).normalized())
-                            v2dot = MVector3D.dotProduct(MVector3D(-1, 0, 0), (v2.position - v0.position).normalized())
+                            base_vertical_axis = MVector3D(-1, 0, 0)
                         elif param_option['direction'] == '左':
-                            v1dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v1.position - v0.position).normalized())
-                            v2dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v2.position - v0.position).normalized())
+                            base_vertical_axis = MVector3D(1, 0, 0)
                         else:
-                            v1dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v1.position - v0.position).normalized())
-                            v2dot = MVector3D.dotProduct(MVector3D(0, -vy, 0), (v2.position - v0.position).normalized())
-                        if abs(v1dot) > abs(v2dot):
+                            base_vertical_axis = MVector3D(0, -1, 0)
+
+                        # 軸の傾き度合いを取得する
+                        v1_axis = (v1.position - v0.position).normalized()
+                        v1_mat = MMatrix4x4()
+                        v1_mat.setToIdentity()
+                        v1_mat.rotate(MQuaternion.rotationTo(base_vertical_axis, v1_axis))
+
+                        v2_axis = (v2.position - v0.position).normalized()
+                        v2_mat = MMatrix4x4()
+                        v2_mat.setToIdentity()
+                        v2_mat.rotate(MQuaternion.rotationTo(base_vertical_axis, v2_axis))
+
+                        v1_vertical_axis = v1_mat * v1_axis
+                        v2_vertical_axis = v2_mat * v2_axis
+                        v1_vertical_dot = MVector3D.dotProduct(v1_vertical_axis, base_vertical_axis)
+                        v2_vertical_dot = MVector3D.dotProduct(v2_vertical_axis, base_vertical_axis)
+
+                        if abs(v1_vertical_dot) > abs(v2_vertical_dot):
                             # v1の方がv0に近い場合、v1は縦展開とみなす
                             vx = 0
                         else:
@@ -4107,6 +4139,7 @@ class PmxTailorExportService():
                 if vidx not in vertex_axis_map and (remaining_x, remaining_y) not in vertex_coordinate_map:
                     is_regist = True
                     vertex_axis_map[vidx] = {'vidx': vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[vidx].position}
+                    logger.debug(f"create_vertex_map_by_index: vidx[{vidx}], axis[{vertex_axis_map[vidx]}]")
             if is_regist:
                 vertex_coordinate_map[(remaining_x, remaining_y)] = vs_duplicated[remaining_v.index]
 
@@ -4125,13 +4158,13 @@ class PmxTailorExportService():
 
             if (remaining_x, vv0_y) in vertex_coordinate_map:
                 remaining_y = vv1_y
-                logger.debug(f"get_remaining_vertex_vec(縦): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(縦): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
             elif (remaining_x, vv1_y) in vertex_coordinate_map:
                 remaining_y = vv0_y
-                logger.debug(f"get_remaining_vertex_vec(縦): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(縦): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
             else:
                 remaining_y = vv1_y if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_y
-                logger.debug(f"get_remaining_vertex_vec(縦計算): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(縦計算): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
 
         elif vv0_y == vv1_y:
             # 元が横方向に一致している場合
@@ -4143,25 +4176,25 @@ class PmxTailorExportService():
             
             if (vv0_x, remaining_y) in vertex_coordinate_map:
                 remaining_x = vv1_x
-                logger.debug(f"get_remaining_vertex_vec(横): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(横): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
             elif (vv1_x, remaining_y) in vertex_coordinate_map:
                 remaining_x = vv0_x
-                logger.debug(f"get_remaining_vertex_vec(横): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(横): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
             else:
                 remaining_x = vv1_x if vv1_vec.distanceToPoint(remaining_v.position) < vv0_vec.distanceToPoint(remaining_v.position) else vv0_x
-                logger.debug(f"get_remaining_vertex_vec(横計算): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(横計算): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
         else:
             # 斜めが一致している場合
             if (vv0_x > vv1_x and vv0_y < vv1_y) or (vv0_x < vv1_x and vv0_y > vv1_y):
                 # ／↑の場合、↓、↓／の場合、↑、／←の場合、→
                 remaining_x = vv1_x
                 remaining_y = vv0_y
-                logger.debug(f"get_remaining_vertex_vec(斜1): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(斜1): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
             else:
                 # ＼←の場合、→、／→の場合、←
                 remaining_x = vv0_x
                 remaining_y = vv1_y
-                logger.debug(f"get_remaining_vertex_vec(斜2): {remaining_x}, {remaining_y}")
+                logger.debug(f"get_remaining_vertex_vec(斜2): [{remaining_v.index}], {remaining_x}, {remaining_y} (v0[{vv0_idx}], ({vv0_x}, {vv0_y})) (v0[{vv1_idx}], ({vv1_x}, {vv1_y}))")
         
         return remaining_x, remaining_y
 
