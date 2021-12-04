@@ -133,7 +133,7 @@ class ParamPanel(BasePanel):
             for material_name in self.frame.file_panel_ctrl.org_model_file_ctrl.data.materials.keys():
                 self.material_list.append(material_name)
             # ボーンリストクリア
-            self.bone_list = []
+            self.bone_list = [""]
             for bone in self.frame.file_panel_ctrl.org_model_file_ctrl.data.bones.values():
                 for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
                     if bone.index == rigidbody.bone_index and rigidbody.mode == 0:
@@ -246,14 +246,15 @@ class PhysicsParam():
         self.simple_header_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         self.simple_abb_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("材質略称 *"), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_abb_txt.SetToolTip(logger.transtext("ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）"))
+        self.simple_abb_txt.SetToolTip(logger.transtext("ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(材質名・頂点CSV・ボーンタブの値は再設定しません)"))
         self.simple_abb_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_abb_txt, 0, wx.ALL, 5)
 
-        self.simple_abb_ctrl = wx.TextCtrl(self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1))
-        self.simple_abb_ctrl.SetToolTip(logger.transtext("ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）"))
+        self.simple_abb_ctrl = wx.TextCtrl(self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1), style=wx.TE_PROCESS_ENTER)
+        self.simple_abb_ctrl.SetToolTip(logger.transtext("ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(材質名・頂点CSV・ボーンタブの値は再設定しません)"))
         self.simple_abb_ctrl.SetMaxLength(6)
         self.simple_abb_ctrl.Bind(wx.EVT_TEXT, self.set_abb_name)
+        self.simple_abb_ctrl.Bind(wx.EVT_TEXT_ENTER, self.set_abb_setting)
         self.simple_header_grid_sizer.Add(self.simple_abb_ctrl, 0, wx.ALL, 5)
 
         self.simple_group_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("剛体グループ *"), wx.DefaultPosition, wx.DefaultSize, 0)
@@ -1492,7 +1493,21 @@ class PhysicsParam():
                 params["bone_grid_rows"] = 0
                 params["bone_grid_cols"] = 0
 
+            if self.vertices_csv_file_ctrl.path() and not os.path.exists(self.vertices_csv_file_ctrl.path()):
+                logger.error("頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
+                return params, False
+
             self.vertices_csv_file_ctrl.save()
+            if self.simple_abb_ctrl.GetValue() not in self.main_frame.file_hitories["abb_setting"]:
+                self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {}
+            self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {
+                "parent_bone_name": self.simple_parent_bone_ctrl.GetStringSelection(),
+                "group": self.simple_group_ctrl.GetStringSelection(),
+                "direction": self.simple_direction_ctrl.GetStringSelection(),
+                "exist_physics_clear": self.simple_exist_physics_clear_ctrl.GetStringSelection(),
+                "primitive": self.simple_primitive_ctrl.GetStringSelection(),
+                "params": self.get_param_export_data(),
+            }
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
 
             # 簡易版オプションデータ -------------
@@ -1616,116 +1631,7 @@ class PhysicsParam():
             try:
                 with open(target_physics_path, 'r') as f:
                     params = json.load(f)
-
-                    # 簡易版オプションデータ -------------
-                    self.simple_similarity_slider.SetValue(params["similarity"])
-                    self.simple_fineness_slider.SetValue(params["fineness"])
-                    self.simple_mass_slider.SetValue(params["mass"])
-                    self.simple_air_resistance_slider.SetValue(params["air_resistance"])
-                    self.simple_shape_maintenance_slider.SetValue(params["shape_maintenance"])
-
-                    # 詳細版オプションデータ -------------
-                    self.vertical_bone_density_spin.SetValue(params["vertical_bone_density"])
-                    self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
-                    self.physics_type_ctrl.SetStringSelection(params["physics_type"])
-
-                    # 剛体 ---------------
-                    self.advance_rigidbody_shape_type_ctrl.SetSelection(params["rigidbody_shape_type"])
-                    self.rigidbody_mass_spin.SetValue(params["rigidbody_mass"])
-                    self.rigidbody_linear_damping_spin.SetValue(params["rigidbody_linear_damping"])
-                    self.rigidbody_angular_damping_spin.SetValue(params["rigidbody_angular_damping"])
-                    self.rigidbody_restitution_spin.SetValue(params["rigidbody_restitution"])
-                    self.rigidbody_friction_spin.SetValue(params["rigidbody_friction"])
-                    self.rigidbody_coefficient_spin.SetValue(params["rigidbody_coefficient"])
-                    self.advance_rigidbody_balancer_ctrl.SetValue(params["rigidbody_balancer"])
-
-                    # 縦ジョイント -----------
-                    self.advance_vertical_joint_valid_check.SetValue(params["vertical_joint_valid"])
-                    self.vertical_joint_mov_x_min_spin.SetValue(params["vertical_joint_mov_x_min"])
-                    self.vertical_joint_mov_y_min_spin.SetValue(params["vertical_joint_mov_y_min"])
-                    self.vertical_joint_mov_z_min_spin.SetValue(params["vertical_joint_mov_z_min"])
-                    self.vertical_joint_mov_x_max_spin.SetValue(params["vertical_joint_mov_x_max"])
-                    self.vertical_joint_mov_y_max_spin.SetValue(params["vertical_joint_mov_y_max"])
-                    self.vertical_joint_mov_z_max_spin.SetValue(params["vertical_joint_mov_z_max"])
-                    self.vertical_joint_rot_x_min_spin.SetValue(params["vertical_joint_rot_x_min"])
-                    self.vertical_joint_rot_y_min_spin.SetValue(params["vertical_joint_rot_y_min"])
-                    self.vertical_joint_rot_z_min_spin.SetValue(params["vertical_joint_rot_z_min"])
-                    self.vertical_joint_rot_x_max_spin.SetValue(params["vertical_joint_rot_x_max"])
-                    self.vertical_joint_rot_y_max_spin.SetValue(params["vertical_joint_rot_y_max"])
-                    self.vertical_joint_rot_z_max_spin.SetValue(params["vertical_joint_rot_z_max"])
-                    self.vertical_joint_spring_mov_x_spin.SetValue(params["vertical_joint_spring_mov_x"])
-                    self.vertical_joint_spring_mov_y_spin.SetValue(params["vertical_joint_spring_mov_y"])
-                    self.vertical_joint_spring_mov_z_spin.SetValue(params["vertical_joint_spring_mov_z"])
-                    self.vertical_joint_spring_rot_x_spin.SetValue(params["vertical_joint_spring_rot_x"])
-                    self.vertical_joint_spring_rot_y_spin.SetValue(params["vertical_joint_spring_rot_y"])
-                    self.vertical_joint_spring_rot_z_spin.SetValue(params["vertical_joint_spring_rot_z"])
-                    self.advance_vertical_joint_coefficient_spin.SetValue(params['vertical_joint_coefficient'])
-
-                    # 横ジョイント -----------
-                    self.advance_horizonal_joint_valid_check.SetValue(params["horizonal_joint_valid"])
-                    self.horizonal_joint_mov_x_min_spin.SetValue(params["horizonal_joint_mov_x_min"])
-                    self.horizonal_joint_mov_y_min_spin.SetValue(params["horizonal_joint_mov_y_min"])
-                    self.horizonal_joint_mov_z_min_spin.SetValue(params["horizonal_joint_mov_z_min"])
-                    self.horizonal_joint_mov_x_max_spin.SetValue(params["horizonal_joint_mov_x_max"])
-                    self.horizonal_joint_mov_y_max_spin.SetValue(params["horizonal_joint_mov_y_max"])
-                    self.horizonal_joint_mov_z_max_spin.SetValue(params["horizonal_joint_mov_z_max"])
-                    self.horizonal_joint_rot_x_min_spin.SetValue(params["horizonal_joint_rot_x_min"])
-                    self.horizonal_joint_rot_y_min_spin.SetValue(params["horizonal_joint_rot_y_min"])
-                    self.horizonal_joint_rot_z_min_spin.SetValue(params["horizonal_joint_rot_z_min"])
-                    self.horizonal_joint_rot_x_max_spin.SetValue(params["horizonal_joint_rot_x_max"])
-                    self.horizonal_joint_rot_y_max_spin.SetValue(params["horizonal_joint_rot_y_max"])
-                    self.horizonal_joint_rot_z_max_spin.SetValue(params["horizonal_joint_rot_z_max"])
-                    self.horizonal_joint_spring_mov_x_spin.SetValue(params["horizonal_joint_spring_mov_x"])
-                    self.horizonal_joint_spring_mov_y_spin.SetValue(params["horizonal_joint_spring_mov_y"])
-                    self.horizonal_joint_spring_mov_z_spin.SetValue(params["horizonal_joint_spring_mov_z"])
-                    self.horizonal_joint_spring_rot_x_spin.SetValue(params["horizonal_joint_spring_rot_x"])
-                    self.horizonal_joint_spring_rot_y_spin.SetValue(params["horizonal_joint_spring_rot_y"])
-                    self.horizonal_joint_spring_rot_z_spin.SetValue(params["horizonal_joint_spring_rot_z"])
-                    self.advance_horizonal_joint_coefficient_spin.SetValue(params['horizonal_joint_coefficient'])
-
-                    # 斜めジョイント -----------
-                    self.advance_diagonal_joint_valid_check.SetValue(params["diagonal_joint_valid"])
-                    self.diagonal_joint_mov_x_min_spin.SetValue(params["diagonal_joint_mov_x_min"])
-                    self.diagonal_joint_mov_y_min_spin.SetValue(params["diagonal_joint_mov_y_min"])
-                    self.diagonal_joint_mov_z_min_spin.SetValue(params["diagonal_joint_mov_z_min"])
-                    self.diagonal_joint_mov_x_max_spin.SetValue(params["diagonal_joint_mov_x_max"])
-                    self.diagonal_joint_mov_y_max_spin.SetValue(params["diagonal_joint_mov_y_max"])
-                    self.diagonal_joint_mov_z_max_spin.SetValue(params["diagonal_joint_mov_z_max"])
-                    self.diagonal_joint_rot_x_min_spin.SetValue(params["diagonal_joint_rot_x_min"])
-                    self.diagonal_joint_rot_y_min_spin.SetValue(params["diagonal_joint_rot_y_min"])
-                    self.diagonal_joint_rot_z_min_spin.SetValue(params["diagonal_joint_rot_z_min"])
-                    self.diagonal_joint_rot_x_max_spin.SetValue(params["diagonal_joint_rot_x_max"])
-                    self.diagonal_joint_rot_y_max_spin.SetValue(params["diagonal_joint_rot_y_max"])
-                    self.diagonal_joint_rot_z_max_spin.SetValue(params["diagonal_joint_rot_z_max"])
-                    self.diagonal_joint_spring_mov_x_spin.SetValue(params["diagonal_joint_spring_mov_x"])
-                    self.diagonal_joint_spring_mov_y_spin.SetValue(params["diagonal_joint_spring_mov_y"])
-                    self.diagonal_joint_spring_mov_z_spin.SetValue(params["diagonal_joint_spring_mov_z"])
-                    self.diagonal_joint_spring_rot_x_spin.SetValue(params["diagonal_joint_spring_rot_x"])
-                    self.diagonal_joint_spring_rot_y_spin.SetValue(params["diagonal_joint_spring_rot_y"])
-                    self.diagonal_joint_spring_rot_z_spin.SetValue(params["diagonal_joint_spring_rot_z"])
-                    self.advance_diagonal_joint_coefficient_spin.SetValue(params['diagonal_joint_coefficient'])
-
-                    # 逆ジョイント -----------
-                    self.advance_reverse_joint_valid_check.SetValue(params["reverse_joint_valid"])
-                    self.reverse_joint_mov_x_min_spin.SetValue(params["reverse_joint_mov_x_min"])
-                    self.reverse_joint_mov_y_min_spin.SetValue(params["reverse_joint_mov_y_min"])
-                    self.reverse_joint_mov_z_min_spin.SetValue(params["reverse_joint_mov_z_min"])
-                    self.reverse_joint_mov_x_max_spin.SetValue(params["reverse_joint_mov_x_max"])
-                    self.reverse_joint_mov_y_max_spin.SetValue(params["reverse_joint_mov_y_max"])
-                    self.reverse_joint_mov_z_max_spin.SetValue(params["reverse_joint_mov_z_max"])
-                    self.reverse_joint_rot_x_min_spin.SetValue(params["reverse_joint_rot_x_min"])
-                    self.reverse_joint_rot_y_min_spin.SetValue(params["reverse_joint_rot_y_min"])
-                    self.reverse_joint_rot_z_min_spin.SetValue(params["reverse_joint_rot_z_min"])
-                    self.reverse_joint_rot_x_max_spin.SetValue(params["reverse_joint_rot_x_max"])
-                    self.reverse_joint_rot_y_max_spin.SetValue(params["reverse_joint_rot_y_max"])
-                    self.reverse_joint_rot_z_max_spin.SetValue(params["reverse_joint_rot_z_max"])
-                    self.reverse_joint_spring_mov_x_spin.SetValue(params["reverse_joint_spring_mov_x"])
-                    self.reverse_joint_spring_mov_y_spin.SetValue(params["reverse_joint_spring_mov_y"])
-                    self.reverse_joint_spring_mov_z_spin.SetValue(params["reverse_joint_spring_mov_z"])
-                    self.reverse_joint_spring_rot_x_spin.SetValue(params["reverse_joint_spring_rot_x"])
-                    self.reverse_joint_spring_rot_y_spin.SetValue(params["reverse_joint_spring_rot_y"])
-                    self.reverse_joint_spring_rot_z_spin.SetValue(params["reverse_joint_spring_rot_z"])
-                    self.advance_reverse_joint_coefficient_spin.SetValue(params['reverse_joint_coefficient'])
+                    self.set_param_import_data(params)
                 
                 dialog = wx.MessageDialog(self.frame, logger.transtext("材質物理設定JSONのインポートに成功しました \n{0}").format(target_physics_path), style=wx.OK)
                 dialog.ShowModal()
@@ -1735,8 +1641,119 @@ class PhysicsParam():
                 dialog.ShowModal()
                 dialog.Destroy()
 
+    def set_param_import_data(self, params: dict):
+        # 簡易版オプションデータ -------------
+        self.simple_similarity_slider.SetValue(params["similarity"])
+        self.simple_fineness_slider.SetValue(params["fineness"])
+        self.simple_mass_slider.SetValue(params["mass"])
+        self.simple_air_resistance_slider.SetValue(params["air_resistance"])
+        self.simple_shape_maintenance_slider.SetValue(params["shape_maintenance"])
+
+        # 詳細版オプションデータ -------------
+        self.vertical_bone_density_spin.SetValue(params["vertical_bone_density"])
+        self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
+        self.physics_type_ctrl.SetStringSelection(params["physics_type"])
+
+        # 剛体 ---------------
+        self.advance_rigidbody_shape_type_ctrl.SetSelection(params["rigidbody_shape_type"])
+        self.rigidbody_mass_spin.SetValue(params["rigidbody_mass"])
+        self.rigidbody_linear_damping_spin.SetValue(params["rigidbody_linear_damping"])
+        self.rigidbody_angular_damping_spin.SetValue(params["rigidbody_angular_damping"])
+        self.rigidbody_restitution_spin.SetValue(params["rigidbody_restitution"])
+        self.rigidbody_friction_spin.SetValue(params["rigidbody_friction"])
+        self.rigidbody_coefficient_spin.SetValue(params["rigidbody_coefficient"])
+        self.advance_rigidbody_balancer_ctrl.SetValue(params["rigidbody_balancer"])
+
+        # 縦ジョイント -----------
+        self.advance_vertical_joint_valid_check.SetValue(params["vertical_joint_valid"])
+        self.vertical_joint_mov_x_min_spin.SetValue(params["vertical_joint_mov_x_min"])
+        self.vertical_joint_mov_y_min_spin.SetValue(params["vertical_joint_mov_y_min"])
+        self.vertical_joint_mov_z_min_spin.SetValue(params["vertical_joint_mov_z_min"])
+        self.vertical_joint_mov_x_max_spin.SetValue(params["vertical_joint_mov_x_max"])
+        self.vertical_joint_mov_y_max_spin.SetValue(params["vertical_joint_mov_y_max"])
+        self.vertical_joint_mov_z_max_spin.SetValue(params["vertical_joint_mov_z_max"])
+        self.vertical_joint_rot_x_min_spin.SetValue(params["vertical_joint_rot_x_min"])
+        self.vertical_joint_rot_y_min_spin.SetValue(params["vertical_joint_rot_y_min"])
+        self.vertical_joint_rot_z_min_spin.SetValue(params["vertical_joint_rot_z_min"])
+        self.vertical_joint_rot_x_max_spin.SetValue(params["vertical_joint_rot_x_max"])
+        self.vertical_joint_rot_y_max_spin.SetValue(params["vertical_joint_rot_y_max"])
+        self.vertical_joint_rot_z_max_spin.SetValue(params["vertical_joint_rot_z_max"])
+        self.vertical_joint_spring_mov_x_spin.SetValue(params["vertical_joint_spring_mov_x"])
+        self.vertical_joint_spring_mov_y_spin.SetValue(params["vertical_joint_spring_mov_y"])
+        self.vertical_joint_spring_mov_z_spin.SetValue(params["vertical_joint_spring_mov_z"])
+        self.vertical_joint_spring_rot_x_spin.SetValue(params["vertical_joint_spring_rot_x"])
+        self.vertical_joint_spring_rot_y_spin.SetValue(params["vertical_joint_spring_rot_y"])
+        self.vertical_joint_spring_rot_z_spin.SetValue(params["vertical_joint_spring_rot_z"])
+        self.advance_vertical_joint_coefficient_spin.SetValue(params['vertical_joint_coefficient'])
+
+        # 横ジョイント -----------
+        self.advance_horizonal_joint_valid_check.SetValue(params["horizonal_joint_valid"])
+        self.horizonal_joint_mov_x_min_spin.SetValue(params["horizonal_joint_mov_x_min"])
+        self.horizonal_joint_mov_y_min_spin.SetValue(params["horizonal_joint_mov_y_min"])
+        self.horizonal_joint_mov_z_min_spin.SetValue(params["horizonal_joint_mov_z_min"])
+        self.horizonal_joint_mov_x_max_spin.SetValue(params["horizonal_joint_mov_x_max"])
+        self.horizonal_joint_mov_y_max_spin.SetValue(params["horizonal_joint_mov_y_max"])
+        self.horizonal_joint_mov_z_max_spin.SetValue(params["horizonal_joint_mov_z_max"])
+        self.horizonal_joint_rot_x_min_spin.SetValue(params["horizonal_joint_rot_x_min"])
+        self.horizonal_joint_rot_y_min_spin.SetValue(params["horizonal_joint_rot_y_min"])
+        self.horizonal_joint_rot_z_min_spin.SetValue(params["horizonal_joint_rot_z_min"])
+        self.horizonal_joint_rot_x_max_spin.SetValue(params["horizonal_joint_rot_x_max"])
+        self.horizonal_joint_rot_y_max_spin.SetValue(params["horizonal_joint_rot_y_max"])
+        self.horizonal_joint_rot_z_max_spin.SetValue(params["horizonal_joint_rot_z_max"])
+        self.horizonal_joint_spring_mov_x_spin.SetValue(params["horizonal_joint_spring_mov_x"])
+        self.horizonal_joint_spring_mov_y_spin.SetValue(params["horizonal_joint_spring_mov_y"])
+        self.horizonal_joint_spring_mov_z_spin.SetValue(params["horizonal_joint_spring_mov_z"])
+        self.horizonal_joint_spring_rot_x_spin.SetValue(params["horizonal_joint_spring_rot_x"])
+        self.horizonal_joint_spring_rot_y_spin.SetValue(params["horizonal_joint_spring_rot_y"])
+        self.horizonal_joint_spring_rot_z_spin.SetValue(params["horizonal_joint_spring_rot_z"])
+        self.advance_horizonal_joint_coefficient_spin.SetValue(params['horizonal_joint_coefficient'])
+
+        # 斜めジョイント -----------
+        self.advance_diagonal_joint_valid_check.SetValue(params["diagonal_joint_valid"])
+        self.diagonal_joint_mov_x_min_spin.SetValue(params["diagonal_joint_mov_x_min"])
+        self.diagonal_joint_mov_y_min_spin.SetValue(params["diagonal_joint_mov_y_min"])
+        self.diagonal_joint_mov_z_min_spin.SetValue(params["diagonal_joint_mov_z_min"])
+        self.diagonal_joint_mov_x_max_spin.SetValue(params["diagonal_joint_mov_x_max"])
+        self.diagonal_joint_mov_y_max_spin.SetValue(params["diagonal_joint_mov_y_max"])
+        self.diagonal_joint_mov_z_max_spin.SetValue(params["diagonal_joint_mov_z_max"])
+        self.diagonal_joint_rot_x_min_spin.SetValue(params["diagonal_joint_rot_x_min"])
+        self.diagonal_joint_rot_y_min_spin.SetValue(params["diagonal_joint_rot_y_min"])
+        self.diagonal_joint_rot_z_min_spin.SetValue(params["diagonal_joint_rot_z_min"])
+        self.diagonal_joint_rot_x_max_spin.SetValue(params["diagonal_joint_rot_x_max"])
+        self.diagonal_joint_rot_y_max_spin.SetValue(params["diagonal_joint_rot_y_max"])
+        self.diagonal_joint_rot_z_max_spin.SetValue(params["diagonal_joint_rot_z_max"])
+        self.diagonal_joint_spring_mov_x_spin.SetValue(params["diagonal_joint_spring_mov_x"])
+        self.diagonal_joint_spring_mov_y_spin.SetValue(params["diagonal_joint_spring_mov_y"])
+        self.diagonal_joint_spring_mov_z_spin.SetValue(params["diagonal_joint_spring_mov_z"])
+        self.diagonal_joint_spring_rot_x_spin.SetValue(params["diagonal_joint_spring_rot_x"])
+        self.diagonal_joint_spring_rot_y_spin.SetValue(params["diagonal_joint_spring_rot_y"])
+        self.diagonal_joint_spring_rot_z_spin.SetValue(params["diagonal_joint_spring_rot_z"])
+        self.advance_diagonal_joint_coefficient_spin.SetValue(params['diagonal_joint_coefficient'])
+
+        # 逆ジョイント -----------
+        self.advance_reverse_joint_valid_check.SetValue(params["reverse_joint_valid"])
+        self.reverse_joint_mov_x_min_spin.SetValue(params["reverse_joint_mov_x_min"])
+        self.reverse_joint_mov_y_min_spin.SetValue(params["reverse_joint_mov_y_min"])
+        self.reverse_joint_mov_z_min_spin.SetValue(params["reverse_joint_mov_z_min"])
+        self.reverse_joint_mov_x_max_spin.SetValue(params["reverse_joint_mov_x_max"])
+        self.reverse_joint_mov_y_max_spin.SetValue(params["reverse_joint_mov_y_max"])
+        self.reverse_joint_mov_z_max_spin.SetValue(params["reverse_joint_mov_z_max"])
+        self.reverse_joint_rot_x_min_spin.SetValue(params["reverse_joint_rot_x_min"])
+        self.reverse_joint_rot_y_min_spin.SetValue(params["reverse_joint_rot_y_min"])
+        self.reverse_joint_rot_z_min_spin.SetValue(params["reverse_joint_rot_z_min"])
+        self.reverse_joint_rot_x_max_spin.SetValue(params["reverse_joint_rot_x_max"])
+        self.reverse_joint_rot_y_max_spin.SetValue(params["reverse_joint_rot_y_max"])
+        self.reverse_joint_rot_z_max_spin.SetValue(params["reverse_joint_rot_z_max"])
+        self.reverse_joint_spring_mov_x_spin.SetValue(params["reverse_joint_spring_mov_x"])
+        self.reverse_joint_spring_mov_y_spin.SetValue(params["reverse_joint_spring_mov_y"])
+        self.reverse_joint_spring_mov_z_spin.SetValue(params["reverse_joint_spring_mov_z"])
+        self.reverse_joint_spring_rot_x_spin.SetValue(params["reverse_joint_spring_rot_x"])
+        self.reverse_joint_spring_rot_y_spin.SetValue(params["reverse_joint_spring_rot_y"])
+        self.reverse_joint_spring_rot_z_spin.SetValue(params["reverse_joint_spring_rot_z"])
+        self.advance_reverse_joint_coefficient_spin.SetValue(params['reverse_joint_coefficient'])
+
     def on_param_export(self, event: wx.Event):
-        params = self.get_param_export_data(event)
+        params = self.get_param_export_data()
 
         with wx.FileDialog(self.frame, logger.transtext("材質物理設定JSONを保存する"), wildcard="JSONファイル (*.json)|*.json|すべてのファイル (*.*)|*.*",
                            defaultDir=os.path.dirname(self.main_frame.file_panel_ctrl.org_model_file_ctrl.data.path),
@@ -1759,7 +1776,7 @@ class PhysicsParam():
                 dialog.ShowModal()
                 dialog.Destroy()
     
-    def get_param_export_data(self, event: wx.Event):
+    def get_param_export_data(self):
         params = {}
 
         # 簡易版オプションデータ -------------
@@ -2042,6 +2059,24 @@ class PhysicsParam():
         self.advance_material_ctrl.SetLabelText(label_text)
         self.bone_material_ctrl.SetLabelText(label_text)
 
+    def set_abb_setting(self, event: wx.Event):
+        # 既存の設定があったら再設定
+        if self.simple_abb_ctrl.GetValue() in self.main_frame.file_hitories["abb_setting"]:
+            abb_setting = self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()]
+            if not self.simple_parent_bone_ctrl.GetStringSelection():
+                self.simple_parent_bone_ctrl.SetStringSelection(abb_setting["parent_bone_name"])
+            if not self.simple_group_ctrl.GetStringSelection():
+                self.simple_group_ctrl.SetStringSelection(abb_setting["group"])
+            if self.simple_direction_ctrl.GetStringSelection() == logger.transtext("下"):
+                self.simple_direction_ctrl.SetStringSelection(abb_setting["direction"])
+            if not self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext("そのまま"):
+                self.simple_exist_physics_clear_ctrl.SetStringSelection(abb_setting["exist_physics_clear"])
+            if not self.simple_primitive_ctrl.GetStringSelection():
+                self.simple_primitive_ctrl.SetStringSelection(abb_setting["primitive"])
+
+            # 物理パラメーターも設定する
+            self.set_param_import_data(abb_setting["params"])
+
     def initialize_bone_param(self, event: wx.Event):
         # ウェイトボーンリンク生成
         self.create_weighted_bone_names()
@@ -2240,9 +2275,9 @@ class PhysicsParam():
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(小)"):
-            self.simple_mass_slider.SetValue(2.8)
-            self.simple_air_resistance_slider.SetValue(3.3)
-            self.simple_shape_maintenance_slider.SetValue(2.7)
+            self.simple_mass_slider.SetValue(5.4)
+            self.simple_air_resistance_slider.SetValue(4.3)
+            self.simple_shape_maintenance_slider.SetValue(3.7)
 
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
@@ -2252,9 +2287,9 @@ class PhysicsParam():
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
-            self.simple_mass_slider.SetValue(3.2)
-            self.simple_air_resistance_slider.SetValue(2.3)
-            self.simple_shape_maintenance_slider.SetValue(2.0)
+            self.simple_mass_slider.SetValue(6.2)
+            self.simple_air_resistance_slider.SetValue(3.3)
+            self.simple_shape_maintenance_slider.SetValue(3.0)
 
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
