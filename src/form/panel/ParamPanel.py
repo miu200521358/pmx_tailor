@@ -2069,7 +2069,7 @@ class PhysicsParam():
                 self.simple_group_ctrl.SetStringSelection(abb_setting["group"])
             if self.simple_direction_ctrl.GetStringSelection() == logger.transtext("下"):
                 self.simple_direction_ctrl.SetStringSelection(abb_setting["direction"])
-            if not self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext("そのまま"):
+            if self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext("そのまま"):
                 self.simple_exist_physics_clear_ctrl.SetStringSelection(abb_setting["exist_physics_clear"])
             if not self.simple_primitive_ctrl.GetStringSelection():
                 self.simple_primitive_ctrl.SetStringSelection(abb_setting["primitive"])

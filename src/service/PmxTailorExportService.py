@@ -2013,6 +2013,7 @@ class PmxTailorExportService():
         # 中心剛体を接触なしボーン追従剛体で生成
         root_rigidbody = RigidBody(root_rigidbody_name, root_rigidbody_name, parent_bone.index, param_rigidbody.collision_group, 0, \
                                    parent_bone_rigidbody.shape_type, parent_bone_rigidbody.shape_size, parent_bone_rigidbody.shape_position, parent_bone_rigidbody.shape_rotation, 1, 0.5, 0.5, 0, 0, 0)
+        root_rigidbody.index = len(model.rigidbodies)
         model.rigidbodies[root_rigidbody.name] = root_rigidbody
 
         # 登録したボーン名と剛体の対比表を保持
