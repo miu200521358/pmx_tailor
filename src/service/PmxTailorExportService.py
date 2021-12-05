@@ -2834,7 +2834,11 @@ class PmxTailorExportService():
                 bone2_distance = v.position.distanceToPoint(weight_bone2.position) if nearest_deform.weight0 < 1 else 0
 
                 weight_names = np.array([weight_bone1.name, weight_bone2.name])
-                total_weights = np.array([bone1_distance / (bone1_distance + bone2_distance), bone2_distance / (bone1_distance + bone2_distance)])
+                if bone1_distance + bone2_distance != 0:
+                    total_weights = np.array([bone1_distance / (bone1_distance + bone2_distance), bone2_distance / (bone1_distance + bone2_distance)])
+                else:
+                    total_weights = np.array([1, 0])
+                    logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", v.index)
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
 
@@ -2862,7 +2866,11 @@ class PmxTailorExportService():
                 all_distance = bone1_distance + bone2_distance + bone3_distance + bone4_distance
 
                 weight_names = np.array([weight_bone1.name, weight_bone2.name, weight_bone3.name, weight_bone4.name])
-                total_weights = np.array([bone1_distance / all_distance, bone2_distance / all_distance, bone3_distance / all_distance, bone4_distance / all_distance])
+                if all_distance != 0:
+                    total_weights = np.array([bone1_distance / all_distance, bone2_distance / all_distance, bone3_distance / all_distance, bone4_distance / all_distance])
+                else:
+                    total_weights = np.array([1, bone2_distance, bone3_distance, bone4_distance])
+                    logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", v.index)
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
 
