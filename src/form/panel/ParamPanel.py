@@ -477,7 +477,7 @@ class PhysicsParam():
         self.vertical_bone_density_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_txt, 0, wx.ALL, 5)
 
-        self.vertical_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=20, initial=1)
+        self.vertical_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(50, -1), value="1", min=1, max=20, initial=1)
         self.vertical_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_spin, 0, wx.ALL, 5)
 
@@ -487,9 +487,20 @@ class PhysicsParam():
         self.horizonal_bone_density_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_txt, 0, wx.ALL, 5)
 
-        self.horizonal_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2", min=1, max=20, initial=2)
+        self.horizonal_bone_density_spin = wx.SpinCtrl(self.advance_window, id=wx.ID_ANY, size=wx.Size(50, -1), value="2", min=1, max=20, initial=2)
         self.horizonal_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_spin, 0, wx.ALL, 5)
+
+        # 密度計算タイプ
+        self.density_type_txt = wx.StaticText(self.advance_window, wx.ID_ANY, logger.transtext("密度基準"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.density_type_txt.SetToolTip(logger.transtext("頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）"))
+        self.density_type_txt.Wrap(-1)
+        self.advance_bone_grid_sizer.Add(self.density_type_txt, 0, wx.ALL, 5)
+
+        self.density_type_ctrl = wx.Choice(self.advance_window, id=wx.ID_ANY, choices=[logger.transtext('頂点'), logger.transtext('距離')])
+        self.density_type_ctrl.SetToolTip(logger.transtext("頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）"))
+        self.density_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_bone_grid_sizer.Add(self.density_type_ctrl, 0, wx.ALL, 5)
 
         # # 間引きオプション
         # self.bone_thinning_out_check = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("間引き")
@@ -1531,6 +1542,7 @@ class PhysicsParam():
             # params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
             params["bone_thinning_out"] = False
             params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
+            params["density_type"] = self.density_type_ctrl.GetStringSelection()
             
             # 自身を非衝突対象
             no_collision_group = 0
@@ -1653,6 +1665,7 @@ class PhysicsParam():
         self.vertical_bone_density_spin.SetValue(params["vertical_bone_density"])
         self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
         self.physics_type_ctrl.SetStringSelection(params["physics_type"])
+        self.density_type_ctrl.SetStringSelection(params["density_type"])
 
         # 剛体 ---------------
         self.advance_rigidbody_shape_type_ctrl.SetSelection(params["rigidbody_shape_type"])
@@ -1792,6 +1805,7 @@ class PhysicsParam():
         # params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
         params["bone_thinning_out"] = False
         params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
+        params["density_type"] = self.density_type_ctrl.GetStringSelection()
 
         # 剛体 ---------------
         params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
@@ -2436,6 +2450,7 @@ class PhysicsParam():
 
         self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext('箱'))
         self.physics_type_ctrl.SetStringSelection(logger.transtext('布'))
+        self.density_type_ctrl.SetStringSelection(logger.transtext('頂点'))
         # self.bone_thinning_out_check.SetValue(0)
 
         self.set_material_name(event)
