@@ -84,12 +84,16 @@ class PmxTailorExportService():
         # 頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option['vertices_csv']:
             target_vertices = []
-            with open(param_option['vertices_csv'], encoding='cp932', mode='r') as f:
-                reader = csv.reader(f)
-                next(reader)            # ヘッダーを読み飛ばす
-                for row in reader:
-                    if len(row) > 1 and int(row[1]) in model.material_vertices[param_option['material_name']]:
-                        target_vertices.append(int(row[1]))
+            try:
+                with open(param_option['vertices_csv'], encoding='cp932', mode='r') as f:
+                    reader = csv.reader(f)
+                    next(reader)            # ヘッダーを読み飛ばす
+                    for row in reader:
+                        if len(row) > 1 and int(row[1]) in model.material_vertices[param_option['material_name']]:
+                            target_vertices.append(int(row[1]))
+            except Exception:
+                logger.warning("頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                return False
         else:
             target_vertices = list(model.material_vertices[param_option['material_name']])
 
@@ -98,6 +102,9 @@ class PmxTailorExportService():
             logger.info("【%s】既存材質削除", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
 
             model = self.clear_exist_physics(model, param_option, param_option['material_name'], target_vertices, saved_bone_names)
+
+            if not model:
+                return False
 
         if param_option['exist_physics_clear'] == logger.transtext('再利用'):
             if param_option['physics_type'] in [logger.transtext('髪'), logger.transtext('単一揺'), logger.transtext('胸')]:
@@ -132,6 +139,9 @@ class PmxTailorExportService():
 
             vertex_maps, vertex_connecteds, duplicate_vertices, registed_iidxs, duplicate_indices, index_combs_by_vpos \
                 = self.create_vertex_map(model, param_option, param_option['material_name'], target_vertices)
+            
+            if not vertex_maps:
+                return False
             
             # 各頂点の有効INDEX数が最も多いものをベースとする
             map_cnt = []
@@ -1428,7 +1438,7 @@ class PmxTailorExportService():
 
         for yi, (above_v_yidx, below_v_yidx) in enumerate(zip(v_yidxs[1:], v_yidxs[:-1])):
             below_v_xidxs = list(registed_bone_indexs[below_v_yidx].keys())
-            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
+            logger.debug(f"before yi: {yi}, below_v_xidxs: {below_v_xidxs}")
 
             if below_v_yidx < len(vertex_connected) and vertex_connected[below_v_yidx]:
                 # 繋がってる場合、最後に最初のボーンを追加する
@@ -1436,7 +1446,7 @@ class PmxTailorExportService():
             elif len(registed_bone_indexs[below_v_yidx]) > 2:
                 # 繋がってない場合、最後に最後のひとつ前のボーンを追加する
                 below_v_xidxs += [list(registed_bone_indexs[below_v_yidx].keys())[-2]]
-            logger.debug(f"yi: {yi}, below_v_xidxs: {below_v_xidxs}")
+            logger.debug(f"after yi: {yi}, below_v_xidxs: {below_v_xidxs}")
 
             for xi, (prev_below_v_xidx, next_below_v_xidx) in enumerate(zip(below_v_xidxs[:-1], below_v_xidxs[1:])):
                 prev_below_v_xno = registed_bone_indexs[below_v_yidx][prev_below_v_xidx] + 1
@@ -1479,6 +1489,7 @@ class PmxTailorExportService():
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+                        yidx = min(len(vertical_limit_min_mov_xs) - 1, yidx)
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
                                       model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index,
@@ -1567,7 +1578,8 @@ class PmxTailorExportService():
                             joint_euler = joint_rotation_qq.toEulerAngles()
                             joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
-                            yidx, xidx = self.disassemble_bone_name(prev_above_bone_name)
+                            yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+                            yidx = min(len(horizonal_limit_min_mov_xs) - 1, yidx)
 
                             joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
                                           model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index,
@@ -1625,6 +1637,7 @@ class PmxTailorExportService():
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yidx, _ = self.disassemble_bone_name(prev_above_bone_name)
+                        yidx = min(len(diagonal_limit_min_mov_xs) - 1, yidx)
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_above_bone_name]].index, \
                                       model.rigidbodies[registed_rigidbodies[next_below_bone_name]].index,
@@ -1659,6 +1672,7 @@ class PmxTailorExportService():
                         joint_radians = MVector3D(math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z()))
 
                         yidx, _ = self.disassemble_bone_name(prev_below_bone_name)
+                        yidx = min(len(diagonal_limit_min_mov_xs) - 1, yidx)
 
                         joint = Joint(joint_name, joint_name, 0, model.rigidbodies[registed_rigidbodies[prev_below_bone_name]].index, \
                                       model.rigidbodies[registed_rigidbodies[next_above_bone_name]].index,
@@ -2014,7 +2028,8 @@ class PmxTailorExportService():
         root_rigidbody = None if root_rigidbody_name not in model.rigidbodies else model.rigidbodies[root_rigidbody_name]
         if not root_rigidbody:
             root_rigidbody = RigidBody(root_rigidbody_name, root_rigidbody_name, parent_bone.index, param_rigidbody.collision_group, 0, \
-                                       parent_bone_rigidbody.shape_type, parent_bone_rigidbody.shape_size, parent_bone_rigidbody.shape_position, parent_bone_rigidbody.shape_rotation, 1, 0.5, 0.5, 0, 0, 0)
+                                       parent_bone_rigidbody.shape_type, parent_bone_rigidbody.shape_size, parent_bone_rigidbody.shape_position, \
+                                       parent_bone_rigidbody.shape_rotation, 1, 0.5, 0.5, 0, 0, 0)
             root_rigidbody.index = len(model.rigidbodies)
             model.rigidbodies[root_rigidbody.name] = root_rigidbody
 
@@ -2341,7 +2356,8 @@ class PmxTailorExportService():
         if not root_rigidbody:
             # 中心剛体を接触なしボーン追従剛体で生成
             root_rigidbody = RigidBody(root_bone.name, root_bone.english_name, root_bone.index, param_rigidbody.collision_group, 0, \
-                                       parent_bone_rigidbody.shape_type, parent_bone_rigidbody.shape_size, parent_bone_rigidbody.shape_position, parent_bone_rigidbody.shape_rotation, 1, 0.5, 0.5, 0, 0, 0)
+                                       parent_bone_rigidbody.shape_type, parent_bone_rigidbody.shape_size, parent_bone_rigidbody.shape_position, \
+                                       parent_bone_rigidbody.shape_rotation, 1, 0.5, 0.5, 0, 0, 0)
             root_rigidbody.index = len(model.rigidbodies)
             model.rigidbodies[root_rigidbody.name] = root_rigidbody
 
@@ -3162,6 +3178,12 @@ class PmxTailorExportService():
                             target_vertices.append(int(row[1]))
             else:
                 target_vertices = list(model.material_vertices[param_option['material_name']])
+            
+            if edge_material_name:
+                target_vertices = list(set(target_vertices) | set(model.material_vertices[edge_material_name]))
+            
+            if back_material_name:
+                target_vertices = list(set(target_vertices) | set(model.material_vertices[back_material_name]))
 
             if param_option['exist_physics_clear'] == logger.transtext('再利用'):
                 # 再利用の場合、指定されている全ボーンを対象とする
@@ -3199,12 +3221,6 @@ class PmxTailorExportService():
                         if vertex.deform.index1 not in list(weighted_bone_indexes.values()) and vertex.deform.weight0 < 1:
                             weighted_bone_indexes[model.bone_indexes[vertex.deform.index1]] = vertex.deform.index1
             
-            # 非表示子ボーンも削除する
-            for bone in model.bones.values():
-                if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
-                        and model.bone_indexes[bone.parent_index] not in SEMI_STANDARD_BONE_NAMES:
-                    weighted_bone_indexes[bone.name] = bone.index
-
             if param_option['exist_physics_clear'] == logger.transtext('再利用'):
                 # 再利用する場合、ボーンは全部残す
                 saved_bone_names.extend(list(model.bones.keys()))
@@ -3215,13 +3231,22 @@ class PmxTailorExportService():
                     if bone_idx in list(weighted_bone_indexes.values()) and len(vertices) > 0:
                         is_not_delete = False
                         for vertex in vertices:
-                            if vertex.index not in target_vertices \
-                                    and (not edge_material_name or (edge_material_name and vertex.index not in model.material_vertices[edge_material_name])) \
-                                    and (not back_material_name or (back_material_name and vertex.index not in model.material_vertices[back_material_name])):
+                            if vertex.index not in target_vertices:
                                 is_not_delete = True
+                                for material_name, material_vertices in model.material_vertices.items():
+                                    if vertex.index in material_vertices:
+                                        break
+                                logger.info("削除対象外ボーン: %s(%s), 対象外頂点: %s, 所属材質: %s", \
+                                            model.bone_indexes[bone_idx], bone_idx, vertex.index, material_name)
                                 break
                     if is_not_delete:
                         saved_bone_names.append(model.bone_indexes[bone_idx])
+
+            # 非表示子ボーンも削除する
+            for bone in model.bones.values():
+                if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
+                        and model.bone_indexes[bone.parent_index] not in saved_bone_names:
+                    weighted_bone_indexes[bone.name] = bone.index
             
             logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
             logger.debug('saved_bone_names: %s', ", ".join(saved_bone_names))
@@ -3273,16 +3298,71 @@ class PmxTailorExportService():
             if not bone.getVisibleFlag() and bone.parent_index in model.bone_indexes and model.bone_indexes[bone.parent_index] in weighted_bone_indexes \
                     and model.bone_indexes[bone.parent_index] not in SEMI_STANDARD_BONE_NAMES:
                 weighted_bone_indexes[bone.name] = bone.index
+        
+        for bone in model.bones.values():
+            is_target = True
+            if bone.name in saved_bone_names and bone.name in weighted_bone_indexes:
+                # 保存済みボーン名に入ってても対象外
+                logger.warning("他の材質のウェイトボーンとして設定されているため、ボーン「%s」を削除対象外とします。", bone.name)
+                is_target = False
 
-        logger.debug('weighted_bone_indexes: %s', ", ".join(list(weighted_bone_indexes.keys())))
+            if is_target:
+                for vertex in model.vertices.get(bone.name, []):
+                    for vertex_weight_bone_index in vertex.get_idx_list():
+                        if vertex_weight_bone_index not in weighted_bone_indexes.values():
+                            # 他のボーンのウェイトが乗ってたら対象外
+                            logger.warning("削除対象外ボーンにウェイトが乗っているため、ボーン「%s」を削除対象外とします。\n調査対象インデックス：%s", bone.name, vertex.index)
+                            is_target = False
+                            break
 
+            if not is_target and bone.name in weighted_bone_indexes:
+                logger.debug("他ウェイト対象外: %s", bone.name)
+                del weighted_bone_indexes[bone.name]
+
+        for bone_name, bone_index in weighted_bone_indexes.items():
+            bone = model.bones[bone_name]
+            for morph in model.org_morphs.values():
+                if morph.morph_type == 2:
+                    for offset in morph.offsets:
+                        if type(offset) is BoneMorphData:
+                            if offset.bone_index == bone_index:
+                                logger.error("削除対象ボーンがボーンモーフとして登録されているため、削除出来ません。\n" \
+                                             + "事前にボーンモーフから外すか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s), モーフ名: %s", \
+                                             bone_name, morph.name, decoration=MLogger.DECORATION_BOX)
+                                return None
+            for bidx, bone in enumerate(model.bones.values()):
+                if bone.parent_index == bone_index and bone.index not in weighted_bone_indexes.values():
+                    logger.error("削除対象ボーンが削除対象外ボーンの親ボーンとして登録されているため、削除出来ません。\n" \
+                                 + "事前に親子関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外子ボーン: %s(%s)", \
+                                 bone_name, bone_index, bone.name, bone.index, decoration=MLogger.DECORATION_BOX)
+                    return None
+
+                if (bone.getExternalRotationFlag() or bone.getExternalTranslationFlag()) \
+                   and bone.effect_index == bone_index and bone.index not in weighted_bone_indexes.values():
+                    logger.error("削除対象ボーンが削除対象外ボーンの付与親ボーンとして登録されているため、削除出来ません。\n" \
+                                 + "事前に付与関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外付与子ボーン: %s(%s)", \
+                                 bone_name, bone_index, bone.name, bone.index, decoration=MLogger.DECORATION_BOX)
+                    return None
+                    
+                if bone.getIkFlag():
+                    if bone.ik.target_index == bone_index and bone.index not in weighted_bone_indexes.values():
+                        logger.error("削除対象ボーンが削除対象外ボーンのリンクターゲットボーンとして登録されているため、削除出来ません。\n" \
+                                     + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)", \
+                                     bone_name, bone_index, bone.name, bone.index, decoration=MLogger.DECORATION_BOX)
+                        return None
+
+                    for link in bone.ik.link:
+                        if link.bone_index == bone_index and bone.index not in weighted_bone_indexes.values():
+                            logger.error("削除対象ボーンが削除対象外ボーンのリンクボーンとして登録されているため、削除出来ません。\n" \
+                                         + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)", \
+                                         bone_name, bone_index, bone.name, bone.index, decoration=MLogger.DECORATION_BOX)
+                            return None
+                           
         weighted_rigidbody_indexes = {}
         for rigidbody in model.rigidbodies.values():
             if rigidbody.index not in list(weighted_rigidbody_indexes.values()) and rigidbody.bone_index in list(weighted_bone_indexes.values()) \
                and model.bone_indexes[rigidbody.bone_index] not in SEMI_STANDARD_BONE_NAMES:
                 weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
-
-        logger.debug('weighted_rigidbody_indexes: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
 
         weighted_joint_indexes = {}
         for joint in model.joints.values():
@@ -3291,9 +3371,11 @@ class PmxTailorExportService():
             if joint.name not in list(weighted_joint_indexes.values()) and joint.rigidbody_index_b in list(weighted_rigidbody_indexes.values()):
                 weighted_joint_indexes[joint.name] = joint.name
 
-        logger.debug('weighted_joint_indexes: %s', ", ".join((weighted_joint_indexes.keys())))
-
         logger.info("%s: 削除実行", material_name)
+
+        logger.info('削除対象ボーンリスト: %s', ", ".join(list(weighted_bone_indexes.keys())))
+        logger.info('削除対象剛体リスト: %s', ", ".join(list(weighted_rigidbody_indexes.keys())))
+        logger.info('削除対象ジョイントリスト: %s', ", ".join((weighted_joint_indexes.keys())))
 
         # 削除
         for joint_name in weighted_joint_indexes.keys():
@@ -3326,7 +3408,6 @@ class PmxTailorExportService():
                 joint.rigidbody_index_a = reset_rigidbodies[joint.rigidbody_index_a]['index']
             if joint.rigidbody_index_b in reset_rigidbodies:
                 joint.rigidbody_index_b = reset_rigidbodies[joint.rigidbody_index_b]['index']
-
         for rigidbody in model.rigidbodies.values():
             if rigidbody.bone_index in reset_bones:
                 rigidbody.bone_index = reset_bones[rigidbody.bone_index]['index']
@@ -3431,7 +3512,11 @@ class PmxTailorExportService():
 
             # 一旦ルートボーンにウェイトを一括置換
             vertex.deform = Bdef1(model.bones[param_option['parent_bone_name']].index)
-        
+
+        if len(ybase_vertices.keys()) == 0:
+            logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
+            return None, None, None, None, None, None
+                
         ymin = np.min(np.array(list(ybase_vertices.keys())))
         ymax = np.max(np.array(list(ybase_vertices.keys())))
         ymedian = np.median(np.array(list(ybase_vertices.keys())))
@@ -3458,19 +3543,6 @@ class PmxTailorExportService():
                 non_target_iidxs.append(index_idx)
                 continue
             
-            # # 軸の傾き度合いを取得する
-            # v_axis = (v1.position - v0.position).normalized()
-            # mat = MMatrix4x4()
-            # mat.setToIdentity()
-            # mat.rotate(MQuaternion.rotationTo(MVector3D(0, -1, 0), v_axis))
-            # below_axis = mat * v_axis
-
-            # below_x = MVector3D.dotProduct(below_axis, MVector3D(0, -1, 0))
-            # below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
-            # if below_x > max_below_x and below_size > max_below_size * 0.8 and ymin + ((ymedian - ymin) * 0.1) < v0.position.y() < ymax - ((ymax - ymedian) * 0.1):
-            #     below_iidx = index_idx
-            #     max_below_x = below_x
-            #     max_below_size = below_size
             # 重複辺（2点）の組み合わせ
             index_combs = list(itertools.combinations(model.indices[index_idx], 2))
             for (iv1, iv2) in index_combs:
@@ -3511,9 +3583,12 @@ class PmxTailorExportService():
                 # 切替時はとりあえず一面取り出して判定(二次元配列になる)
                 # 出来るだけ真っ直ぐの辺がある面とする
                 max_below_x = 0
-                max_below_size = -9999
+                max_below_x_size = 0
+                max_below_y = 0
+                max_below_y_size = 0
                 remaining_iidxs = list(set(model.material_indices[material_name]) - set(registed_iidxs))
-                below_iidx = None
+                below_x_iidx = None
+                below_y_iidx = None
                 for index_idx in remaining_iidxs:
                     v0 = model.vertex_dict[model.indices[index_idx][0]]
                     v1 = model.vertex_dict[model.indices[index_idx][1]]
@@ -3522,88 +3597,55 @@ class PmxTailorExportService():
                         # 3つ揃ってない場合、スルー
                         continue
 
+                    # 方向に応じて判定値を変える
                     if param_option['direction'] == '上':
                         v0v = -v0.position.y()
                         v1v = -v1.position.y()
                         base_vertical_axis = MVector3D(0, 1, 0)
+                        base_horizonal_axis = MVector3D(1, 0, 0)
                     elif param_option['direction'] == '右':
                         v0v = v0.position.x()
                         v1v = v1.position.x()
                         base_vertical_axis = MVector3D(-1, 0, 0)
+                        base_horizonal_axis = MVector3D(0, -1, 0)
                     elif param_option['direction'] == '左':
                         v0v = -v0.position.x()
                         v1v = -v1.position.x()
                         base_vertical_axis = MVector3D(1, 0, 0)
+                        base_horizonal_axis = MVector3D(0, -1, 0)
                     else:
                         # デフォルトは下
                         v0v = v0.position.y()
                         v1v = v1.position.y()
                         base_vertical_axis = MVector3D(0, -1, 0)
+                        base_horizonal_axis = MVector3D(1, 0, 0)
+                    
+                    below_axis = (v1.position - v0.position).normalized()
 
-                    # 軸の傾き度合いを取得する
-                    v_axis = (v1.position - v0.position).normalized()
-                    mat = MMatrix4x4()
-                    mat.setToIdentity()
-                    mat.rotate(MQuaternion.rotationTo(base_vertical_axis, v_axis))
-                    below_axis = mat * v_axis
-
-                    below_x = MVector3D.dotProduct(below_axis, base_vertical_axis)
+                    below_x = MVector3D.dotProduct(below_axis.normalized(), base_vertical_axis)
+                    below_y = MVector3D.dotProduct(below_axis.normalized(), base_horizonal_axis)
                     below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
-                    if v0v > v1v and abs(below_x) > max_below_x and below_size > max_below_size * 0.6:
-                        logger.debug(f'vertical iidx[{index_idx}], v_axis[{v_axis.to_log()}], below_axis[{below_axis.to_log()}], below_x[{below_x}], below_size[{below_size}], below_iidx[{below_iidx}], max_below_x[{max_below_x}], max_below_size[{max_below_size}]')  # noqa
-                        below_iidx = index_idx
+
+                    if v0v > v1v and abs(below_x) > max_below_x and below_size > max_below_x_size * 0.6 and (set(registed_iidxs) - set(non_target_iidxs) or \
+                       (not set(registed_iidxs) - set(non_target_iidxs) and ymin + (ymedian - ymin) * 0.1 < v0.position.y() < ymax - (ymax - ymedian) * 0.1)):
+                        logger.debug(f'vertical iidx[{index_idx}], below_axis[{below_axis.to_log()}], below_x[{below_x}], ' \
+                                     + f'below_size[{below_size}], below_x_iidx[{below_x_iidx}], max_below_x[{max_below_x}], max_below_x_size[{max_below_x_size}]')
+                        below_x_iidx = index_idx
                         max_below_x = abs(below_x)
-                        max_below_size = below_size
-                if not below_iidx:
-                    # 下向きのが取れなかった場合、横向きのを取る
-                    max_below_x = 0
-                    max_below_size = -9999
-                    remaining_iidxs = list(set(model.material_indices[material_name]) - set(registed_iidxs))
-                    below_iidx = remaining_iidxs[0]
-                    for index_idx in remaining_iidxs:
-                        v0 = model.vertex_dict[model.indices[index_idx][0]]
-                        v1 = model.vertex_dict[model.indices[index_idx][1]]
-                        v2 = model.vertex_dict[model.indices[index_idx][2]]
-                        if v0.index not in target_vertices or v1.index not in target_vertices or v2.index not in target_vertices:
-                            # 3つ揃ってない場合、スルー
-                            continue
+                        max_below_x_size = below_size
 
-                        if param_option['direction'] == '上':
-                            v0v = -v0.position.y()
-                            v1v = -v1.position.y()
-                            base_vertical_axis = MVector3D(1, 0, 0)
-                        elif param_option['direction'] == '右':
-                            v0v = v0.position.x()
-                            v1v = v1.position.x()
-                            base_vertical_axis = MVector3D(0, -1, 0)
-                        elif param_option['direction'] == '左':
-                            v0v = -v0.position.x()
-                            v1v = -v1.position.x()
-                            base_vertical_axis = MVector3D(0, -1, 0)
-                        else:
-                            # デフォルトは下
-                            v0v = v0.position.y()
-                            v1v = v1.position.y()
-                            base_vertical_axis = MVector3D(1, 0, 0)
+                    if v0v > v1v and abs(below_y) > max_below_y and below_size > max_below_y_size * 0.6:
+                        logger.debug(f'horizonal iidx[{index_idx}], below_axis[{below_axis.to_log()}], below_y[{below_y}], ' \
+                                     + f'below_size[{below_size}], below_y_iidx[{below_y_iidx}], max_below_y[{max_below_y}], max_below_y_size[{max_below_y_size}]')
+                        below_y_iidx = index_idx
+                        max_below_y = abs(below_y)
+                        max_below_y_size = below_size
+                
+                below_iidx = below_x_iidx if below_x_iidx and max_below_x > 0.97 and max_below_x > max_below_y else below_y_iidx if below_y_iidx else remaining_iidxs[0]
 
-                        # 軸の傾き度合いを取得する
-                        v_axis = (v1.position - v0.position).normalized()
-                        mat = MMatrix4x4()
-                        mat.setToIdentity()
-                        mat.rotate(MQuaternion.rotationTo(base_vertical_axis, v_axis))
-                        below_axis = mat * v_axis
-
-                        below_x = MVector3D.dotProduct(below_axis, base_vertical_axis)
-                        below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
-                        if v0v > v1v and abs(below_x) > max_below_x and below_size > max_below_size * 0.6:
-                            logger.debug(f'horizonal iidx[{index_idx}], v_axis[{v_axis.to_log()}], below_axis[{below_axis.to_log()}], below_x[{below_x}], below_size[{below_size}], below_iidx[{below_iidx}], max_below_x[{max_below_x}], max_below_size[{max_below_size}]')  # noqa
-                            below_iidx = index_idx
-                            max_below_x = abs(below_x)
-                            max_below_size = below_size
-
-                logger.debug(f'below_iidx: {below_iidx}, max_below_x: {max_below_x}')
+                logger.debug(f'below_iidx: {below_iidx}, max_below_x: {max_below_x}, max_below_y: {max_below_y}')
                 first_vertex_axis_map, first_vertex_coordinate_map = \
-                    self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, {}, {}, below_iidx)
+                    self.create_vertex_map_by_index(model, param_option, duplicate_vertices, {}, {}, below_iidx)
                 vertex_axis_maps.append(first_vertex_axis_map)
                 vertex_coordinate_maps.append(first_vertex_coordinate_map)
                 registed_iidxs.append(below_iidx)
@@ -3851,7 +3893,7 @@ class PmxTailorExportService():
                         if edge_size == 2:
                             # 重複頂点(2つの頂点)を持つ面(=連続面)
                             vertex_axis_map, vertex_coordinate_map = \
-                                self.create_vertex_map_by_index(model, param_option, duplicate_indices, duplicate_vertices, \
+                                self.create_vertex_map_by_index(model, param_option, duplicate_vertices, \
                                                                 vertex_axis_map, vertex_coordinate_map, iidx)
                         
                         # 登録済みでなければ保持
@@ -4013,8 +4055,8 @@ class PmxTailorExportService():
             logger.debug(f"fill_vertical: vertical_vs_list[{vertical_vs_list}], horizonaled_duplicate_dots[{horizonaled_duplicate_dots}], horizonaled_index_combs[{horizonaled_index_combs}]")
 
             full_d = [i for i, d in enumerate(horizonaled_duplicate_dots) if np.round(d, decimals=5) == np.max(np.round(horizonaled_duplicate_dots, decimals=5))]  # noqa
-            not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.05]  # noqa
-            # not_full_d = []
+            # not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.05]  # noqa
+            not_full_d = []
             if full_d:
                 if not_full_d:
                     # 平行辺の内積より一定以上近い内積のINDEX組合せがあった場合、臨時採用
@@ -4075,7 +4117,7 @@ class PmxTailorExportService():
                             # 残り一点のマップ位置
                             remaining_x, remaining_y = self.get_remaining_vertex_vec(vertical_v0['vidx'], vertical_v0['x'], vertical_v0['y'], vertical_v0['position'], \
                                                                                      vertical_v1['vidx'], vertical_v1['x'], vertical_v1['y'], vertical_v1['position'], \
-                                                                                     remaining_v, vertex_coordinate_map, duplicate_indices, duplicate_vertices)
+                                                                                     remaining_v, vertex_coordinate_map)
 
                             is_regist = False
                             for vidx in duplicate_vertices[remaining_v.position.to_log()]:
@@ -4128,7 +4170,7 @@ class PmxTailorExportService():
 
         return vertical_vs, horizonal_vs, diagonal_vs
 
-    def create_vertex_map_by_index(self, model: PmxModel, param_option: dict, duplicate_indices: dict, duplicate_vertices: dict, \
+    def create_vertex_map_by_index(self, model: PmxModel, param_option: dict, duplicate_vertices: dict, \
                                    vertex_axis_map: dict, vertex_coordinate_map: dict, index_idx: int):
         # 該当面の頂点
         v0 = model.vertex_dict[model.indices[index_idx][0]]
@@ -4149,99 +4191,201 @@ class PmxTailorExportService():
             vertex_coordinate_map[(0, 0)] = vs_duplicated[v0.index]
 
             for vidx in vs_duplicated[v1.index]:
-                # v1 は位置関係で当てはめる
-                if round(v0.position.y(), 2) == round(v1.position.y(), 2) == round(v2.position.y(), 2):
-                    v1dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v1.position - v0.position).normalized())
-                    v2dot = MVector3D.dotProduct(MVector3D(1, 0, 0), (v2.position - v0.position).normalized())
 
-                    if abs(v1dot) > abs(v2dot):
-                        # v1の方がv2よりX平行に近い場合、v1は横方向とみなす
-                        vx = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
-                        vy = 0
-                    else:
-                        # v2の方がv1よりX平行に近い場合、v1は縦方向とみなす
-                        vx = 0
-                        vy = int(np.sign(MVector3D.crossProduct((v1.position - v0.position).normalized(), (v2.position - v0.position).normalized()).y()))
+                # 方向に応じて判定値を変える
+                if param_option['direction'] == '上':
+                    v0v = -v0.position.y()
+                    v1v = -v1.position.y()
+                    v2v = -v2.position.y()
+                    base_vertical_axis = MVector3D(0, 1, 0)
+                    base_horizonal_axis = MVector3D(1, 0, 0)
+                elif param_option['direction'] == '右':
+                    v0v = v0.position.x()
+                    v1v = v1.position.x()
+                    v2v = v2.position.x()
+                    base_vertical_axis = MVector3D(-1, 0, 0)
+                    base_horizonal_axis = MVector3D(0, -1, 0)
+                elif param_option['direction'] == '左':
+                    v0v = -v0.position.x()
+                    v1v = -v1.position.x()
+                    v2v = -v2.position.x()
+                    base_vertical_axis = MVector3D(1, 0, 0)
+                    base_horizonal_axis = MVector3D(0, -1, 0)
                 else:
-                    # 方向に応じて判定値を変える
-                    if param_option['direction'] == '上':
-                        v0v = -v0.position.y()
-                        v1v = -v1.position.y()
-                        v2v = -v2.position.y()
-                    elif param_option['direction'] == '右':
-                        v0v = v0.position.x()
-                        v1v = v1.position.x()
-                        v2v = v2.position.x()
-                    elif param_option['direction'] == '左':
-                        v0v = -v0.position.x()
-                        v1v = -v1.position.x()
-                        v2v = -v2.position.x()
-                    else:
-                        # デフォルトは下
-                        v0v = v0.position.y()
-                        v1v = v1.position.y()
-                        v2v = v2.position.y()
+                    # デフォルトは下
+                    v0v = v0.position.y()
+                    v1v = v1.position.y()
+                    v2v = v2.position.y()
+                    base_vertical_axis = MVector3D(0, -1, 0)
+                    base_horizonal_axis = MVector3D(1, 0, 0)
+                
+                parent_bone = model.bones[param_option['parent_bone_name']]
+                is_horizonal = round(v0.position.y(), 2) == round(v1.position.y(), 2) == round(v2.position.y(), 2)
 
-                    logger.debug(f"direction[{param_option['direction']}], v0v[{v0v}], v1v[{v1v}], v2v[{v2v}]")
+                v21_axis = (v2.position - v1.position).normalized()
 
-                    if abs(v1v - v0v) < abs(v2v - v0v) and abs(v0v - v1v) < abs(v2v - v1v):
-                        # v1は横展開とみなす
-                        if v0v < v2v:
-                            # 上にあがる場合、v1は左方向
-                            vx = -1
+                v10_axis = (v1.position - v0.position).normalized()
+                v10_axis_cross = MVector3D.crossProduct(v10_axis, v21_axis).normalized()
+                v10_axis_qq = MQuaternion.fromDirection(base_vertical_axis, v10_axis_cross)
+
+                v10_mat = MMatrix4x4()
+                v10_mat.setToIdentity()
+                v10_mat.translate(v0.position)
+                v10_mat.rotate(v10_axis_qq)
+
+                v1_local_position = v10_mat.inverted() * v1.position
+                v2_local_position = v10_mat.inverted() * v2.position
+
+                v1_vertical_dot = MVector3D.dotProduct(v1_local_position.normalized(), base_vertical_axis)
+                v2_vertical_dot = MVector3D.dotProduct(v2_local_position.normalized(), base_vertical_axis)
+                v1_horizonal_dot = MVector3D.dotProduct(v1_local_position.normalized(), base_horizonal_axis)
+                v2_horizonal_dot = MVector3D.dotProduct(v2_local_position.normalized(), base_horizonal_axis)
+
+                vertical_didx = np.argmax(np.abs([v1_vertical_dot, v2_vertical_dot]))
+                horizonal_didx = np.argmax(np.abs([v1_horizonal_dot, v2_horizonal_dot]))
+                direction_idxs = tuple(np.argsort(np.abs([v1_vertical_dot, v2_vertical_dot, v1_horizonal_dot, v2_horizonal_dot])))
+
+                v1_vertical_sign = round(v1_vertical_dot, 2)
+                v2_vertical_sign = round(v2_vertical_dot, 2)
+                v1_horizonal_sign = round(v1_horizonal_dot, 2)
+                v2_horizonal_sign = round(v2_horizonal_dot, 2)
+
+                # より親ボーンに近い方が上
+                v1_vertical_direction = 1 if parent_bone.position.distanceToPoint(v0.position) < parent_bone.position.distanceToPoint(v1.position) else -1
+                v2_vertical_direction = 1 if parent_bone.position.distanceToPoint(v0.position) < parent_bone.position.distanceToPoint(v2.position) else -1
+
+                logger.debug(f"direction[{param_option['direction']}], v0v[{v0v}], v1v[{v1v}], v2v[{v2v}], is_horizonal[{is_horizonal}]")
+
+                logger.debug(f"v1[{v1.position.to_log()}], vertical[{v1_local_position.to_log()}], " \
+                             + f"v1_vertical_dot[{v1_vertical_dot}], v1_horizonal_dot[{v1_horizonal_dot}]")
+                logger.debug(f"v2[{v2.position.to_log()}], vertical[{v2_local_position.to_log()}], " \
+                             + f"v2_vertical_dot[{v2_vertical_dot}], v2_horizonal_dot[{v2_horizonal_dot}]")
+
+                logger.debug(f"vertical_didx[{vertical_didx}], horizonal_didx[{horizonal_didx}], direction_idxs[{direction_idxs}]")
+                logger.debug(f"v1_vertical_direction[{v1_vertical_direction}], v2_vertical_direction[{v2_vertical_direction}]")
+
+                if v1_vertical_sign == 0 and v2_vertical_sign == 0:
+                    # vertical がどちらも0の場合このルート(垂直にメッシュが並んでいる場合)
+                    if v2_horizonal_sign == 0:
+                        if v1_horizonal_sign > 0:
+                            # v1-v0: 水平, v2-v1: 垂直, v0-v2: 斜め
+                            remaining_x = 0
+                            remaining_y = v2_vertical_direction
+
+                            vx = 1 if v2_vertical_direction == 1 else -1
+                            vy = 0
                         else:
-                            # 下におりる場合、v1は右方向
-                            vx = 1
+                            # v1-v0: 斜め, v2-v1: 垂直, v0-v2: 水平
+                            remaining_x = 0
+                            remaining_y = v2_vertical_direction
+
+                            vx = 1 if v2_vertical_direction == 1 else -1
+                            vy = v2_vertical_direction
+                    elif abs(v1_horizonal_sign) < abs(v2_horizonal_sign):
+                        # v1-v0: 垂直, v2-v1: 水平, v0-v2: 斜め
+                        vx = 0
+                        vy = v1_vertical_direction
+
+                        remaining_x = -1 if v1_vertical_direction == 1 else 1
+                        remaining_y = 0
+                    else:
+                        # v1-v0: 水平, v2-v1: 斜め, v0-v2: 垂直
+                        remaining_x = 1 if v2_vertical_direction == 1 else -1
+                        remaining_y = v2_vertical_direction
+
+                        vx = int(remaining_x)
                         vy = 0
-                    else:
-                        vy = -1 if v0v < v1v else 1
-                        if param_option['direction'] == '上':
-                            base_vertical_axis = MVector3D(0, 1, 0)
-                        elif param_option['direction'] == '右':
-                            base_vertical_axis = MVector3D(-1, 0, 0)
-                        elif param_option['direction'] == '左':
-                            base_vertical_axis = MVector3D(1, 0, 0)
+                elif (vertical_didx, horizonal_didx) == (0, 1):
+                    if abs(v2_horizonal_sign) == 1:
+                        if abs(v1_vertical_sign) < abs(v1_horizonal_sign):
+                            # v1-v0: 斜め, v2-v1: 水平, v0-v2: 垂直
+                            vx = -1 if v1_vertical_direction == 1 else 1
+                            vy = v1_vertical_direction
+
+                            remaining_x = int(vx)
+                            remaining_y = 0
                         else:
-                            base_vertical_axis = MVector3D(0, -1, 0)
-
-                        # 軸の傾き度合いを取得する
-                        v1_axis = (v1.position - v0.position).normalized()
-                        v1_mat = MMatrix4x4()
-                        v1_mat.setToIdentity()
-                        v1_mat.rotate(MQuaternion.rotationTo(base_vertical_axis, v1_axis))
-
-                        v2_axis = (v2.position - v0.position).normalized()
-                        v2_mat = MMatrix4x4()
-                        v2_mat.setToIdentity()
-                        v2_mat.rotate(MQuaternion.rotationTo(base_vertical_axis, v2_axis))
-
-                        v1_vertical_axis = v1_mat * v1_axis
-                        v2_vertical_axis = v2_mat * v2_axis
-                        v1_vertical_dot = MVector3D.dotProduct(v1_vertical_axis, base_vertical_axis)
-                        v2_vertical_dot = MVector3D.dotProduct(v2_vertical_axis, base_vertical_axis)
-
-                        logger.debug(f"v1_axis[{v1_axis.to_log()}], v1_vertical_axis[{v1_vertical_axis.to_log()}], v1_vertical_dot[{v1_vertical_dot}]")
-                        logger.debug(f"v2_axis[{v2_axis.to_log()}], v2_vertical_axis[{v2_vertical_axis.to_log()}], v2_vertical_dot[{v2_vertical_dot}]")
-
-                        if abs(v1_vertical_dot) > abs(v2_vertical_dot):
-                            # v1の方がv0に近い場合、v1は縦展開とみなす
+                            # v1-v0: 垂直, v2-v1: 水平, v0-v2: 斜め
                             vx = 0
+                            vy = v1_vertical_direction
+
+                            remaining_x = -1 if v1_vertical_direction == 1 else 1
+                            remaining_y = 0
+                    elif abs(v1_vertical_sign) >= abs(v1_horizonal_sign):
+                        # v1-v0: 垂直, v2-v1: 斜め, v0-v2: 水平
+                        vx = 0
+                        vy = v1_vertical_direction
+
+                        remaining_x = -1 if v1_vertical_direction == 1 else 1
+                        remaining_y = int(vy)
+                    elif abs(v2_vertical_sign) < abs(v2_horizonal_sign):
+                        # v1-v0: 斜め, v2-v1: 水平, v0-v2: 垂直
+                        vx = -1 if v1_vertical_direction == 1 else 1
+                        vy = v1_vertical_direction
+
+                        remaining_x = int(vx)
+                        remaining_y = 0
+                    elif abs(v1_vertical_sign) < abs(v1_horizonal_sign):
+                        # v1-v0: 斜め, v2-v1: 水平, v0-v2: 垂直
+                        vx = -1 if v1_vertical_direction == 1 else 1
+                        vy = v1_vertical_direction
+
+                        remaining_x = int(vx)
+                        remaining_y = 0
+                    else:
+                        # v1-v0: 垂直, v2-v1: 水平, v0-v2: 斜め
+                        vx = 0
+                        vy = v1_vertical_direction
+
+                        remaining_x = -1 if v1_vertical_direction == 1 else 1
+                        remaining_y = 0
+                elif (vertical_didx, horizonal_didx) == (1, 0):
+                    if abs(v1_horizonal_sign) == 1:
+                        if abs(v2_vertical_sign) < abs(v2_horizonal_sign) or (v1_horizonal_sign < 0 and v2_horizonal_sign < 0):
+                            # v1-v0: 水平, v2-v1: 斜め, v0-v2: 垂直
+                            remaining_x = 1 if v2_vertical_direction == 1 else -1
+                            remaining_y = v2_vertical_direction
+
+                            vx = int(remaining_x)
+                            vy = 0
                         else:
-                            # v2の方がv0に近い場合、v1は斜めと見なす
-                            if abs(v0v - v1v) < abs(v2v - v1v):
-                                # ／の場合、v1は右方向
-                                vx = 1 if vy == -1 else -1
-                            else:
-                                # ＼の場合、v1は左方向
-                                vx = -1 if vy == -1 else 1
+                            # v1-v0: 水平, v2-v1: 垂直, v0-v2: 斜め
+                            remaining_x = 0
+                            remaining_y = v2_vertical_direction
+
+                            vx = 1 if v2_vertical_direction == 1 else -1
+                            vy = 0
+                    elif abs(v2_vertical_sign) >= abs(v2_horizonal_sign):
+                        # v1-v0: 斜め, v2-v1: 垂直, v0-v2: 水平
+                        remaining_x = 0
+                        remaining_y = v2_vertical_direction
+
+                        vx = 1 if v2_vertical_direction == 1 else -1
+                        vy = int(remaining_y)
+                    elif abs(v1_vertical_sign) < abs(v1_horizonal_sign):
+                        # v1-v0: 水平, v2-v1: 斜め, v0-v2: 垂直
+                        remaining_x = 1 if v2_vertical_direction == 1 else -1
+                        remaining_y = v2_vertical_direction
+
+                        vx = int(remaining_x)
+                        vy = 0
+                    elif abs(v2_vertical_sign) < abs(v2_horizonal_sign):
+                        # v1-v0: 垂直, v2-v1: 水平, v0-v2: 斜め
+                        vx = 0
+                        vy = v1_vertical_direction
+
+                        remaining_x = -1 if v1_vertical_direction == 1 else 1
+                        remaining_y = 0
+                    else:
+                        # v1-v0: 水平, v2-v1: 斜め, v0-v2: 垂直
+                        remaining_x = 1 if v2_vertical_direction == 1 else -1
+                        remaining_y = v2_vertical_direction
+
+                        vx = int(remaining_x)
+                        vy = 0
 
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': vx, 'y': vy, 'position': model.vertex_dict[vidx].position, 'duplicate': duplicate_vertices[model.vertex_dict[vidx].position.to_log()]}
             vertex_coordinate_map[(vx, vy)] = vs_duplicated[v1.index]
-
-            # 残り一点のマップ位置
-            remaining_x, remaining_y = self.get_remaining_vertex_vec(v0.index, vertex_axis_map[v0.index]['x'], vertex_axis_map[v0.index]['y'], vertex_axis_map[v0.index]['position'], \
-                                                                     v1.index, vertex_axis_map[v1.index]['x'], vertex_axis_map[v1.index]['y'], vertex_axis_map[v1.index]['position'], \
-                                                                     v2, vertex_coordinate_map, duplicate_indices, duplicate_vertices)
 
             for vidx in vs_duplicated[v2.index]:
                 vertex_axis_map[vidx] = {'vidx': vidx, 'x': remaining_x, 'y': remaining_y, 'position': model.vertex_dict[vidx].position}
@@ -4272,7 +4416,7 @@ class PmxTailorExportService():
             # 残り一点のマップ位置
             remaining_x, remaining_y = self.get_remaining_vertex_vec(v_duplicated_maps[0]['vidx'], v_duplicated_maps[0]['x'], v_duplicated_maps[0]['y'], v_duplicated_maps[0]['position'], \
                                                                      v_duplicated_maps[1]['vidx'], v_duplicated_maps[1]['x'], v_duplicated_maps[1]['y'], v_duplicated_maps[1]['position'], \
-                                                                     remaining_v, vertex_coordinate_map, duplicate_indices, duplicate_vertices)
+                                                                     remaining_v, vertex_coordinate_map)
 
             is_regist = False
             for vidx in vs_duplicated[remaining_v.index]:
@@ -4286,8 +4430,7 @@ class PmxTailorExportService():
         return vertex_axis_map, vertex_coordinate_map
 
     def get_remaining_vertex_vec(self, vv0_idx: int, vv0_x: int, vv0_y: int, vv0_vec: MVector3D, \
-                                 vv1_idx: int, vv1_x: int, vv1_y: int, vv1_vec: MVector3D, remaining_v: Vertex, vertex_coordinate_map: dict, \
-                                 duplicate_indices: dict, duplicate_vertices: dict):
+                                 vv1_idx: int, vv1_x: int, vv1_y: int, vv1_vec: MVector3D, remaining_v: Vertex, vertex_coordinate_map: dict):
         # 時計回りと見なして位置を合わせる
         if vv0_x == vv1_x:
             # 元が縦方向に一致している場合

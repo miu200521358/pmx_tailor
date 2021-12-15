@@ -1437,6 +1437,7 @@ class PhysicsParam():
         self.bone_param_sizer = wx.BoxSizer(wx.VERTICAL)
 
         self.bone_btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.bone_btn_sizer.AddSpacer(250)
 
         # インポートボタン
         self.bone_import_btn_ctrl = wx.Button(self.bone_window, wx.ID_ANY, logger.transtext("設定クリア"), wx.DefaultPosition, wx.DefaultSize, 0)
@@ -1456,7 +1457,7 @@ class PhysicsParam():
         self.bone_export_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_bone_export)
         self.bone_btn_sizer.Add(self.bone_export_btn_ctrl, 0, wx.ALL, 5)
 
-        self.bone_param_sizer.Add(self.bone_btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 0)
+        self.bone_param_sizer.Add(self.bone_btn_sizer, 0, wx.ALL, 0)
 
         self.bone_material_ctrl = wx.StaticText(self.bone_window, wx.ID_ANY, logger.transtext("（材質未選択）"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.bone_param_sizer.Add(self.bone_material_ctrl, 0, wx.ALL, 5)
@@ -1491,7 +1492,7 @@ class PhysicsParam():
             bone_grid, bone_grid_rows, bone_grid_cols, is_boned = self.get_bone_grid()
             if self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext('再利用'):
                 if not is_boned:
-                    logger.error("既存設定を再利用する場合、「パラ調整(ボーン)」画面でボーン並び順を指定してください。", decoration=MLogger.DECORATION_BOX)
+                    logger.error("既存設定を再利用する場合、「パラ調整(ボーン)」画面で有効なボーン並び順を指定してください。", decoration=MLogger.DECORATION_BOX)
                     return params, False
                 params["bone_grid"] = bone_grid
                 params["bone_grid_rows"] = bone_grid_rows
@@ -1503,6 +1504,9 @@ class PhysicsParam():
                 params["bone_grid"] = {}
                 params["bone_grid_rows"] = 0
                 params["bone_grid_cols"] = 0
+            
+            if self.simple_exist_physics_clear_ctrl.GetStringSelection() == logger.transtext('再利用') and bone_grid and not is_boned:
+                return params, False
 
             if self.vertices_csv_file_ctrl.path() and not os.path.exists(self.vertices_csv_file_ctrl.path()):
                 logger.error("頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
@@ -1517,6 +1521,8 @@ class PhysicsParam():
                 "direction": self.simple_direction_ctrl.GetStringSelection(),
                 "exist_physics_clear": self.simple_exist_physics_clear_ctrl.GetStringSelection(),
                 "primitive": self.simple_primitive_ctrl.GetStringSelection(),
+                "back_material_name": self.simple_back_material_ctrl.GetStringSelection(),
+                "edge_material_name": self.simple_edge_material_ctrl.GetStringSelection(),
                 "params": self.get_param_export_data(),
             }
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
@@ -1665,7 +1671,7 @@ class PhysicsParam():
         self.vertical_bone_density_spin.SetValue(params["vertical_bone_density"])
         self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
         self.physics_type_ctrl.SetStringSelection(params["physics_type"])
-        self.density_type_ctrl.SetStringSelection(params["density_type"])
+        self.density_type_ctrl.SetStringSelection(params.get("density_type", "頂点"))
 
         # 剛体 ---------------
         self.advance_rigidbody_shape_type_ctrl.SetSelection(params["rigidbody_shape_type"])
@@ -2087,6 +2093,10 @@ class PhysicsParam():
                 self.simple_exist_physics_clear_ctrl.SetStringSelection(abb_setting["exist_physics_clear"])
             if not self.simple_primitive_ctrl.GetStringSelection():
                 self.simple_primitive_ctrl.SetStringSelection(abb_setting["primitive"])
+            if not self.simple_back_material_ctrl.GetStringSelection():
+                self.simple_back_material_ctrl.SetStringSelection(abb_setting.get("back_material_name", ""))
+            if not self.simple_edge_material_ctrl.GetStringSelection():
+                self.simple_edge_material_ctrl.SetStringSelection(abb_setting.get("edge_material_name", ""))
 
             # 物理パラメーターも設定する
             self.set_param_import_data(abb_setting["params"])
@@ -2159,10 +2169,14 @@ class PhysicsParam():
                 bone_grid[r][c] = bone_name
                 if bone_name:
                     is_boned = True
+                if r > 0 and bone_grid[r][c] and not bone_grid[r - 1][c]:
+                    logger.error("行[%s], 列[%s]にボーン名が指定されておらず、次の行にボーン名が指定されています。\n空欄の後にボーン名を指定しないでください。", \
+                                 r, c + 1, decoration=MLogger.DECORATION_BOX)
+                    return bone_grid, max_r + 1, max_c + 1, False
 
                 max_r = r if r > max_r and bone_name else max_r
                 max_c = c if c > max_c and bone_name else max_c
-
+            
         return bone_grid, max_r + 1, max_c + 1, is_boned
 
     def set_fineness(self, event: wx.Event):

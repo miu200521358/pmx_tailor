@@ -508,14 +508,14 @@ class PmxWriter:
     def write_number(self, fout, val_type: str, val: float, is_positive_only=False):
         # 正常な値を強制設定
         val = max(0, get_effective_value(val)) if is_positive_only else get_effective_value(val)
-        
+
         try:
             # INT型の場合、INT変換
-            if val_type in [TYPE_SHORT, TYPE_UNSIGNED_SHORT, TYPE_INT, TYPE_UNSIGNED_INT, TYPE_LONG, TYPE_UNSIGNED_LONG]:
-                fout.write(struct.pack(val_type, int(val)))
-            else:
+            if val_type in [TYPE_FLOAT]:
                 fout.write(struct.pack(val_type, float(val)))
+            else:
+                fout.write(struct.pack(val_type, int(val)))
         except Exception as e:
-            logger.error("val_type in [TYPE_INT, TYPE_UNSIGNED_INT]: %s", val_type in [TYPE_INT, TYPE_UNSIGNED_INT])
+            logger.error("val_type in [float]: %s", val_type in [TYPE_FLOAT])
             logger.error("write_number失敗: type: %s, val: %s, int(val): %s", val_type, val, int(val))
             raise e
