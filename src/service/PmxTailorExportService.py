@@ -3107,8 +3107,6 @@ class PmxTailorExportService():
 
                         if yi > 0:
                             parent_v_xidx_diff = np.abs(np.array(list(registed_bone_indexs[v_yidxs[yi - 1]].values())) - total_v_xidx)
-                            if not parent_v_xidx_diff.any():
-                                continue
 
                             # 2段目以降は最も近い親段でv_xidxを探す
                             parent_v_xidx = list(registed_bone_indexs[v_yidxs[yi - 1]].values())[(0 if vertex_connected[yi] and (v_xidxs[-1] + 1) - v_xidx < np.min(parent_v_xidx_diff) else np.argmin(parent_v_xidx_diff))]   # noqa
@@ -3559,159 +3557,147 @@ class PmxTailorExportService():
         target_iidxs = list(set(model.material_indices[material_name]) - set(non_target_iidxs) - set(registered_iidxs))
         n = 0
 
-        while len(target_iidxs) > 1 and n < 30:
+        logger.info("%s: 相対頂点マップの準備", material_name)
+
+        index_line_map = {}
+        for ii, index_idx in enumerate(target_iidxs):
+            for i, (iv1, iv2) in enumerate([(model.indices[index_idx][0], model.indices[index_idx][1]), \
+                                            (model.indices[index_idx][1], model.indices[index_idx][2]), \
+                                            (model.indices[index_idx][2], model.indices[index_idx][0])]):
+                dkey = (min(iv1, iv2), max(iv1, iv2))
+                key = (index_idx, i)
+                index_line_map[key] = []
+                if dkey in duplicate_indices:
+                    # 辺を共有する面リストを保持
+                    remaining_iidxs = list(set(duplicate_indices[dkey]) - {index_idx})
+                    for remaining_iidx in remaining_iidxs:
+                        for j, (jv1, jv2) in enumerate([(model.indices[remaining_iidx][0], model.indices[remaining_iidx][1]), \
+                                                        (model.indices[remaining_iidx][1], model.indices[remaining_iidx][2]), \
+                                                        (model.indices[remaining_iidx][2], model.indices[remaining_iidx][0])]):
+                            jkey = (min(jv1, jv2), max(jv1, jv2))
+                            if jkey in duplicate_indices and index_idx in duplicate_indices[jkey]:
+                                index_line_map[key].append((remaining_iidx, j))
+                                break
+                    logger.test(f"面[{index_idx}({i}) {dkey}] -> [{index_line_map[key]}]")
+                else:
+                    logger.test(f'単独面[{index_idx}{dkey}]')
+
+            if ii > 0 and ii % 1000 == 0:
+                logger.info("-- 準備: %s個目:終了", ii)
+
+        while len(target_iidxs) > 0 and n < 10000:
             vertex_address_maps.append({})
-
-            logger.info("%s: 相対頂点マップの準備(No.%s)", material_name, n + 1)
-
-            # 親ボーンとの距離を測る
-            distance_indices = {}
-            for ii, index_idx in enumerate(target_iidxs):
-                for i in range(3):
-                    key = model.vertex_dict[model.indices[index_idx][i]].position.distanceToPoint(parent_bone.position)
-                    if key not in distance_indices:
-                        distance_indices[key] = []
-                    if vertex.index not in distance_indices[key]:
-                        distance_indices[key].append(index_idx)
-
-                if ii > 0 and ii % 1000 == 0:
-                    logger.info("-- 準備: %s個目:終了", ii)
 
             logger.info("%s: 相対頂点マップの生成(No.%s)", material_name, n + 1)
 
-            # 中間よりやや上距離面
-            median_index_idx = distance_indices[list(distance_indices.keys())[np.argsort(list(distance_indices.keys()))[int(len(distance_indices.keys()) // 3)]]][0]
-
-            logger.info("基準面(No.%s): %s", median_index_idx, n + 1)
-
-            # 中間面と各頂点との距離を測る
-            median_index_vdistances = []
-            for i in range(3):
-                median_index_vdistances.append(model.vertex_dict[model.indices[median_index_idx][i]].position.distanceToPoint(parent_bone.position))
+            edge_index_idxs = []
+            for index_idx in target_iidxs:
+                if np.count_nonzero([len(index_line_map[(index_idx, 0)]), len(index_line_map[(index_idx, 1)]), len(index_line_map[(index_idx, 2)])]) == 2:
+                    # 共有されない1辺がある面を抽出（角は無視）
+                    for i in range(3):
+                        if len(index_line_map[(index_idx, i)]) == 0:
+                            edge_index_idxs.append((index_idx, i))
             
-            sorted_vdistances = np.sort(median_index_vdistances)
-            sorted_vidxs = np.argsort(median_index_vdistances)
+            logger.debug(f"エッジ面: {edge_index_idxs}")
+            
+            # 親ボーンとの距離を測る
+            distance_indices = {}
+            for (index_idx, i) in edge_index_idxs:
+                key = model.vertex_dict[model.indices[index_idx][i]].position.distanceToPoint(parent_bone.position)
+                if key not in distance_indices:
+                    distance_indices[key] = []
+                if vertex.index not in distance_indices[key]:
+                    distance_indices[key].append(index_idx)
 
-            if abs(sorted_vdistances[0] - sorted_vdistances[1]) < abs(sorted_vdistances[1] - sorted_vdistances[2]):
-                # 親ボーンに近い方の二頂点の距離が残り一頂点の距離より近い場合（水平に近い場合）
-                v0 = model.vertex_dict[model.indices[median_index_idx][sorted_vidxs[0]]]
-                if sorted_vidxs[0] == 0:
-                    v1i = 1
-                    v2i = 2
-                elif sorted_vidxs[0] == 1:
-                    v1i = 2
-                    v2i = 0
-                elif sorted_vidxs[0] == 2:
-                    v1i = 0
-                    v2i = 1
-                v1 = model.vertex_dict[model.indices[median_index_idx][v1i]]
-                v2 = model.vertex_dict[model.indices[median_index_idx][v2i]]
-                # 近い二点のうち、親ボーンに近い頂点を原点とする
-                vertex_address_maps[-1][(0, 0)] = [duplicate_vertices[v0.position.to_log()]]
-                # 近い二点のうち、遠い方はプラス移動になる
-                vertex_address_maps[-1][(1, 0)] = [duplicate_vertices[v1.position.to_log()]]
-                # 親ボーンに遠い（下）の頂点は、近い方に寄せる
-                if v0.position.distanceToPoint(v2.position) < v1.position.distanceToPoint(v2.position):
-                    v2x = 0
-                    already_v = v1
-                    remaining_vx = 1
-                else:
-                    v2x = 1
-                    already_v = v0
-                    remaining_vx = 0
-                v2y = 1
-                hminus = 0
-                hplus = 1
-                hstarty = 0
-                vminus = 0
-                vplus = 1
-                vertex_address_maps[-1][(v2x, v2y)] = [duplicate_vertices[v2.position.to_log()]]
+            # 直近距離面
+            nearest_index_idx = distance_indices[list(sorted(distance_indices.keys()))[0]][0]
+
+            logger.debug(f"直近エッジ面: {nearest_index_idx}")
+
+            # 端の一辺を取得
+            for (index_idx, line_idx) in edge_index_idxs:
+                if index_idx == nearest_index_idx:
+                    break
+            
+            if line_idx == 0:
+                iv0 = 0
+                iv1 = 1
+                iv2 = 2
+            elif line_idx == 1:
+                iv0 = 1
+                iv1 = 2
+                iv2 = 0
+            elif line_idx == 2:
+                iv0 = 2
+                iv1 = 0
+                iv2 = 1
+
+            v0 = model.vertex_dict[model.indices[nearest_index_idx][iv0]]
+            v1 = model.vertex_dict[model.indices[nearest_index_idx][iv1]]
+            v2 = model.vertex_dict[model.indices[nearest_index_idx][iv2]]
+            v2x = 0 if v0.position.distanceToPoint(v2.position) < v1.position.distanceToPoint(v2.position) else 1
+
+            for v, x, y in [(v0, 0, 0), (v1, 1, 0), (v2, v2x, 1)]:
+                vertex_address_maps[-1][(x, y)] = [duplicate_vertices[v.position.to_log()]]
+
+            registered_iidxs.append(nearest_index_idx)
+            logger.debug(f"初期iidx: iidx[{nearest_index_idx}], coodinate[{vertex_address_maps[-1]}]")
+
+            if v2x == 0:
+                # v2xが左寄りの場合、四角面は右側にある
+                if line_idx == 0:
+                    adjacent_iv = 1
+                elif line_idx == 1:
+                    adjacent_iv = 2
+                elif line_idx == 2:
+                    adjacent_iv = 0
+                adjacent_x = 1
             else:
-                # 親ボーンに遠い方の二頂点の距離が残り一頂点の距離より近い場合
-                v0 = model.vertex_dict[model.indices[median_index_idx][sorted_vidxs[1]]]
-                if sorted_vidxs[1] == 0:
-                    v1i = 1
-                    v2i = 2
-                elif sorted_vidxs[1] == 1:
-                    v1i = 2
-                    v2i = 0
-                elif sorted_vidxs[1] == 2:
-                    v1i = 0
-                    v2i = 1
-                v1 = model.vertex_dict[model.indices[median_index_idx][v1i]]
-                v2 = model.vertex_dict[model.indices[median_index_idx][v2i]]
-                # 遠い二点のうち、親ボーンに近い頂点を原点とする
-                vertex_address_maps[-1][(0, 0)] = [duplicate_vertices[v0.position.to_log()]]
-                # 遠い方はマイナス移動になる
-                vertex_address_maps[-1][(-1, 0)] = [duplicate_vertices[v1.position.to_log()]]
-                # 親ボーンに近い（上）の頂点は、近い方に寄せる
-                if v0.position.distanceToPoint(v2.position) < v1.position.distanceToPoint(v2.position):
-                    v2x = 0
-                    already_v = v1
-                    remaining_vx = -1
-                else:
-                    v2x = -1
-                    already_v = v0
-                    remaining_vx = 0
-                v2y = -1
-                hminus = -1
-                hplus = 0
-                hstarty = -1
-                vminus = -1
-                vplus = 0
-                vertex_address_maps[-1][(v2x, v2y)] = [duplicate_vertices[v2.position.to_log()]]
-            registered_iidxs.append(median_index_idx)
+                # v2xが右寄りの場合、四角面は左側にある
+                if line_idx == 0:
+                    adjacent_iv = 2
+                elif line_idx == 1:
+                    adjacent_iv = 0
+                elif line_idx == 2:
+                    adjacent_iv = 1
+                adjacent_x = 0
+            adjacent_y = 1
 
-            logger.debug(f"初期iidx: iidx[{median_index_idx}], coodinate[{vertex_address_maps[-1]}]")
+            adjacent_index_idx, adjacent_line_idx = index_line_map[(nearest_index_idx, adjacent_iv)][0]
 
-            rkey = (min(v2.index, already_v.index), max(v2.index, already_v.index))
-            remaining_index_idxs = list(set(duplicate_indices[rkey]) - set(registered_iidxs))
-            if len(remaining_index_idxs) == 0:
-                target_iidxs = list(set(model.material_indices[material_name]) - set(non_target_iidxs) - set(registered_iidxs))
-                n += 1
-                continue
+            if adjacent_line_idx == 0:
+                iv2 = 2
+            elif adjacent_line_idx == 1:
+                iv2 = 0
+            elif adjacent_line_idx == 2:
+                iv2 = 1
 
-            # 辺を共有する残りの隣接面
-            remaining_index_idx = remaining_index_idxs[0]
+            v = model.vertex_dict[model.indices[adjacent_index_idx][iv2]]
 
-            # 残りの一点
-            remaining_vidxs = list(set(model.indices[remaining_index_idx]) - (set(duplicate_vertices[v2.position.to_log()]) | set(duplicate_vertices[already_v.position.to_log()])))
-            if len(remaining_vidxs) == 0:
-                target_iidxs = list(set(model.material_indices[material_name]) - set(non_target_iidxs) - set(registered_iidxs))
-                n += 1
-                continue
+            vertex_address_maps[-1][(adjacent_x, adjacent_y)] = [duplicate_vertices[v.position.to_log()]]
 
-            remaining_vidx = remaining_vidxs[0]
-            remaining_v = model.vertex_dict[remaining_vidx]
-
-            vertex_address_maps[-1][(remaining_vx, v2y)] = [duplicate_vertices[remaining_v.position.to_log()]]
-            registered_iidxs.append(remaining_index_idx)
-
-            logger.debug(f"隣接iidx: iidx[{remaining_index_idx}], coodinate[{vertex_address_maps[-1]}]")
-
-            # 横＋方向
-            vertex_address_maps[-1], registered_iidxs = \
-                self.fill_horizonal_indices(model, hstarty, hplus, 1, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)
+            registered_iidxs.append(adjacent_index_idx)
+            logger.debug(f"四角面: iidx[{adjacent_index_idx}], coodinate[{vertex_address_maps[-1]}]")
             
-            logger.debug(f"fill_horizonal_indices＋: {vertex_address_maps[-1]}")
-
-            # 横－方向
+            # +方向
             vertex_address_maps[-1], registered_iidxs = \
-                self.fill_horizonal_indices(model, hstarty, hminus, -1, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)
+                self.fill_edge_indices(model, 1, 1, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)
             
-            logger.debug(f"fill_horizonal_indices－: {vertex_address_maps[-1]}")
+            logger.debug(f"fill_edge_indices＋: {vertex_address_maps[-1]}")
+
+            # -方向
+            vertex_address_maps[-1], registered_iidxs = \
+                self.fill_edge_indices(model, 0, -1, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)
+            
+            logger.debug(f"fill_edge_indices－: {vertex_address_maps[-1]}")
 
             index_x_keys = np.unique([x for (x, y) in vertex_address_maps[-1].keys()])
 
-            # 縦＋方向
+            # 縦方向
             for prev_x in index_x_keys:
                 vertex_address_maps[-1], registered_iidxs = \
-                    self.fill_vertical_indices(model, vplus, prev_x, 1, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)            
-                logger.debug(f"fill_vertical_indices＋: {vertex_address_maps[-1]}")
-
-                vertex_address_maps[-1], registered_iidxs = \
-                    self.fill_vertical_indices(model, vminus, prev_x, -1, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)            
-                logger.debug(f"fill_vertical_indices－: {vertex_address_maps[-1]}")
+                    self.fill_vertical_indices(model, 1, prev_x, duplicate_indices, duplicate_vertices, vertex_address_maps[-1], registered_iidxs)            
+                logger.debug(f"fill_vertical_indices: {vertex_address_maps[-1]}")
 
             # 処理対象INDEXリスト再計算
             target_iidxs = list(set(model.material_indices[material_name]) - set(non_target_iidxs) - set(registered_iidxs))
@@ -3850,13 +3836,13 @@ class PmxTailorExportService():
         return vertex_maps, vertex_connecteds, duplicate_vertices
     
     # 上端を埋めていく
-    def fill_horizonal_indices(self, model: PmxModel, start_y: int, start_x: int, odd: int, duplicate_indices: dict, \
-                               duplicate_vertices: dict, vertex_address_map: dict, registered_iidxs: list):
-        if (start_x, start_y) not in vertex_address_map or (start_x, start_y + 1) not in vertex_address_map:
+    def fill_edge_indices(self, model: PmxModel, start_x: int, odd: int, duplicate_indices: dict, \
+                          duplicate_vertices: dict, vertex_address_map: dict, registered_iidxs: list):
+        if (start_x, 0) not in vertex_address_map or (start_x, 1) not in vertex_address_map:
             return vertex_address_map, registered_iidxs
 
-        top_vidx = vertex_address_map[(start_x, start_y)][-1][0]
-        bottom_vidx = vertex_address_map[(start_x, start_y + 1)][-1][0]
+        top_vidx = vertex_address_map[(start_x, 0)][-1][0]
+        bottom_vidx = vertex_address_map[(start_x, 1)][-1][0]
 
         vkey = (min(top_vidx, bottom_vidx), max(top_vidx, bottom_vidx))
         if vkey not in duplicate_indices:
@@ -3881,7 +3867,7 @@ class PmxTailorExportService():
         adjacent_v = model.vertex_dict[adjacent_vidx]
         adjacent_x = start_x + odd
         # 上下と近い方を選択する
-        adjacent_y = start_y if top_v.position.distanceToPoint(adjacent_v.position) < bottom_v.position.distanceToPoint(adjacent_v.position) else start_y + 1
+        adjacent_y = 0 if top_v.position.distanceToPoint(adjacent_v.position) < bottom_v.position.distanceToPoint(adjacent_v.position) else 1
 
         # 残りの一点を隣に置く
         if (adjacent_x, adjacent_y) not in vertex_address_map:
@@ -3895,18 +3881,18 @@ class PmxTailorExportService():
             logger.info("-- 面: %s個目:終了", len(registered_iidxs))
             
         # 四角面の残りの一面
-        if adjacent_y == start_y:
+        if adjacent_y == 0:
             # 残りの頂点が上にある場合
             # 下の頂点と繋いだ辺が四角面で共有される
             already_v = bottom_v
             # 四角面の残りの一点は下にある
-            remaining_y = start_y + 1
+            remaining_y = 1
         else:
             # 残りの頂点が下にある場合
             # 上の頂点と繋いだ辺が四角面で共有される
             already_v = top_v
             # 四角面の残りの一点は上にある
-            remaining_y = start_y
+            remaining_y = 0
         
         rkey = (min(adjacent_v.index, already_v.index), max(adjacent_v.index, already_v.index))
         if rkey not in duplicate_indices:
@@ -3937,17 +3923,16 @@ class PmxTailorExportService():
         if len(registered_iidxs) > 0 and len(registered_iidxs) % 200 == 0:
             logger.info("-- 面: %s個目:終了", len(registered_iidxs))
             
-        return self.fill_horizonal_indices(model, start_y, adjacent_x, odd, duplicate_indices, duplicate_vertices, vertex_address_map, registered_iidxs)
+        return self.fill_edge_indices(model, adjacent_x, odd, duplicate_indices, duplicate_vertices, vertex_address_map, registered_iidxs)
 
     # 縦方向を埋めていく
-    def fill_vertical_indices(self, model: PmxModel, start_y: int, prev_x: int, odd: int, duplicate_indices: dict, duplicate_vertices: dict, \
+    def fill_vertical_indices(self, model: PmxModel, start_y: int, prev_x: int, duplicate_indices: dict, duplicate_vertices: dict, \
                               vertex_address_map: dict, registered_iidxs: list):
-        if (prev_x, start_y) not in vertex_address_map or (prev_x + 1, start_y) not in vertex_address_map or \
-           (prev_x, start_y - odd) not in vertex_address_map or (prev_x + 1, start_y - odd) not in vertex_address_map:
+        if (prev_x, start_y) not in vertex_address_map or (prev_x + 1, start_y) not in vertex_address_map:
             return vertex_address_map, registered_iidxs
 
-        prev_above_vidx = vertex_address_map[(prev_x, start_y - odd)][-1][0]
-        next_above_vidx = vertex_address_map[(prev_x + 1, start_y - odd)][-1][0]
+        prev_above_vidx = vertex_address_map[(prev_x, start_y - 1)][-1][0]
+        next_above_vidx = vertex_address_map[(prev_x + 1, start_y - 1)][-1][0]
 
         prev_above_v = model.vertex_dict[prev_above_vidx]
         next_above_v = model.vertex_dict[next_above_vidx]
@@ -3979,7 +3964,7 @@ class PmxTailorExportService():
         # 上の辺との内積が近い方を採用する
         adjacent_x = prev_x if MVector3D.dotProduct((prev_v.position - prev_above_v.position).normalized(), (adjacent_v.position - prev_v.position).normalized()) > \
             MVector3D.dotProduct((next_v.position - next_above_v.position).normalized(), (adjacent_v.position - next_v.position).normalized()) else prev_x + 1
-        adjacent_y = start_y + odd
+        adjacent_y = start_y + 1
 
         # 残りの一点を下に置く
         if (adjacent_x, adjacent_y) not in vertex_address_map:
@@ -4035,7 +4020,7 @@ class PmxTailorExportService():
         if len(registered_iidxs) > 0 and len(registered_iidxs) % 200 == 0:
             logger.info("-- 面: %s個目:終了", len(registered_iidxs))
             
-        return self.fill_vertical_indices(model, adjacent_y, prev_x, odd, duplicate_indices, duplicate_vertices, vertex_address_map, registered_iidxs)
+        return self.fill_vertical_indices(model, adjacent_y, prev_x, duplicate_indices, duplicate_vertices, vertex_address_map, registered_iidxs)
 
     # # 頂点を展開した図を作成
     # def create_vertex_map2(self, model: PmxModel, param_option: dict, material_name: str, target_vertices: list):
