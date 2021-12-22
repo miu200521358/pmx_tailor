@@ -3036,13 +3036,13 @@ class PmxTailorExportService():
                     if xi == 0 or np.sum(bone_horizonal_distances[median_y, prev_xi:(xi + 1)]) >= median_x_distance * param_option["horizonal_bone_density"] * 0.8:
                         base_v_xidxs.append(xi)
                         prev_xi = xi + 1
-                if base_v_xidxs[-1] < vertex_map.shape[1] - 1:
-                    # 右端は必ず登録
-                    base_v_xidxs = base_v_xidxs + [vertex_map.shape[1] - 1]
             else:
-                # 頂点ベースの場合、そのまま
-                base_v_xidxs = list(range(vertex_map.shape[1]))
-            
+                base_v_xidxs = list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]))
+
+            if base_v_xidxs[-1] < vertex_map.shape[1] - param_option["horizonal_bone_density"]:
+                # 右端は必ず登録
+                base_v_xidxs = base_v_xidxs + [vertex_map.shape[1] - param_option["horizonal_bone_density"]]
+
             all_bone_indexes[base_map_idx] = {}
             for yi in range(vertex_map.shape[0]):
                 all_bone_indexes[base_map_idx][yi] = {}
