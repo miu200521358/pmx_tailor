@@ -2108,7 +2108,8 @@ class PhysicsParam():
         for bone_names in self.weighted_bone_names.values():
             max_link_num = len(bone_names) if max_link_num < len(bone_names) else max_link_num
 
-        self.bone_sizer.Remove(self.bone_grid_sizer)
+        self.bone_sizer.Hide(self.bone_grid_sizer, recursive=True)
+        self.bone_grid_sizer.Clear()
 
         # ボーングリッド再生成
         self.bone_grid_sizer = wx.BoxSizer(wx.VERTICAL)

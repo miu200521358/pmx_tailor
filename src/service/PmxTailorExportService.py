@@ -4055,8 +4055,8 @@ class PmxTailorExportService():
             logger.debug(f"fill_vertical: vertical_vs_list[{vertical_vs_list}], horizonaled_duplicate_dots[{horizonaled_duplicate_dots}], horizonaled_index_combs[{horizonaled_index_combs}]")
 
             full_d = [i for i, d in enumerate(horizonaled_duplicate_dots) if np.round(d, decimals=5) == np.max(np.round(horizonaled_duplicate_dots, decimals=5))]  # noqa
-            # not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.05]  # noqa
-            not_full_d = []
+            not_full_d = [i for i, d in enumerate(not_horizonaled_duplicate_dots) if np.round(d, decimals=5) > np.max(np.round(horizonaled_duplicate_dots, decimals=5)) + 0.05]  # noqa
+            # not_full_d = []
             if full_d:
                 if not_full_d:
                     # 平行辺の内積より一定以上近い内積のINDEX組合せがあった場合、臨時採用
