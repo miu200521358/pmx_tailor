@@ -26,7 +26,7 @@ def resource_path(relative):
 # ファイル履歴読み込み
 def read_history(mydir_path):
     # ファイル履歴
-    base_file_hitories = {"org_pmx": [], "org_vroid": [], "vertices_csv": [], "max": 50}
+    base_file_hitories = {"org_pmx": [], "org_vroid": [], "vertices_csv": [], "abb_setting": {}, "max": 50}
     file_hitories = cPickle.loads(cPickle.dumps(base_file_hitories, -1))
 
     # 履歴JSONファイルがあれば読み込み
@@ -36,7 +36,7 @@ def read_history(mydir_path):
             # キーが揃っているかチェック
             for key in base_file_hitories.keys():
                 if key not in file_hitories:
-                    file_hitories[key] = []
+                    file_hitories[key] = base_file_hitories[key]
             # 最大件数は常に上書き
             file_hitories["max"] = 50
     except Exception:
@@ -47,7 +47,7 @@ def read_history(mydir_path):
                 # キーが揃っているかチェック
                 for key in base_file_hitories.keys():
                     if key not in file_hitories:
-                        file_hitories[key] = []
+                        file_hitories[key] = base_file_hitories[key]
                 # 最大件数は常に上書き
                 file_hitories["max"] = 50
             
