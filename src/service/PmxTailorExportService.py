@@ -3619,23 +3619,35 @@ class PmxTailorExportService():
                         v1v = v1.position.y()
                         base_vertical_axis = MVector3D(0, -1, 0)
                         base_horizonal_axis = MVector3D(1, 0, 0)
-                    
-                    below_axis = (v1.position - v0.position).normalized()
 
-                    below_x = MVector3D.dotProduct(below_axis.normalized(), base_vertical_axis)
-                    below_y = MVector3D.dotProduct(below_axis.normalized(), base_horizonal_axis)
+                    v21_axis = (v2.position - v1.position).normalized()
+
+                    v10_axis = (v1.position - v0.position).normalized()
+                    v10_axis_cross = MVector3D.crossProduct(v10_axis, v21_axis).normalized()
+                    v10_axis_qq = MQuaternion.fromDirection(base_vertical_axis, v10_axis_cross)
+
+                    v10_mat = MMatrix4x4()
+                    v10_mat.setToIdentity()
+                    v10_mat.translate(v0.position)
+                    v10_mat.rotate(v10_axis_qq)
+
+                    v1_local_position = v10_mat.inverted() * v1.position
+
+                    below_x = MVector3D.dotProduct(v1_local_position.normalized(), base_vertical_axis)
+                    below_y = MVector3D.dotProduct(v1_local_position.normalized(), base_horizonal_axis)
+
                     below_size = v0.position.distanceToPoint(v1.position) * v1.position.distanceToPoint(v2.position) * v2.position.distanceToPoint(v0.position)
 
                     if v0v > v1v and abs(below_x) > max_below_x and below_size > max_below_x_size * 0.6 and (set(registed_iidxs) - set(non_target_iidxs) or \
                        (not set(registed_iidxs) - set(non_target_iidxs) and ymin + (ymedian - ymin) * 0.1 < v0.position.y() < ymax - (ymax - ymedian) * 0.1)):
-                        logger.debug(f'vertical iidx[{index_idx}], below_axis[{below_axis.to_log()}], below_x[{below_x}], ' \
+                        logger.debug(f'vertical iidx[{index_idx}], v1_local_position[{v1_local_position.to_log()}], below_x[{below_x}], ' \
                                      + f'below_size[{below_size}], below_x_iidx[{below_x_iidx}], max_below_x[{max_below_x}], max_below_x_size[{max_below_x_size}]')
                         below_x_iidx = index_idx
                         max_below_x = abs(below_x)
                         max_below_x_size = below_size
 
                     if v0v > v1v and abs(below_y) > max_below_y and below_size > max_below_y_size * 0.6:
-                        logger.debug(f'horizonal iidx[{index_idx}], below_axis[{below_axis.to_log()}], below_y[{below_y}], ' \
+                        logger.debug(f'horizonal iidx[{index_idx}], v1_local_position[{v1_local_position.to_log()}], below_y[{below_y}], ' \
                                      + f'below_size[{below_size}], below_y_iidx[{below_y_iidx}], max_below_y[{max_below_y}], max_below_y_size[{max_below_y_size}]')
                         below_y_iidx = index_idx
                         max_below_y = abs(below_y)
@@ -4342,14 +4354,14 @@ class PmxTailorExportService():
                 elif (vertical_didx, horizonal_didx) == (1, 0):
                     if abs(v1_horizonal_sign) == 1:
                         if abs(v2_vertical_sign) < abs(v2_horizonal_sign) or (v1_horizonal_sign < 0 and v2_horizonal_sign < 0):
-                            # v1-v0: 水平, v2-v1: 斜め, v0-v2: 垂直
+                            # v1-v0: 水平, v2-v1: 垂直, v0-v2: 斜め
                             remaining_x = 1 if v2_vertical_direction == 1 else -1
                             remaining_y = v2_vertical_direction
 
                             vx = int(remaining_x)
                             vy = 0
                         else:
-                            # v1-v0: 水平, v2-v1: 垂直, v0-v2: 斜め
+                            # v1-v0: 水平, v2-v1: 斜め, v0-v2: 垂直
                             remaining_x = 0
                             remaining_y = v2_vertical_direction
 
