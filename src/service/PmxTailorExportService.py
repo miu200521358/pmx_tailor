@@ -4095,19 +4095,24 @@ class PmxTailorExportService():
                             dot = MVector3D.dotProduct(vertical_direction, now_direction)
                             direction_dots.append(dot)
 
-                    # # 最も直進しているのの前後も含めてチェック
-                    # tids = [np.argmax(direction_dots) - 1, np.argmax(direction_dots), np.argmax(direction_dots) + 1]
-                    # tkeys = (top_keys + top_keys + top_keys)[(np.argmax(direction_dots) + len(top_keys) - 2):(np.argmax(direction_dots) + len(top_keys) + 1)]
-                    tids = [np.argmax(direction_dots)]
-                    tkeys = [top_keys[np.argmax(direction_dots)]]
+                    # できるだけ直進しているのをチェック(近似値が複数取れる可能性)
+                    tids = np.where(direction_dots >= np.max(np.fix(np.array(direction_dots) * 100) / 100))[0]
+                    tkeys = np.array(top_keys)[tids]
+
+                    # # # 最も直進しているのの前後も含めてチェック
+                    # # tids = [np.argmax(direction_dots) - 1, np.argmax(direction_dots), np.argmax(direction_dots) + 1]
+                    # # tkeys = (top_keys + top_keys + top_keys)[(np.argmax(direction_dots) + len(top_keys) - 2):(np.argmax(direction_dots) + len(top_keys) + 1)]
+                    # # 最も直進しているのをチェック
+                    # tids = [np.argmax(direction_dots)]
+                    # tkeys = [top_keys[np.argmax(direction_dots)]]
 
                 for ci, (tkey, tid) in enumerate(zip(tkeys, tids)):
-                    logger.debug(f'** start: bx: {bx}, top: {virtual_vertices[tkey].vidxs()}, bottom: {virtual_vertices[bhe].vidxs()}, dots: [{np.round(direction_dots, decimals=3).tolist()}]')
+                    logger.debug(f'** start: bx: {bx}, top: {virtual_vertices[tuple(tkey)].vidxs()}, bottom: {virtual_vertices[bhe].vidxs()}, dots: [{np.round(direction_dots, decimals=3).tolist()}]')
                     if ci == 1 and bx > 0 and tid > 0 and top_distances[tid] == 0:
                         # 上端の切れ目の場合、グループを変える
                         vertex_coordinate_maps.append([])
-                    logger.info(f'頂点ルート走査[{bx:02d}-{ci}]: 始端: {virtual_vertices[tkey].vidxs()}, 終端: {virtual_vertices[bhe].vidxs()}')
-                    vertex_coordinate_maps[-1].append(self.create_vertex_coordinate_map(bx, tkey, bhe, virtual_vertices, top_keys, bottom_keys, MVector3D(1, 0, 0)))
+                    logger.info(f'頂点ルート走査[{bx:02d}-{ci}]: 始端: {virtual_vertices[tuple(tkey)].vidxs()}, 終端: {virtual_vertices[bhe].vidxs()}')
+                    vertex_coordinate_maps[-1].append(self.create_vertex_coordinate_map(bx, tuple(tkey), bhe, virtual_vertices, top_keys, bottom_keys, MVector3D(1, 0, 0)))
                     bx += 1
 
         logger.info("%s: 絶対頂点マップの生成", material_name)
