@@ -4092,11 +4092,12 @@ class PmxTailorExportService():
                             vertical_direction = (vertical_pos - top_pos).normalized()
 
                             # 出来るだけ直進している始端を選ぶ
-                            dot = MVector3D.dotProduct(vertical_direction, now_direction)
+                            dot = abs(MVector3D.dotProduct(vertical_direction, now_direction))
                             direction_dots.append(dot)
 
                     # できるだけ直進しているのをチェック(近似値が複数取れる可能性)
-                    tids = np.where(direction_dots >= np.max(np.fix(np.array(direction_dots) * 100) / 100))[0]
+                    similarity = param_option['similarity'] * 150
+                    tids = np.where(direction_dots >= np.max(np.fix(np.array(direction_dots) * similarity) / similarity))[0]
                     tkeys = np.array(top_keys)[tids]
 
                     # # # 最も直進しているのの前後も含めてチェック
@@ -4111,7 +4112,7 @@ class PmxTailorExportService():
                     if ci == 1 and bx > 0 and tid > 0 and top_distances[tid] == 0:
                         # 上端の切れ目の場合、グループを変える
                         vertex_coordinate_maps.append([])
-                    logger.info(f'頂点ルート走査[{bx:02d}-{ci}]: 始端: {virtual_vertices[tuple(tkey)].vidxs()}, 終端: {virtual_vertices[bhe].vidxs()}')
+                    logger.info('頂点ルート走査[%s-%s]: 始端: %s, 終端: %s', f'{bx:04d}', f'{ci:02d}', virtual_vertices[tuple(tkey)].vidxs(), virtual_vertices[bhe].vidxs())
                     vertex_coordinate_maps[-1].append(self.create_vertex_coordinate_map(bx, tuple(tkey), bhe, virtual_vertices, top_keys, bottom_keys, MVector3D(1, 0, 0)))
                     bx += 1
 
@@ -4126,6 +4127,8 @@ class PmxTailorExportService():
             vertex_connecteds.append([])
             vertex_tmp_dots = []
             top_keys = []
+
+            logger.info("-- 絶対頂点マップ[%s]: 頂点ルート決定", midx + 1)
 
             for vcm in vertex_coordinate_map:
                 vertex_tmp_dots.append([])
@@ -4161,10 +4164,12 @@ class PmxTailorExportService():
                         prev_direction = (prev_pos - prev_prev_pos).normalized()
                         now_direction = (now_pos - prev_pos).normalized()
 
-                        dot = MVector3D.dotProduct(now_direction, prev_direction) * now_pos.distanceToPoint(prev_pos)
+                        dot = MVector3D.dotProduct(now_direction, prev_direction) * (now_pos.distanceToPoint(prev_pos) / bottom_pos.distanceToPoint(top_pos))
                         logger.debug(f"target top: [{virtual_vertices[vcm_reverse_list[0]['vv']].vidxs()}], bottom: [{virtual_vertices[vcm_reverse_list[-1]['vv']].vidxs()}], dot({y}): {round(dot, 3)}")   # noqa
 
                         vertex_tmp_dots[-1].append(dot)
+
+                logger.info("-- 絶対頂点マップ[%s]: 頂点ルート確認[%s] 始端: %s, 終端: %s", midx + 1, len(top_keys), virtual_vertices[vcm_reverse_list[0]['vv']].vidxs(), virtual_vertices[vcm_reverse_list[-1]['vv']].vidxs())
 
             logger.debug('------------------')
             top_key_cnts = dict(Counter(top_keys))
@@ -4190,6 +4195,8 @@ class PmxTailorExportService():
                 target_regists = [True for _ in range(len(vertex_coordinate_map))]
 
             logger.debug(f'target_regists: {target_regists}')
+
+            logger.info("-- 絶対頂点マップ[%s]: マップ生成", midx + 1)
 
             # XYの最大と最小の抽出
             start_x = vertex_coordinate_map[0][list(vertex_coordinate_map[0].keys())[0]]['x']
