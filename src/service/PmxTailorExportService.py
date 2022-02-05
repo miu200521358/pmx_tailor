@@ -4199,12 +4199,12 @@ class PmxTailorExportService():
             bottom_mean_pos = MVector3D(np.mean(bottom_poses, axis=0))
             if bottom_max_pos.x() != 0:
                 # Xに値が入ってる場合（下）
-                minor_diameter = np.mean(np.abs([bottom_max_pos.x(), bottom_min_pos.x()]))
+                major_diameter = np.mean(np.abs([bottom_max_pos.x(), bottom_min_pos.x()]))
+                minor_diameter = np.mean(np.abs([bottom_max_pos.z(), bottom_min_pos.z()]))
             else:
                 # Xに値が入って無い場合（左右）
                 minor_diameter = np.mean(np.abs([bottom_max_pos.y(), bottom_min_pos.y()]))
-            # Zにはどっち方向でも入る
-            major_diameter = np.mean(np.abs([bottom_max_pos.z(), bottom_min_pos.z()]))
+                major_diameter = np.mean(np.abs([bottom_max_pos.z(), bottom_min_pos.z()]))
             # 開始地点ベクトル
             bottom_start_vec = virtual_vertices[bottom_horizonal_edge_lines[0][0]].position() - bottom_mean_pos
             # 扇形の位置
@@ -4215,15 +4215,16 @@ class PmxTailorExportService():
                     degree = qq.toDegree()
                     if degree < 0:
                         degree += 360
-                    arc_minor_diameter = minor_diameter * math.cos(math.radians(degree))
                     arc_major_diameter = major_diameter * math.sin(math.radians(degree))
+                    arc_minor_diameter = minor_diameter * math.cos(math.radians(degree))
                     
                     arc_pos = MVector3D()
                     if bottom_max_pos.x() != 0:
-                        arc_pos.setX(arc_minor_diameter)
+                        arc_pos.setX(arc_major_diameter)
+                        arc_pos.setZ(arc_minor_diameter)
                     else:
                         arc_pos.setY(arc_minor_diameter)
-                    arc_pos.setZ(arc_major_diameter)
+                        arc_pos.setZ(arc_major_diameter)
                     arc_pos += bottom_mean_pos
                     arc_poses.append(arc_pos)
 
@@ -4394,7 +4395,7 @@ class PmxTailorExportService():
                 bottom_vv = virtual_vertices[vcm_reverse_list[-1]['vv']]
                 top_pos = top_vv.position()
                 bottom_pos = bottom_vv.position()
-                total_direction = (top_pos - bottom_pos).normalized()
+                total_direction = (bottom_pos - top_pos).normalized()
 
                 for y, vc in enumerate(vcm_reverse_list):
                     if y == 0:
@@ -4422,7 +4423,7 @@ class PmxTailorExportService():
                         now_direction = (now_pos - prev_pos).normalized()
 
                         # dot = MVector3D.dotProduct(now_direction, prev_direction) * (now_pos.distanceToPoint(prev_pos) / bottom_pos.distanceToPoint(top_pos))
-                        dot = MVector3D.dotProduct(now_direction, prev_direction)   # * now_pos.distanceToPoint(prev_pos)
+                        dot = MVector3D.dotProduct(now_direction, prev_direction) # * now_pos.distanceToPoint(prev_pos)   # * MVector3D.dotProduct(now_direction, total_direction)   #
                         logger.debug(f"target top: [{virtual_vertices[vcm_reverse_list[0]['vv']].vidxs()}], bottom: [{virtual_vertices[vcm_reverse_list[-1]['vv']].vidxs()}], dot({y}): {round(dot, 5)}")   # noqa
 
                         vertex_tmp_dots[-1].append(dot)
