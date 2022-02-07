@@ -52,6 +52,18 @@ class VirtualVertex:
         if line_v2 not in self.line_vertices:
             self.line_vertices.append(line_v2)
     
+    def delegate(self, real_vertices: list, line_vertices: list, indexs: list):
+        for rv in real_vertices:
+            self.real_vertices.append(rv)
+            self.positions.append(rv.position.data())
+            self.normals.append(rv.normal.data())
+        
+        for lv in line_vertices:
+            self.line_vertices.append(lv)
+        
+        for i in indexs:
+            self.indexs.append(i)
+
     def vidxs(self):
         return [v.index for v in self.real_vertices]
     
@@ -3166,7 +3178,7 @@ class PmxTailorExportService():
 
                         # ボーン名
                         bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
-                        if bone_name not in tmp_all_bones:
+                        if bone_name not in tmp_all_bones or (vertex_map[v_yidx, v_xidx] == np.inf).any():
                             continue
 
                         vv = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])]
@@ -3761,6 +3773,7 @@ class PmxTailorExportService():
         non_target_iidxs = []
         virtual_vertices = {}
         edge_pair_lkeys = {}
+        vertex_poses = []
         for index_idx in model.material_indices[material_name]:
             # 頂点の組み合わせから面INDEXを引く
             if model.indices[index_idx][0] not in target_vertices or model.indices[index_idx][1] not in target_vertices or model.indices[index_idx][2] not in target_vertices:
@@ -3791,6 +3804,8 @@ class PmxTailorExportService():
                     edge_pair_lkeys[lkey] = []
                 edge_pair_lkeys[lkey].append(index_idx)
 
+                vertex_poses.append(np.array([v0_key[0], v0_key[1], v0_key[2]]))
+
         if len(virtual_vertices.keys()) == 0:
             logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
             return None, None, None
@@ -3799,18 +3814,6 @@ class PmxTailorExportService():
             logger.debug(f'[{key}] {virtual_vertex}')
 
         logger.info("%s: エッジの抽出準備", material_name)
-
-        edge_line_pairs = {}
-        for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
-            if len(line_iidxs) == 1:
-                # 1つの面にしか紐付いてない辺を抽出
-                if min_vkey not in edge_line_pairs:
-                    edge_line_pairs[min_vkey] = []
-                if max_vkey not in edge_line_pairs:
-                    edge_line_pairs[max_vkey] = []
-                
-                edge_line_pairs[min_vkey].append(max_vkey)
-                edge_line_pairs[max_vkey].append(min_vkey)
 
         # 方向に応じて判定値を変える
         # デフォルトは下
@@ -3822,6 +3825,118 @@ class PmxTailorExportService():
         elif param_option['direction'] == '左':
             base_vertical_axis = MVector3D(1, 0, 0)
         
+        edge_line_pairs = {}
+        for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
+            if len(line_iidxs) == 1:
+                min_dot = MVector3D.dotProduct((virtual_vertices[min_vkey].position() - model.bones[param_option['parent_bone_name']].position).normalized(), \
+                                               virtual_vertices[min_vkey].normal(base_vertical_axis).normalized())
+                max_dot = MVector3D.dotProduct((virtual_vertices[max_vkey].position() - model.bones[param_option['parent_bone_name']].position).normalized(), \
+                                               virtual_vertices[max_vkey].normal(base_vertical_axis).normalized())
+                if min_dot < 0 or max_dot < 0:
+                    # 内側に向いてる（裏面）のは無視
+                    continue
+                if min_vkey not in edge_line_pairs:
+                    edge_line_pairs[min_vkey] = []
+                if max_vkey not in edge_line_pairs:
+                    edge_line_pairs[max_vkey] = []
+                
+                edge_line_pairs[min_vkey].append(max_vkey)
+                edge_line_pairs[max_vkey].append(min_vkey)
+
+        # 厚みがある材質であるか
+        thickness = (not edge_line_pairs)
+
+        if not edge_line_pairs:
+            # 登録されたエッジがない場合、エッジが足りないので追加する
+            unique_edge = np.sort(np.unique(np.abs(base_vertical_axis.data()) * np.array(vertex_poses), axis=0), axis=0)
+
+            min_axises = []
+            for ui, ue in enumerate(unique_edge):
+                if ui == 0:
+                    min_axises.append(ue)
+                elif np.isclose(ue, (np.abs(base_vertical_axis.data()) * (min_axises[-1] + np.array([0.1, 0.1, 0.1])))).all():
+                    min_axises.append(ue)
+
+            max_axises = []
+            for ui, ue in enumerate(reversed(unique_edge)):
+                if ui == 0:
+                    max_axises.append(ue)
+                elif np.isclose(ue, (np.abs(base_vertical_axis.data()) * (max_axises[-1] - np.array([0.1, 0.1, 0.1])))).all():
+                    max_axises.append(ue)
+
+            # まずは最上端と最下端を抽出する
+            for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
+                min_vec = (MVector3D(min_vkey[0], min_vkey[1], min_vkey[2]) * np.abs(base_vertical_axis.data())).data()
+                max_vec = (MVector3D(max_vkey[0], max_vkey[1], max_vkey[2]) * np.abs(base_vertical_axis.data())).data()
+
+                # min_dot = MVector3D.dotProduct((virtual_vertices[min_vkey].position() - virtual_vertices[max_vkey].position()).normalized(), \
+                #                                virtual_vertices[min_vkey].normal(base_vertical_axis).normalized())
+                # max_dot = MVector3D.dotProduct((virtual_vertices[max_vkey].position() - virtual_vertices[min_vkey].position()).normalized(), \
+                #                                virtual_vertices[max_vkey].normal(base_vertical_axis).normalized())
+                
+                # # 厚み方向のエッジは無視する
+                # if (np.isin(min_vec, max_axises[:1]).all() and np.isin(max_vec, max_axises[:2]).all() and abs(max_dot) < 0.5) \
+                #    or (np.isin(min_vec, min_axises[:1]).all() and np.isin(max_vec, min_axises[:2]).all() and abs(min_dot) < 0.5):
+                # min_vec = np.array(min_vkey) * np.logical_not(base_vertical_axis.data())
+                # max_vec = np.array(max_vkey) * np.logical_not(base_vertical_axis.data())
+
+                # min_vkey_pairs = []
+                # max_vkey_pairs = []
+                # if min_vkey in edge_line_pairs and edge_line_pairs[min_vkey]:
+                #     min_vkey_pairs = np.array(edge_line_pairs[min_vkey])    # * np.logical_not(base_vertical_axis.data())
+                # if max_vkey in edge_line_pairs and edge_line_pairs[max_vkey]:
+                #     max_vkey_pairs = np.array(edge_line_pairs[max_vkey])    # * np.logical_not(base_vertical_axis.data())
+
+                # if np.count_nonzero(np.isin(np.array(min_vkey), min_vkey_pairs)) > 1 or np.count_nonzero(np.isin(np.array(max_vkey), max_vkey_pairs)) > 1:
+                #     # ベクトルのうち2つが同じのがあればスルー
+                #     continue
+
+                # min_back_dot = MVector3D.dotProduct((virtual_vertices[min_vkey].position() - model.bones[param_option['parent_bone_name']].position).normalized(), \
+                #                                     virtual_vertices[min_vkey].normal(base_vertical_axis).normalized())
+                # max_back_dot = MVector3D.dotProduct((virtual_vertices[max_vkey].position() - model.bones[param_option['parent_bone_name']].position).normalized(), \
+                #                                     virtual_vertices[max_vkey].normal(base_vertical_axis).normalized())
+                # if min_back_dot < 0 and max_back_dot < 0:
+                #     # 内側に向いてる（裏面）のは無視
+                #     continue
+
+                if (np.isin(min_vec, max_axises[:5]).all() and np.isin(max_vec, max_axises[:5]).all()) \
+                   or (np.isin(min_vec, min_axises[:5]).all() and np.isin(max_vec, min_axises[:5]).all()):
+                    if min_vkey not in edge_line_pairs:
+                        edge_line_pairs[min_vkey] = []
+                    if max_vkey not in edge_line_pairs:
+                        edge_line_pairs[max_vkey] = []
+                    
+                    if max_vkey not in edge_line_pairs[min_vkey]:
+                        edge_line_pairs[min_vkey].append(max_vkey)
+                    if min_vkey not in edge_line_pairs[max_vkey]:
+                        edge_line_pairs[max_vkey].append(min_vkey)
+            
+            # regist = True
+            # while regist:
+            #     regist = False
+            #     for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
+            #         min_vec = (base_vertical_axis.abs() * MVector3D(min_vkey[0], min_vkey[1], min_vkey[2])).data()
+            #         max_vec = (base_vertical_axis.abs() * MVector3D(max_vkey[0], max_vkey[1], max_vkey[2])).data()
+
+            #         min_dot = MVector3D.dotProduct((virtual_vertices[min_vkey].position() - virtual_vertices[max_vkey].position()).normalized(), \
+            #                                        virtual_vertices[min_vkey].normal(base_vertical_axis).normalized())
+            #         max_dot = MVector3D.dotProduct((virtual_vertices[max_vkey].position() - virtual_vertices[min_vkey].position()).normalized(), \
+            #                                        virtual_vertices[max_vkey].normal(base_vertical_axis).normalized())
+
+            #         if (min_vkey in edge_line_pairs and max_vkey not in edge_line_pairs and abs(max_dot) < 0.5) \
+            #            or (max_vkey in edge_line_pairs and min_vkey not in edge_line_pairs and abs(min_dot) < 0.5):
+            #             if min_vkey not in edge_line_pairs:
+            #                 edge_line_pairs[min_vkey] = []
+            #             if max_vkey not in edge_line_pairs:
+            #                 edge_line_pairs[max_vkey] = []
+                        
+            #             if max_vkey not in edge_line_pairs[min_vkey]:
+            #                 edge_line_pairs[min_vkey].append(max_vkey)
+            #             if min_vkey not in edge_line_pairs[max_vkey]:
+            #                 edge_line_pairs[max_vkey].append(min_vkey)
+                        
+            #             regist = True
+
         logger.info("%s: エッジの判定", material_name)
 
         # エッジを繋いでいく
@@ -3829,6 +3944,64 @@ class PmxTailorExportService():
         edge_vkeys = []
         while len(edge_vkeys) < len(edge_line_pairs.keys()):
             _, tmp_all_edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, virtual_vertices, None, tmp_all_edge_lines, edge_vkeys)
+
+        if thickness:
+            # 厚みがある場合、並べ直す
+            sorted_tmp_all_edge_lines = []
+            for n, edge_line in enumerate(tmp_all_edge_lines):
+                edge_poses = []
+                edge_keys = []
+                for edge_vkey in edge_line:
+                    edge_poses.append((virtual_vertices[edge_vkey].position()).data())
+                    edge_keys.append(edge_vkey)
+                edge_mean_pos = MVector3D(np.mean(edge_poses, axis=0))
+                # 開始地点ベクトル
+                edge_start_vec = virtual_vertices[edge_line[0]].position() - edge_mean_pos
+                # 円周の角度
+                edge_degrees = []
+                # 位置
+                edge_poses = []
+                # 距離
+                edge_distances = []
+                for edge_vkey in edge_line:
+                    edge_pos = virtual_vertices[edge_vkey].position()
+                    qq = MQuaternion.rotationTo(edge_start_vec, edge_pos - edge_mean_pos)
+                    degree = qq.toDegree()
+                    if edge_pos.x() < 0:
+                        degree *= -1
+                    edge_degrees.append(degree)
+                    edge_poses.append(edge_pos.data())
+                    edge_distances.append(edge_pos.distanceToPoint(edge_mean_pos))
+                
+                # 角度でソート
+                sorted_edge_line = np.array(edge_line)[np.argsort(edge_degrees)]
+                # # 角度間の差分
+                # sorted_degrees = np.diff(np.sort(edge_degrees))
+                # ソートした距離(外側と内側)
+                sorted_distances = np.array(edge_distances)[np.argsort(edge_degrees)]
+                sorted_distances_diff = np.diff(sorted_distances)
+                target_edge_keys = [sorted_edge_line[0].tolist()] + (np.array(sorted_edge_line)[np.where(sorted_distances_diff > np.mean(sorted_distances_diff))[0] + 1]).tolist()
+
+                # target_idxs = np.where(np.array(edge_distances) > np.mean(edge_distances))
+                # target_edge_keys = np.array(edge_line)[target_idxs]
+                # target_edge_degrees = np.array(edge_degrees)[np.where(np.array(edge_distances) > np.mean(edge_distances))]
+                # sorted_edge_line = np.array(target_edge_keys)[np.argsort(target_edge_degrees)]
+                sorted_tmp_all_edge_lines.append(target_edge_keys)
+                # sorted_degees = np.sort(edge_degrees)
+                # # 角度の閾値以上の角度が取れたのだけピックアップ
+                # sorted_all_idxs.append((np.where(np.diff(sorted_degees) > 1))[0])
+
+                # sorted_edge_dots.append([])
+                # for edge_vkey in edge_line:
+                #     edge_back_dot = MVector3D.dotProduct((virtual_vertices[edge_vkey].position() - edge_mean_pos).normalized(), \
+                #                                          virtual_vertices[edge_vkey].normal(base_vertical_axis).normalized())
+                #     sorted_edge_dots[-1].append(edge_back_dot)
+
+            tmp_all_edge_lines = []
+            for edge_line in sorted_tmp_all_edge_lines:
+                tmp_all_edge_lines.append([])
+                for n, edge_vkey in enumerate(zip(edge_line)):
+                    tmp_all_edge_lines[-1].append(tuple(edge_vkey[0]))
 
         logger.info("%s: エッジの抽出", material_name)
 
@@ -3849,7 +4022,19 @@ class PmxTailorExportService():
                     prev_direction = (now_pos - prev_pos).normalized()
                     now_direction = (next_pos - now_pos).normalized()
                     dot = MVector3D.dotProduct(prev_direction, now_direction)
-                    if dot < 0.4:
+                    prev_dot = 0
+                    if m > 2:
+                        prev_prev_vkey = edge_line[m - 2]
+                        prev_prev_pos = virtual_vertices[prev_prev_vkey].position()
+                        prev_prev_direction = (prev_pos - prev_prev_pos).normalized()
+                        prev_dot = MVector3D.dotProduct(prev_direction, prev_prev_direction)
+                    next_dot = 0
+                    if len(edge_line) - m > 1:
+                        next_next_vkey = edge_line[m + 1]
+                        next_next_pos = virtual_vertices[next_next_vkey].position()
+                        next_next_direction = (next_next_pos - next_pos).normalized()
+                        next_dot = MVector3D.dotProduct(now_direction, next_next_direction)
+                    if dot < 0.4 and prev_dot > 0.8 and next_dot > 0.8:
                         logger.debug('-------------------')
                         # ある程度角がある場合、別辺と見なす
                         all_edge_lines[n].append([copy.deepcopy(now_vkey)])
@@ -4005,28 +4190,6 @@ class PmxTailorExportService():
             else:
                 is_connect = False
 
-        top_pos = MVector3D()
-        if top_horizonal_edge_lines[0][0] in virtual_vertices[top_horizonal_edge_lines[-1][-1]].lines():
-            # 終端は先頭と最後が繋がっている場合、最初を選ぶ
-            top_pos = virtual_vertices[top_horizonal_edge_lines[0][0]].position()
-        else:
-            # 繋がってない場合、繋がっている場所を探す
-            start_vertical_lines = []
-            end_vertical_lines = []
-            for vertical_lines in vertical_edge_lines:
-                if top_horizonal_edge_lines[0][0] == vertical_lines[0] or top_horizonal_edge_lines[0][0] == vertical_lines[-1]:
-                    start_vertical_lines = vertical_lines
-                if top_horizonal_edge_lines[-1][-1] == vertical_lines[0] or top_horizonal_edge_lines[-1][-1] == vertical_lines[-1]:
-                    end_vertical_lines = vertical_lines
-            if start_vertical_lines and end_vertical_lines and start_vertical_lines[0] == end_vertical_lines[-1]:
-                # verticalが繋がっているトコとTOPの位置を合わせる
-                top_pos = virtual_vertices[start_vertical_lines[0]].position()
-            elif start_vertical_lines and end_vertical_lines and start_vertical_lines[-1] == end_vertical_lines[0]:
-                # verticalが繋がっているトコとTOPの位置を合わせる
-                top_pos = virtual_vertices[start_vertical_lines[-1]].position()
-            else:
-                is_connect = False
-
         if is_connect and not is_many_bottom:
             # 繋がっていて、かつ下の頂点がそこまで多くない場合、上を下に合わせて調整する
             vertical_dots = []
@@ -4035,11 +4198,12 @@ class PmxTailorExportService():
                 top_pos = top_vv.position()
                 top_bottom_direction = (bottom_pos - top_pos)
                 
-                _, vertical_pos, vertical_direction \
-                    = self.get_vertical_pos(top_edge_vkey, virtual_vertices, base_vertical_axis)
-                vertical_dots.append(MVector3D.dotProduct(top_bottom_direction.normalized(), vertical_direction.normalized()))
+                # vertical_key = self.get_vertical_key(top_edge_vkey, virtual_vertices, base_vertical_axis)
+                # vertical_pos = virtual_vertices[vertical_key].position()
+                # vertical_direction = vertical_pos - top_pos
+                vertical_dots.append(MVector3D.dotProduct(top_bottom_direction.normalized(), base_vertical_axis))
 
-                logger.debug(f'[{n:03d}] top[{top_vv.vidxs()}], bottom[{bottom_pos.to_log()}], vertical[{vertical_pos.to_log()}] - dot[{round(vertical_dots[-1], 3)}]')
+                logger.debug(f'[{n:03d}] top[{top_vv.vidxs()}], bottom[{bottom_pos.to_log()}], dot[{round(vertical_dots[-1], 3)}]')
 
             max_dot_idx = np.argmax(vertical_dots)  # + int((len(all_bottom_horizonal_edge_lines) - len(all_top_horizonal_edge_lines)) / 2)
 
@@ -4069,6 +4233,26 @@ class PmxTailorExportService():
             logger.debug(f'top[{top_direction.to_log()}], bottom[{bottom_direction.to_log()}], dot[{round(top_bottom_dot, 3)}]')
 
         elif is_connect and is_many_bottom:
+            top_pos = MVector3D()
+            if top_horizonal_edge_lines[0][0] in virtual_vertices[top_horizonal_edge_lines[-1][-1]].lines():
+                # 終端は先頭と最後が繋がっている場合、最初を選ぶ
+                top_pos = virtual_vertices[top_horizonal_edge_lines[0][0]].position()
+            else:
+                # 繋がってない場合、繋がっている場所を探す
+                start_vertical_lines = []
+                end_vertical_lines = []
+                for vertical_lines in vertical_edge_lines:
+                    if top_horizonal_edge_lines[0][0] == vertical_lines[0] or top_horizonal_edge_lines[0][0] == vertical_lines[-1]:
+                        start_vertical_lines = vertical_lines
+                    if top_horizonal_edge_lines[-1][-1] == vertical_lines[0] or top_horizonal_edge_lines[-1][-1] == vertical_lines[-1]:
+                        end_vertical_lines = vertical_lines
+                if start_vertical_lines and end_vertical_lines and start_vertical_lines[0] == end_vertical_lines[-1]:
+                    # verticalが繋がっているトコとTOPの位置を合わせる
+                    top_pos = virtual_vertices[start_vertical_lines[0]].position()
+                elif start_vertical_lines and end_vertical_lines and start_vertical_lines[-1] == end_vertical_lines[0]:
+                    # verticalが繋がっているトコとTOPの位置を合わせる
+                    top_pos = virtual_vertices[start_vertical_lines[-1]].position()
+
             # 繋がっていて、かつ下の頂点が多いない場合、下を上に合わせて調整する
             vertical_dots = []
             for n, bottom_edge_vkey in enumerate(all_bottom_horizonal_edge_lines):
@@ -4161,12 +4345,12 @@ class PmxTailorExportService():
 
             logger.debug(f'SHIFT [bottom_horizonal_edge_lines] {bottom_horizonal_edge_lines}')
 
-        if bottom_horizonal_edge_lines[0][0] in virtual_vertices[bottom_horizonal_edge_lines[-1][-1]].lines():
-            # 終端は先頭と最後が繋がっている場合、最後を最初に移す
-            bottom_horizonal_edge_lines[0].insert(0, copy.deepcopy(bottom_horizonal_edge_lines[-1][-1]))
-            del bottom_horizonal_edge_lines[-1][-1]
+            if bottom_horizonal_edge_lines[0][0] in virtual_vertices[bottom_horizonal_edge_lines[-1][-1]].lines():
+                # 終端は先頭と最後が繋がっている場合、最後を最初に移す
+                bottom_horizonal_edge_lines[0].insert(0, copy.deepcopy(bottom_horizonal_edge_lines[-1][-1]))
+                del bottom_horizonal_edge_lines[-1][-1]
 
-            logger.debug(f'REVERSE [bottom_horizonal_edge_lines] {bottom_horizonal_edge_lines}')
+                logger.debug(f'REVERSE [bottom_horizonal_edge_lines] {bottom_horizonal_edge_lines}')
 
         vertex_coordinate_maps = []
         logger.info("%s: 水平エッジの距離比率測定", material_name)
@@ -4256,6 +4440,10 @@ class PmxTailorExportService():
         logger.info("%s: 水平エッジの距離比率-上部: %s", material_name, [f'{virtual_vertices[athel].vidxs()}({round(tdr, 4)})' for athel, tdr in zip(all_top_horizonal_edge_lines, top_distance_ratios)])
         logger.info("%s: 水平エッジの距離比率-下部: %s", material_name, [f'{virtual_vertices[abhel].vidxs()}({round(bdr, 4)})' for abhel, bdr in zip(all_bottom_horizonal_edge_lines, bottom_distance_ratios)])
 
+        top_vidxs = []
+        for tk in top_keys:
+            top_vidxs.extend([v.index for v in virtual_vertices[tk].real_vertices])
+
         bx = 0
         xx = 0
         for bhel in bottom_horizonal_edge_lines:
@@ -4286,8 +4474,10 @@ class PmxTailorExportService():
                     logger.info('頂点ルート走査[%s-%s]: 始端: %s(%s), 終端: %s(%s)', f'{(bi + 1):04d}', f'{(ci + 1):02d}', virtual_vertices[tuple(tkey)].vidxs(),
                                 round((top_distance_ratios.tolist() + top_distance_ratios.tolist() + top_distance_ratios.tolist())[tids[ci]], 5), \
                                 virtual_vertices[bhe].vidxs(), round(bottom_distance_ratios[xx], 5))
-                    vertex_coordinate_maps[-1].append(self.create_vertex_coordinate_map(bx, tuple(tkey), bhe, virtual_vertices, top_keys, bottom_keys, base_vertical_axis * -1))
-                    bx += 1
+                    map = self.create_vertex_coordinate_map(bx, tuple(tkey), bhe, virtual_vertices, top_keys, bottom_keys, top_vidxs, base_vertical_axis * -1)
+                    if map:
+                        vertex_coordinate_maps[-1].append(map)
+                        bx += 1
                 xx += 1
         # else:
         #     # 上辺より下辺の超点数が多い場合、フリルとみなして直進ベースを選ぶ
@@ -4307,7 +4497,7 @@ class PmxTailorExportService():
         #                 top_bottom_direction = (bottom_pos - top_pos)
                         
         #                 _, vertical_pos, vertical_direction \
-        #                     = self.get_vertical_pos(top_edge_vkey, virtual_vertices, base_vertical_axis)
+        #                     = self.get_vertical_key(top_edge_vkey, virtual_vertices, base_vertical_axis)
         #                 dot = MVector3D.dotProduct(top_bottom_direction.normalized(), vertical_direction.normalized())
         #                 vertical_dots.append(dot)
 
@@ -4395,7 +4585,7 @@ class PmxTailorExportService():
                 bottom_vv = virtual_vertices[vcm_reverse_list[-1]['vv']]
                 top_pos = top_vv.position()
                 bottom_pos = bottom_vv.position()
-                total_direction = (bottom_pos - top_pos).normalized()
+                # total_direction = (bottom_pos - top_pos).normalized()
 
                 for y, vc in enumerate(vcm_reverse_list):
                     if y == 0:
@@ -4423,7 +4613,7 @@ class PmxTailorExportService():
                         now_direction = (now_pos - prev_pos).normalized()
 
                         # dot = MVector3D.dotProduct(now_direction, prev_direction) * (now_pos.distanceToPoint(prev_pos) / bottom_pos.distanceToPoint(top_pos))
-                        dot = MVector3D.dotProduct(now_direction, prev_direction) # * now_pos.distanceToPoint(prev_pos)   # * MVector3D.dotProduct(now_direction, total_direction)   #
+                        dot = MVector3D.dotProduct(now_direction, prev_direction)   # * now_pos.distanceToPoint(prev_pos)   # * MVector3D.dotProduct(now_direction, total_direction)   #
                         logger.debug(f"target top: [{virtual_vertices[vcm_reverse_list[0]['vv']].vidxs()}], bottom: [{virtual_vertices[vcm_reverse_list[-1]['vv']].vidxs()}], dot({y}): {round(dot, 5)}")   # noqa
 
                         vertex_tmp_dots[-1].append(dot)
@@ -4519,120 +4709,115 @@ class PmxTailorExportService():
 
         return vertex_maps, vertex_connecteds, virtual_vertices
     
-    def get_vertical_pos(self, from_key: tuple, virtual_vertices: dict, base_vertical_axis: MVector3D):
+    def get_vertical_key(self, from_key: tuple, top_key: tuple, bottom_key: tuple, virtual_vertices: dict, base_vertical_axis: MVector3D):
+        top_vv = virtual_vertices[top_key]
+        top_pos = top_vv.position()
+        bottom_vv = virtual_vertices[bottom_key]
+        bottom_pos = bottom_vv.position()
+        local_next_direction = MVector3D(1, 0, 0)
+
+        # # ボーン進行方向(x)
+        # bottom_direction = (bottom_pos - top_pos)
+        # # 法線（垂線）
+        # top_up_pos = bottom_vv.normal(base_vertical_axis)
+        # # ボーン進行方向に対しての横軸(z)
+        # bottom_z_pos = MVector3D.crossProduct(bottom_direction, top_up_pos)
+        # # ボーン進行方向に対しての縦軸(y)
+        # bottom_y_pos = MVector3D.crossProduct(bottom_z_pos, bottom_direction)
+        # bottom_qq = MQuaternion.fromDirection(bottom_direction.normalized(), bottom_y_pos.normalized())
+
+        # ボーン進行方向(x)
+        bottom_direction = (bottom_pos - top_pos)
+        bottom_qq = MQuaternion.rotationTo(local_next_direction, bottom_direction.normalized())
+
         from_vv = virtual_vertices[from_key]
         from_pos = from_vv.position()
 
         dots = []
-        for from_to_key in from_vv.lines():
-            from_to_vv = virtual_vertices[from_to_key]
-            from_to_pos = from_to_vv.position()
-            from_to_direction = (from_pos - from_to_pos)
+        scores = []
+        for n, to_key in enumerate(from_vv.lines()):
+            if to_key == from_key:
+                dots.append(0)
+                continue
 
-            # Z方向法線
-            from_to_z_pos = MVector3D.crossProduct(from_to_direction, from_to_vv.normal(base_vertical_axis))
-            from_to_y_pos = MVector3D.crossProduct(from_to_z_pos, from_to_direction)
-            from_to_qq = MQuaternion.fromDirection(from_to_direction.normalized(), from_to_y_pos.normalized())
+            to_vv = virtual_vertices[to_key]
+            to_pos = to_vv.position()
 
             mat = MMatrix4x4()
             mat.setToIdentity()
             mat.translate(from_pos)
-            mat.rotate(from_to_qq)
+            mat.rotate(bottom_qq)
 
-            from_to_vertical_direction = mat * base_vertical_axis
-            dots.append(MVector3D.dotProduct(from_to_vertical_direction.normalized(), from_to_direction.normalized()))
+            local_next_vpos = (mat.inverted() * to_pos).normalized()
 
-        vertical_key = from_vv.lines()[np.argmax(dots)]
-        vertical_vv = virtual_vertices[vertical_key]
-        vertical_pos = vertical_vv.position()
-        vertical_direction = (vertical_pos - from_pos)
+            vec_yaw1 = (local_next_direction * MVector3D(1, 0, 1)).normalized()
+            vec_yaw2 = (local_next_vpos * MVector3D(1, 0, 1)).normalized()
+            yaw_score = calc_ratio(MVector3D.dotProduct(vec_yaw1, vec_yaw2), -1, 1, 0, 1)
 
-        return vertical_key, vertical_pos, vertical_direction
+            vec_pitch1 = (local_next_direction * MVector3D(0, 1, 1)).normalized()
+            vec_pitch2 = (local_next_vpos * MVector3D(0, 1, 1)).normalized()
+            pitch_score = calc_ratio(MVector3D.dotProduct(vec_pitch1, vec_pitch2), -1, 1, 0, 1)
 
-    def create_vertex_coordinate_map(self, tx: int, top_edge_key: tuple, bottom_edge_key: tuple, virtual_vertices: dict, top_keys: list, bottom_keys: list, base_vertical_axis: MVector3D):
+            vec_roll1 = (local_next_direction * MVector3D(1, 1, 0)).normalized()
+            vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
+            roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
+
+            score = (yaw_score * 10) + (pitch_score * 10) + roll_score
+            scores.append(score)
+
+            dot = MVector3D.dotProduct(local_next_direction, local_next_vpos)
+            dots.append(dot)
+            # mats.append(mat)
+
+            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], yaw: {yaw_score}, pitch: {pitch_score}, roll: {roll_score}, score: {score}')
+
+        max_idx = np.argmax(dots)
+
+        return from_vv.lines()[max_idx]
+
+    def create_vertex_coordinate_map(self, tx: int, top_edge_key: tuple, bottom_edge_key: tuple, virtual_vertices: dict, \
+                                     top_keys: list, bottom_keys: list, top_vidxs: list, base_vertical_axis: MVector3D):
         vertex_coordinate_map = {}
 
         vertex_coordinate_map[bottom_edge_key] = {'x': tx, 'y': 0, 'vv': bottom_edge_key}
 
         return self.create_vertex_direction(vertex_coordinate_map, tx, -1, bottom_edge_key, top_edge_key, bottom_edge_key, virtual_vertices, \
-                                            top_keys, bottom_keys, base_vertical_axis)
+                                            top_keys, bottom_keys, top_vidxs, base_vertical_axis)
 
     def create_vertex_direction(self, vertex_coordinate_map: list, tx: int, ty: int, from_key: tuple, top_edge_key: tuple, bottom_edge_key: tuple, \
-                                virtual_vertices: dict, top_keys: list, bottom_keys: list, base_vertical_axis: MVector3D):
+                                virtual_vertices: dict, top_keys: list, bottom_keys: list, top_vidxs: list, base_vertical_axis: MVector3D, loop=0):
+
+        if loop > 500:
+            return None
 
         top_edge_vv = virtual_vertices[top_edge_key]
-        top_edge_pos = top_edge_vv.position()
+        # top_edge_pos = top_edge_vv.position()
         bottom_edge_vv = virtual_vertices[bottom_edge_key]
-        bottom_edge_pos = bottom_edge_vv.position()
+        # bottom_edge_pos = bottom_edge_vv.position()
 
-        # http://www.sousakuba.com/Programming/gs_near_pos_on_line.html
-        # 始端と終端を繋いだ線分
-        top_bottom_direction = top_edge_pos - bottom_edge_pos
-        top_bottom_normal_direction = top_bottom_direction.normalized()
+        # # http://www.sousakuba.com/Programming/gs_near_pos_on_line.html
+        # # 始端と終端を繋いだ線分
+        # top_bottom_direction = top_edge_pos - bottom_edge_pos
+        # top_bottom_normal_direction = top_bottom_direction.normalized()
 
         logger.debug('-----------')
         logger.debug(f'create_vertex_direction: tx: {tx}, ty: {ty}, top: {top_edge_vv.vidxs()}, bottom: {bottom_edge_vv.vidxs()}')
 
-        # FROMから繋がる辺
-        from_vv = virtual_vertices[from_key]
-        from_pos = from_vv.position()
-        from_edge_lines = from_vv.lines()
+        vertical_key = self.get_vertical_key(from_key, bottom_edge_key, top_edge_key, virtual_vertices, base_vertical_axis)
+        logger.debug(f'direction: from: [{virtual_vertices[from_key].vidxs()}], to: [{virtual_vertices[vertical_key].vidxs()}]')
 
-        if not from_edge_lines:
-            return vertex_coordinate_map
+        vertex_coordinate_map[vertical_key] = {'x': tx, 'y': ty, 'vv': vertical_key}
 
-        to_vv_dots = []
-        for tvv_key in from_edge_lines:
-            if tvv_key not in bottom_keys:
-                # tvv = virtual_vertices[tvv_key]
-                # tvv_pos = tvv.position()
-                # from_to_direction = (tvv_pos - from_pos)
-
-                # # Z方向法線
-                # from_to_z_pos = MVector3D.crossProduct(from_to_direction, tvv.normal(base_vertical_axis))
-                # from_to_y_pos = MVector3D.crossProduct(from_to_z_pos, from_to_direction)
-                # from_to_qq = MQuaternion.fromDirection(from_to_direction.normalized(), from_to_y_pos.normalized())
-
-                # mat = MMatrix4x4()
-                # mat.setToIdentity()
-                # mat.translate(from_pos)
-                # mat.rotate(from_to_qq)
-
-                # from_to_vertical_direction = mat * base_vertical_axis
-                # dot = MVector3D.dotProduct(from_to_vertical_direction.normalized(), top_bottom_normal_direction)
-                # to_vv_dots.append(dot)
-
-                tvv = virtual_vertices[tvv_key]
-                tvv_pos = tvv.position()
-                from_to_vertical_direction = (tvv_pos - from_pos).normalized()
-
-                dot = MVector3D.dotProduct(top_bottom_normal_direction, from_to_vertical_direction)
-                to_vv_dots.append(dot)
-
-                logger.debug(f'to_vv: vidx: [{tvv.vidxs()}], from: [{from_pos.to_log()}], to: [{tvv_pos.to_log()}], vertical: [{from_to_vertical_direction.to_log()}], dot: [{round(dot, 5)}]')
-            else:
-                to_vv_dots.append(0)
-
-        if len(to_vv_dots) == 0 or (np.array(to_vv_dots) == 0).all():
-            return vertex_coordinate_map
-
-        # 進行方向のキー(1つだけ)
-        direction_key = from_edge_lines[np.argmax(to_vv_dots)]
-        logger.debug(f'direction: from: [{from_vv.vidxs()}], to: [{virtual_vertices[direction_key].vidxs()}]')
-        vertex_coordinate_map[direction_key] = {'x': tx, 'y': ty, 'vv': direction_key}
-
-        # logger.debug(f'to_vv: from: [{from_vv.vidxs()}], to: [{ver.to_log()}], vertical: [{vertical_pos.to_log()}], dot: [{round(dot, 5)}]')
-
-        if direction_key in top_keys:
+        if np.isin(np.array([v.index for v in virtual_vertices[vertical_key].real_vertices]), np.array(top_vidxs)).any():
             # 上端に辿り着いたら終了
             return vertex_coordinate_map
 
-        return self.create_vertex_direction(vertex_coordinate_map, tx, ty - 1, direction_key, top_edge_key, bottom_edge_key, virtual_vertices, \
-                                            top_keys, bottom_keys, base_vertical_axis)
+        return self.create_vertex_direction(vertex_coordinate_map, tx, ty - 1, vertical_key, top_edge_key, bottom_edge_key, virtual_vertices, \
+                                            top_keys, bottom_keys, top_vidxs, base_vertical_axis, loop + 1)
 
     # エッジを繋いでいく
-    def get_edge_lines(self, edge_line_pairs: dict, virtual_vertices: dict, start_vkey: tuple, edge_lines: list, edge_vkeys: list):
-        if len(edge_vkeys) >= len(edge_line_pairs.keys()):
+    def get_edge_lines(self, edge_line_pairs: dict, virtual_vertices: dict, start_vkey: tuple, edge_lines: list, edge_vkeys: list, loop=0):
+        if len(edge_vkeys) >= len(edge_line_pairs.keys()) or loop > 500:
             return start_vkey, edge_lines, edge_vkeys
         
         if not start_vkey:
@@ -4647,7 +4832,7 @@ class PmxTailorExportService():
             if next_vkey not in edge_vkeys:
                 edge_lines[-1].append(next_vkey)
                 edge_vkeys.append(next_vkey)
-                start_vkey, edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, virtual_vertices, next_vkey, edge_lines, edge_vkeys)
+                start_vkey, edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, virtual_vertices, next_vkey, edge_lines, edge_vkeys, loop + 1)
 
         return None, edge_lines, edge_vkeys
 

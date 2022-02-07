@@ -423,6 +423,7 @@ cdef class MVector3D:
 
     def to_key(self):
         return (round(self.__data[0], 1), round(self.__data[1], 1), round(self.__data[2], 1))
+        # return (round(self.__data[0] * 5) / 5, round(self.__data[1] * 5) / 5, round(self.__data[2] * 5) / 5)
 
     def __str__(self):
         return "MVector3D({0}, {1}, {2})".format(self.__data[0], self.__data[1], self.__data[2])
