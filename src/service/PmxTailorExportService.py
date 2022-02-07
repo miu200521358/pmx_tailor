@@ -4024,7 +4024,7 @@ class PmxTailorExportService():
                     dot = MVector3D.dotProduct(prev_direction, now_direction)
                     prev_dot = 0
                     if m > 2:
-                        prev_prev_vkey = edge_line[m - 2]
+                        prev_prev_vkey = edge_line[m - 3]
                         prev_prev_pos = virtual_vertices[prev_prev_vkey].position()
                         prev_prev_direction = (prev_pos - prev_prev_pos).normalized()
                         prev_dot = MVector3D.dotProduct(prev_direction, prev_prev_direction)
@@ -4076,49 +4076,49 @@ class PmxTailorExportService():
         vertical_edge_lines = []
         horizonal_edge_lines = []
         for i, edge_lines in enumerate(all_edge_lines):
-            if len(edge_lines) > 1:
-                edge_dots = []
-                for n, edge_line in enumerate(edge_lines):
-                    edge_dots.append([])
-                    for m, edge_vkey in enumerate(edge_line):
-                        if m == 0:
-                            logger.debug(f'[{n:02d}-{m:03d}] {edge_vkey}({virtual_vertices[edge_vkey].vidxs()}) **')
-                        else:
-                            now_vkey = edge_line[m - 1]
-                            next_vkey = edge_line[m]
-                            now_pos = virtual_vertices[now_vkey].position()
-                            next_pos = virtual_vertices[next_vkey].position()
-                            now_direction = (next_pos - now_pos).normalized()
-
-                            # ローカル軸のvertical方向を求める
-                            mat = MMatrix4x4()
-                            mat.setToIdentity()
-                            mat.translate(now_pos)
-                            mat.rotate(MQuaternion.rotationTo(now_direction, base_vertical_axis))
-
-                            vertical_pos = mat * base_vertical_axis
-                            vertical_direction = (vertical_pos - now_pos).normalized()
-
-                            dot = MVector3D.dotProduct(vertical_direction, now_direction)
-                            edge_dots[-1].append(dot)
-                            logger.debug(f'[{n:02d}-{m:03d}] {edge_vkey}({virtual_vertices[edge_vkey].vidxs()}) - {now_direction.to_log()} ({dot})')
-                    logger.debug('--------------')
-
-                # 全体のmeanで切り分ける
-                mean_dot = np.mean([np.mean(np.abs(np.array(ed))) for ed in edge_dots])
-                for n, (edge_line, edge_dot) in enumerate(zip(edge_lines, edge_dots)):
-                    edge_mean = np.mean(np.abs(edge_dot))
-                    if round(edge_mean, 3) >= round(mean_dot, 3):
-                        # 進行方向と同じ向きの場合、水平方向
-                        horizonal_edge_lines.append(edge_line)
-                        logger.debug(f'[{n:02d}-horizonal] {edge_mean} - {mean_dot}')
+            # if len(edge_lines) > 1:
+            edge_dots = []
+            for n, edge_line in enumerate(edge_lines):
+                edge_dots.append([])
+                for m, edge_vkey in enumerate(edge_line):
+                    if m == 0:
+                        logger.debug(f'[{n:02d}-{m:03d}] {edge_vkey}({virtual_vertices[edge_vkey].vidxs()}) **')
                     else:
-                        vertical_edge_lines.append(edge_line)
-                        all_vertical_edge_lines.extend(edge_line)
-                        logger.debug(f'[{n:02d}-vertical] {edge_mean} - {mean_dot}')
-            else:
-                # 一辺しかない場合、水平とみなす
-                horizonal_edge_lines.append(edge_lines[0])
+                        now_vkey = edge_line[m - 1]
+                        next_vkey = edge_line[m]
+                        now_pos = virtual_vertices[now_vkey].position()
+                        next_pos = virtual_vertices[next_vkey].position()
+                        now_direction = (next_pos - now_pos).normalized()
+
+                        # # ローカル軸のvertical方向を求める
+                        # mat = MMatrix4x4()
+                        # mat.setToIdentity()
+                        # mat.translate(now_pos)
+                        # mat.rotate(MQuaternion.rotationTo(now_direction, base_vertical_axis))
+
+                        # vertical_pos = mat * base_vertical_axis
+                        # vertical_direction = (vertical_pos - now_pos).normalized()
+
+                        dot = MVector3D.dotProduct(base_vertical_axis, now_direction)
+                        edge_dots[-1].append(dot)
+                        logger.debug(f'[{n:02d}-{m:03d}] {edge_vkey}({virtual_vertices[edge_vkey].vidxs()}) - {now_direction.to_log()} ({dot})')
+                logger.debug('--------------')
+
+            # 全体のmeanで切り分ける
+            mean_dot = np.mean([np.mean(np.abs(np.array(ed))) for ed in edge_dots])
+            for n, (edge_line, edge_dot) in enumerate(zip(edge_lines, edge_dots)):
+                edge_mean = np.mean(np.abs(edge_dot))
+                if round(edge_mean, 3) <= round(mean_dot, 3):
+                    # base_axisより小さい場合、水平方向
+                    horizonal_edge_lines.append(edge_line)
+                    logger.debug(f'[{n:02d}-horizonal] {edge_mean} - {mean_dot}')
+                else:
+                    vertical_edge_lines.append(edge_line)
+                    all_vertical_edge_lines.extend(edge_line)
+                    logger.debug(f'[{n:02d}-vertical] {edge_mean} - {mean_dot}')
+            # else:
+            #     # 一辺しかない場合、水平とみなす
+            #     horizonal_edge_lines.append(edge_lines[0])
 
         logger.info("%s: 水平エッジの上下判定", material_name)
 
@@ -4714,7 +4714,7 @@ class PmxTailorExportService():
         top_pos = top_vv.position()
         bottom_vv = virtual_vertices[bottom_key]
         bottom_pos = bottom_vv.position()
-        local_next_direction = MVector3D(1, 0, 0)
+        # local_next_direction = MVector3D(1, 0, 0)
 
         # # ボーン進行方向(x)
         # bottom_direction = (bottom_pos - top_pos)
@@ -4728,13 +4728,13 @@ class PmxTailorExportService():
 
         # ボーン進行方向(x)
         bottom_direction = (bottom_pos - top_pos)
-        bottom_qq = MQuaternion.rotationTo(local_next_direction, bottom_direction.normalized())
+        bottom_qq = MQuaternion.rotationTo(base_vertical_axis, bottom_direction.normalized())
 
         from_vv = virtual_vertices[from_key]
         from_pos = from_vv.position()
 
         dots = []
-        scores = []
+        # scores = []
         for n, to_key in enumerate(from_vv.lines()):
             if to_key == from_key:
                 dots.append(0)
@@ -4750,26 +4750,26 @@ class PmxTailorExportService():
 
             local_next_vpos = (mat.inverted() * to_pos).normalized()
 
-            vec_yaw1 = (local_next_direction * MVector3D(1, 0, 1)).normalized()
-            vec_yaw2 = (local_next_vpos * MVector3D(1, 0, 1)).normalized()
-            yaw_score = calc_ratio(MVector3D.dotProduct(vec_yaw1, vec_yaw2), -1, 1, 0, 1)
+            # vec_yaw1 = (local_next_direction * MVector3D(1, 0, 1)).normalized()
+            # vec_yaw2 = (local_next_vpos * MVector3D(1, 0, 1)).normalized()
+            # yaw_score = calc_ratio(MVector3D.dotProduct(vec_yaw1, vec_yaw2), -1, 1, 0, 1)
 
-            vec_pitch1 = (local_next_direction * MVector3D(0, 1, 1)).normalized()
-            vec_pitch2 = (local_next_vpos * MVector3D(0, 1, 1)).normalized()
-            pitch_score = calc_ratio(MVector3D.dotProduct(vec_pitch1, vec_pitch2), -1, 1, 0, 1)
+            # vec_pitch1 = (local_next_direction * MVector3D(0, 1, 1)).normalized()
+            # vec_pitch2 = (local_next_vpos * MVector3D(0, 1, 1)).normalized()
+            # pitch_score = calc_ratio(MVector3D.dotProduct(vec_pitch1, vec_pitch2), -1, 1, 0, 1)
 
-            vec_roll1 = (local_next_direction * MVector3D(1, 1, 0)).normalized()
-            vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
-            roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
+            # vec_roll1 = (local_next_direction * MVector3D(1, 1, 0)).normalized()
+            # vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
+            # roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
 
-            score = (yaw_score * 10) + (pitch_score * 10) + roll_score
-            scores.append(score)
+            # score = (yaw_score * 10) + (pitch_score * 10) + roll_score
+            # scores.append(score)
 
-            dot = MVector3D.dotProduct(local_next_direction, local_next_vpos)
+            dot = MVector3D.dotProduct(base_vertical_axis, local_next_vpos)
             dots.append(dot)
             # mats.append(mat)
 
-            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], yaw: {yaw_score}, pitch: {pitch_score}, roll: {roll_score}, score: {score}')
+            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], dot: {dot}')
 
         max_idx = np.argmax(dots)
 
@@ -4791,19 +4791,69 @@ class PmxTailorExportService():
             return None
 
         top_edge_vv = virtual_vertices[top_edge_key]
-        # top_edge_pos = top_edge_vv.position()
+        top_edge_pos = top_edge_vv.position()
         bottom_edge_vv = virtual_vertices[bottom_edge_key]
-        # bottom_edge_pos = bottom_edge_vv.position()
-
-        # # http://www.sousakuba.com/Programming/gs_near_pos_on_line.html
-        # # 始端と終端を繋いだ線分
-        # top_bottom_direction = top_edge_pos - bottom_edge_pos
-        # top_bottom_normal_direction = top_bottom_direction.normalized()
+        bottom_edge_pos = bottom_edge_vv.position()
 
         logger.debug('-----------')
         logger.debug(f'create_vertex_direction: tx: {tx}, ty: {ty}, top: {top_edge_vv.vidxs()}, bottom: {bottom_edge_vv.vidxs()}')
+        
+        bottom_direction = (top_edge_pos - bottom_edge_pos)
+        bottom_qq = MQuaternion.rotationTo(base_vertical_axis, bottom_direction.normalized())
 
-        vertical_key = self.get_vertical_key(from_key, bottom_edge_key, top_edge_key, virtual_vertices, base_vertical_axis)
+        prev_pos = None
+        if len(list(vertex_coordinate_map.keys())) > 1:
+            prev_key = vertex_coordinate_map[list(vertex_coordinate_map.keys())[-2]]['vv']
+            prev_vv = virtual_vertices[prev_key]
+            prev_pos = prev_vv.position()
+
+        from_vv = virtual_vertices[from_key]
+        from_pos = from_vv.position()
+
+        dots = []
+        # scores = []
+        for n, to_key in enumerate(from_vv.lines()):
+            if to_key in list(vertex_coordinate_map.keys()):
+                dots.append(0)
+                continue
+
+            to_vv = virtual_vertices[to_key]
+            to_pos = to_vv.position()
+
+            mat = MMatrix4x4()
+            mat.setToIdentity()
+            mat.translate(from_pos)
+            mat.rotate(bottom_qq)
+
+            local_next_vpos = (mat.inverted() * to_pos).normalized()
+
+            # vec_yaw1 = (local_next_direction * MVector3D(1, 0, 1)).normalized()
+            # vec_yaw2 = (local_next_vpos * MVector3D(1, 0, 1)).normalized()
+            # yaw_score = calc_ratio(MVector3D.dotProduct(vec_yaw1, vec_yaw2), -1, 1, 0, 1)
+
+            # vec_pitch1 = (local_next_direction * MVector3D(0, 1, 1)).normalized()
+            # vec_pitch2 = (local_next_vpos * MVector3D(0, 1, 1)).normalized()
+            # pitch_score = calc_ratio(MVector3D.dotProduct(vec_pitch1, vec_pitch2), -1, 1, 0, 1)
+
+            # vec_roll1 = (local_next_direction * MVector3D(1, 1, 0)).normalized()
+            # vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
+            # roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
+
+            # score = (yaw_score * 10) + (pitch_score * 10) + roll_score
+            # scores.append(score)
+
+            local_dot = MVector3D.dotProduct(base_vertical_axis, local_next_vpos)
+            prev_dot = MVector3D.dotProduct((from_pos - prev_pos).normalized(), (to_pos - from_pos).normalized()) if prev_pos else 1
+            dots.append(local_dot * prev_dot)
+            # mats.append(mat)
+
+            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_dot: {round(local_dot, 5)}, prev_dot: {round(prev_dot, 5)}')
+
+        max_idx = np.argmax(dots)
+
+        vertical_key = from_vv.lines()[max_idx]
+
+        # vertical_key = self.get_vertical_key(from_key, bottom_edge_key, top_edge_key, virtual_vertices, base_vertical_axis)
         logger.debug(f'direction: from: [{virtual_vertices[from_key].vidxs()}], to: [{virtual_vertices[vertical_key].vidxs()}]')
 
         vertex_coordinate_map[vertical_key] = {'x': tx, 'y': ty, 'vv': vertical_key}
