@@ -3964,9 +3964,13 @@ class PmxTailorExportService():
             for edge_vkey in edge_line:
                 edge_pos = virtual_vertices[edge_vkey].position()
                 qq = MQuaternion.rotationTo(edge_start_vec, edge_pos - edge_mean_pos)
-                degree = qq.toDegree()
-                if edge_pos.x() < 0:
-                    degree *= -1
+                degree = qq.toDegreeSign(base_vertical_axis)
+                if np.isclose(MVector3D.dotProduct(edge_start_vec.normalized(), (edge_pos - edge_mean_pos).normalized()), -1):
+                    # ほぼ真後ろを向いてる場合、固定で180度を入れておく
+                    degree = 180
+                if degree < 0:
+                    # マイナスになった場合、360を足しておく
+                    degree += 360
                 edge_degrees.append(degree)
                 edge_poses.append(edge_pos.data())
                 edge_distances.append(edge_pos.distanceToPoint(edge_mean_pos))
@@ -4174,6 +4178,10 @@ class PmxTailorExportService():
 
         logger.info("%s: 水平エッジの開始位置判定", material_name)
 
+        top_vidxs = []
+        for tk in all_top_horizonal_edge_lines:
+            top_vidxs.extend([v.index for v in virtual_vertices[tk].real_vertices])
+
         logger.debug(f'[all_top_horizonal_edge_lines] {all_top_horizonal_edge_lines}')
 
         logger.debug('--------------------------------------')
@@ -4205,6 +4213,26 @@ class PmxTailorExportService():
             # 繋がっていて、かつ下の頂点がそこまで多くない場合、上を下に合わせて調整する
             vertical_dots = []
             for n, top_edge_vkey in enumerate(all_top_horizonal_edge_lines):
+                # vcmap = self.create_vertex_coordinate_map(n, top_edge_vkey, bottom_key, virtual_vertices, all_top_horizonal_edge_lines, \
+                #                                           all_bottom_horizonal_edge_lines, top_vidxs, base_vertical_axis * -1)
+                # dots = []
+                # if vcmap:
+                #     prev_to_key = None
+                #     prev_prev_to_key = None
+                #     for m, (to_key, vcm) in enumerate(vcmap.items()):
+                #         if m > 1:
+                #             to_pos = virtual_vertices[to_key].position()
+                #             prev_to_pos = virtual_vertices[prev_to_key].position()
+                #             prev_prev_to_pos = virtual_vertices[prev_prev_to_key].position()
+                #             dots.append(MVector3D.dotProduct((to_pos - prev_to_pos).normalized(), (prev_to_pos - prev_prev_to_pos).normalized()))
+                #         prev_prev_to_key = prev_to_key
+                #         prev_to_key = to_key
+                # else:
+                #     dots = [0]
+
+                # vertical_dots.append(np.mean(dots))
+                # logger.debug(f'[{n:03d}], dot[{np.round(dots, decimals=3)}]')
+
                 top_vv = virtual_vertices[top_edge_vkey]
                 top_pos = top_vv.position()
                 top_bottom_direction = (bottom_pos - top_pos)
@@ -4450,10 +4478,6 @@ class PmxTailorExportService():
 
         logger.info("%s: 水平エッジの距離比率-上部: %s", material_name, [f'{virtual_vertices[athel].vidxs()}({round(tdr, 4)})' for athel, tdr in zip(all_top_horizonal_edge_lines, top_distance_ratios)])
         logger.info("%s: 水平エッジの距離比率-下部: %s", material_name, [f'{virtual_vertices[abhel].vidxs()}({round(bdr, 4)})' for abhel, bdr in zip(all_bottom_horizonal_edge_lines, bottom_distance_ratios)])
-
-        top_vidxs = []
-        for tk in top_keys:
-            top_vidxs.extend([v.index for v in virtual_vertices[tk].real_vertices])
 
         bx = 0
         xx = 0
@@ -4858,7 +4882,7 @@ class PmxTailorExportService():
 
             # dots.append(local_dot * prev_dot)
 
-            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, local_dot: {round(local_dot, 5)}')   # noqa
+            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, prev_dot: {round(prev_dot, 5)}')   # noqa
 
         if np.count_nonzero(scores) == 0:
             # スコアが付けられなくなったら終了
