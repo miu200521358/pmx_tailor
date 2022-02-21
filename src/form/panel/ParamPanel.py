@@ -4,6 +4,7 @@ import wx
 import wx.lib.newevent
 from wx.grid import Grid, GridCellChoiceEditor, EVT_GRID_CELL_CHANGING
 
+import glob
 import json
 import os
 import unicodedata
@@ -44,6 +45,12 @@ class ParamPanel(BasePanel):
 
         self.btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
+        # Vroid2Pmxインポートボタン
+        self.clear_btn_ctrl = wx.Button(self.header_panel, wx.ID_ANY, logger.transtext("Vroid2Pmx設定インポート ... "), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.clear_btn_ctrl.SetToolTip(logger.transtext("Vroid2Pmxで出力したPmxTailor用設定データを選択インポートします。"))
+        self.clear_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_vroid2pmx_import)
+        self.btn_sizer.Add(self.clear_btn_ctrl, 0, wx.ALL, 5)
+
         # 材質設定クリアボタン
         self.clear_btn_ctrl = wx.Button(self.header_panel, wx.ID_ANY, logger.transtext("物理設定クリア"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.clear_btn_ctrl.SetToolTip(logger.transtext("既に入力されたデータをすべて空にします。"))
@@ -79,6 +86,55 @@ class ParamPanel(BasePanel):
         self.scrolled_window.Layout()
         self.sizer.Add(self.scrolled_window, 1, wx.ALL | wx.EXPAND | wx.FIXED_MINSIZE, 5)
         self.fit()
+    
+    def on_vroid2pmx_import(self, event: wx.Event):
+        file_pathes = glob.glob(os.path.join(os.path.dirname(self.frame.file_panel_ctrl.org_model_file_ctrl.path()), 'PmxTailorSetting', '*.json'))
+        file_names = [os.path.basename(fpath) for fpath in file_pathes]
+
+        with wx.MultiChoiceDialog(self.frame, logger.transtext("インポートしたい設定を選んで、OKボタンをクリックしてください。複数選択OKです。\n件数が多い場合、読み込み完了まで少し時間がかかります。"), \
+                                  caption="Vroid2Pmx設定インポート選択", choices=file_names,
+                                  style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE) as choiceDialog:
+
+            if choiceDialog.ShowModal() == wx.ID_CANCEL:
+                return     # the user changed their mind
+
+            ng_setting_names = []
+            for i, cidx in enumerate(choiceDialog.GetSelections()):
+                # 選択された数だけ設定追加
+                if i > 0:
+                    # 1番目以降はまずエリア追加
+                    self.on_add(event)
+
+                try:
+                    with open(file_pathes[cidx], 'r', encoding='utf-8') as f:
+                        vroid2pmx_setting = json.load(f)
+
+                        self.physics_list[-1].simple_material_ctrl.SetStringSelection(vroid2pmx_setting["material_name"])
+                        self.physics_list[-1].simple_parent_bone_ctrl.SetStringSelection(vroid2pmx_setting["parent_bone_name"])
+                        self.physics_list[-1].simple_abb_ctrl.ChangeValue(vroid2pmx_setting["abb_name"])
+                        self.physics_list[-1].simple_group_ctrl.SetStringSelection(vroid2pmx_setting["group"])
+                        self.physics_list[-1].simple_direction_ctrl.SetStringSelection(vroid2pmx_setting["direction"])
+                        self.physics_list[-1].simple_exist_physics_clear_ctrl.SetStringSelection(vroid2pmx_setting["exist_physics_clear"])
+                        self.physics_list[-1].simple_primitive_ctrl.SetStringSelection(vroid2pmx_setting["primitive"])
+
+                        self.physics_list[-1].set_simple_primitive(event)
+                        self.physics_list[-1].initialize_bone_param(event)
+
+                        for c, target_bone_cols in enumerate(vroid2pmx_setting['target_bones']):
+                            for r, target_bone_name in enumerate(target_bone_cols):
+                                if r < self.physics_list[-1].bone_grid.GetNumberRows() and c < self.physics_list[-1].bone_grid.GetNumberCols():
+                                    self.physics_list[-1].bone_grid.GetTable().SetValue(r, c, target_bone_name)
+                except Exception:
+                    ng_setting_names.append(file_names[cidx])
+
+            if len(ng_setting_names) == 0:
+                dialog = wx.MessageDialog(self.frame, logger.transtext("Vroid2Pmxからの設定JSONのインポートに成功しました。"), style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
+            else:
+                dialog = wx.MessageDialog(self.frame, logger.transtext("Vroid2Pmxからの設定JSONのインポートに一部失敗しました。\n\n{0}").format(','.join(ng_setting_names)), style=wx.OK)
+                dialog.ShowModal()
+                dialog.Destroy()
 
     def on_add(self, event: wx.Event):
         self.physics_list.append(PhysicsParam(self.frame, self, self.scrolled_window, self.frame.advance_param_panel_ctrl.scrolled_window, \
