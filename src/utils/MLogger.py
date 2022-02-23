@@ -40,6 +40,7 @@ class MLogger():
     MODE_UPDATE = 1
 
     total_level = logging.INFO
+    default_level = logging.INFO
     is_file = False
     mode = MODE_READONLY
     outout_datetime = ""
@@ -164,6 +165,9 @@ class MLogger():
             
         kwargs["level"] = logging.CRITICAL
         self.print_logger(msg, *args, **kwargs)
+    
+    def is_debug_level(self):
+        return self.default_level <= MLogger.DEBUG
 
     # 実際に出力する実態
     def print_logger(self, org_msg, *args, **kwargs):

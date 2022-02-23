@@ -397,9 +397,9 @@ class PhysicsParam():
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
 
-        # 材質頂点類似度
-        self.simple_similarity_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("検出度"), wx.DefaultPosition, wx.DefaultSize, 0)
-        self.simple_similarity_txt.SetToolTip(logger.transtext("材質内の頂点を検出する時の傾き等の類似度\n値を小さくすると傾きが違っていても検出しやすくなりますが、誤検知が増える可能性があります。"))
+        # 材質頂点密集度
+        self.simple_similarity_txt = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("密集度"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_txt.SetToolTip(logger.transtext("材質の厚みや密集の度合い。\n値を大きくすると、厚みのある材質でも一枚ものとみなして処理できます。\n値を小さくすると、細かいメッシュも別頂点として処理できます。"))
         self.simple_similarity_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_txt, 0, wx.ALL, 5)
 
@@ -407,15 +407,15 @@ class PhysicsParam():
         self.simple_similarity_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_label, 0, wx.ALL, 5)
 
-        self.simple_similarity_min_label = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("0.3"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_min_label = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("0.1"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_similarity_min_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_min_label, 0, wx.ALL, 5)
 
         self.simple_similarity_slider = \
-            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.75, 0.3, 1, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
+            FloatSliderCtrl(self.simple_window, wx.ID_ANY, 0.75, 0.1, 3, 0.01, self.simple_similarity_label, wx.DefaultPosition, (350, 30), wx.SL_HORIZONTAL)
         self.simple_grid_sizer.Add(self.simple_similarity_slider, 1, wx.ALL | wx.EXPAND, 5)
 
-        self.simple_similarity_max_label = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("1"), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.simple_similarity_max_label = wx.StaticText(self.simple_window, wx.ID_ANY, logger.transtext("3"), wx.DefaultPosition, wx.DefaultSize, 0)
         self.simple_similarity_max_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_similarity_max_label, 0, wx.ALL, 5)
 
