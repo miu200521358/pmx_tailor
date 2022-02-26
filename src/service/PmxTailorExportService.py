@@ -321,10 +321,10 @@ class PmxTailorExportService():
             edge_dot_mean = np.mean(np.abs(edge_dots))
             edge_dot_diff_max = np.max(np.abs(np.abs(edge_dots) - edge_dot_mean))
 
-            logger.debug(f'[{n:02d}] direction[{np.round(direction_dot_mean, 4)}], dot[{np.round(direction_dots, 4)}]')
+            logger.debug(f'[{n:02d}] direction[{np.round(direction_dot_mean, 4)}], dot[{np.round(direction_dots, 4)}], edge_dot_diff_max[{round(edge_dot_diff_max, 4)}]')
             logger.debug(f'[{n:02d}] mean[{np.round(edge_dot_mean, 4)}], dot[{np.round(edge_dots, 4)}] diff[{np.round(np.array(edge_dots) - edge_dot_mean, 4)}] diffmax[{np.round(edge_dot_diff_max, 4)}]')     # noqa
 
-            if edge_dot_diff_max > 0.3:
+            if edge_dot_diff_max > 0.5:
                 # 内積差が大きい場合、エッジが分断されてるとみなす
                 logger.debug(f'[{n:02d}] corner[{np.where(edge_dots < edge_dot_mean)[0].tolist()}]')
                 slice_idxs = np.where(edge_dots < edge_dot_mean)[0].tolist()
