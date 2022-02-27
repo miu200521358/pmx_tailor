@@ -1081,7 +1081,11 @@ cdef class MQuaternion:
 
     # 軸による符号付き角度に変換
     cpdef double toDegreeSign(self, MVector3D local_axis):
-        cdef double deg =  self.toDegree() * np.sign(MVector3D.dotProduct(self.vector(), local_axis)) * np.sign(self.scalar())
+        cdef double deg =  self.toDegree()
+        cdef double sign = np.sign(MVector3D.dotProduct(self.vector(), local_axis)) * np.sign(self.scalar())
+
+        if sign != 0:
+            deg *= sign
 
         if abs(deg) > 180:
             # 180度を超してる場合、フリップなので、除去
