@@ -172,10 +172,130 @@ class PmxTailorExportService():
             
             if not vertex_maps:
                 return False
-
-    def create_bone(self, model: PmxModel, param_option: dict, vertex_maps: dict, virtual_vertices: dict):
-        pass
             
+            # 各頂点の有効INDEX数が最も多いものをベースとする
+            map_cnt = []
+            for vertex_map in vertex_maps:
+                map_cnt.append(np.count_nonzero(~np.isinf(vertex_map)) / 3)
+
+            if len(map_cnt) == 0:
+                logger.warning("有効な頂点マップが生成できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                return False
+            
+            vertex_map_orders = [k for k in np.argsort(-np.array(map_cnt)) if map_cnt[k] > np.max(map_cnt) * 0.5]
+            
+            logger.info("【%s】ボーン生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
+            
+            root_bone, virtual_vertices \
+                = self.create_bone(model, param_option, material_name, virtual_vertices, vertex_maps, vertex_map_orders)
+
+        return True
+
+    def create_bone(self, model: PmxModel, param_option: dict, material_name: str, virtual_vertices: dict, vertex_maps: dict, vertex_map_orders: dict):
+        # 中心ボーン生成
+
+        # 略称
+        abb_name = param_option['abb_name']
+        # 表示枠名
+        display_name = f"{abb_name}:{material_name}"
+        # 親ボーン
+        parent_bone = model.bones[param_option['parent_bone_name']]
+
+        # 表示枠定義
+        model.display_slots[display_name] = DisplaySlot(display_name, display_name, 0, 0)
+
+        # 中心ボーン
+        root_bone = Bone(f'{abb_name}中心', f'{abb_name}Root', parent_bone.position, \
+                         parent_bone.index, 0, 0x0000 | 0x0002 | 0x0004 | 0x0008 | 0x0010)
+        root_bone.index = len(model.bones)
+        model.bones[root_bone.name] = root_bone
+        model.bone_indexes[root_bone.index] = root_bone.name
+
+        logger.info("%s: 頂点距離の算出", material_name)
+
+        all_bone_horizonal_distances = {}
+        all_bone_vertical_distances = {}
+
+        for base_map_idx, vertex_map in enumerate(vertex_maps):
+            bone_horizonal_distances = np.zeros((vertex_map.shape[0], vertex_map.shape[1] + 1))
+            bone_vertical_distances = np.zeros((vertex_map.shape[0], vertex_map.shape[1]))
+
+            # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
+            for v_yidx in range(vertex_map.shape[0]):
+                for v_xidx in range(1, vertex_map.shape[1]):
+                    if (vertex_map[v_yidx, v_xidx] != np.inf).all() and (vertex_map[v_yidx, v_xidx - 1] != np.inf).all():
+                        now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
+                        prev_v_vec = now_v_vec if v_xidx == 0 else virtual_vertices[tuple(vertex_map[v_yidx, v_xidx - 1])].position()
+                        bone_horizonal_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                    if (vertex_map[v_yidx, v_xidx] != np.inf).all() and (vertex_map[v_yidx - 1, v_xidx] != np.inf).all():
+                        now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
+                        prev_v_vec = now_v_vec if v_yidx == 0 else virtual_vertices[tuple(vertex_map[v_yidx - 1, v_xidx])].position()
+                        bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                if (vertex_map[v_yidx, v_xidx] != np.inf).all() and (vertex_map[v_yidx, 0] != np.inf).all():
+                    # 輪を描いたのも入れとく(ウェイト対象取得の時に範囲指定入るからここでは強制)
+                    now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
+                    prev_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, 0])].position()
+                    bone_horizonal_distances[v_yidx, v_xidx + 1] = now_v_vec.distanceToPoint(prev_v_vec)
+
+            all_bone_horizonal_distances[base_map_idx] = bone_horizonal_distances
+            all_bone_vertical_distances[base_map_idx] = bone_vertical_distances
+
+        prev_xs = [0]
+        for base_map_idx in vertex_map_orders:
+            logger.info("%s: ボーン登録: %s個目", material_name, base_map_idx + 1)
+            vertex_map = vertex_maps[base_map_idx]
+            
+            for v_yidx in range(vertex_map.shape[0]):
+                for v_xidx in range(vertex_map.shape[1]):
+                    if (vertex_map[v_yidx, v_xidx] == np.inf).any():
+                        continue
+
+                    v_yno = v_yidx + 1
+                    v_xno = v_xidx + max(prev_xs) + 1
+
+                    vkey = tuple(vertex_map[v_yidx, v_xidx])
+                    vv = virtual_vertices[vkey]
+
+                    if v_yidx == 0:
+                        parent_bone = root_bone
+                    else:
+                        parent_vkey = tuple(vertex_map[v_yidx - 1, v_xidx])
+                        parent_bone = virtual_vertices[parent_vkey].bone
+
+                    if not vv.bone:
+                        # ボーン仮登録
+                        bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
+                        bone = Bone(bone_name, bone_name, vv.position().copy(), parent_bone.index, 0, 0x0000 | 0x0002)
+                        bone.index = len(model.bones)
+                        bone.local_z_vector = vv.normal().copy()
+
+                        bone.parent_index = parent_bone.index
+                        bone.local_x_vector = (bone.position - parent_bone.position).normalized()
+                        bone.local_z_vector *= MVector3D(-1, 1, -1)
+                        bone.flag |= 0x0800
+
+                        if v_yidx > 0:
+                            # 親ボーンの表示先も同時設定
+                            parent_bone.tail_index = bone.index
+                            parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
+                            parent_bone.flag |= 0x0001
+
+                        # 表示枠
+                        parent_bone.flag |= 0x0008 | 0x0010
+                        model.display_slots[display_name].references.append((0, parent_bone.index))
+
+                        vv.bone = bone
+                        model.bones[bone.name] = bone
+                        model.bone_indexes[bone.index] = bone.name
+                        logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
+
+            prev_xs.extend(max(prev_xs) + np.array(list(range(vertex_map.shape[1]))) + 1)
+
+        return root_bone, virtual_vertices
+
+    def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
+        return f'{abb_name}-{(v_yno):03d}-{(v_xno):03d}'
+
     def create_vertex_map(self, model: PmxModel, param_option: dict, material_name: str, target_vertices: list):
         # 閾値（元の検出度ベースで求め直す）
         threshold = param_option['similarity'] / 7.5
@@ -439,20 +559,24 @@ class PmxTailorExportService():
             all_vkeys_list.append([])
             for hi, bhe in enumerate(bhel):
                 for ki, bottom_edge_key in enumerate(bhe):
-                    bottom_degree = bottom_degrees[bottom_edge_key]
-                    if (len(bottom_horizonal_edge_lines) > 0 and ((ki == len(bhe) - 1 and bi < len(bottom_horizonal_edge_lines) - 1) or (ki == 0 and bi > 0))):
-                        # 途中の切れ目である場合、前後の中間角度で見る
-                        bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
-                        if ki == len(bhe) - 1 and hi < len(bottom_horizonal_edge_lines) - 1:
-                            # 末端の場合、次との中間角度
-                            bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
-                        else:
-                            # 開始の場合、前との中間角度
-                            bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
+                    if len(top_degrees) == len(bottom_degrees):
+                        # 同じ列数の場合、そのまま適用
+                        top_edge_key = list(top_degrees.keys())[ki]
+                    else:
+                        bottom_degree = bottom_degrees[bottom_edge_key]
+                        if (len(bottom_horizonal_edge_lines) > 0 and ((ki == len(bhe) - 1 and bi < len(bottom_horizonal_edge_lines) - 1))):
+                            # 途中の切れ目である場合、前後の中間角度で見る
+                            bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
+                            if ki == len(bhe) - 1 and hi < len(bottom_horizonal_edge_lines) - 1:
+                                # 末端の場合、次との中間角度
+                                bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
+                            else:
+                                # 開始の場合、前との中間角度
+                                bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
 
-                    # 近いdegreeのものを選ぶ
-                    top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
-                    top_edge_key = list(top_degrees.keys())[top_idx]
+                        # 近いdegreeのものを選ぶ
+                        top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
+                        top_edge_key = list(top_degrees.keys())[top_idx]
                     logger.debug(f'** start: ({bi:02d}-{hi:02d}), top[{top_edge_key}({virtual_vertices[top_edge_key].vidxs()})][{round(top_degrees[top_edge_key], 3)}], bottom[{bottom_edge_key}({virtual_vertices[bottom_edge_key].vidxs()})][{round(bottom_degrees[bottom_edge_key], 3)}]')   # noqa
 
                     vkeys = self.create_vertex_line_map(top_edge_key, bottom_edge_key, bottom_edge_key, virtual_vertices, \
@@ -469,7 +593,6 @@ class PmxTailorExportService():
         for li, vkeys_list in enumerate(all_vkeys_list):
             logger.info("-- 絶対頂点マップ: %s個目: ---------", midx + 1)
 
-            vertex_maps.append([])
             top_keys = []
             line_dots = []
 
@@ -650,7 +773,7 @@ class PmxTailorExportService():
             vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
             roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
 
-            score = (yaw_score * 10) + (pitch_score * 10) + roll_score
+            score = (yaw_score * 20) + pitch_score + (roll_score * 10)
             # local_dot = MVector3D.dotProduct(base_vertical_axis, local_next_vpos)
             # prev_dot = MVector3D.dotProduct((from_pos - prev_pos).normalized(), (to_pos - from_pos).normalized()) if prev_pos else 1
 
