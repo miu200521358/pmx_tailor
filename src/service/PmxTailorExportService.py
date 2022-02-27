@@ -555,8 +555,10 @@ class PmxTailorExportService():
 
         logger.info('--------------------------')
         all_vkeys_list = []
+        all_scores = []
         for bi, bhel in enumerate(bottom_horizonal_edge_lines):
             all_vkeys_list.append([])
+            all_scores.append([])
             for hi, bhe in enumerate(bhel):
                 for ki, bottom_edge_key in enumerate(bhe):
                     if len(top_degrees) == len(bottom_degrees):
@@ -579,74 +581,75 @@ class PmxTailorExportService():
                         top_edge_key = list(top_degrees.keys())[top_idx]
                     logger.debug(f'** start: ({bi:02d}-{hi:02d}), top[{top_edge_key}({virtual_vertices[top_edge_key].vidxs()})][{round(top_degrees[top_edge_key], 3)}], bottom[{bottom_edge_key}({virtual_vertices[bottom_edge_key].vidxs()})][{round(bottom_degrees[bottom_edge_key], 3)}]')   # noqa
 
-                    vkeys = self.create_vertex_line_map(top_edge_key, bottom_edge_key, bottom_edge_key, virtual_vertices, \
-                                                        top_keys, bottom_keys, base_vertical_axis, [bottom_edge_key])
+                    vkeys, vscores = self.create_vertex_line_map(top_edge_key, bottom_edge_key, bottom_edge_key, virtual_vertices, \
+                                                                 top_keys, bottom_keys, base_vertical_axis, [bottom_edge_key], [1])
                     logger.info('頂点ルート走査[%s-%s-%s]: 終端: %s -> 始端: %s', f'{(bi + 1):04d}', f'{(hi + 1):02d}', f'{(ki + 1):02d}', \
                                 virtual_vertices[vkeys[-1]].vidxs(), virtual_vertices[vkeys[0]].vidxs() if vkeys else 'NG')
                     if vkeys:
                         all_vkeys_list[-1].append(vkeys)
+                        all_scores[-1].append(vscores)
 
         logger.info("%s: 絶対頂点マップの生成", material_name)
         vertex_maps = []
 
         midx = 0
-        for li, vkeys_list in enumerate(all_vkeys_list):
+        for li, (vkeys_list, scores) in enumerate(zip(all_vkeys_list, all_scores)):
             logger.info("-- 絶対頂点マップ: %s個目: ---------", midx + 1)
 
-            top_keys = []
-            line_dots = []
+            # top_keys = []
+            # line_dots = []
 
             logger.info("-- 絶対頂点マップ[%s]: 頂点ルート決定", midx + 1)
 
-            top_vv = virtual_vertices[vkeys[0]]
-            bottom_vv = virtual_vertices[vkeys[-1]]
+            # top_vv = virtual_vertices[vkeys[0]]
+            # bottom_vv = virtual_vertices[vkeys[-1]]
             # top_pos = top_vv.position()
             # bottom_pos = bottom_vv.position()
 
-            for vkeys in vkeys_list:
-                line_dots.append([])
+            # for vkeys in vkeys_list:
+            #     line_dots.append([])
 
-                for y, vkey in enumerate(vkeys):
-                    if y == 0:
-                        line_dots[-1].append(1)
-                        top_keys.append(vkey)
-                    elif y <= 1:
-                        continue
-                    else:
-                        prev_prev_vv = virtual_vertices[vkeys[y - 2]]
-                        prev_vv = virtual_vertices[vkeys[y - 1]]
-                        now_vv = virtual_vertices[vkey]
-                        prev_prev_pos = prev_prev_vv.position()
-                        prev_pos = prev_vv.position()
-                        now_pos = now_vv.position()
-                        prev_direction = (prev_pos - prev_prev_pos).normalized()
-                        now_direction = (now_pos - prev_pos).normalized()
+            #     for y, vkey in enumerate(vkeys):
+            #         if y == 0:
+            #             line_dots[-1].append(1)
+            #             top_keys.append(vkey)
+            #         elif y <= 1:
+            #             continue
+            #         else:
+            #             prev_prev_vv = virtual_vertices[vkeys[y - 2]]
+            #             prev_vv = virtual_vertices[vkeys[y - 1]]
+            #             now_vv = virtual_vertices[vkey]
+            #             prev_prev_pos = prev_prev_vv.position()
+            #             prev_pos = prev_vv.position()
+            #             now_pos = now_vv.position()
+            #             prev_direction = (prev_pos - prev_prev_pos).normalized()
+            #             now_direction = (now_pos - prev_pos).normalized()
 
-                        dot = MVector3D.dotProduct(now_direction, prev_direction)   # * now_pos.distanceToPoint(prev_pos)   # * MVector3D.dotProduct(now_direction, total_direction)   #
-                        line_dots[-1].append(dot)
+            #             dot = MVector3D.dotProduct(now_direction, prev_direction)   # * now_pos.distanceToPoint(prev_pos)   # * MVector3D.dotProduct(now_direction, total_direction)   #
+            #             line_dots[-1].append(dot)
 
-                        logger.debug(f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], dot({y}): {round(dot, 5)}")   # noqa
+            #             logger.debug(f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], dot({y}): {round(dot, 5)}")   # noqa
 
-                logger.info("-- 絶対頂点マップ[%s]: 頂点ルート確認[%s] 始端: %s, 終端: %s, 近似値: %s", midx + 1, len(top_keys), top_vv.vidxs(), bottom_vv.vidxs(), round(np.mean(line_dots[-1]), 4))
+            #     logger.info("-- 絶対頂点マップ[%s]: 頂点ルート確認[%s] 始端: %s, 終端: %s, 近似値: %s", midx + 1, len(top_keys), top_vv.vidxs(), bottom_vv.vidxs(), round(np.mean(line_dots[-1]), 4))
 
             logger.debug('------------------')
-            top_key_cnts = dict(Counter(top_keys))
+            top_key_cnts = dict(Counter([vkeys[0] for vkeys in vkeys_list]))
             target_regists = [False for _ in range(len(vkeys_list))]
             if np.max(list(top_key_cnts.values())) > 1:
                 # 同じ始端から2つ以上の末端に繋がっている場合
                 for top_key, cnt in top_key_cnts.items():
-                    vertex_mean_dots = {}
-                    for x, vkeys in enumerate(vkeys_list):
+                    total_scores = {}
+                    for x, (vkeys, ss) in enumerate(zip(vkeys_list, scores)):
                         if vkeys[0] == top_key:
                             if cnt > 1:
-                                # 2個以上同じ始端から出ている場合は内積の平均値を取る
-                                vertex_mean_dots[x] = np.mean(line_dots[x])
-                                logger.debug(f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], dot: {round(vertex_mean_dots[x], 3)}")   # noqa
+                                # 2個以上同じ始端から出ている場合はスコアの合計を取る
+                                total_scores[x] = np.sum(ss)
+                                logger.debug(f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], total: {round(total_scores[x], 3)}")   # noqa
                             else:
                                 # 1個の場合はそのまま登録
-                                vertex_mean_dots[x] = 1
+                                total_scores[x] = 1
                     # 最も内積平均値が大きい列を登録対象とする
-                    target_regists[list(vertex_mean_dots.keys())[np.argmax(list(vertex_mean_dots.values()))]] = True
+                    target_regists[list(total_scores.keys())[np.argmax(list(total_scores.values()))]] = True
             else:
                 # 全部1個ずつ繋がっている場合はそのまま登録
                 target_regists = [True for _ in range(len(vkeys_list))]
@@ -702,10 +705,10 @@ class PmxTailorExportService():
         return degree
     
     def create_vertex_line_map(self, top_edge_key: tuple, bottom_edge_key: tuple, from_key: tuple, virtual_vertices: dict, \
-                               top_keys: list, bottom_keys: list, base_vertical_axis: MVector3D, vkeys: list, loop=0):
+                               top_keys: list, bottom_keys: list, base_vertical_axis: MVector3D, vkeys: list, vscores: list, loop=0):
 
         if loop > 500:
-            return None
+            return None, None
 
         from_vv = virtual_vertices[from_key]
         from_pos = from_vv.position()
@@ -727,7 +730,7 @@ class PmxTailorExportService():
         top_qq = MQuaternion.fromDirection(top_z_pos, top_y_pos)
         logger.debug(f' - top({top_vv.vidxs()}): x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]')
 
-        int_max = np.iinfo(np.int32).max
+        # int_max = np.iinfo(np.int32).max
         scores = []
         for n, to_key in enumerate(from_vv.connected_vvs):
             to_vv = virtual_vertices[to_key]
@@ -773,7 +776,7 @@ class PmxTailorExportService():
             vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
             roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
 
-            score = (yaw_score * 20) + pitch_score + (roll_score * 10)
+            score = (yaw_score * 20) + pitch_score + (roll_score * 2)
             # local_dot = MVector3D.dotProduct(base_vertical_axis, local_next_vpos)
             # prev_dot = MVector3D.dotProduct((from_pos - prev_pos).normalized(), (to_pos - from_pos).normalized()) if prev_pos else 1
 
@@ -781,7 +784,7 @@ class PmxTailorExportService():
 
             # dots.append(local_dot * prev_dot)
 
-            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_next_vpos[{local_next_vpos.to_log()}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}')   # noqa
+            logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_next_vpos[{local_next_vpos.to_log()}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}')   # noqa
 
             # to_degrees.append(self.calc_arc_degree(bottom_edge_start_pos, bottom_edge_mean_pos, to_pos, base_vertical_axis))
             # to_lengths.append(to_pos.distanceToPoint(top_pos))
@@ -792,13 +795,16 @@ class PmxTailorExportService():
             # スコアが付けられなくなったら終了
             return vkeys
         
-        nearest_idx = np.where(np.array(scores) == int_max)[0]
-        if len(nearest_idx) > 0:
-            # TOP到達した場合、採用
-            nearest_idx = nearest_idx[0]
-        else:
-            # TOP到達でない場合、最もTOP-BOTTOM間の角度に近い移動量の頂点
-            nearest_idx = np.argmax(scores)
+        # nearest_idx = np.where(np.array(scores) == int_max)[0]
+        # if len(nearest_idx) > 0:
+        #     # TOP到達した場合、採用
+        #     nearest_idx = nearest_idx[0]
+        #     vscores.append(1)
+        # else:
+
+        # 最もスコアの高いINDEXを採用
+        nearest_idx = np.argmax(scores)
+        vscores.append(np.max(scores))
         vertical_key = from_vv.connected_vvs[nearest_idx]
 
         logger.debug(f'direction: from: [{virtual_vertices[from_key].vidxs()}], to: [{virtual_vertices[vertical_key].vidxs()}]')
@@ -807,10 +813,10 @@ class PmxTailorExportService():
 
         if vertical_key in top_keys:
             # 上端に辿り着いたら終了
-            return vkeys
+            return vkeys, vscores
 
         return self.create_vertex_line_map(top_edge_key, bottom_edge_key, vertical_key, virtual_vertices, \
-                                           top_keys, bottom_keys, base_vertical_axis, vkeys, loop + 1)
+                                           top_keys, bottom_keys, base_vertical_axis, vkeys, vscores, loop + 1)
 
     def get_edge_lines(self, edge_line_pairs: dict, start_vkey: tuple, edge_lines: list, edge_vkeys: list, loop=0):
         if len(edge_vkeys) >= len(edge_line_pairs.keys()) or loop > 500:
