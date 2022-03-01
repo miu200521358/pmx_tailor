@@ -186,7 +186,7 @@ class PmxTailorExportService():
             
             logger.info("【%s】ボーン生成", param_option['material_name'], decoration=MLogger.DECORATION_LINE)
             
-            root_bone, virtual_vertices \
+            root_bone, virtual_vertices, all_regist_bones \
                 = self.create_bone(model, param_option, material_name, virtual_vertices, vertex_maps, vertex_map_orders)
 
         return True
@@ -231,6 +231,7 @@ class PmxTailorExportService():
                         now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
                         prev_v_vec = now_v_vec if v_yidx == 0 else virtual_vertices[tuple(vertex_map[v_yidx - 1, v_xidx])].position()
                         bone_vertical_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                v_xidx = vertex_map.shape[1] - 1
                 if (vertex_map[v_yidx, v_xidx] != np.inf).all() and (vertex_map[v_yidx, 0] != np.inf).all():
                     # 輪を描いたのも入れとく(ウェイト対象取得の時に範囲指定入るからここでは強制)
                     now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
@@ -240,11 +241,62 @@ class PmxTailorExportService():
             all_bone_horizonal_distances[base_map_idx] = bone_horizonal_distances
             all_bone_vertical_distances[base_map_idx] = bone_vertical_distances
 
+        # 全体通してのX番号
         prev_xs = [0]
+        all_regist_bones = {}
         for base_map_idx in vertex_map_orders:
             logger.info("%s: ボーン登録: %s個目", material_name, base_map_idx + 1)
             vertex_map = vertex_maps[base_map_idx]
-            
+
+            # ボーン登録有無
+            regist_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
+            all_regist_bones[base_map_idx] = regist_bones
+
+            if param_option["density_type"] == logger.transtext('距離'):
+                median_vertical_distance = np.median(all_bone_vertical_distances[base_map_idx][:, int(vertex_map.shape[1] / 2)])
+                median_horizonal_distance = np.median(all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), :])
+
+                logger.debug(f'median_horizonal_distance: {round(median_horizonal_distance, 4)}, median_vertical_distance: {round(median_vertical_distance, 4)}')
+
+                # 間隔が距離タイプの場合、均等になるように間を空ける
+                y_regists = np.zeros(vertex_map.shape[0], dtype=np.int)
+                prev_y_regist = 0
+                for v_yidx in range(vertex_map.shape[0]):
+                    if v_yidx in [0, vertex_map.shape[0] - 1]:
+                        # 最初は必ず登録
+                        y_regists[v_yidx] = True
+                        continue
+                    
+                    if np.sum(all_bone_vertical_distances[base_map_idx][(prev_y_regist + 1):(v_yidx + 1), int(vertex_map.shape[1] / 2)]) > \
+                       median_vertical_distance * param_option["vertical_bone_density"]:
+                        # 前の登録ボーンから一定距離離れたら登録対象
+                        y_regists[v_yidx] = True
+                        prev_y_regist = v_yidx
+
+                x_regists = np.zeros(vertex_map.shape[1], dtype=np.int)
+                prev_x_regist = 0
+                for v_xidx in range(vertex_map.shape[1]):
+                    if v_xidx in [0, vertex_map.shape[1] - 1]:
+                        # 最初は必ず登録
+                        x_regists[v_xidx] = True
+                        continue
+                    
+                    if np.sum(all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), (prev_x_regist + 1):(v_xidx + 1)]) > \
+                       median_horizonal_distance * param_option["horizonal_bone_density"]:
+                        # 前の登録ボーンから一定距離離れたら登録対象
+                        x_regists[v_xidx] = True
+                        prev_x_regist = v_xidx
+
+                for v_yidx, y_regist in enumerate(y_regists):
+                    for v_xidx, x_regist in enumerate(x_regists):
+                        regist_bones[v_yidx, v_xidx] = (y_regist and x_regist)
+
+            else:
+                # 間隔が頂点タイプの場合、規則的に間を空ける
+                for v_yidx in list(set(list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [vertex_map.shape[0] - 1])):
+                    for v_xidx in list(set(list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"])) + [vertex_map.shape[1] - 1])):
+                        regist_bones[v_yidx, v_xidx] = True
+
             for v_yidx in range(vertex_map.shape[0]):
                 for v_xidx in range(vertex_map.shape[1]):
                     if (vertex_map[v_yidx, v_xidx] == np.inf).any():
@@ -256,11 +308,26 @@ class PmxTailorExportService():
                     vkey = tuple(vertex_map[v_yidx, v_xidx])
                     vv = virtual_vertices[vkey]
 
-                    if v_yidx == 0:
+                    # 親は既にモデルに登録済みのものを選ぶ
+                    parent_bone = None
+                    for parent_v_yidx in range(v_yidx - 1, -1, -1):
+                        parent_bone = virtual_vertices[tuple(vertex_map[parent_v_yidx, v_xidx])].bone
+                        if parent_bone and parent_bone.name in model.bones:
+                            # 登録されていたら終了
+                            break
+                        else:
+                            parent_bone = None
+                    if not parent_bone:
+                        # 最後まで登録されている親ボーンが見つからなければ、ルート
                         parent_bone = root_bone
-                    else:
-                        parent_vkey = tuple(vertex_map[v_yidx - 1, v_xidx])
-                        parent_bone = virtual_vertices[parent_vkey].bone
+
+                    # ひとつ前も既にモデルに登録済みのものを選ぶ
+                    prev_bone = None
+                    for prev_v_xidx in range(v_xidx - 1, -1, -1):
+                        prev_bone = virtual_vertices[tuple(vertex_map[v_yidx, prev_v_xidx])].bone
+                        if prev_bone and prev_bone.name in model.bones:
+                            # 登録されていたら終了
+                            break
 
                     if not vv.bone:
                         # ボーン仮登録
@@ -280,18 +347,22 @@ class PmxTailorExportService():
                             parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
                             parent_bone.flag |= 0x0001
 
-                        # 表示枠
-                        parent_bone.flag |= 0x0008 | 0x0010
-                        model.display_slots[display_name].references.append((0, parent_bone.index))
+                            # 表示枠
+                            parent_bone.flag |= 0x0008 | 0x0010
+                            model.display_slots[display_name].references.append((0, parent_bone.index))
 
                         vv.bone = bone
-                        model.bones[bone.name] = bone
-                        model.bone_indexes[bone.index] = bone.name
+
+                        if regist_bones[v_yidx, v_xidx]:
+                            # 登録対象である場合
+                            model.bones[bone.name] = bone
+                            model.bone_indexes[bone.index] = bone.name
+
                         logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
 
             prev_xs.extend(max(prev_xs) + np.array(list(range(vertex_map.shape[1]))) + 1)
 
-        return root_bone, virtual_vertices
+        return root_bone, virtual_vertices, all_regist_bones
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
         return f'{abb_name}-{(v_yno):03d}-{(v_xno):03d}'
@@ -339,10 +410,11 @@ class PmxTailorExportService():
                 # 一旦ルートボーンにウェイトを一括置換
                 v0.deform = Bdef1(parent_bone.index)
 
-                # 面垂線
+                # 面垂線（Yは潰す）
                 vv1 = (v1.position - v0.position).normalized()
                 vv2 = (v2.position - v1.position).normalized()
                 surface_normal = MVector3D.crossProduct(vv1, vv2).normalized()
+                surface_normal.setY(0)
 
                 # 親ボーンに対する向き（Yは潰す）
                 parent_direction = (v0.position - parent_bone.position)
@@ -358,7 +430,8 @@ class PmxTailorExportService():
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
-                    edge_pair_lkeys[lkey].append(index_idx)
+                    if index_idx not in edge_pair_lkeys[lkey]:
+                        edge_pair_lkeys[lkey].append(index_idx)
 
                     # 仮想頂点登録（該当頂点対象）
                     virtual_vertices[v0_key].append([v0], [v1_key, v2_key], [index_idx], [])
@@ -374,14 +447,14 @@ class PmxTailorExportService():
             logger.warning("対象範囲にエッジが見つけられなかった為、処理を終了します。\n面が表裏反転してないかご確認ください。", decoration=MLogger.DECORATION_BOX)
             return None, None
 
-        # if logger.is_debug_level():
-        #     logger.debug('--------------------------')
-        #     for key, virtual_vertex in virtual_vertices.items():
-        #         logger.debug(f'[{key}] {virtual_vertex}')
+        if logger.is_debug_level():
+            logger.debug('--------------------------')
+            for key, virtual_vertex in virtual_vertices.items():
+                logger.debug(f'[{key}] {virtual_vertex}')
 
-        #     logger.debug('--------------------------')
-        #     for (min_key, max_key), indexes in edge_pair_lkeys.items():
-        #         logger.debug(f'[{min_key}, {max_key}] {indexes}')
+            logger.debug('--------------------------')
+            for (min_key, max_key), indexes in edge_pair_lkeys.items():
+                logger.debug(f'[{min_key}:{virtual_vertices[min_key].vidxs()}, {max_key}:{virtual_vertices[max_key].vidxs()}] {indexes}')
 
         edge_line_pairs = {}
         for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
@@ -404,7 +477,7 @@ class PmxTailorExportService():
 
         if logger.is_debug_level():
             for n, edge_lines in enumerate(all_edge_lines):
-                logger.debug(f'[{n:02d}] {edge_lines}')
+                logger.debug(f'[{n:02d}] {[f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines]}')
 
         logger.info("%s: エッジの抽出", material_name)
 
@@ -437,8 +510,8 @@ class PmxTailorExportService():
 
             if edge_dot_diff_max > 0.5:
                 # 内積差が大きい場合、エッジが分断されてるとみなす
-                logger.debug(f'[{n:02d}] corner[{np.where(edge_dots < edge_dot_mean)[0].tolist()}]')
-                slice_idxs = np.where(edge_dots < edge_dot_mean)[0].tolist()
+                logger.debug(f'[{n:02d}] corner[{np.where(np.array(edge_dots) < 0.5)[0].tolist()}]')
+                slice_idxs = np.where(np.array(edge_dots) < 0.5)[0].tolist()
                 slice_idxs += [slice_idxs[0]]
                 # is_prev_horizonal = True
                 for ssi, esi in zip(slice_idxs, slice_idxs[1:]):
@@ -494,17 +567,17 @@ class PmxTailorExportService():
         for n, (hd, hel) in enumerate(zip(horizonal_distances, horizonal_edge_lines)):
             if hd > horizonal_total_mean_distance:
                 # 遠い方が下(BOTTOM)
-                bottom_horizonal_edge_lines.append(hel)
+                # 一枚物は反転
+                if 1 == len(all_edge_lines):
+                    bottom_horizonal_edge_lines.append([])
+                    for he in hel:
+                        bottom_horizonal_edge_lines[-1].insert(0, list(reversed(he)))
+                else:
+                    bottom_horizonal_edge_lines.append(hel)
                 logger.debug(f'[{n:02d}-horizonal-bottom] {hel}')
             else:
                 # 近い方が上(TOP)
-                # 一枚物は反転
-                if 1 == len(all_edge_lines):
-                    top_horizonal_edge_lines.append([])
-                    for he in hel:
-                        top_horizonal_edge_lines[-1].append(list(reversed(he)))
-                else:
-                    top_horizonal_edge_lines.append(hel)
+                top_horizonal_edge_lines.append(hel)
                 logger.debug(f'[{n:02d}-horizonal-top] {hel}')
 
         if not top_horizonal_edge_lines:
@@ -560,21 +633,24 @@ class PmxTailorExportService():
             all_vkeys_list.append([])
             all_scores.append([])
             for hi, bhe in enumerate(bhel):
+                if hi > 0:
+                    all_vkeys_list.append([])
+                    all_scores.append([])
                 for ki, bottom_edge_key in enumerate(bhe):
                     if len(top_degrees) == len(bottom_degrees):
                         # 同じ列数の場合、そのまま適用
                         top_edge_key = list(top_degrees.keys())[ki]
                     else:
                         bottom_degree = bottom_degrees[bottom_edge_key]
-                        if (len(bottom_horizonal_edge_lines) > 0 and ((ki == len(bhe) - 1 and bi < len(bottom_horizonal_edge_lines) - 1))):
-                            # 途中の切れ目である場合、前後の中間角度で見る
-                            bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
-                            if ki == len(bhe) - 1 and hi < len(bottom_horizonal_edge_lines) - 1:
-                                # 末端の場合、次との中間角度
-                                bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
-                            else:
-                                # 開始の場合、前との中間角度
-                                bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
+                        # # 途中の切れ目である場合、前後の中間角度で見る
+                        # bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
+                        # if ki == len(bhe) - 1 and ((len(bhel) > 0 and hi < len(bhel) - 1) or \
+                        #    (len(bottom_horizonal_edge_lines) > 0 and hi < len(bottom_horizonal_edge_lines) - 1)):
+                        #     # 末端の場合、次との中間角度
+                        #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
+                        # elif ki == 0 and ((len(bhel) > 0 and hi > 0) or (len(bottom_horizonal_edge_lines) > 0 and bi > 0)):
+                        #     # 開始の場合、前との中間角度
+                        #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
 
                         # 近いdegreeのものを選ぶ
                         top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
@@ -583,8 +659,8 @@ class PmxTailorExportService():
 
                     vkeys, vscores = self.create_vertex_line_map(top_edge_key, bottom_edge_key, bottom_edge_key, virtual_vertices, \
                                                                  top_keys, bottom_keys, base_vertical_axis, [bottom_edge_key], [1])
-                    logger.info('頂点ルート走査[%s-%s-%s]: 終端: %s -> 始端: %s', f'{(bi + 1):04d}', f'{(hi + 1):02d}', f'{(ki + 1):02d}', \
-                                virtual_vertices[vkeys[-1]].vidxs(), virtual_vertices[vkeys[0]].vidxs() if vkeys else 'NG')
+                    logger.info('頂点ルート走査[%s-%s-%s]: 終端: %s -> 始端: %s, スコア: %s', f'{(bi + 1):04d}', f'{(hi + 1):02d}', f'{(ki + 1):02d}', \
+                                virtual_vertices[vkeys[-1]].vidxs(), virtual_vertices[vkeys[0]].vidxs() if vkeys else 'NG', round(np.sum(vscores), 4) if vscores else '-')
                     if vkeys:
                         all_vkeys_list[-1].append(vkeys)
                         all_scores[-1].append(vscores)
@@ -793,7 +869,7 @@ class PmxTailorExportService():
 
         if np.count_nonzero(scores) == 0:
             # スコアが付けられなくなったら終了
-            return vkeys
+            return vkeys, vscores
         
         # nearest_idx = np.where(np.array(scores) == int_max)[0]
         # if len(nearest_idx) > 0:
