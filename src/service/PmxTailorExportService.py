@@ -285,6 +285,7 @@ class PmxTailorExportService:
 
         # ジョイント生成
         created_joints = {}
+        prev_joint_cnt = 0
 
         for base_map_idx, regist_bones in all_regist_bones.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
@@ -522,6 +523,10 @@ class PmxTailorExportService:
                     )
                     vv.horizonal_joint = joint
                     created_joints[joint_key] = joint
+
+                if len(created_joints) > 0 and len(created_joints) // 100 > prev_joint_cnt:
+                    logger.info("-- -- 【No.%s】ジョイント: %s個目:終了", base_map_idx + 1, len(created_joints))
+                    prev_joint_cnt = len(created_joints) // 100
 
         logger.info("-- ジョイント: %s個目:終了", len(created_joints))
 
@@ -1102,7 +1107,7 @@ class PmxTailorExportService:
                             x_size * 0.25, max(0.25, y_size * 0.5), rigidbody_limit_thicks[rigidbody_y_idx]
                         )
                 else:
-                    # カプセル剛体の場合
+                    # TODO カプセル剛体の場合
                     pass
 
                 tail_vv = virtual_vertices[tuple(vertex_map[(below_yidx, v_xidx)])]
@@ -1162,9 +1167,9 @@ class PmxTailorExportService:
                 created_rigidbody_linear_dampinges[vv.rigidbody.name] = linear_damping
                 created_rigidbody_angular_dampinges[vv.rigidbody.name] = angular_damping
 
-                if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 100 > prev_rigidbody_cnt:
+                if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 50 > prev_rigidbody_cnt:
                     logger.info("-- -- 【No.%s】剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
-                    prev_rigidbody_cnt = len(created_rigidbodies) // 100
+                    prev_rigidbody_cnt = len(created_rigidbodies) // 50
 
         min_mass = 0
         min_linear_damping = 0
@@ -1298,9 +1303,9 @@ class PmxTailorExportService:
 
                     elif regist_bones[:, v_xidx].any():
                         # 同じX位置にボーンがある場合、縦のBDEF2登録対象
-                        # Y末端は登録対象外
-                        above_yidx = np.max(np.where(regist_bones[:v_yidx, v_xidx]))
-                        below_yidx = np.min(np.where(regist_bones[v_yidx:, v_xidx])) + v_yidx
+                        prev_xidx, next_xidx, above_yidx, below_yidx = self.get_block_vidxs(
+                            v_yidx, v_xidx, regist_bones, bone_connected
+                        )
 
                         if below_yidx == regist_bones.shape[0] - 1:
                             # 末端がある場合、上のボーンでBDEF1
@@ -1379,10 +1384,15 @@ class PmxTailorExportService:
                                 deform_weights = total_weights / total_weights.sum(axis=0, keepdims=1)
 
                                 for rv in vv.real_vertices:
-                                    rv.deform = Bdef2(
+                                    rv.deform = Bdef4(
                                         virtual_vertices[tuple(vertex_map[above_yidx, prev_xidx])].bone.index,
                                         virtual_vertices[tuple(vertex_map[above_yidx, target_next_xidx])].bone.index,
+                                        virtual_vertices[tuple(vertex_map[below_yidx, prev_xidx])].bone.index,
+                                        virtual_vertices[tuple(vertex_map[below_yidx, target_next_xidx])].bone.index,
                                         deform_weights[0],
+                                        deform_weights[1],
+                                        0,
+                                        0,
                                     )
                         else:
                             # ほぼ0のものは0に置換（円周用）
