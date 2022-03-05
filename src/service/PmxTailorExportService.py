@@ -31,9 +31,9 @@ from mmd.PmxData import (
     IkLink,
     Ik,
     BoneMorphData,
-)  # noqa
+)
 from mmd.PmxWriter import PmxWriter
-from module.MMath import MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4  # noqa
+from module.MMath import MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4
 from utils.MLogger import MLogger
 from utils.MException import SizingException, MKilledException
 import utils.MBezierUtils as MBezierUtils
@@ -62,6 +62,15 @@ class VirtualVertex:
         self.bone_regist = False
         # 対象頂点に対する剛体情報
         self.rigidbody = None
+        self.rigidbody_qq = None
+        self.balance_rigidbody = None
+        self.balance_rigidbody_qq = None
+        # 対象頂点に対するジョイント情報
+        self.vertical_joint = None
+        self.vertical_balancer_joint = None
+        self.horizonal_joint = None
+        self.diagonal_joint = None
+        self.reverse_joint = None
 
     def append(self, real_vertices: list, connected_vvs: list, indexes: list, out_indexes: list):
         for rv in real_vertices:
@@ -237,7 +246,7 @@ class PmxTailorExportService:
 
             # TODO 残りウェイト・裏ウェイト
 
-        self.create_rigidbody(
+        root_rigidbody = self.create_rigidbody(
             model,
             param_option,
             material_name,
@@ -248,7 +257,680 @@ class PmxTailorExportService:
             root_bone,
         )
 
+        self.create_joint(
+            model,
+            param_option,
+            material_name,
+            virtual_vertices,
+            vertex_maps,
+            all_regist_bones,
+            all_bone_connected,
+            root_rigidbody,
+        )
+
         return True
+
+    def create_joint(
+        self,
+        model: PmxModel,
+        param_option: dict,
+        material_name: str,
+        virtual_vertices: dict,
+        vertex_maps: dict,
+        all_regist_bones: dict,
+        all_bone_connected: dict,
+        root_rigidbody: RigidBody,
+    ):
+        logger.info("【%s】ジョイント生成", material_name, decoration=MLogger.DECORATION_LINE)
+
+        # ジョイント生成
+        created_joints = {}
+
+        for base_map_idx, regist_bones in all_regist_bones.items():
+            logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
+
+            vertex_map = vertex_maps[base_map_idx]
+            bone_connected = all_bone_connected[base_map_idx]
+
+            # 上下はY軸比較, 左右はX軸比較
+            target_idx = 1 if param_option["direction"] in ["上", "下"] else 0
+            target_direction = 1 if param_option["direction"] in ["上", "右"] else -1
+
+            # キーは比較対象＋向きで昇順
+            vv_keys = sorted(np.unique(vertex_map[np.where(regist_bones)][:, target_idx]) * target_direction)
+
+            # 縦ジョイント情報
+            (
+                vertical_limit_min_mov_xs,
+                vertical_limit_min_mov_ys,
+                vertical_limit_min_mov_zs,
+                vertical_limit_max_mov_xs,
+                vertical_limit_max_mov_ys,
+                vertical_limit_max_mov_zs,
+                vertical_limit_min_rot_xs,
+                vertical_limit_min_rot_ys,
+                vertical_limit_min_rot_zs,
+                vertical_limit_max_rot_xs,
+                vertical_limit_max_rot_ys,
+                vertical_limit_max_rot_zs,
+                vertical_spring_constant_mov_xs,
+                vertical_spring_constant_mov_ys,
+                vertical_spring_constant_mov_zs,
+                vertical_spring_constant_rot_xs,
+                vertical_spring_constant_rot_ys,
+                vertical_spring_constant_rot_zs,
+            ) = self.create_joint_param(
+                param_option["vertical_joint"], vv_keys, param_option["vertical_joint_coefficient"]
+            )
+
+            # 横ジョイント情報
+            (
+                horizonal_limit_min_mov_xs,
+                horizonal_limit_min_mov_ys,
+                horizonal_limit_min_mov_zs,
+                horizonal_limit_max_mov_xs,
+                horizonal_limit_max_mov_ys,
+                horizonal_limit_max_mov_zs,
+                horizonal_limit_min_rot_xs,
+                horizonal_limit_min_rot_ys,
+                horizonal_limit_min_rot_zs,
+                horizonal_limit_max_rot_xs,
+                horizonal_limit_max_rot_ys,
+                horizonal_limit_max_rot_zs,
+                horizonal_spring_constant_mov_xs,
+                horizonal_spring_constant_mov_ys,
+                horizonal_spring_constant_mov_zs,
+                horizonal_spring_constant_rot_xs,
+                horizonal_spring_constant_rot_ys,
+                horizonal_spring_constant_rot_zs,
+            ) = self.create_joint_param(
+                param_option["horizonal_joint"], vv_keys, param_option["horizonal_joint_coefficient"]
+            )
+
+            # 斜めジョイント情報
+            (
+                diagonal_limit_min_mov_xs,
+                diagonal_limit_min_mov_ys,
+                diagonal_limit_min_mov_zs,
+                diagonal_limit_max_mov_xs,
+                diagonal_limit_max_mov_ys,
+                diagonal_limit_max_mov_zs,
+                diagonal_limit_min_rot_xs,
+                diagonal_limit_min_rot_ys,
+                diagonal_limit_min_rot_zs,
+                diagonal_limit_max_rot_xs,
+                diagonal_limit_max_rot_ys,
+                diagonal_limit_max_rot_zs,
+                diagonal_spring_constant_mov_xs,
+                diagonal_spring_constant_mov_ys,
+                diagonal_spring_constant_mov_zs,
+                diagonal_spring_constant_rot_xs,
+                diagonal_spring_constant_rot_ys,
+                diagonal_spring_constant_rot_zs,
+            ) = self.create_joint_param(
+                param_option["diagonal_joint"], vv_keys, param_option["diagonal_joint_coefficient"]
+            )
+
+            # 逆ジョイント情報
+            (
+                reverse_limit_min_mov_xs,
+                reverse_limit_min_mov_ys,
+                reverse_limit_min_mov_zs,
+                reverse_limit_max_mov_xs,
+                reverse_limit_max_mov_ys,
+                reverse_limit_max_mov_zs,
+                reverse_limit_min_rot_xs,
+                reverse_limit_min_rot_ys,
+                reverse_limit_min_rot_zs,
+                reverse_limit_max_rot_xs,
+                reverse_limit_max_rot_ys,
+                reverse_limit_max_rot_zs,
+                reverse_spring_constant_mov_xs,
+                reverse_spring_constant_mov_ys,
+                reverse_spring_constant_mov_zs,
+                reverse_spring_constant_rot_xs,
+                reverse_spring_constant_rot_ys,
+                reverse_spring_constant_rot_zs,
+            ) = self.create_joint_param(
+                param_option["reverse_joint"], vv_keys, param_option["reverse_joint_coefficient"]
+            )
+
+            for v_yidx, v_xidx in zip(np.where(regist_bones[:-1, :])[0], np.where(regist_bones[:-1, :])[1]):
+                bone_key = tuple(vertex_map[v_yidx, v_xidx])
+                vv = virtual_vertices[bone_key]
+                bone_y_idx = np.where(vv_keys == bone_key[target_idx] * target_direction)[0][0]
+
+                prev_xidx, next_xidx, above_yidx, below_yidx = self.get_block_vidxs(
+                    v_yidx, v_xidx, regist_bones, bone_connected
+                )
+
+                now_above_vv = virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])]
+                prev_above_vv = virtual_vertices[tuple(vertex_map[above_yidx, prev_xidx])]
+                next_above_vv = virtual_vertices[tuple(vertex_map[above_yidx, next_xidx])]
+                now_prev_vv = virtual_vertices[tuple(vertex_map[v_yidx, prev_xidx])]
+                now_next_vv = virtual_vertices[tuple(vertex_map[v_yidx, next_xidx])]
+                now_below_vv = virtual_vertices[tuple(vertex_map[below_yidx, v_xidx])]
+                prev_below_vv = virtual_vertices[tuple(vertex_map[below_yidx, prev_xidx])]
+                next_below_vv = virtual_vertices[tuple(vertex_map[below_yidx, next_xidx])]
+
+                if param_option["vertical_joint"]:
+                    if v_yidx == 0:
+                        joint_pos = vv.bone.position
+                        a_rigidbody = root_rigidbody
+                        b_rigidbody = vv.rigidbody
+
+                        # 剛体進行方向(x) 中心剛体との角度は反映させない
+                        tail_vv = now_below_vv
+                        x_direction_pos = (vv.bone.position - tail_vv.bone.position).normalized()
+                    else:
+                        joint_pos = vv.bone.position
+                        a_rigidbody = now_above_vv.rigidbody
+                        b_rigidbody = vv.rigidbody
+
+                        # 剛体進行方向(x)
+                        tail_vv = now_above_vv
+                        x_direction_pos = (tail_vv.bone.position - vv.bone.position).normalized()
+
+                    # 剛体進行方向に対しての縦軸(y)
+                    y_direction_pos = ((vv.normal().normalized() + tail_vv.normal().normalized()) / 2) * -1
+                    joint_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
+
+                    joint_key, joint = self.build_joint(
+                        "↓",
+                        0,
+                        bone_y_idx,
+                        a_rigidbody,
+                        b_rigidbody,
+                        joint_pos,
+                        joint_qq,
+                        vertical_limit_min_mov_xs,
+                        vertical_limit_min_mov_ys,
+                        vertical_limit_min_mov_zs,
+                        vertical_limit_max_mov_xs,
+                        vertical_limit_max_mov_ys,
+                        vertical_limit_max_mov_zs,
+                        vertical_limit_min_rot_xs,
+                        vertical_limit_min_rot_ys,
+                        vertical_limit_min_rot_zs,
+                        vertical_limit_max_rot_xs,
+                        vertical_limit_max_rot_ys,
+                        vertical_limit_max_rot_zs,
+                        vertical_spring_constant_mov_xs,
+                        vertical_spring_constant_mov_ys,
+                        vertical_spring_constant_mov_zs,
+                        vertical_spring_constant_rot_xs,
+                        vertical_spring_constant_rot_ys,
+                        vertical_spring_constant_rot_zs,
+                    )
+                    vv.vertical_joint = joint
+                    created_joints[joint_key] = joint
+
+                    # TODO バランサー剛体
+
+                if param_option["horizonal_joint"]:
+                    # 剛体が重なる箇所の交点
+                    now_mat = MMatrix4x4()
+                    now_mat.setToIdentity()
+                    now_mat.translate(vv.rigidbody.shape_position)
+                    now_mat.rotate(vv.rigidbody_qq)
+                    now_point = now_mat * MVector3D(vv.rigidbody.shape_size.x(), 0, 0)
+
+                    next_mat = MMatrix4x4()
+                    next_mat.setToIdentity()
+                    next_mat.translate(now_next_vv.rigidbody.shape_position)
+                    next_mat.rotate(now_next_vv.rigidbody_qq)
+                    now_next_point = next_mat * MVector3D(-now_next_vv.rigidbody.shape_size.x(), 0, 0)
+
+                    joint_pos = calc_intersect(
+                        vv.rigidbody.shape_position,
+                        now_point,
+                        now_next_vv.rigidbody.shape_position,
+                        now_next_point,
+                    )
+
+                    joint_qq = MQuaternion.slerp(now_prev_vv.rigidbody_qq, vv.rigidbody_qq, 0.5)
+
+                    a_rigidbody = now_prev_vv.rigidbody
+                    b_rigidbody = vv.rigidbody
+
+                    joint_key, joint = self.build_joint(
+                        "→",
+                        1,
+                        bone_y_idx,
+                        a_rigidbody,
+                        b_rigidbody,
+                        joint_pos,
+                        joint_qq,
+                        horizonal_limit_min_mov_xs,
+                        horizonal_limit_min_mov_ys,
+                        horizonal_limit_min_mov_zs,
+                        horizonal_limit_max_mov_xs,
+                        horizonal_limit_max_mov_ys,
+                        horizonal_limit_max_mov_zs,
+                        horizonal_limit_min_rot_xs,
+                        horizonal_limit_min_rot_ys,
+                        horizonal_limit_min_rot_zs,
+                        horizonal_limit_max_rot_xs,
+                        horizonal_limit_max_rot_ys,
+                        horizonal_limit_max_rot_zs,
+                        horizonal_spring_constant_mov_xs,
+                        horizonal_spring_constant_mov_ys,
+                        horizonal_spring_constant_mov_zs,
+                        horizonal_spring_constant_rot_xs,
+                        horizonal_spring_constant_rot_ys,
+                        horizonal_spring_constant_rot_zs,
+                    )
+                    vv.horizonal_joint = joint
+                    created_joints[joint_key] = joint
+
+        logger.info("-- ジョイント: %s個目:終了", len(created_joints))
+
+        for joint_key in sorted(created_joints.keys()):
+            # ジョイントを登録
+            joint = created_joints[joint_key]
+            joint.index = len(model.joints)
+
+            if joint.name in model.joints:
+                logger.warning("同じジョイント名が既に登録されているため、末尾に乱数を追加します。 既存ジョイント名: %s", joint.name)
+                joint.name += randomname(3)
+
+            model.joints[joint.name] = joint
+            logger.debug(f"joint: {joint}")
+
+    def build_joint(
+        self,
+        direction_mark: str,
+        direction_idx: int,
+        bone_y_idx: int,
+        a_rigidbody: RigidBody,
+        b_rigidbody: RigidBody,
+        joint_pos: MVector3D,
+        joint_qq: MQuaternion,
+        limit_min_mov_xs: np.ndarray,
+        limit_min_mov_ys: np.ndarray,
+        limit_min_mov_zs: np.ndarray,
+        limit_max_mov_xs: np.ndarray,
+        limit_max_mov_ys: np.ndarray,
+        limit_max_mov_zs: np.ndarray,
+        limit_min_rot_xs: np.ndarray,
+        limit_min_rot_ys: np.ndarray,
+        limit_min_rot_zs: np.ndarray,
+        limit_max_rot_xs: np.ndarray,
+        limit_max_rot_ys: np.ndarray,
+        limit_max_rot_zs: np.ndarray,
+        spring_constant_mov_xs: np.ndarray,
+        spring_constant_mov_ys: np.ndarray,
+        spring_constant_mov_zs: np.ndarray,
+        spring_constant_rot_xs: np.ndarray,
+        spring_constant_rot_ys: np.ndarray,
+        spring_constant_rot_zs: np.ndarray,
+    ):
+        joint_name = f"{direction_mark}|{a_rigidbody.name}|{b_rigidbody.name}"
+        joint_key = f"{direction_idx}:{a_rigidbody.index:05d}:{b_rigidbody.index:05d}"
+
+        joint_euler = joint_qq.toEulerAngles()
+        joint_rotation_radians = MVector3D(
+            math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z())
+        )
+
+        joint = Joint(
+            joint_name,
+            joint_name,
+            0,
+            a_rigidbody.index,
+            b_rigidbody.index,
+            joint_pos,
+            joint_rotation_radians,
+            MVector3D(
+                limit_min_mov_xs[bone_y_idx],
+                limit_min_mov_ys[bone_y_idx],
+                limit_min_mov_zs[bone_y_idx],
+            ),
+            MVector3D(
+                limit_max_mov_xs[bone_y_idx],
+                limit_max_mov_ys[bone_y_idx],
+                limit_max_mov_zs[bone_y_idx],
+            ),
+            MVector3D(
+                math.radians(limit_min_rot_xs[bone_y_idx]),
+                math.radians(limit_min_rot_ys[bone_y_idx]),
+                math.radians(limit_min_rot_zs[bone_y_idx]),
+            ),
+            MVector3D(
+                math.radians(limit_max_rot_xs[bone_y_idx]),
+                math.radians(limit_max_rot_ys[bone_y_idx]),
+                math.radians(limit_max_rot_zs[bone_y_idx]),
+            ),
+            MVector3D(
+                spring_constant_mov_xs[bone_y_idx],
+                spring_constant_mov_ys[bone_y_idx],
+                spring_constant_mov_zs[bone_y_idx],
+            ),
+            MVector3D(
+                spring_constant_rot_xs[bone_y_idx],
+                spring_constant_rot_ys[bone_y_idx],
+                spring_constant_rot_zs[bone_y_idx],
+            ),
+        )
+        return joint_key, joint
+
+    def create_joint_param(self, param_joint: Joint, vv_keys: np.ndarray, coefficient: float):
+        max_vy = len(vv_keys)
+        middle_vy = max_vy * 0.3
+        min_vy = 0
+        xs = np.arange(min_vy, max_vy, step=1)
+
+        limit_min_mov_xs = 0
+        limit_min_mov_ys = 0
+        limit_min_mov_zs = 0
+        limit_max_mov_xs = 0
+        limit_max_mov_ys = 0
+        limit_max_mov_zs = 0
+        limit_min_rot_xs = 0
+        limit_min_rot_ys = 0
+        limit_min_rot_zs = 0
+        limit_max_rot_xs = 0
+        limit_max_rot_ys = 0
+        limit_max_rot_zs = 0
+        spring_constant_mov_xs = 0
+        spring_constant_mov_ys = 0
+        spring_constant_mov_zs = 0
+        spring_constant_rot_xs = 0
+        spring_constant_rot_ys = 0
+        spring_constant_rot_zs = 0
+
+        if param_joint:
+            # 縦ジョイント
+            limit_min_mov_xs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, max_vy],
+                            [
+                                param_joint.translation_limit_min.x() / coefficient,
+                                param_joint.translation_limit_min.x(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_min_mov_ys = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, max_vy],
+                            [
+                                param_joint.translation_limit_min.y() / coefficient,
+                                param_joint.translation_limit_min.y(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_min_mov_zs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, max_vy],
+                            [
+                                param_joint.translation_limit_min.z() / coefficient,
+                                param_joint.translation_limit_min.z(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+
+            limit_max_mov_xs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, max_vy],
+                            [
+                                param_joint.translation_limit_max.x() / coefficient,
+                                param_joint.translation_limit_max.x(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_max_mov_ys = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, max_vy],
+                            [
+                                param_joint.translation_limit_max.y() / coefficient,
+                                param_joint.translation_limit_max.y(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_max_mov_zs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, max_vy],
+                            [
+                                param_joint.translation_limit_max.z() / coefficient,
+                                param_joint.translation_limit_max.z(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+
+            limit_min_rot_xs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.rotation_limit_min.x() / coefficient,
+                                param_joint.rotation_limit_min.x() / coefficient,
+                                param_joint.rotation_limit_min.x(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_min_rot_ys = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.rotation_limit_min.y() / coefficient,
+                                param_joint.rotation_limit_min.y() / coefficient,
+                                param_joint.rotation_limit_min.y(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_min_rot_zs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.rotation_limit_min.z() / coefficient,
+                                param_joint.rotation_limit_min.z() / coefficient,
+                                param_joint.rotation_limit_min.z(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+
+            limit_max_rot_xs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.rotation_limit_max.x() / coefficient,
+                                param_joint.rotation_limit_max.x() / coefficient,
+                                param_joint.rotation_limit_max.x(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_max_rot_ys = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.rotation_limit_max.y() / coefficient,
+                                param_joint.rotation_limit_max.y() / coefficient,
+                                param_joint.rotation_limit_max.y(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            limit_max_rot_zs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.rotation_limit_max.z() / coefficient,
+                                param_joint.rotation_limit_max.z() / coefficient,
+                                param_joint.rotation_limit_max.z(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+
+            spring_constant_mov_xs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.spring_constant_translation.x() / coefficient,
+                                param_joint.spring_constant_translation.x() / coefficient,
+                                param_joint.spring_constant_translation.x(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            spring_constant_mov_ys = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.spring_constant_translation.y() / coefficient,
+                                param_joint.spring_constant_translation.y() / coefficient,
+                                param_joint.spring_constant_translation.y(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            spring_constant_mov_zs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.spring_constant_translation.z() / coefficient,
+                                param_joint.spring_constant_translation.z() / coefficient,
+                                param_joint.spring_constant_translation.z(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+
+            spring_constant_rot_xs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.spring_constant_rotation.x() / coefficient,
+                                param_joint.spring_constant_rotation.x() / coefficient,
+                                param_joint.spring_constant_rotation.x(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            spring_constant_rot_ys = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.spring_constant_rotation.y() / coefficient,
+                                param_joint.spring_constant_rotation.y() / coefficient,
+                                param_joint.spring_constant_rotation.y(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+            spring_constant_rot_zs = MBezierUtils.intersect_by_x(
+                bezier.Curve.from_nodes(
+                    np.asfortranarray(
+                        [
+                            [min_vy, middle_vy, max_vy],
+                            [
+                                param_joint.spring_constant_rotation.z() / coefficient,
+                                param_joint.spring_constant_rotation.z() / coefficient,
+                                param_joint.spring_constant_rotation.z(),
+                            ],
+                        ]
+                    )
+                ),
+                xs,
+            )
+
+        return (
+            limit_min_mov_xs,
+            limit_min_mov_ys,
+            limit_min_mov_zs,
+            limit_max_mov_xs,
+            limit_max_mov_ys,
+            limit_max_mov_zs,
+            limit_min_rot_xs,
+            limit_min_rot_ys,
+            limit_min_rot_zs,
+            limit_max_rot_xs,
+            limit_max_rot_ys,
+            limit_max_rot_zs,
+            spring_constant_mov_xs,
+            spring_constant_mov_ys,
+            spring_constant_mov_zs,
+            spring_constant_rot_xs,
+            spring_constant_rot_ys,
+            spring_constant_rot_zs,
+        )
 
     def create_rigidbody(
         self,
@@ -271,8 +953,6 @@ class PmxTailorExportService:
         created_rigidbody_angular_dampinges = {}
         prev_rigidbody_cnt = 0
 
-        # 略称
-        abb_name = param_option["abb_name"]
         # 剛体情報
         param_rigidbody = param_option["rigidbody"]
         # 剛体係数
@@ -369,10 +1049,10 @@ class PmxTailorExportService:
                     v_yidx, v_xidx, regist_bones, bone_connected
                 )
 
-                prev_above_bone = virtual_vertices[tuple(vertex_maps[base_map_idx][v_yidx, prev_xidx])].bone
-                next_above_bone = virtual_vertices[tuple(vertex_maps[base_map_idx][v_yidx, next_xidx])].bone
-                prev_below_bone = virtual_vertices[tuple(vertex_maps[base_map_idx][below_yidx, prev_xidx])].bone
-                next_below_bone = virtual_vertices[tuple(vertex_maps[base_map_idx][below_yidx, next_xidx])].bone
+                prev_above_bone = virtual_vertices[tuple(vertex_map[v_yidx, prev_xidx])].bone
+                next_above_bone = virtual_vertices[tuple(vertex_map[v_yidx, next_xidx])].bone
+                prev_below_bone = virtual_vertices[tuple(vertex_map[below_yidx, prev_xidx])].bone
+                next_below_bone = virtual_vertices[tuple(vertex_map[below_yidx, next_xidx])].bone
 
                 if rigidbody_shape_type == 0:
                     # 球剛体の場合
@@ -397,7 +1077,7 @@ class PmxTailorExportService:
                     # 箱剛体の場合
                     rigidbody_y_idx = np.where(vv_keys == rigidbody_bone_key[target_idx] * target_direction)[0]
 
-                    x_size = np.mean(
+                    x_size = np.max(
                         np.linalg.norm(
                             np.array([prev_above_bone.position.data(), prev_below_bone.position.data()])
                             - np.array([next_above_bone.position.data(), next_below_bone.position.data()]),
@@ -415,30 +1095,30 @@ class PmxTailorExportService:
                     )
                     if physics_type == logger.transtext("袖"):
                         shape_size = MVector3D(
-                            x_size * 0.4, max(0.25, y_size * 0.5), rigidbody_limit_thicks[rigidbody_y_idx]
+                            x_size * 0.2, max(0.25, y_size * 0.5), rigidbody_limit_thicks[rigidbody_y_idx]
                         )
                     else:
                         shape_size = MVector3D(
-                            x_size * 0.5, max(0.25, y_size * 0.5), rigidbody_limit_thicks[rigidbody_y_idx]
+                            x_size * 0.25, max(0.25, y_size * 0.5), rigidbody_limit_thicks[rigidbody_y_idx]
                         )
                 else:
                     # カプセル剛体の場合
                     pass
 
-                tail_bone = virtual_vertices[tuple(vertex_map[(below_yidx, v_xidx)])].bone
+                tail_vv = virtual_vertices[tuple(vertex_map[(below_yidx, v_xidx)])]
 
                 shape_position = MVector3D(
                     np.mean(
                         [
                             vv.bone.position.data(),
-                            tail_bone.position.data(),
+                            tail_vv.bone.position.data(),
                         ],
                         axis=0,
                     )
                 )
 
                 # ボーン進行方向(x)
-                x_direction_pos = (vv.bone.position - tail_bone.position).normalized()
+                x_direction_pos = (vv.bone.position - tail_vv.bone.position).normalized()
                 # ボーン進行方向に対しての縦軸(y)
                 y_direction_pos = vv.normal().normalized() * -1
                 shape_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
@@ -474,6 +1154,7 @@ class PmxTailorExportService:
                     param_rigidbody.param.friction,
                     mode,
                 )
+                vv.rigidbody_qq = shape_qq
 
                 # 別途保持しておく
                 created_rigidbodies[vv.rigidbody.name] = vv.rigidbody
@@ -481,9 +1162,9 @@ class PmxTailorExportService:
                 created_rigidbody_linear_dampinges[vv.rigidbody.name] = linear_damping
                 created_rigidbody_angular_dampinges[vv.rigidbody.name] = angular_damping
 
-                if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 200 > prev_rigidbody_cnt:
+                if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 100 > prev_rigidbody_cnt:
                     logger.info("-- -- 【No.%s】剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
-                    prev_rigidbody_cnt = len(created_rigidbodies) // 200
+                    prev_rigidbody_cnt = len(created_rigidbodies) // 100
 
         min_mass = 0
         min_linear_damping = 0
@@ -541,6 +1222,10 @@ class PmxTailorExportService:
             logger.debug(f"rigidbody: {rigidbody}")
 
         logger.info("-- 剛体: %s個目:終了", len(created_rigidbodies))
+
+        # TODO バランサー剛体
+
+        return root_rigidbody
 
     def create_weight(
         self,
@@ -1731,6 +2416,42 @@ def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax
 
 def randomname(n) -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=n))
+
+
+def calc_intersect(vP0: MVector3D, vP1: MVector3D, vQ0: MVector3D, vQ1: MVector3D) -> MVector3D:
+    P0 = vP0.data()
+    P1 = vP1.data()
+    Q0 = vQ0.data()
+    Q1 = vQ1.data()
+
+    # Direction vectors
+    DP = P1 - P0
+    DQ = Q1 - Q0
+
+    # start difference vector
+    PQ = Q0 - P0
+
+    # Find values
+    a = DP.dot(DP)
+    b = DP.dot(DQ)
+    c = DQ.dot(DQ)
+    d = DP.dot(PQ)
+    e = DQ.dot(PQ)
+
+    # Find discriminant
+    DD = a * c - b * b
+
+    if np.isclose(DD, 0):
+        return (vP0 + vQ0) / 2
+
+    # Find parameters for the closest points on lines
+    tt = (b * e - c * d) / DD
+    uu = (a * e - b * d) / DD
+
+    Pt = P0 + tt * DP
+    Qu = Q0 + uu * DQ
+
+    return MVector3D(Pt)
 
 
 SEMI_STANDARD_BONE_NAMES = [
