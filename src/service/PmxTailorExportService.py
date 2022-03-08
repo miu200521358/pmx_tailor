@@ -75,14 +75,12 @@ class VirtualVertex:
         self.diagonal_joint = None
         self.reverse_joint = None
 
-    def append(self, real_vertices: list, connected_vvs: list, indexes: list, out_indexes: list):
+    def append(self, real_vertices: list, connected_vvs: list, indexes: list):
         for rv in real_vertices:
             if rv not in self.real_vertices:
                 self.real_vertices.append(rv)
                 self.positions.append(rv.position.data())
-                if len(indexes) > 0:
-                    # 対象面である場合のみ法線保持
-                    self.normals.append(rv.normal.data())
+                self.normals.append(rv.normal.data())
 
         for lv in connected_vvs:
             if lv not in self.connected_vvs:
@@ -91,10 +89,6 @@ class VirtualVertex:
         for i in indexes:
             if i not in self.indexes:
                 self.indexes.append(i)
-
-        for i in out_indexes:
-            if i not in self.out_indexes:
-                self.out_indexes.append(i)
 
     def vidxs(self):
         return [v.index for v in self.real_vertices]
@@ -1884,12 +1878,13 @@ class PmxTailorExportService:
         # 方向に応じて判定値を変える
         # デフォルトは下
         base_vertical_axis = MVector3D(0, -1, 0)
-        if param_option["direction"] == "上":
+        if param_option["direction"] == logger.transtext("上"):
             base_vertical_axis = MVector3D(0, 1, 0)
-        elif param_option["direction"] == "右":
+        elif param_option["direction"] == logger.transtext("右"):
             base_vertical_axis = MVector3D(-1, 0, 0)
-        elif param_option["direction"] == "左":
+        elif param_option["direction"] == logger.transtext("左"):
             base_vertical_axis = MVector3D(1, 0, 0)
+        base_reverse_axis = MVector3D(np.logical_not(np.abs(base_vertical_axis.data())))
 
         logger.info("%s: 材質頂点の傾き算出", material_name)
 
@@ -1926,7 +1921,7 @@ class PmxTailorExportService:
         # nan_to_num対策(落とさない為)
         nan_key = (0, 0, 0)
         virtual_vertices[nan_key] = VirtualVertex(nan_key)
-        virtual_vertices[nan_key].append([], [], [], [])
+        virtual_vertices[nan_key].append([], [], [])
         virtual_vertices[nan_key].bone = parent_bone
 
         edge_pair_lkeys = {}
@@ -1953,21 +1948,16 @@ class PmxTailorExportService:
                 v1_key = v1.position.to_key(threshold)
                 v2_key = v2.position.to_key(threshold)
 
-                if v0_key not in virtual_vertices:
-                    virtual_vertices[v0_key] = VirtualVertex(v0_key)
-
                 # 一旦ルートボーンにウェイトを一括置換
                 v0.deform = Bdef1(parent_bone.index)
 
                 # 面垂線
                 vv1 = v1.position - v0.position
                 vv2 = v2.position - v1.position
-                surface_normal = MVector3D.crossProduct(vv1, vv2).normalized()
-                surface_normal.setY(0)
+                surface_normal = MVector3D.crossProduct(vv1, vv2).normalized() * base_reverse_axis
 
                 # 親ボーンに対する向き
-                parent_direction = (v0.position - parent_bone.position).normalized()
-                parent_direction.setY(0)
+                parent_direction = (v0.position - parent_bone.position).normalized() * base_reverse_axis
 
                 # 親ボーンの向きとの内積
                 normal_dot = MVector3D.dotProduct(surface_normal, parent_direction)
@@ -1983,8 +1973,11 @@ class PmxTailorExportService:
                     if index_idx not in edge_pair_lkeys[lkey]:
                         edge_pair_lkeys[lkey].append(index_idx)
 
+                    if v0_key not in virtual_vertices:
+                        virtual_vertices[v0_key] = VirtualVertex(v0_key)
+
                     # 仮想頂点登録（該当頂点対象）
-                    virtual_vertices[v0_key].append([v0], [v1_key, v2_key], [index_idx], [])
+                    virtual_vertices[v0_key].append([v0], [v1_key, v2_key], [index_idx])
 
                     # 残頂点リストにまずは登録
                     if v0_key not in remaining_vertices:
@@ -2032,9 +2025,10 @@ class PmxTailorExportService:
         while len(edge_vkeys) < len(edge_line_pairs.keys()):
             _, all_edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, None, all_edge_lines, edge_vkeys)
 
-        if logger.is_debug_level():
-            for n, edge_lines in enumerate(all_edge_lines):
-                logger.debug(f'[{n:02d}] {[f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines]}')
+        for n, edge_lines in enumerate(all_edge_lines):
+            logger.info(
+                "-- %s: 検出エッジ: %s", material_name, [f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines]
+            )
 
         logger.info("%s: エッジの抽出", material_name)
 
@@ -2066,15 +2060,12 @@ class PmxTailorExportService:
             # 方向の中央値
             # direction_dot_mean = np.mean([np.min(np.abs(direction_dots)), np.mean(np.abs(direction_dots))])
             direction_dot_mean = np.mean(np.abs(direction_dots))
-            # 最大の内積差
-            edge_dot_mean = np.mean(np.abs(edge_dots))
-            edge_dot_diff_max = np.max(np.abs(np.abs(edge_dots) - edge_dot_mean))
+            # 内積の前後差
+            edge_dot_diffs = np.diff(edge_dots)
+            edge_dot_diff_max = np.max(np.abs(edge_dot_diffs))
 
             logger.debug(
                 f"[{n:02d}] direction[{np.round(direction_dot_mean, 4)}], dot[{np.round(direction_dots, 4)}], edge_dot_diff_max[{round(edge_dot_diff_max, 4)}]"
-            )
-            logger.debug(
-                f"[{n:02d}] mean[{np.round(edge_dot_mean, 4)}], dot[{np.round(edge_dots, 4)}] diff[{np.round(np.array(edge_dots) - edge_dot_mean, 4)}] diffmax[{np.round(edge_dot_diff_max, 4)}]"
             )
 
             if edge_dot_diff_max > 0.5:
@@ -2281,7 +2272,7 @@ class PmxTailorExportService:
                         virtual_vertices[vkeys[0]].vidxs() if vkeys else "NG",
                         round(np.sum(vscores), 4) if vscores else "-",
                     )
-                    if vkeys:
+                    if len(vkeys) > 1:
                         all_vkeys_list[-1].append(vkeys)
                         all_scores[-1].append(vscores)
 
