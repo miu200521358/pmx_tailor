@@ -2071,7 +2071,6 @@ class PmxTailorExportService:
                 )
 
             # 方向の中央値
-            # direction_dot_mean = np.mean([np.min(np.abs(direction_dots)), np.mean(np.abs(direction_dots))])
             direction_dot_mean = np.mean(np.abs(direction_dots))
             # 内積の前後差
             edge_dot_diffs = np.diff(edge_dots)
@@ -2086,7 +2085,6 @@ class PmxTailorExportService:
                 logger.debug(f"[{n:02d}] corner[{np.where(np.array(edge_dots) < 0.5)[0].tolist()}]")
                 slice_idxs = np.where(np.array(edge_dots) < 0.5)[0].tolist()
                 slice_idxs += [slice_idxs[0]]
-                # is_prev_horizonal = True
                 for ssi, esi in zip(slice_idxs, slice_idxs[1:]):
                     target_edge_lines = (
                         edge_lines[ssi : (esi + 1)] if 0 <= ssi < esi else edge_lines[ssi:] + edge_lines[: (esi + 1)]
@@ -2102,21 +2100,11 @@ class PmxTailorExportService:
                         if 1 == len(all_edge_lines):
                             horizonal_edge_lines.append([])
                         horizonal_edge_lines[-1].append(target_edge_lines)
-                        # is_prev_horizonal = True
                     else:
                         # 同一方向の傾きがdirectionと同じっぽければ、垂直方向
-
-                        # # 垂直が2回続いている場合、スリットとみなして、切替の一点を水平に入れておく
-                        # if not is_prev_horizonal:
-                        #     if 1 == len(all_edge_lines):
-                        #         horizonal_edge_lines.append([])
-                        #     horizonal_edge_lines[-1].append([target_edge_lines[0]])
-
                         if 1 == len(all_edge_lines):
                             vertical_edge_lines.append([])
                         vertical_edge_lines[-1].append(target_edge_lines)
-                        # is_prev_horizonal = False
-
             else:
                 # 内積差が小さい場合、エッジが均一に水平に繋がってるとみなす(一枚物は有り得ない)
                 horizonal_edge_lines[-1].append(edge_lines)
@@ -2243,24 +2231,10 @@ class PmxTailorExportService:
                     all_vkeys_list.append([])
                     all_scores.append([])
                 for ki, bottom_edge_key in enumerate(bhe):
-                    # if len(top_degrees) == len(bottom_degrees):
-                    #     # 同じ列数の場合、そのまま適用
-                    #     top_edge_key = list(top_degrees.keys())[ki]
-                    # else:
                     bottom_degree = bottom_degrees[bottom_edge_key]
                     # 近いdegreeのものを選ぶ(大体近いでOK)
                     top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
                     top_edge_key = list(top_degrees.keys())[top_idx]
-
-                    # # 途中の切れ目である場合、前後の中間角度で見る
-                    # bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
-                    # if ki == len(bhe) - 1 and ((len(bhel) > 0 and hi < len(bhel) - 1) or \
-                    #    (len(bottom_horizonal_edge_lines) > 0 and hi < len(bottom_horizonal_edge_lines) - 1)):
-                    #     # 末端の場合、次との中間角度
-                    #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
-                    # elif ki == 0 and ((len(bhel) > 0 and hi > 0) or (len(bottom_horizonal_edge_lines) > 0 and bi > 0)):
-                    #     # 開始の場合、前との中間角度
-                    #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
 
                     logger.debug(
                         f"** start: ({bi:02d}-{hi:02d}), top[{top_edge_key}({virtual_vertices[top_edge_key].vidxs()})][{round(top_degrees[top_edge_key], 3)}], bottom[{bottom_edge_key}({virtual_vertices[bottom_edge_key].vidxs()})][{round(bottom_degrees[bottom_edge_key], 3)}]"
@@ -2297,41 +2271,7 @@ class PmxTailorExportService:
         for li, (vkeys_list, scores) in enumerate(zip(all_vkeys_list, all_scores)):
             logger.info("-- 絶対頂点マップ: %s個目: ---------", midx + 1)
 
-            # top_keys = []
-            # line_dots = []
-
             logger.info("-- 絶対頂点マップ[%s]: 頂点ルート決定", midx + 1)
-
-            # top_vv = virtual_vertices[vkeys[0]]
-            # bottom_vv = virtual_vertices[vkeys[-1]]
-            # top_pos = top_vv.position()
-            # bottom_pos = bottom_vv.position()
-
-            # for vkeys in vkeys_list:
-            #     line_dots.append([])
-
-            #     for y, vkey in enumerate(vkeys):
-            #         if y == 0:
-            #             line_dots[-1].append(1)
-            #             top_keys.append(vkey)
-            #         elif y <= 1:
-            #             continue
-            #         else:
-            #             prev_prev_vv = virtual_vertices[vkeys[y - 2]]
-            #             prev_vv = virtual_vertices[vkeys[y - 1]]
-            #             now_vv = virtual_vertices[vkey]
-            #             prev_prev_pos = prev_prev_vv.position()
-            #             prev_pos = prev_vv.position()
-            #             now_pos = now_vv.position()
-            #             prev_direction = (prev_pos - prev_prev_pos).normalized()
-            #             now_direction = (now_pos - prev_pos).normalized()
-
-            #             dot = MVector3D.dotProduct(now_direction, prev_direction)   # * now_pos.distanceToPoint(prev_pos)   # * MVector3D.dotProduct(now_direction, total_direction)   #
-            #             line_dots[-1].append(dot)
-
-            #             logger.debug(f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], dot({y}): {round(dot, 5)}")
-
-            #     logger.info("-- 絶対頂点マップ[%s]: 頂点ルート確認[%s] 始端: %s, 終端: %s, 近似値: %s", midx + 1, len(top_keys), top_vv.vidxs(), bottom_vv.vidxs(), round(np.mean(line_dots[-1]), 4))
 
             logger.debug("------------------")
             top_key_cnts = dict(Counter([vkeys[0] for vkeys in vkeys_list]))
@@ -2351,7 +2291,7 @@ class PmxTailorExportService:
                             else:
                                 # 後はそのまま登録
                                 total_scores[x] = cnt
-                    # 最も内積平均値が大きい列を登録対象とする
+                    # 最もスコアが大きい列を登録対象とする
                     target_regists[list(total_scores.keys())[np.argmax(list(total_scores.values()))]] = True
             else:
                 # 全部1個ずつ繋がっている場合はそのまま登録
@@ -2472,7 +2412,6 @@ class PmxTailorExportService:
             f" - top({top_vv.vidxs()}): x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]"
         )
 
-        # int_max = np.iinfo(np.int32).max
         scores = []
         for n, to_key in enumerate(from_vv.connected_vvs):
             to_vv = virtual_vertices[to_key]
@@ -2486,20 +2425,6 @@ class PmxTailorExportService:
                 scores.append(0)
                 logger.debug(f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], 対象外")
                 continue
-
-            # if to_key == top_edge_key:
-            #     # TOPに到達するときには必ずそこに向く
-            #     scores.append(int_max)
-            #     logger.debug(f' - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], TOP到達')
-            #     continue
-
-            # # ボーン進行方向(x)
-            # to_x_pos = (to_pos - bottom_pos).normalized()
-            # # ボーン進行方向に対しての縦軸(y)
-            # to_y_pos = to_vv.normal(base_vertical_axis).normalized()
-            # # ボーン進行方向に対しての横軸(z)
-            # to_z_pos = MVector3D.crossProduct(to_x_pos, to_y_pos)
-            # to_qq = MQuaternion.fromDirection(to_z_pos, to_y_pos)
 
             mat = MMatrix4x4()
             mat.setToIdentity()
@@ -2521,32 +2446,16 @@ class PmxTailorExportService:
             roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
 
             score = (yaw_score * 20) + pitch_score + (roll_score * 2)
-            # local_dot = MVector3D.dotProduct(base_vertical_axis, local_next_vpos)
-            # prev_dot = MVector3D.dotProduct((from_pos - prev_pos).normalized(), (to_pos - from_pos).normalized()) if prev_pos else 1
 
             scores.append(score)
-
-            # dots.append(local_dot * prev_dot)
 
             logger.debug(
                 f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_next_vpos[{local_next_vpos.to_log()}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
             )
 
-            # to_degrees.append(self.calc_arc_degree(bottom_edge_start_pos, bottom_edge_mean_pos, to_pos, base_vertical_axis))
-            # to_lengths.append(to_pos.distanceToPoint(top_pos))
-
-            # logger.debug(f' - get_vertical_key({n}) : to[{to_vv.vidxs()}], pos[{to_pos.to_log()}], degree[{round(to_degrees[-1], 4)}]')
-
         if np.count_nonzero(scores) == 0:
             # スコアが付けられなくなったら終了
             return vkeys, vscores
-
-        # nearest_idx = np.where(np.array(scores) == int_max)[0]
-        # if len(nearest_idx) > 0:
-        #     # TOP到達した場合、採用
-        #     nearest_idx = nearest_idx[0]
-        #     vscores.append(1)
-        # else:
 
         # 最もスコアの高いINDEXを採用
         nearest_idx = np.argmax(scores)
