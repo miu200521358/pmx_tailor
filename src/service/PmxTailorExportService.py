@@ -1288,36 +1288,47 @@ class PmxTailorExportService:
         for vkey, vv in remaining_vertices.items():
             surround_bone_vvs = self.get_surround_vvs(vv, virtual_vertices)
 
-            if len(surround_bone_vvs) < 4:
-                logger.warning("残ウェイト計算で関連ボーンが必要数見つからなかった為、親ボーンウェイトのままスキップします。: 対象頂点[%s]", vv.vidxs())
+            if len(surround_bone_vvs) < 1:
+                logger.warning("残ウェイト計算で関連ボーンが見つからなかった為、親ボーンウェイトのままスキップします。: 対象頂点[%s]", vv.vidxs())
                 continue
+
+            weigth_cnt = 1 if len(surround_bone_vvs) < 2 else 2 if len(surround_bone_vvs) < 4 else 4
 
             # 位置をリストアップ
             surround_bone_positions = []
             for bone_vv in surround_bone_vvs:
                 surround_bone_positions.append(virtual_vertices[bone_vv].position().data())
 
-            # 近いのから4つ選ぶ
+            # 近いのからウェイト対象分選ぶ
             surround_distances = np.linalg.norm(
                 np.array(surround_bone_positions) - vv.position().data(), ord=2, axis=1
             )
-            weight_bone_vvs = np.array(surround_bone_vvs)[np.argsort(surround_distances)[:4]]
-            weight_bone_distances = np.sort(surround_distances)[:4]
+            weight_bone_vvs = np.array(surround_bone_vvs)[np.argsort(surround_distances)[:weigth_cnt]]
+            weight_bone_distances = np.sort(surround_distances)[:weigth_cnt]
             reverse_weights = weight_bone_distances / weight_bone_distances.sum(axis=0, keepdims=1)
             target_weights = 1 - reverse_weights
             deform_weights = target_weights / target_weights.sum(axis=0, keepdims=1)
 
             for rv in vv.real_vertices:
-                rv.deform = Bdef4(
-                    virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[0]))].bone.index,
-                    virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[1]))].bone.index,
-                    virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[2]))].bone.index,
-                    virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[3]))].bone.index,
-                    deform_weights[0],
-                    deform_weights[1],
-                    deform_weights[2],
-                    deform_weights[3],
-                )
+                if weigth_cnt == 1:
+                    rv.deform = Bdef1(virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[0]))].bone.index)
+                elif weigth_cnt == 2:
+                    rv.deform = Bdef2(
+                        virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[0]))].bone.index,
+                        virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[1]))].bone.index,
+                        deform_weights[0],
+                    )
+                else:
+                    rv.deform = Bdef4(
+                        virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[0]))].bone.index,
+                        virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[1]))].bone.index,
+                        virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[2]))].bone.index,
+                        virtual_vertices[tuple(np.nan_to_num(weight_bone_vvs[3]))].bone.index,
+                        deform_weights[0],
+                        deform_weights[1],
+                        deform_weights[2],
+                        deform_weights[3],
+                    )
 
             vertex_cnt += 1
 
@@ -2025,6 +2036,8 @@ class PmxTailorExportService:
         while len(edge_vkeys) < len(edge_line_pairs.keys()):
             _, all_edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, None, all_edge_lines, edge_vkeys)
 
+        all_edge_lines = [els for els in all_edge_lines if len(els) > 4]
+
         for n, edge_lines in enumerate(all_edge_lines):
             logger.info(
                 "-- %s: 検出エッジ: %s", material_name, [f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines]
@@ -2230,24 +2243,25 @@ class PmxTailorExportService:
                     all_vkeys_list.append([])
                     all_scores.append([])
                 for ki, bottom_edge_key in enumerate(bhe):
-                    if len(top_degrees) == len(bottom_degrees):
-                        # 同じ列数の場合、そのまま適用
-                        top_edge_key = list(top_degrees.keys())[ki]
-                    else:
-                        bottom_degree = bottom_degrees[bottom_edge_key]
-                        # # 途中の切れ目である場合、前後の中間角度で見る
-                        # bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
-                        # if ki == len(bhe) - 1 and ((len(bhel) > 0 and hi < len(bhel) - 1) or \
-                        #    (len(bottom_horizonal_edge_lines) > 0 and hi < len(bottom_horizonal_edge_lines) - 1)):
-                        #     # 末端の場合、次との中間角度
-                        #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
-                        # elif ki == 0 and ((len(bhel) > 0 and hi > 0) or (len(bottom_horizonal_edge_lines) > 0 and bi > 0)):
-                        #     # 開始の場合、前との中間角度
-                        #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
+                    # if len(top_degrees) == len(bottom_degrees):
+                    #     # 同じ列数の場合、そのまま適用
+                    #     top_edge_key = list(top_degrees.keys())[ki]
+                    # else:
+                    bottom_degree = bottom_degrees[bottom_edge_key]
+                    # 近いdegreeのものを選ぶ(大体近いでOK)
+                    top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
+                    top_edge_key = list(top_degrees.keys())[top_idx]
 
-                        # 近いdegreeのものを選ぶ
-                        top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
-                        top_edge_key = list(top_degrees.keys())[top_idx]
+                    # # 途中の切れ目である場合、前後の中間角度で見る
+                    # bottom_idx = [i for i, k in enumerate(bottom_degrees.keys()) if k == bottom_edge_key][0]
+                    # if ki == len(bhe) - 1 and ((len(bhel) > 0 and hi < len(bhel) - 1) or \
+                    #    (len(bottom_horizonal_edge_lines) > 0 and hi < len(bottom_horizonal_edge_lines) - 1)):
+                    #     # 末端の場合、次との中間角度
+                    #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx + 1]]])
+                    # elif ki == 0 and ((len(bhel) > 0 and hi > 0) or (len(bottom_horizonal_edge_lines) > 0 and bi > 0)):
+                    #     # 開始の場合、前との中間角度
+                    #     bottom_degree = np.mean([bottom_degrees[bottom_edge_key], bottom_degrees[list(bottom_degrees.keys())[bottom_idx - 1]]])
+
                     logger.debug(
                         f"** start: ({bi:02d}-{hi:02d}), top[{top_edge_key}({virtual_vertices[top_edge_key].vidxs()})][{round(top_degrees[top_edge_key], 3)}], bottom[{bottom_edge_key}({virtual_vertices[bottom_edge_key].vidxs()})][{round(bottom_degrees[bottom_edge_key], 3)}]"
                     )
