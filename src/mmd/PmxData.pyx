@@ -504,6 +504,7 @@ cdef class RigidBody:
         self.bone_name = ""
         self.is_arm_upper = False
         self.is_small = False
+        self.shape_qq = MQuaternion()
 
         self.SHAPE_SPHERE = 0
         self.SHAPE_BOX = 1
