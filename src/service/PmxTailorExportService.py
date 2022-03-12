@@ -553,65 +553,6 @@ class PmxTailorExportService:
                     )
                     created_joints[joint_key] = joint
 
-                    # if v_yidx == regist_bones.shape[0] - 2:
-                    #     # 最後のひとつ上の段は自身の剛体も作成する（最後の段は非表示ボーン）
-                    #     a_rigidbody = now_prev_vv.map_rigidbodies[prev_map_idx]
-                    #     b_rigidbody = vv.map_rigidbodies[base_map_idx]
-
-                    #     if (
-                    #         not a_rigidbody
-                    #         or not b_rigidbody
-                    #         or (a_rigidbody.name == b_rigidbody.name)
-                    #         or a_rigidbody.index < 0
-                    #         or b_rigidbody.index < 0
-                    #     ):
-                    #         continue
-
-                    #     # 剛体が重なる箇所の交点
-                    #     now_mat = MMatrix4x4()
-                    #     now_mat.setToIdentity()
-                    #     now_mat.translate(a_rigidbody.shape_position)
-                    #     now_mat.rotate(a_rigidbody.shape_qq)
-                    #     now_point = now_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
-
-                    #     next_mat = MMatrix4x4()
-                    #     next_mat.setToIdentity()
-                    #     next_mat.translate(b_rigidbody.shape_position)
-                    #     next_mat.rotate(b_rigidbody.shape_qq)
-                    #     now_next_point = next_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
-
-                    #     joint_pos = (now_point + now_next_point) / 2
-                    #     joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
-
-                    #     joint_key, joint = self.build_joint(
-                    #         "→",
-                    #         1,
-                    #         bone_y_idx,
-                    #         a_rigidbody,
-                    #         b_rigidbody,
-                    #         joint_pos,
-                    #         joint_qq,
-                    #         horizonal_limit_min_mov_xs,
-                    #         horizonal_limit_min_mov_ys,
-                    #         horizonal_limit_min_mov_zs,
-                    #         horizonal_limit_max_mov_xs,
-                    #         horizonal_limit_max_mov_ys,
-                    #         horizonal_limit_max_mov_zs,
-                    #         horizonal_limit_min_rot_xs,
-                    #         horizonal_limit_min_rot_ys,
-                    #         horizonal_limit_min_rot_zs,
-                    #         horizonal_limit_max_rot_xs,
-                    #         horizonal_limit_max_rot_ys,
-                    #         horizonal_limit_max_rot_zs,
-                    #         horizonal_spring_constant_mov_xs,
-                    #         horizonal_spring_constant_mov_ys,
-                    #         horizonal_spring_constant_mov_zs,
-                    #         horizonal_spring_constant_rot_xs,
-                    #         horizonal_spring_constant_rot_ys,
-                    #         horizonal_spring_constant_rot_zs,
-                    #     )
-                    #     created_joints[joint_key] = joint
-
                 if len(created_joints) > 0 and len(created_joints) // 100 > prev_joint_cnt:
                     logger.info("-- -- 【No.%s】ジョイント: %s個目:終了", base_map_idx + 1, len(created_joints))
                     prev_joint_cnt = len(created_joints) // 100
@@ -1224,8 +1165,34 @@ class PmxTailorExportService:
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
-                if bone_connected.shape[0] == 1:
-                    # 一列の場合、自身の真ん中
+                if prev_connected and not next_connected:
+                    # 後が繋がってない場合、前との中間とする
+                    shape_position = MVector3D(
+                        np.mean(
+                            [
+                                now_above_bone.position.data(),
+                                now_below_bone.position.data(),
+                                prev_now_bone.position.data(),
+                                prev_below_bone.position.data(),
+                            ],
+                            axis=0,
+                        )
+                    )
+                elif not prev_connected and next_connected:
+                    # 前が繋がってない場合、次との中間とする
+                    shape_position = MVector3D(
+                        np.mean(
+                            [
+                                now_above_bone.position.data(),
+                                now_below_bone.position.data(),
+                                next_now_bone.position.data(),
+                                next_below_bone.position.data(),
+                            ],
+                            axis=0,
+                        )
+                    )
+                else:
+                    # それ以外は自身の中間
                     shape_position = MVector3D(
                         np.mean(
                             [
@@ -1235,92 +1202,6 @@ class PmxTailorExportService:
                             axis=0,
                         )
                     )
-                    # ボーン進行方向に対しての縦軸(z)
-                    z_direction_pos = MVector3D(
-                        np.mean(
-                            [
-                                now_above_vv.normal().data(),
-                                now_below_vv.normal().data(),
-                            ],
-                            axis=0,
-                        )
-                    ).normalized()
-                else:
-                    if (
-                        prev_below_vv.key in now_below_vv.connected_vvs or now_below_vv.key == prev_below_vv.key
-                    ) and not (now_below_vv.key in next_below_vv.connected_vvs):
-                        # ボーン組みが二次元かつ後が繋がってない場合、前との中間とする
-                        shape_position = MVector3D(
-                            np.mean(
-                                [
-                                    now_above_bone.position.data(),
-                                    now_below_bone.position.data(),
-                                    prev_now_bone.position.data(),
-                                    prev_below_bone.position.data(),
-                                ],
-                                axis=0,
-                            )
-                        )
-                        # ボーン進行方向に対しての縦軸(z)
-                        z_direction_pos = MVector3D(
-                            np.mean(
-                                [
-                                    now_above_vv.normal().data(),
-                                    now_below_vv.normal().data(),
-                                    prev_now_vv.normal().data(),
-                                    prev_below_vv.normal().data(),
-                                ],
-                                axis=0,
-                            )
-                        ).normalized()
-                    elif not (prev_below_vv.key in now_below_vv.connected_vvs) and (
-                        now_below_vv.key in next_below_vv.connected_vvs or now_below_vv.key == next_below_vv.key
-                    ):
-                        # ボーン組みが二次元かつ前が繋がってない場合、次との中間とする
-                        shape_position = MVector3D(
-                            np.mean(
-                                [
-                                    now_above_bone.position.data(),
-                                    now_below_bone.position.data(),
-                                    next_now_bone.position.data(),
-                                    next_below_bone.position.data(),
-                                ],
-                                axis=0,
-                            )
-                        )
-                        # ボーン進行方向に対しての縦軸(z)
-                        z_direction_pos = MVector3D(
-                            np.mean(
-                                [
-                                    now_above_vv.normal().data(),
-                                    now_below_vv.normal().data(),
-                                    next_now_vv.normal().data(),
-                                    next_below_vv.normal().data(),
-                                ],
-                                axis=0,
-                            )
-                        ).normalized()
-                    else:
-                        # それ以外は自身の中間
-                        shape_position = MVector3D(
-                            np.mean(
-                                [
-                                    now_above_bone.position.data(),
-                                    now_below_bone.position.data(),
-                                ],
-                                axis=0,
-                            )
-                        )
-                        # ボーン進行方向に対しての縦軸(z)
-                        z_direction_pos = MVector3D(
-                            np.mean(
-                                [
-                                    now_above_vv.normal().data(),
-                                    now_below_vv.normal().data(),
-                                ],
-                                axis=0,
-                            )
-                        ).normalized()
 
                 # ボーン進行方向(x)
                 x_direction_pos = (now_above_bone.position - now_below_bone.position).normalized()
@@ -1328,13 +1209,6 @@ class PmxTailorExportService:
                 y_direction_pos = (next_above_bone.position - prev_above_bone.position).normalized()
                 # ボーン進行方向に対しての縦軸(z)
                 z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
-                # if (
-                #     np.where(np.array(vv_keys) == rigidbody_bone_key[target_idx] * target_direction)
-                #     >= len(vv_keys) - 1
-                # ):
-                #     # ボーン進行方向に対しての縦軸(z)
-                #     # 末端は上部頂点の向きだけ参照する（末端を見ると傾きがズレる）
-                #     z_direction_pos = now_above_vv.normal().normalized()
                 shape_qq = MQuaternion.fromDirection(z_direction_pos * -1, x_direction_pos)
                 shape_euler = shape_qq.toEulerAngles()
                 shape_rotation_radians = MVector3D(
@@ -2989,18 +2863,25 @@ class PmxTailorExportService:
                 prev_connected = True
             elif all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]][v_yidx, -1].any():
                 prev_map_idx = list(all_bone_connected.keys())[base_map_idx - 1]
+                prev_connected = True
                 # 最後が先頭と繋がっている場合(最後の有効ボーンから最初までがどこか繋がっている場合）、最後と繋ぐ
                 if (
                     tuple(vertex_maps[prev_map_idx][v_yidx, -1]) == tuple(vertex_maps[base_map_idx][v_yidx, v_xidx])
                     and all_bone_connected[prev_map_idx][v_yidx, -2].any()
                 ):
                     # 前のボーンが同じ仮想頂点であり、かつそのもうひとつ前と繋がっている場合
-                    prev_xidx = -2
-                    prev_connected = True
+                    prev_xidx = (
+                        np.max(np.where(all_regist_bones[prev_map_idx][v_yidx, :-1]))
+                        if all_regist_bones[prev_map_idx][v_yidx, :-1].any()
+                        else np.max(np.where(all_regist_bones[prev_map_idx][: (v_yidx + 1), :-1])[1])
+                    )
                 else:
                     # 前のボーンの仮想頂点が自分と違う場合、そのまま前のを採用
-                    prev_xidx = -1
-                    prev_connected = True
+                    prev_xidx = (
+                        np.max(np.where(all_regist_bones[prev_map_idx][v_yidx, :]))
+                        if all_regist_bones[prev_map_idx][v_yidx, :].any()
+                        else np.max(np.where(all_regist_bones[prev_map_idx][: (v_yidx + 1), :])[1])
+                    )
         else:
             # 1番目以降は、自分より前で、ボーンが登録されている最も近いの
             prev_xidx = (
