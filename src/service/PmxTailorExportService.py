@@ -565,9 +565,9 @@ class PmxTailorExportService:
                     )
                     created_joints[joint_key] = joint
 
-                if len(created_joints) > 0 and len(created_joints) // 100 > prev_joint_cnt:
+                if len(created_joints) > 0 and len(created_joints) // 50 > prev_joint_cnt:
                     logger.info("-- -- 【No.%s】ジョイント: %s個目:終了", base_map_idx + 1, len(created_joints))
-                    prev_joint_cnt = len(created_joints) // 100
+                    prev_joint_cnt = len(created_joints) // 50
 
         logger.info("-- ジョイント: %s個目:終了", len(created_joints))
 
@@ -1592,7 +1592,7 @@ class PmxTailorExportService:
                                 if weight_bone_idx not in model.vertices:
                                     model.vertices[weight_bone_idx] = []
                                 model.vertices[weight_bone_idx].append(rv)
-                    elif regist_bones[v_yidx, :].any():
+                    elif np.where(regist_bones[v_yidx, :])[0].shape[0] > 1:
                         # 同じY位置にボーンがある場合、横のBDEF2登録対象
                         # 末端ボーンにはウェイトを割り当てない
                         target_v_yidx = (
@@ -1653,7 +1653,7 @@ class PmxTailorExportService:
                             if weight_bone_idx_1 not in model.vertices:
                                 model.vertices[weight_bone_idx_1] = []
                             model.vertices[weight_bone_idx_1].append(rv)
-                    elif regist_bones[:, v_xidx].any():
+                    elif np.where(regist_bones[:, v_xidx])[0].shape[0] > 1:
                         # 同じX位置にボーンがある場合、縦のBDEF2登録対象
                         (
                             prev_map_idx,
@@ -1979,8 +1979,6 @@ class PmxTailorExportService:
                         ):
                             # 前の仮想頂点と繋がっている場合、True
                             bone_connected[v_yidx, v_xidx] = True
-                        else:
-                            bone_connected[v_yidx, v_xidx] = False
 
                     if (
                         v_yidx < vertex_map.shape[0] - 1
@@ -2070,11 +2068,6 @@ class PmxTailorExportService:
                 y_regists = np.zeros(vertex_map.shape[0], dtype=np.int)
                 prev_y_regist = 0
                 for v_yidx in range(vertex_map.shape[0]):
-                    if v_yidx in [0, vertex_map.shape[0] - 1]:
-                        # 最初は必ず登録
-                        y_regists[v_yidx] = True
-                        continue
-
                     if (
                         np.sum(
                             all_bone_vertical_distances[base_map_idx][
@@ -2086,15 +2079,12 @@ class PmxTailorExportService:
                         # 前の登録ボーンから一定距離離れたら登録対象
                         y_regists[v_yidx] = True
                         prev_y_regist = v_yidx
+                # 最初と最後は必ず登録する
+                y_regists[0] = y_regists[-1] = True
 
                 x_regists = np.zeros(vertex_map.shape[1], dtype=np.int)
                 prev_x_regist = 0
                 for v_xidx in range(vertex_map.shape[1]):
-                    if v_xidx in [0, vertex_map.shape[1] - 1]:
-                        # 最初は必ず登録
-                        x_regists[v_xidx] = True
-                        continue
-
                     if (
                         np.sum(
                             all_bone_horizonal_distances[base_map_idx][
@@ -2106,12 +2096,12 @@ class PmxTailorExportService:
                         # 前の登録ボーンから一定距離離れたら登録対象
                         x_regists[v_xidx] = True
                         prev_x_regist = v_xidx
+                # 最初と最後は必ず登録する
+                x_regists[0] = x_regists[-1] = True
 
                 for v_yidx, y_regist in enumerate(y_regists):
                     for v_xidx, x_regist in enumerate(x_regists):
-                        regist_bones[v_yidx, v_xidx] = (y_regist and x_regist) or not all_bone_connected[base_map_idx][
-                            v_yidx, v_xidx
-                        ]
+                        regist_bones[v_yidx, v_xidx] = y_regist and x_regist
 
             else:
                 # 間隔が頂点タイプの場合、規則的に間を空ける
@@ -2146,19 +2136,17 @@ class PmxTailorExportService:
                     # 親は既にモデルに登録済みのものを選ぶ
                     parent_bone = None
                     for parent_v_yidx in range(v_yidx - 1, -1, -1):
-                        parent_bone = virtual_vertices[tuple(vertex_map[parent_v_yidx, v_xidx])].map_bones[
-                            base_map_idx
-                        ]
-                        if parent_bone and parent_bone.name in model.bones or parent_bone.name in tmp_all_bones:
+                        parent_bone = virtual_vertices[tuple(vertex_map[parent_v_yidx, v_xidx])].map_bones.get(
+                            base_map_idx, None
+                        )
+                        if parent_bone and (parent_bone.name in model.bones or parent_bone.name in tmp_all_bones):
                             # 登録されていたら終了
                             break
-                        else:
-                            parent_bone = None
                     if not parent_bone:
                         # 最後まで登録されている親ボーンが見つからなければ、ルート
                         parent_bone = root_bone
 
-                    if not vv.map_bones[base_map_idx]:
+                    if not vv.map_bones.get(base_map_idx, None):
                         # ボーン仮登録
                         is_add_random = False
                         bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
@@ -2168,7 +2156,6 @@ class PmxTailorExportService:
                             bone_name += randomname(3)
 
                         bone = Bone(bone_name, bone_name, vv.position().copy(), parent_bone.index, 0, 0x0000 | 0x0002)
-                        bone.index = len(model.bones)
                         bone.local_z_vector = vv.normal().copy()
 
                         bone.parent_index = parent_bone.index
@@ -2181,9 +2168,8 @@ class PmxTailorExportService:
                             parent_bone.flag |= 0x0008 | 0x0010
                             model.display_slots[display_name].references.append((0, parent_bone.index))
 
-                        vv.map_bones[base_map_idx] = bone
-
                         if regist_bones[v_yidx, v_xidx]:
+                            vv.map_bones[base_map_idx] = bone
                             bone.index = len(tmp_all_bones)
 
                             if is_add_random:
