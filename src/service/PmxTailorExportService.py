@@ -437,8 +437,8 @@ class PmxTailorExportService:
                             vv.map_bones[base_map_idx].position - tail_vv.map_bones[base_map_idx].position
                         ).normalized()
                     else:
-                        a_rigidbody = now_above_vv.map_rigidbodies[base_map_idx]
-                        b_rigidbody = vv.map_rigidbodies[base_map_idx]
+                        a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+                        b_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
 
                         # 剛体が重なる箇所の交点
                         above_mat = MMatrix4x4()
@@ -507,9 +507,9 @@ class PmxTailorExportService:
 
                     # TODO バランサー剛体
 
-                if param_option["horizonal_joint"]:
-                    a_rigidbody = now_prev_vv.map_rigidbodies[prev_map_idx]
-                    b_rigidbody = vv.map_rigidbodies[base_map_idx]
+                if param_option["horizonal_joint"] and prev_connected:
+                    a_rigidbody = now_prev_vv.map_rigidbodies.get(prev_map_idx, None)
+                    b_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
 
                     if (
                         not a_rigidbody
@@ -2573,7 +2573,7 @@ class PmxTailorExportService:
                 f"[{n:02d}] direction[{np.round(direction_dot_mean, 4)}], dot[{np.round(direction_dots, 4)}], edge_dot_diff_max[{round(edge_dot_diff_max, 4)}]"
             )
 
-            if edge_dot_diff_max > 0.5 and 3 <= len(target_idx_pose_indices) <= len(target_idx_poses) / 4:
+            if edge_dot_diff_max > 0.5 and 3 <= len(target_idx_pose_indices) <= len(target_idx_poses) / 3:
                 # 内積差が大きく、角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
                 logger.debug(f"[{n:02d}] corner[{np.where(np.array(edge_dots) < 0.5)[0].tolist()}]")
                 slice_idxs = np.where(np.array(edge_dots) < 0.5)[0].tolist()
