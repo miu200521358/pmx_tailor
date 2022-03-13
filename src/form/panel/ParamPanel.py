@@ -395,6 +395,7 @@ class PhysicsParam:
                 "材質物理の起点となる親ボーン\nボーン追従剛体を持っているボーンのみが対象となります。\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）"
             )
         )
+        self.simple_parent_bone_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_parent_bone_sizer, 0, wx.ALL | wx.EXPAND, 0)
@@ -438,6 +439,7 @@ class PhysicsParam:
             choices=["", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
         )
         self.simple_group_ctrl.SetToolTip(logger.transtext("剛体のグループ。初期設定では、自分自身のグループのみ非衝突として設定します。"))
+        self.simple_group_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_group_ctrl, 0, wx.ALL, 5)
 
         self.simple_direction_txt = wx.StaticText(
@@ -3240,7 +3242,9 @@ class PhysicsParam:
             if not self.simple_primitive_ctrl.GetStringSelection():
                 self.simple_primitive_ctrl.SetStringSelection(abb_setting["primitive"])
             if self.simple_special_shape_ctrl.GetStringSelection() == logger.transtext("なし"):
-                self.simple_special_shape_ctrl.SetStringSelection(abb_setting.get("special_shape", logger.transtext("なし")))
+                self.simple_special_shape_ctrl.SetStringSelection(
+                    abb_setting.get("special_shape", logger.transtext("なし"))
+                )
             if not self.simple_back_material_ctrl.GetStringSelection():
                 self.simple_back_material_ctrl.SetStringSelection(abb_setting.get("back_material_name", ""))
             if not self.simple_edge_material_ctrl.GetStringSelection():
