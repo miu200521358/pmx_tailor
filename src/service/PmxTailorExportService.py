@@ -505,7 +505,89 @@ class PmxTailorExportService:
                     )
                     created_joints[joint_key] = joint
 
-                    # TODO バランサー剛体
+                    # バランサー剛体が必要な場合
+                    if param_option["rigidbody_balancer"]:
+                        a_rigidbody = vv.map_rigidbodies[base_map_idx]
+                        b_rigidbody = vv.map_balance_rigidbodies[base_map_idx]
+
+                        if (
+                            not a_rigidbody
+                            or not b_rigidbody
+                            or (a_rigidbody.name == b_rigidbody.name)
+                            or a_rigidbody.index < 0
+                            or b_rigidbody.index < 0
+                        ):
+                            continue
+
+                        joint_axis_up = (
+                            now_below_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
+                        ).normalized()
+                        joint_axis = (
+                            vv.map_balance_rigidbodies[base_map_idx].shape_position
+                            - vv.map_bones[base_map_idx].position
+                        ).normalized()
+                        joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                        joint_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+
+                        joint_key, joint = self.build_joint(
+                            "B",
+                            8,
+                            0,
+                            a_rigidbody,
+                            b_rigidbody,
+                            a_rigidbody.shape_position.copy(),
+                            MQuaternion(),
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [0],
+                            [100000],
+                            [100000],
+                            [100000],
+                            [100000],
+                            [100000],
+                            [100000],
+                        )
+                        created_joints[joint_key] = joint
+
+                        if now_below_vv.map_balance_rigidbodies.get(base_map_idx, None):
+                            # バランサー補助剛体
+                            joint_key, joint = self.build_joint(
+                                "BS",
+                                9,
+                                0,
+                                vv.map_balance_rigidbodies[base_map_idx],
+                                now_below_vv.map_balance_rigidbodies[base_map_idx],
+                                MVector3D(),
+                                MQuaternion(),
+                                [-50],
+                                [-50],
+                                [-50],
+                                [50],
+                                [50],
+                                [50],
+                                [1],
+                                [1],
+                                [1],
+                                [0],
+                                [0],
+                                [0],
+                                [0],
+                                [0],
+                                [0],
+                                [0],
+                                [0],
+                                [0],
+                            )
+                            created_joints[joint_key] = joint
 
                 if param_option["horizonal_joint"] and prev_connected:
                     a_rigidbody = now_prev_vv.map_rigidbodies.get(prev_map_idx, None)
@@ -994,6 +1076,7 @@ class PmxTailorExportService:
 
         # 剛体生成
         created_rigidbodies = {}
+        created_rigidbody_vvs = {}
         # 剛体の質量
         created_rigidbody_masses = {}
         created_rigidbody_linear_dampinges = {}
@@ -1065,7 +1148,6 @@ class PmxTailorExportService:
             logger.info("--【No.%s】剛体生成", base_map_idx + 1)
 
             vertex_map = vertex_maps[base_map_idx]
-            bone_connected = all_bone_connected[base_map_idx]
 
             # 厚みの判定
 
@@ -1271,6 +1353,11 @@ class PmxTailorExportService:
 
                 # 別途保持しておく
                 if vv.map_rigidbodies[base_map_idx].name not in created_rigidbodies:
+                    if base_map_idx not in created_rigidbody_vvs:
+                        created_rigidbody_vvs[base_map_idx] = {}
+                    if v_xidx not in created_rigidbody_vvs[base_map_idx]:
+                        created_rigidbody_vvs[base_map_idx][v_xidx] = {}
+                    created_rigidbody_vvs[base_map_idx][v_xidx][v_yidx] = vv
                     created_rigidbodies[vv.map_rigidbodies[base_map_idx].name] = vv.map_rigidbodies[base_map_idx]
                     created_rigidbody_masses[vv.map_rigidbodies[base_map_idx].name] = mass
                     created_rigidbody_linear_dampinges[vv.map_rigidbodies[base_map_idx].name] = linear_damping
@@ -1340,7 +1427,144 @@ class PmxTailorExportService:
 
         logger.info("-- 剛体: %s個目:終了", len(created_rigidbodies))
 
-        # TODO バランサー剛体
+        if param_option["rigidbody_balancer"]:
+            # バランサー剛体が必要な場合
+
+            prev_rigidbody_cnt = 0
+            # すべて非衝突対象
+            balancer_no_collision_group = 0
+            # 剛体生成
+            created_rigidbodies = {}
+            # ボーン生成
+            created_bones = {}
+
+            for base_map_idx in sorted(created_rigidbody_vvs.keys()):
+                logger.info("--【No.%s】バランサー剛体生成", base_map_idx + 1)
+
+                for v_xidx in sorted(created_rigidbody_vvs[base_map_idx].keys()):
+
+                    rigidbody_volume = MVector3D(1, 1, 1)
+                    rigidbody_mass = 0
+                    for v_yidx in reversed(created_rigidbody_vvs[base_map_idx][v_xidx].keys()):
+                        vv = created_rigidbody_vvs[base_map_idx][v_xidx][v_yidx]
+                        # 元の剛体
+                        org_rigidbody = vv.map_rigidbodies[base_map_idx]
+                        org_bone = vv.map_bones[base_map_idx]
+                        org_tail_position = org_bone.tail_position
+                        if org_bone.tail_index >= 0:
+                            org_tail_position = model.bones[model.bone_indexes[org_bone.tail_index]].position
+                        # ボーンの向き
+                        org_axis = (org_tail_position - org_bone.position).normalized()
+
+                        if rigidbody_mass > 0:
+                            # 元剛体の重量は子の1.5倍
+                            org_rigidbody.param.mass = rigidbody_mass * 1.5
+                            # バランサー剛体のサイズ
+                            shape_size = MVector3D(
+                                org_rigidbody.shape_size.x() * 0.5,
+                                (org_rigidbody.shape_size.y() + rigidbody_volume.y()) * 5,
+                                org_rigidbody.shape_size.z(),
+                            )
+                        else:
+                            # バランサー剛体のサイズ
+                            shape_size = MVector3D(
+                                org_rigidbody.shape_size.x() * 0.5,
+                                org_rigidbody.shape_size.y() * 0.8,
+                                org_rigidbody.shape_size.z(),
+                            )
+
+                        # 名前にバランサー追加
+                        rigidbody_name = f"B-{org_rigidbody.name}"
+
+                        # バランサー剛体の回転
+                        if org_axis.y() < 0:
+                            # 下を向いてたらY方向に反転
+                            shape_qq = MQuaternion.fromEulerAngles(0, 180, 0)
+                            shape_qq *= org_rigidbody.shape_qq.copy()
+                        else:
+                            # 上を向いてたらX方向に反転
+                            shape_qq = org_rigidbody.shape_qq.copy()
+                            shape_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+
+                        shape_euler = shape_qq.toEulerAngles()
+                        shape_rotation_radians = MVector3D(
+                            math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
+                        )
+
+                        # バランサー剛体の位置はバランサー剛体の上端から反対向き
+                        mat = MMatrix4x4()
+                        mat.setToIdentity()
+                        mat.translate(org_rigidbody.shape_position)
+                        mat.rotate(shape_qq)
+
+                        # バランサー剛体の位置
+                        shape_position = mat * MVector3D(0, -shape_size.y() / 2, 0)
+
+                        # バランサー剛体用のボーン
+                        balancer_bone = Bone(
+                            rigidbody_name, rigidbody_name, shape_position, org_rigidbody.bone_index, 0, 0x0002
+                        )
+                        created_bones[balancer_bone.name] = balancer_bone
+
+                        vv.map_balance_rigidbodies[base_map_idx] = RigidBody(
+                            rigidbody_name,
+                            rigidbody_name,
+                            -1,
+                            org_rigidbody.collision_group,
+                            balancer_no_collision_group,
+                            2,
+                            shape_size,
+                            shape_position,
+                            shape_rotation_radians,
+                            org_rigidbody.param.mass,
+                            org_rigidbody.param.linear_damping,
+                            org_rigidbody.param.angular_damping,
+                            org_rigidbody.param.restitution,
+                            org_rigidbody.param.friction,
+                            1,
+                        )
+                        vv.map_balance_rigidbodies[base_map_idx].shape_qq = shape_qq
+
+                        # 別途保持しておく
+                        if vv.map_balance_rigidbodies[base_map_idx].name not in created_rigidbodies:
+                            created_rigidbodies[
+                                vv.map_balance_rigidbodies[base_map_idx].name
+                            ] = vv.map_balance_rigidbodies[base_map_idx]
+                        else:
+                            # 既に保持済みの剛体である場合、前のを参照する
+                            vv.map_balance_rigidbodies[base_map_idx] = created_rigidbodies[
+                                vv.map_balance_rigidbodies[base_map_idx].name
+                            ]
+
+                        if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 50 > prev_rigidbody_cnt:
+                            logger.info("-- -- 【No.%s】バランサー剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
+                            prev_rigidbody_cnt = len(created_rigidbodies) // 50
+
+                        # 子剛体のサイズを保持
+                        rigidbody_volume += org_rigidbody.shape_size
+                        # 質量は子の1.5倍
+                        rigidbody_mass = org_rigidbody.param.mass
+
+            for rigidbody_name in sorted(created_rigidbodies.keys()):
+                # ボーンを登録
+                bone = created_bones[rigidbody_name]
+                bone.index = len(model.bones)
+                model.bones[bone.name] = bone
+
+                # 剛体を登録
+                rigidbody = created_rigidbodies[rigidbody_name]
+                rigidbody.index = len(model.rigidbodies)
+                rigidbody.bone_index = bone.index
+
+                if rigidbody.name in model.rigidbodies:
+                    logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
+                    rigidbody.name += randomname(3)
+                    bone.name = copy.deepcopy(rigidbody.name)
+
+                model.rigidbodies[rigidbody.name] = rigidbody
+                logger.debug(f"rigidbody: {rigidbody}")
+
+            logger.info("-- バランサー剛体: %s個目:終了", len(created_rigidbodies))
 
         return root_rigidbody
 
