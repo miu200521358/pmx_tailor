@@ -406,7 +406,7 @@ class PhysicsParam:
         )
         self.simple_abb_txt.SetToolTip(
             logger.transtext(
-                "ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(材質名・頂点CSV・ボーンタブの値は再設定しません)"
+                "ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(ボーンタブの値は再設定しません)"
             )
         )
         self.simple_abb_txt.Wrap(-1)
@@ -417,7 +417,7 @@ class PhysicsParam:
         )
         self.simple_abb_ctrl.SetToolTip(
             logger.transtext(
-                "ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(材質名・頂点CSV・ボーンタブの値は再設定しません)"
+                "ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(ボーンタブの値は再設定しません)"
             )
         )
         self.simple_abb_ctrl.SetMaxLength(6)
@@ -505,6 +505,26 @@ class PhysicsParam:
         self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"))
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
+
+        self.simple_special_shape_txt = wx.StaticText(
+            self.simple_window, wx.ID_ANY, logger.transtext("特殊形状"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.simple_special_shape_txt.SetToolTip(
+            logger.transtext("スカート等で特殊な処理が必要な形状\nデフォルトでは「なし」となっているので、必要に応じて形状を選択してください")
+        )
+        self.simple_special_shape_txt.Wrap(-1)
+        self.simple_header_grid_sizer.Add(self.simple_special_shape_txt, 0, wx.ALL, 5)
+
+        self.simple_special_shape_ctrl = wx.Choice(
+            self.simple_window,
+            id=wx.ID_ANY,
+            choices=[logger.transtext("なし"), logger.transtext("プリーツ")],
+        )
+        self.simple_special_shape_ctrl.SetToolTip(
+            logger.transtext("スカート等で特殊な処理が必要な形状\nデフォルトでは「なし」となっているので、必要に応じて形状を選択してください")
+        )
+        self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_header_grid_sizer.Add(self.simple_special_shape_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
@@ -2448,8 +2468,10 @@ class PhysicsParam:
                 "direction": self.simple_direction_ctrl.GetStringSelection(),
                 "exist_physics_clear": self.simple_exist_physics_clear_ctrl.GetStringSelection(),
                 "primitive": self.simple_primitive_ctrl.GetStringSelection(),
+                "special_shape": self.simple_special_shape_ctrl.GetStringSelection(),
                 "back_material_name": self.simple_back_material_ctrl.GetStringSelection(),
                 "edge_material_name": self.simple_edge_material_ctrl.GetStringSelection(),
+                "vertices_csv": self.vertices_csv_file_ctrl.path(),
                 "params": self.get_param_export_data(),
             }
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
@@ -2462,6 +2484,7 @@ class PhysicsParam:
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["direction"] = self.simple_direction_ctrl.GetStringSelection()
             params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection()
+            params["special_shape"] = self.simple_special_shape_ctrl.GetStringSelection()
             params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
             params["threshold"] = self.simple_threshold_slider.GetValue()
             params["fineness"] = self.simple_fineness_slider.GetValue()
@@ -3216,10 +3239,14 @@ class PhysicsParam:
                 self.simple_exist_physics_clear_ctrl.SetStringSelection(abb_setting["exist_physics_clear"])
             if not self.simple_primitive_ctrl.GetStringSelection():
                 self.simple_primitive_ctrl.SetStringSelection(abb_setting["primitive"])
+            if self.simple_special_shape_ctrl.GetStringSelection() == logger.transtext("なし"):
+                self.simple_special_shape_ctrl.SetStringSelection(abb_setting.get("special_shape", logger.transtext("なし")))
             if not self.simple_back_material_ctrl.GetStringSelection():
                 self.simple_back_material_ctrl.SetStringSelection(abb_setting.get("back_material_name", ""))
             if not self.simple_edge_material_ctrl.GetStringSelection():
                 self.simple_edge_material_ctrl.SetStringSelection(abb_setting.get("edge_material_name", ""))
+            if not self.vertices_csv_file_ctrl.path():
+                self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
 
             # 物理パラメーターも設定する
             self.set_param_import_data(abb_setting["params"])
@@ -3636,6 +3663,7 @@ class PhysicsParam:
         self.simple_shape_maintenance_slider.SetValue(1.5)
         self.simple_direction_ctrl.SetStringSelection(logger.transtext("下"))
         self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("そのまま"))
+        self.simple_special_shape_ctrl.SetStringSelection(logger.transtext("なし"))
 
         self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("箱"))
         self.physics_type_ctrl.SetStringSelection(logger.transtext("布"))
