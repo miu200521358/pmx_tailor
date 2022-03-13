@@ -2,7 +2,6 @@
 #
 from cmath import isnan
 import logging
-from operator import index
 import os
 import traceback
 import numpy as np
@@ -2482,6 +2481,17 @@ class PmxTailorExportService:
             logger.warning("対象範囲にエッジが見つけられなかった為、処理を終了します。\n面が表裏反転してないかご確認ください。", decoration=MLogger.DECORATION_BOX)
             return None, None, None, None, None, None
 
+        if logger.is_debug_level():
+            logger.debug("--------------------------")
+            for key, virtual_vertex in virtual_vertices.items():
+                logger.debug(f"[{key}] {virtual_vertex}")
+
+            logger.debug("--------------------------")
+            for (min_key, max_key), indexes in edge_pair_lkeys.items():
+                logger.debug(
+                    f"[{min_key}:{virtual_vertices[min_key].vidxs()}, {max_key}:{virtual_vertices[max_key].vidxs()}] {indexes}"
+                )
+
         edge_line_pairs = {}
         for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
             if len(line_iidxs) == 1:
@@ -2654,23 +2664,26 @@ class PmxTailorExportService:
 
         top_edge_mean_pos = MVector3D(np.mean(top_edge_poses, axis=0))
         # 真後ろに最も近い位置
-        top_edge_start_pos = MVector3D(list(sorted(top_edge_poses, key=lambda x: (-x[2], abs(x[0]), -x[1])))[0])
+        top_edge_start_pos = MVector3D(list(sorted(top_edge_poses, key=lambda x: (abs(x[0]), -x[2], -x[1])))[0])
 
         for ti, thel in enumerate(top_horizonal_edge_lines):
             for hi, the in enumerate(thel):
                 top_keys.extend(the)
                 for ei, thkey in enumerate(the):
-                    top_degrees[thkey] = self.calc_arc_degree(
+                    top_degree0, top_degree1 = self.calc_arc_degree(
                         top_edge_start_pos, top_edge_mean_pos, virtual_vertices[thkey].position(), base_vertical_axis
                     )
+                    top_degrees[(thkey, 0)] = top_degree0
+                    top_degrees[(thkey, 1)] = top_degree1
                     logger.info(
-                        "%s: 水平エッジ上部(%s-%s-%s): %s -> %s",
+                        "%s: 水平エッジ上部(%s-%s-%s): %s -> [%s, %s]",
                         material_name,
                         f"{(ti + 1):03d}",
                         f"{(hi + 1):03d}",
                         f"{(ei + 1):03d}",
                         virtual_vertices[thkey].vidxs(),
-                        round(top_degrees[thkey], 3),
+                        round(top_degree0, 3),
+                        round(top_degree1, 3),
                     )
 
         if not bottom_horizonal_edge_lines:
@@ -2684,32 +2697,40 @@ class PmxTailorExportService:
         bottom_keys = []
         bottom_degrees = {}
         bottom_edge_poses = []
+        bottom_side_edge_poses = []
         for bi, bhel in enumerate(bottom_horizonal_edge_lines):
             for hi, bhe in enumerate(bhel):
                 for ei, bhkey in enumerate(bhe):
-                    bottom_edge_poses.append(virtual_vertices[bhkey].position().data())
+                    pos = virtual_vertices[bhkey].position().data()
+                    bottom_edge_poses.append(pos)
+                    if np.sign(pos[2]) == np.sign(top_edge_start_pos.data()[2]):
+                        # 下部の対象エッジは上部と同じZ軸方向のみとする（検出だけ）
+                        bottom_side_edge_poses.append(pos)
 
         bottom_edge_mean_pos = MVector3D(np.mean(bottom_edge_poses, axis=0))
-        bottom_edge_start_pos = MVector3D(list(sorted(bottom_edge_poses, key=lambda x: (-x[2], abs(x[0]), -x[1])))[0])
+        bottom_edge_start_pos = MVector3D(list(sorted(bottom_side_edge_poses, key=lambda x: (abs(x[0]), -x[2], -x[1])))[0])
 
         for bi, bhel in enumerate(bottom_horizonal_edge_lines):
             for hi, bhe in enumerate(bhel):
                 bottom_keys.extend(bhe)
                 for ei, bhkey in enumerate(bhe):
-                    bottom_degrees[bhkey] = self.calc_arc_degree(
+                    bottom_degree0, bottom_degree1 = self.calc_arc_degree(
                         bottom_edge_start_pos,
                         bottom_edge_mean_pos,
                         virtual_vertices[bhkey].position(),
                         base_vertical_axis,
                     )
+                    bottom_degrees[(bhkey, 0)] = bottom_degree0
+                    bottom_degrees[(bhkey, 1)] = bottom_degree1
                     logger.info(
-                        "%s: 水平エッジ下部(%s-%s-%s): %s -> %s",
+                        "%s: 水平エッジ下部(%s-%s-%s): %s -> [%s, %s]",
                         material_name,
                         f"{(bi + 1):03d}",
                         f"{(hi + 1):03d}",
                         f"{(ei + 1):03d}",
                         virtual_vertices[bhkey].vidxs(),
-                        round(bottom_degrees[bhkey], 3),
+                        round(bottom_degree0, 3),
+                        round(bottom_degree1, 3),
                     )
 
         logger.info("--------------------------")
@@ -2723,13 +2744,17 @@ class PmxTailorExportService:
                     all_vkeys_list.append([])
                     all_scores.append([])
                 for ki, bottom_edge_key in enumerate(bhe):
-                    bottom_degree = bottom_degrees[bottom_edge_key]
+                    bottom_degree0 = bottom_degrees[(bottom_edge_key, 0)]
+                    bottom_degree1 = bottom_degrees[(bottom_edge_key, 1)]
                     # 近いdegreeのものを選ぶ(大体近いでOK)
-                    top_idx = np.argmin(np.abs(np.array(list(top_degrees.values())) - bottom_degree))
-                    top_edge_key = list(top_degrees.keys())[top_idx]
+                    top_degree0_diffs = np.abs(np.array(list(top_degrees.values())) - bottom_degree0)
+                    top_degree1_diffs = np.abs(np.array(list(top_degrees.values())) - bottom_degree1)
+                    top_sub_idx = np.argmin([np.min(top_degree0_diffs), np.min(top_degree1_diffs)])
+                    top_idx = np.argmin([top_degree0_diffs, top_degree1_diffs][top_sub_idx])
+                    top_edge_key, _ = list(top_degrees.keys())[top_idx]
 
                     logger.debug(
-                        f"** start: ({bi:02d}-{hi:02d}), top[{top_edge_key}({virtual_vertices[top_edge_key].vidxs()})][{round(top_degrees[top_edge_key], 3)}], bottom[{bottom_edge_key}({virtual_vertices[bottom_edge_key].vidxs()})][{round(bottom_degrees[bottom_edge_key], 3)}]"
+                        f"** start: ({bi:02d}-{hi:02d}), top[{top_edge_key}({virtual_vertices[top_edge_key].vidxs()})][{round(top_degrees[(top_edge_key, top_sub_idx)], 3)}], bottom[{bottom_edge_key}({virtual_vertices[bottom_edge_key].vidxs()})][{round(bottom_degrees[(bottom_edge_key, 0)], 3)}]"
                     )
 
                     vkeys, vscores = self.create_vertex_line_map(
@@ -2742,22 +2767,16 @@ class PmxTailorExportService:
                         base_vertical_axis,
                         [bottom_edge_key],
                         [1],
+                        param_option,
                     )
                     logger.info(
-                        "頂点ルート走査[%s-%s-%s]: 終端: %s -> 始端: %s, スコア平均: %s",
+                        "頂点ルート走査[%s-%s-%s]: 始端: %s -> 終端: %s, スコア: %s",
                         f"{(bi + 1):03d}",
                         f"{(hi + 1):03d}",
                         f"{(ki + 1):03d}",
-                        virtual_vertices[vkeys[-1]].vidxs(),
                         virtual_vertices[vkeys[0]].vidxs() if vkeys else "NG",
-                        round(
-                            np.average(
-                                vscores, weights=list(reversed((np.arange(1, len(vscores) + 1) ** 2).tolist()))
-                            ),
-                            4,
-                        )
-                        if vscores
-                        else "-",
+                        virtual_vertices[vkeys[-1]].vidxs(),
+                        round(np.sum(vscores), 4) if vscores else "-",
                     )
                     if len(vkeys) > 1:
                         all_vkeys_list[-1].append(vkeys)
@@ -2787,10 +2806,8 @@ class PmxTailorExportService:
                     for x, (vkeys, ss) in enumerate(zip(vkeys_list, scores)):
                         if vkeys[0] == top_key:
                             if cnt > 1:
-                                # 2個以上同じ始端から出ている場合はスコアの重み付合計を取る
-                                total_scores[x] = np.average(
-                                    ss, weights=list(reversed((np.arange(1, len(ss) + 1) ** 2).tolist()))
-                                )
+                                # 2個以上同じ始端から出ている場合はスコアの合計を取る
+                                total_scores[x] = np.sum(ss)
                                 logger.debug(
                                     f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], total: {round(total_scores[x], 3)}"
                                 )
@@ -2827,7 +2844,7 @@ class PmxTailorExportService:
                             continue
                         prev_vv = virtual_vertices[tuple(np.nan_to_num(vertex_map[y, prev_xx]))]
                         vv = virtual_vertices[vkey]
-                        prev_vv.connected_vvs.extend(copy.deepcopy(vv.connected_vvs))
+                        prev_vv.connected_vvs.extend(vv.connected_vvs)
                     continue
 
                 for y, vkey in enumerate(vkeys):
@@ -2888,11 +2905,11 @@ class PmxTailorExportService:
         if np.isclose(MVector3D.dotProduct(start_normal_pos, target_normal_pos), -1):
             # ほぼ真後ろを向いてる場合、固定で180度を入れておく
             degree = 180
-        if degree < 0:
-            # マイナスになった場合、360を足しておく
-            degree += 360
+        # if degree < 0:
+        #     # マイナスになった場合、360を足しておく
+        #     degree += 360
 
-        return degree
+        return (degree, degree + 360)
 
     def create_vertex_line_map(
         self,
@@ -2905,6 +2922,7 @@ class PmxTailorExportService:
         base_vertical_axis: MVector3D,
         vkeys: list,
         vscores: list,
+        param_option: dict,
         loop=0,
     ):
 
@@ -2987,13 +3005,13 @@ class PmxTailorExportService:
         nearest_idx = np.argmax(scores)
         vertical_key = from_vv.connected_vvs[nearest_idx]
 
-        # 前の辺との内積差を考慮する（ライン選択用）
+        # 前の辺との内積差を考慮する（プリーツライン選択用）
         prev_diff_dot = (
             MVector3D.dotProduct(
                 (virtual_vertices[vkeys[0]].position() - virtual_vertices[vkeys[1]].position()).normalized(),
                 (virtual_vertices[vertical_key].position() - virtual_vertices[vkeys[0]].position()).normalized(),
             )
-            if len(vkeys) > 1
+            if len(vkeys) > 1 and param_option["special_shape"] == logger.transtext("プリーツ")
             else 1
         )
 
@@ -3018,6 +3036,7 @@ class PmxTailorExportService:
             base_vertical_axis,
             vkeys,
             vscores,
+            param_option,
             loop + 1,
         )
 
@@ -3070,7 +3089,7 @@ class PmxTailorExportService:
             if regist_bones[v_yidx, :].any()
             else np.max(np.where(regist_bones[: (v_yidx + 1), :])[1])
             if np.where(regist_bones[: (v_yidx + 1), :])[1].any()
-            else 0
+            else regist_bones.shape[1] - 1
         )
 
         prev_xidx = 0
@@ -3159,7 +3178,7 @@ class PmxTailorExportService:
                 if regist_bones[v_yidx, (v_xidx + 1) :].any()
                 else np.min(np.where(regist_bones[: (v_yidx + 1), (v_xidx + 1) :])[1]) + (v_xidx + 1)
                 if np.where(regist_bones[: (v_yidx + 1), (v_xidx + 1) :])[1].any()
-                else 0
+                else max_xidx
             )
             next_connected = True
 
@@ -3180,7 +3199,7 @@ class PmxTailorExportService:
                 if regist_bones[(v_yidx + 1) :, v_xidx].any()
                 else np.min(np.where(regist_bones[(v_yidx + 1) :, :v_xidx])[0]) + (v_yidx + 1)
                 if np.where(regist_bones[(v_yidx + 1) :, :v_xidx])[0].any()
-                else 0
+                else regist_bones.shape[0] - 1
             )
 
         return prev_map_idx, prev_xidx, prev_connected, next_map_idx, next_xidx, next_connected, above_yidx, below_yidx
