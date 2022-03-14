@@ -398,9 +398,10 @@ class PmxTailorExportService:
 
             for v_yidx, v_xidx in zip(np.where(regist_bones)[0], np.where(regist_bones)[1]):
                 bone_key = tuple(vertex_map[v_yidx, v_xidx])
-                vv = virtual_vertices[bone_key]
+                vv = virtual_vertices.get(bone_key, None)
 
-                if base_map_idx not in vv.map_rigidbodies:
+                if not vv or not vv.map_rigidbodies.get(base_map_idx, None):
+                    logger.warning("ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s", bone_key)
                     continue
 
                 bone_y_idx = np.where(vv_keys == bone_key[target_idx] * target_direction)[0]
@@ -419,23 +420,21 @@ class PmxTailorExportService:
                     v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
                 )
 
-                prev_above_vv = virtual_vertices[tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])]
-                now_prev_vv = virtual_vertices[tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx])]
-                now_above_vv = virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])]
-                now_next_vv = virtual_vertices[tuple(vertex_maps[next_map_idx][v_yidx, next_xidx])]
-                now_below_vv = virtual_vertices[tuple(vertex_map[below_yidx, v_xidx])]
+                prev_above_vv = virtual_vertices.get(tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx]), None)
+                now_prev_vv = virtual_vertices.get(tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx]), None)
+                now_above_vv = virtual_vertices.get(tuple(vertex_map[above_yidx, v_xidx]), None)
+                now_below_vv = virtual_vertices.get(tuple(vertex_map[below_yidx, v_xidx]), None)
 
-                if param_option["vertical_joint"]:
+                if param_option["vertical_joint"] and now_above_vv:
+                    # 縦ジョイント
                     if v_yidx == 0:
-                        joint_pos = vv.map_bones[base_map_idx].position
                         a_rigidbody = root_rigidbody
                         b_rigidbody = vv.map_rigidbodies[base_map_idx]
 
+                        joint_pos = vv.map_bones[base_map_idx].position
+
                         # 剛体進行方向(x) 中心剛体との角度は反映させない
                         tail_vv = now_below_vv
-                        x_direction_pos = (
-                            vv.map_bones[base_map_idx].position - tail_vv.map_bones[base_map_idx].position
-                        ).normalized()
                     else:
                         a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
@@ -455,11 +454,7 @@ class PmxTailorExportService:
 
                         joint_pos = (above_point + now_point) / 2
 
-                        # 剛体進行方向(x)
                         tail_vv = now_above_vv
-                        x_direction_pos = (
-                            tail_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
-                        ).normalized()
 
                     if (
                         not a_rigidbody
@@ -468,128 +463,187 @@ class PmxTailorExportService:
                         or a_rigidbody.index < 0
                         or b_rigidbody.index < 0
                     ):
-                        continue
-
-                    # 剛体進行方向に対しての縦軸(y)
-                    y_direction_pos = (
-                        (vv.normal().normalized() + tail_vv.normal().normalized()) / 2
-                    ).normalized() * -1
-                    joint_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
-
-                    joint_key, joint = self.build_joint(
-                        "↓",
-                        0,
-                        bone_y_idx,
-                        a_rigidbody,
-                        b_rigidbody,
-                        joint_pos,
-                        joint_qq,
-                        vertical_limit_min_mov_xs,
-                        vertical_limit_min_mov_ys,
-                        vertical_limit_min_mov_zs,
-                        vertical_limit_max_mov_xs,
-                        vertical_limit_max_mov_ys,
-                        vertical_limit_max_mov_zs,
-                        vertical_limit_min_rot_xs,
-                        vertical_limit_min_rot_ys,
-                        vertical_limit_min_rot_zs,
-                        vertical_limit_max_rot_xs,
-                        vertical_limit_max_rot_ys,
-                        vertical_limit_max_rot_zs,
-                        vertical_spring_constant_mov_xs,
-                        vertical_spring_constant_mov_ys,
-                        vertical_spring_constant_mov_zs,
-                        vertical_spring_constant_rot_xs,
-                        vertical_spring_constant_rot_ys,
-                        vertical_spring_constant_rot_zs,
-                    )
-                    created_joints[joint_key] = joint
-
-                    # バランサー剛体が必要な場合
-                    if param_option["rigidbody_balancer"]:
-                        a_rigidbody = vv.map_rigidbodies[base_map_idx]
-                        b_rigidbody = vv.map_balance_rigidbodies[base_map_idx]
-
-                        if (
-                            not a_rigidbody
-                            or not b_rigidbody
-                            or (a_rigidbody.name == b_rigidbody.name)
-                            or a_rigidbody.index < 0
-                            or b_rigidbody.index < 0
-                        ):
-                            continue
-
-                        joint_axis_up = (
-                            now_below_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
+                        logger.warning(
+                            "縦ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                            vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
+                        )
+                    else:
+                        # 剛体進行方向(x)
+                        x_direction_pos = (
+                            vv.map_bones[base_map_idx].position - tail_vv.map_bones[base_map_idx].position
                         ).normalized()
-                        joint_axis = (
-                            vv.map_balance_rigidbodies[base_map_idx].shape_position
-                            - vv.map_bones[base_map_idx].position
-                        ).normalized()
-                        joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
-                        joint_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                        # 剛体進行方向に対しての縦軸(y)
+                        y_direction_pos = (
+                            (vv.normal().normalized() + tail_vv.normal().normalized()) / 2
+                        ).normalized() * -1
+                        joint_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
 
                         joint_key, joint = self.build_joint(
-                            "B",
-                            8,
+                            "↓",
                             0,
+                            bone_y_idx,
                             a_rigidbody,
                             b_rigidbody,
-                            a_rigidbody.shape_position.copy(),
-                            MQuaternion(),
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [0],
-                            [100000],
-                            [100000],
-                            [100000],
-                            [100000],
-                            [100000],
-                            [100000],
+                            joint_pos,
+                            joint_qq,
+                            vertical_limit_min_mov_xs,
+                            vertical_limit_min_mov_ys,
+                            vertical_limit_min_mov_zs,
+                            vertical_limit_max_mov_xs,
+                            vertical_limit_max_mov_ys,
+                            vertical_limit_max_mov_zs,
+                            vertical_limit_min_rot_xs,
+                            vertical_limit_min_rot_ys,
+                            vertical_limit_min_rot_zs,
+                            vertical_limit_max_rot_xs,
+                            vertical_limit_max_rot_ys,
+                            vertical_limit_max_rot_zs,
+                            vertical_spring_constant_mov_xs,
+                            vertical_spring_constant_mov_ys,
+                            vertical_spring_constant_mov_zs,
+                            vertical_spring_constant_rot_xs,
+                            vertical_spring_constant_rot_ys,
+                            vertical_spring_constant_rot_zs,
                         )
                         created_joints[joint_key] = joint
 
-                        if now_below_vv.map_balance_rigidbodies.get(base_map_idx, None):
-                            # バランサー補助剛体
+                        if param_option["reverse_joint"]:
+                            # 逆ジョイント
+                            if v_yidx == 0:
+                                a_rigidbody = vv.map_rigidbodies[base_map_idx]
+                                b_rigidbody = root_rigidbody
+
+                                # 剛体進行方向(x) 中心剛体との角度は反映させない
+                                tail_vv = now_below_vv
+                            else:
+                                a_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
+                                b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+
+                                tail_vv = now_above_vv
+
+                            # 剛体進行方向(x)
+                            x_direction_pos = (
+                                tail_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
+                            ).normalized()
+                            # 剛体進行方向に対しての縦軸(y)
+                            y_direction_pos = (
+                                (vv.normal().normalized() + tail_vv.normal().normalized()) / 2
+                            ).normalized() * -1
+                            joint_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
+
                             joint_key, joint = self.build_joint(
-                                "BS",
-                                9,
-                                0,
-                                vv.map_balance_rigidbodies[base_map_idx],
-                                now_below_vv.map_balance_rigidbodies[base_map_idx],
-                                MVector3D(),
-                                MQuaternion(),
-                                [-50],
-                                [-50],
-                                [-50],
-                                [50],
-                                [50],
-                                [50],
-                                [1],
-                                [1],
-                                [1],
-                                [0],
-                                [0],
-                                [0],
-                                [0],
-                                [0],
-                                [0],
-                                [0],
-                                [0],
-                                [0],
+                                "↑",
+                                1,
+                                bone_y_idx,
+                                a_rigidbody,
+                                b_rigidbody,
+                                joint_pos,
+                                joint_qq,
+                                reverse_limit_min_mov_xs,
+                                reverse_limit_min_mov_ys,
+                                reverse_limit_min_mov_zs,
+                                reverse_limit_max_mov_xs,
+                                reverse_limit_max_mov_ys,
+                                reverse_limit_max_mov_zs,
+                                reverse_limit_min_rot_xs,
+                                reverse_limit_min_rot_ys,
+                                reverse_limit_min_rot_zs,
+                                reverse_limit_max_rot_xs,
+                                reverse_limit_max_rot_ys,
+                                reverse_limit_max_rot_zs,
+                                reverse_spring_constant_mov_xs,
+                                reverse_spring_constant_mov_ys,
+                                reverse_spring_constant_mov_zs,
+                                reverse_spring_constant_rot_xs,
+                                reverse_spring_constant_rot_ys,
+                                reverse_spring_constant_rot_zs,
                             )
                             created_joints[joint_key] = joint
 
-                if param_option["horizonal_joint"] and prev_connected:
+                        # バランサー剛体が必要な場合
+                        if param_option["rigidbody_balancer"]:
+                            a_rigidbody = vv.map_rigidbodies[base_map_idx]
+                            b_rigidbody = vv.map_balance_rigidbodies[base_map_idx]
+
+                            if not (
+                                not a_rigidbody
+                                or not b_rigidbody
+                                or (a_rigidbody.name == b_rigidbody.name)
+                                or a_rigidbody.index < 0
+                                or b_rigidbody.index < 0
+                            ):
+                                joint_axis_up = (
+                                    now_below_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
+                                ).normalized()
+                                joint_axis = (
+                                    vv.map_balance_rigidbodies[base_map_idx].shape_position
+                                    - vv.map_bones[base_map_idx].position
+                                ).normalized()
+                                joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
+                                joint_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+
+                                joint_key, joint = self.build_joint(
+                                    "B",
+                                    8,
+                                    0,
+                                    a_rigidbody,
+                                    b_rigidbody,
+                                    a_rigidbody.shape_position.copy(),
+                                    MQuaternion(),
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [0],
+                                    [100000],
+                                    [100000],
+                                    [100000],
+                                    [100000],
+                                    [100000],
+                                    [100000],
+                                )
+                                created_joints[joint_key] = joint
+
+                                if now_below_vv.map_balance_rigidbodies.get(base_map_idx, None):
+                                    # バランサー補助剛体
+                                    joint_key, joint = self.build_joint(
+                                        "BS",
+                                        9,
+                                        0,
+                                        vv.map_balance_rigidbodies[base_map_idx],
+                                        now_below_vv.map_balance_rigidbodies[base_map_idx],
+                                        MVector3D(),
+                                        MQuaternion(),
+                                        [-50],
+                                        [-50],
+                                        [-50],
+                                        [50],
+                                        [50],
+                                        [50],
+                                        [1],
+                                        [1],
+                                        [1],
+                                        [0],
+                                        [0],
+                                        [0],
+                                        [0],
+                                        [0],
+                                        [0],
+                                        [0],
+                                        [0],
+                                        [0],
+                                    )
+                                    created_joints[joint_key] = joint
+
+                if param_option["horizonal_joint"] and prev_connected and now_prev_vv:
+                    # 横ジョイント
                     a_rigidbody = now_prev_vv.map_rigidbodies.get(prev_map_idx, None)
                     b_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
 
@@ -600,52 +654,208 @@ class PmxTailorExportService:
                         or a_rigidbody.index < 0
                         or b_rigidbody.index < 0
                     ):
-                        continue
+                        logger.warning(
+                            "横ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                            vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
+                        )
+                    else:
+                        # 剛体が重なる箇所の交点
+                        now_mat = MMatrix4x4()
+                        now_mat.setToIdentity()
+                        now_mat.translate(a_rigidbody.shape_position)
+                        now_mat.rotate(a_rigidbody.shape_qq)
+                        now_point = now_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
 
-                    # 剛体が重なる箇所の交点
-                    now_mat = MMatrix4x4()
-                    now_mat.setToIdentity()
-                    now_mat.translate(a_rigidbody.shape_position)
-                    now_mat.rotate(a_rigidbody.shape_qq)
-                    now_point = now_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+                        next_mat = MMatrix4x4()
+                        next_mat.setToIdentity()
+                        next_mat.translate(b_rigidbody.shape_position)
+                        next_mat.rotate(b_rigidbody.shape_qq)
+                        now_next_point = next_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
 
-                    next_mat = MMatrix4x4()
-                    next_mat.setToIdentity()
-                    next_mat.translate(b_rigidbody.shape_position)
-                    next_mat.rotate(b_rigidbody.shape_qq)
-                    now_next_point = next_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+                        joint_pos = (now_point + now_next_point) / 2
+                        joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
 
-                    joint_pos = (now_point + now_next_point) / 2
-                    joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
+                        joint_key, joint = self.build_joint(
+                            "→",
+                            2,
+                            bone_y_idx,
+                            a_rigidbody,
+                            b_rigidbody,
+                            joint_pos,
+                            joint_qq,
+                            horizonal_limit_min_mov_xs,
+                            horizonal_limit_min_mov_ys,
+                            horizonal_limit_min_mov_zs,
+                            horizonal_limit_max_mov_xs,
+                            horizonal_limit_max_mov_ys,
+                            horizonal_limit_max_mov_zs,
+                            horizonal_limit_min_rot_xs,
+                            horizonal_limit_min_rot_ys,
+                            horizonal_limit_min_rot_zs,
+                            horizonal_limit_max_rot_xs,
+                            horizonal_limit_max_rot_ys,
+                            horizonal_limit_max_rot_zs,
+                            horizonal_spring_constant_mov_xs,
+                            horizonal_spring_constant_mov_ys,
+                            horizonal_spring_constant_mov_zs,
+                            horizonal_spring_constant_rot_xs,
+                            horizonal_spring_constant_rot_ys,
+                            horizonal_spring_constant_rot_zs,
+                        )
+                        created_joints[joint_key] = joint
 
-                    joint_key, joint = self.build_joint(
-                        "→",
-                        1,
-                        bone_y_idx,
-                        a_rigidbody,
-                        b_rigidbody,
-                        joint_pos,
-                        joint_qq,
-                        horizonal_limit_min_mov_xs,
-                        horizonal_limit_min_mov_ys,
-                        horizonal_limit_min_mov_zs,
-                        horizonal_limit_max_mov_xs,
-                        horizonal_limit_max_mov_ys,
-                        horizonal_limit_max_mov_zs,
-                        horizonal_limit_min_rot_xs,
-                        horizonal_limit_min_rot_ys,
-                        horizonal_limit_min_rot_zs,
-                        horizonal_limit_max_rot_xs,
-                        horizonal_limit_max_rot_ys,
-                        horizonal_limit_max_rot_zs,
-                        horizonal_spring_constant_mov_xs,
-                        horizonal_spring_constant_mov_ys,
-                        horizonal_spring_constant_mov_zs,
-                        horizonal_spring_constant_rot_xs,
-                        horizonal_spring_constant_rot_ys,
-                        horizonal_spring_constant_rot_zs,
-                    )
-                    created_joints[joint_key] = joint
+                        if param_option["reverse_joint"]:
+                            # 逆ジョイント
+                            a_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
+                            b_rigidbody = now_prev_vv.map_rigidbodies.get(prev_map_idx, None)
+
+                            joint_key, joint = self.build_joint(
+                                "←",
+                                3,
+                                bone_y_idx,
+                                a_rigidbody,
+                                b_rigidbody,
+                                joint_pos,
+                                joint_qq,
+                                reverse_limit_min_mov_xs,
+                                reverse_limit_min_mov_ys,
+                                reverse_limit_min_mov_zs,
+                                reverse_limit_max_mov_xs,
+                                reverse_limit_max_mov_ys,
+                                reverse_limit_max_mov_zs,
+                                reverse_limit_min_rot_xs,
+                                reverse_limit_min_rot_ys,
+                                reverse_limit_min_rot_zs,
+                                reverse_limit_max_rot_xs,
+                                reverse_limit_max_rot_ys,
+                                reverse_limit_max_rot_zs,
+                                reverse_spring_constant_mov_xs,
+                                reverse_spring_constant_mov_ys,
+                                reverse_spring_constant_mov_zs,
+                                reverse_spring_constant_rot_xs,
+                                reverse_spring_constant_rot_ys,
+                                reverse_spring_constant_rot_zs,
+                            )
+                            created_joints[joint_key] = joint
+
+                if param_option["diagonal_joint"] and prev_connected and prev_above_vv:
+                    # 斜めジョイント
+                    a_rigidbody = prev_above_vv.map_rigidbodies.get(prev_map_idx, None)
+                    b_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
+
+                    if (
+                        not a_rigidbody
+                        or not b_rigidbody
+                        or (a_rigidbody.name == b_rigidbody.name)
+                        or a_rigidbody.index < 0
+                        or b_rigidbody.index < 0
+                        or v_yidx == above_yidx
+                    ):
+                        logger.warning(
+                            "斜めジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                            vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
+                        )
+                    else:
+                        # 剛体が重なる箇所の交点
+                        now_mat = MMatrix4x4()
+                        now_mat.setToIdentity()
+                        now_mat.translate(a_rigidbody.shape_position)
+                        now_mat.rotate(a_rigidbody.shape_qq)
+                        now_point = now_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+
+                        next_mat = MMatrix4x4()
+                        next_mat.setToIdentity()
+                        next_mat.translate(b_rigidbody.shape_position)
+                        next_mat.rotate(b_rigidbody.shape_qq)
+                        now_next_point = next_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+
+                        joint_pos = (now_point + now_next_point) / 2
+                        joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
+
+                        joint_key, joint = self.build_joint(
+                            "＼",
+                            4,
+                            bone_y_idx,
+                            a_rigidbody,
+                            b_rigidbody,
+                            joint_pos,
+                            joint_qq,
+                            diagonal_limit_min_mov_xs,
+                            diagonal_limit_min_mov_ys,
+                            diagonal_limit_min_mov_zs,
+                            diagonal_limit_max_mov_xs,
+                            diagonal_limit_max_mov_ys,
+                            diagonal_limit_max_mov_zs,
+                            diagonal_limit_min_rot_xs,
+                            diagonal_limit_min_rot_ys,
+                            diagonal_limit_min_rot_zs,
+                            diagonal_limit_max_rot_xs,
+                            diagonal_limit_max_rot_ys,
+                            diagonal_limit_max_rot_zs,
+                            diagonal_spring_constant_mov_xs,
+                            diagonal_spring_constant_mov_ys,
+                            diagonal_spring_constant_mov_zs,
+                            diagonal_spring_constant_rot_xs,
+                            diagonal_spring_constant_rot_ys,
+                            diagonal_spring_constant_rot_zs,
+                        )
+                        created_joints[joint_key] = joint
+
+                    a_rigidbody = now_prev_vv.map_rigidbodies.get(prev_map_idx, None)
+                    b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+
+                    if not (
+                        not a_rigidbody
+                        or not b_rigidbody
+                        or (a_rigidbody.name == b_rigidbody.name)
+                        or a_rigidbody.index < 0
+                        or b_rigidbody.index < 0
+                        or v_yidx == above_yidx
+                    ):
+                        # 剛体が重なる箇所の交点
+                        now_mat = MMatrix4x4()
+                        now_mat.setToIdentity()
+                        now_mat.translate(a_rigidbody.shape_position)
+                        now_mat.rotate(a_rigidbody.shape_qq)
+                        now_point = now_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+
+                        next_mat = MMatrix4x4()
+                        next_mat.setToIdentity()
+                        next_mat.translate(b_rigidbody.shape_position)
+                        next_mat.rotate(b_rigidbody.shape_qq)
+                        now_next_point = next_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+
+                        joint_pos = (now_point + now_next_point) / 2
+                        joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
+
+                        joint_key, joint = self.build_joint(
+                            "／",
+                            5,
+                            bone_y_idx,
+                            a_rigidbody,
+                            b_rigidbody,
+                            joint_pos,
+                            joint_qq,
+                            diagonal_limit_min_mov_xs,
+                            diagonal_limit_min_mov_ys,
+                            diagonal_limit_min_mov_zs,
+                            diagonal_limit_max_mov_xs,
+                            diagonal_limit_max_mov_ys,
+                            diagonal_limit_max_mov_zs,
+                            diagonal_limit_min_rot_xs,
+                            diagonal_limit_min_rot_ys,
+                            diagonal_limit_min_rot_zs,
+                            diagonal_limit_max_rot_xs,
+                            diagonal_limit_max_rot_ys,
+                            diagonal_limit_max_rot_zs,
+                            diagonal_spring_constant_mov_xs,
+                            diagonal_spring_constant_mov_ys,
+                            diagonal_spring_constant_mov_zs,
+                            diagonal_spring_constant_rot_xs,
+                            diagonal_spring_constant_rot_ys,
+                            diagonal_spring_constant_rot_zs,
+                        )
+                        created_joints[joint_key] = joint
 
                 if len(created_joints) > 0 and len(created_joints) // 50 > prev_joint_cnt:
                     logger.info("-- -- 【No.%s】ジョイント: %s個目:終了", base_map_idx + 1, len(created_joints))
@@ -1175,7 +1385,14 @@ class PmxTailorExportService:
 
             for v_yidx, v_xidx in zip(np.where(regist_bones[:-1, :])[0], np.where(regist_bones[:-1, :])[1]):
                 rigidbody_bone_key = tuple(vertex_map[v_yidx, v_xidx])
-                vv = virtual_vertices[rigidbody_bone_key]
+                vv = virtual_vertices.get(rigidbody_bone_key, None)
+
+                if not vv:
+                    logger.warning(
+                        "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                        rigidbody_bone_key,
+                    )
+                    continue
 
                 (
                     prev_map_idx,
@@ -1190,29 +1407,43 @@ class PmxTailorExportService:
                     v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
                 )
 
-                prev_now_vv = virtual_vertices[tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx])]
-                prev_now_bone = prev_now_vv.map_bones[prev_map_idx]
+                prev_now_vv = virtual_vertices.get(tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx]), None)
+                prev_below_vv = virtual_vertices.get(tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx]), None)
+                now_above_vv = virtual_vertices.get(tuple(vertex_map[v_yidx, v_xidx]), None)
+                now_below_vv = virtual_vertices.get(tuple(vertex_map[below_yidx, v_xidx]), None)
+                next_above_vv = virtual_vertices.get(tuple(vertex_maps[next_map_idx][v_yidx, next_xidx]), None)
+                next_now_vv = virtual_vertices.get(tuple(vertex_maps[next_map_idx][v_yidx, next_xidx]), None)
+                next_below_vv = virtual_vertices.get(tuple(vertex_maps[next_map_idx][below_yidx, next_xidx]), None)
 
-                prev_below_vv = virtual_vertices[tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx])]
-                prev_below_bone = prev_below_vv.map_bones[prev_map_idx]
+                if not (
+                    prev_now_vv
+                    and prev_below_vv
+                    and now_above_vv
+                    and now_below_vv
+                    and next_above_vv
+                    and next_now_vv
+                    and next_below_vv
+                ):
+                    logger.warning(
+                        "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                        vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
+                    )
+                    continue
 
-                now_above_vv = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])]
-                now_above_bone = now_above_vv.map_bones[base_map_idx]
+                prev_now_bone = prev_now_vv.map_bones.get(prev_map_idx, None)
+                prev_below_bone = prev_below_vv.map_bones.get(prev_map_idx, None)
+                now_above_bone = now_above_vv.map_bones.get(base_map_idx, None)
+                now_below_bone = now_below_vv.map_bones.get(base_map_idx, None)
+                next_above_bone = next_above_vv.map_bones.get(next_map_idx, None)
+                next_now_bone = next_now_vv.map_bones.get(next_map_idx, None)
+                next_below_bone = next_below_vv.map_bones.get(next_map_idx, None)
 
-                now_below_vv = virtual_vertices[tuple(vertex_map[below_yidx, v_xidx])]
-                now_below_bone = now_below_vv.map_bones[base_map_idx]
-
-                prev_above_vv = virtual_vertices[tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx])]
-                prev_above_bone = prev_above_vv.map_bones[prev_map_idx]
-
-                next_above_vv = virtual_vertices[tuple(vertex_maps[next_map_idx][v_yidx, next_xidx])]
-                next_above_bone = next_above_vv.map_bones[next_map_idx]
-
-                next_now_vv = virtual_vertices[tuple(vertex_maps[next_map_idx][v_yidx, next_xidx])]
-                next_now_bone = next_now_vv.map_bones[next_map_idx]
-
-                next_below_vv = virtual_vertices[tuple(vertex_maps[next_map_idx][below_yidx, next_xidx])]
-                next_below_bone = next_below_vv.map_bones[next_map_idx]
+                if not (now_above_bone and now_below_bone and next_above_bone):
+                    logger.warning(
+                        "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                        vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
+                    )
+                    continue
 
                 # 剛体の厚みINDEX
                 rigidbody_y_idx = np.where(vv_keys == rigidbody_bone_key[target_idx] * target_direction)[0]
@@ -1222,12 +1453,12 @@ class PmxTailorExportService:
                 v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[now_above_bone.index]]
 
                 # 前と繋がっている場合、前のボーンの頂点を追加する
-                if prev_connected:
-                    v_poses += [(v.position * base_reverse_axis).data() for v in model.vertices[prev_above_bone.index]]
+                if prev_connected and prev_now_bone:
+                    v_poses += [(v.position * base_reverse_axis).data() for v in model.vertices[prev_now_bone.index]]
 
                 # 次と繋がっている場合、次のボーンの頂点を追加する
-                if next_connected:
-                    v_poses += [(v.position * base_reverse_axis).data() for v in model.vertices[next_above_bone.index]]
+                if next_connected and next_now_bone:
+                    v_poses += [(v.position * base_reverse_axis).data() for v in model.vertices[next_now_bone.index]]
 
                 # 重複は除外
                 v_poses = np.unique(v_poses, axis=0)
@@ -1260,7 +1491,7 @@ class PmxTailorExportService:
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
-                if prev_connected and not next_connected:
+                if prev_connected and prev_now_bone and prev_below_bone and not next_connected:
                     # 後が繋がってない場合、前との中間とする
                     mean_position = MVector3D(
                         np.mean(
@@ -1276,7 +1507,8 @@ class PmxTailorExportService:
                 elif (
                     not prev_connected
                     and next_connected
-                    or (next_connected and param_option["special_shape"] == logger.transtext("プリーツ"))
+                    and next_now_bone
+                    or (next_connected and next_now_bone and param_option["special_shape"] == logger.transtext("プリーツ"))
                 ):
                     # 前が繋がってない場合、次との中間とする
                     mean_position = MVector3D(
@@ -1305,7 +1537,7 @@ class PmxTailorExportService:
                 # ボーン進行方向(x)
                 x_direction_pos = (now_above_bone.position - now_below_bone.position).normalized()
                 # ボーン進行方向に対しての横軸(y)
-                y_direction_pos = (next_above_bone.position - prev_above_bone.position).normalized()
+                y_direction_pos = (next_above_bone.position - now_above_bone.position).normalized()
                 # ボーン進行方向に対しての縦軸(z)
                 z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
                 shape_qq = MQuaternion.fromDirection(z_direction_pos * -1, x_direction_pos)
@@ -1842,7 +2074,17 @@ class PmxTailorExportService:
                         else:
                             regist_next_xidx = 0
 
-                        if not all_bone_horizonal_distances[base_map_idx].any():
+                        if (
+                            not all_bone_horizonal_distances[base_map_idx].any()
+                            or np.isnan(vertex_maps[prev_map_idx][target_v_yidx, prev_xidx]).any()
+                            or np.isnan(vertex_maps[next_map_idx][target_v_yidx, regist_next_xidx]).any()
+                            or not virtual_vertices[
+                                tuple(vertex_maps[prev_map_idx][target_v_yidx, prev_xidx])
+                            ].map_bones[prev_map_idx]
+                            or not virtual_vertices[
+                                tuple(vertex_maps[next_map_idx][target_v_yidx, regist_next_xidx])
+                            ].map_bones[next_map_idx]
+                        ):
                             continue
 
                         prev_weight = np.nan_to_num(
@@ -1892,7 +2134,11 @@ class PmxTailorExportService:
                             v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
                         )
 
-                        if below_yidx == regist_bones.shape[0] - 1:
+                        if (
+                            below_yidx == regist_bones.shape[0] - 1
+                            and not np.isnan(vertex_map[above_yidx, v_xidx]).any()
+                            and virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])].map_bones[base_map_idx]
+                        ):
                             weight_bone_idx_0 = (
                                 virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])].map_bones[base_map_idx].index
                             )
@@ -1904,7 +2150,13 @@ class PmxTailorExportService:
                                 # 逆登録
                                 model.vertices[weight_bone_idx_0].append(rv)
                         else:
-                            if not all_bone_vertical_distances[base_map_idx].any():
+                            if (
+                                not all_bone_vertical_distances[base_map_idx].any()
+                                or np.isnan(vertex_map[above_yidx, v_xidx]).any()
+                                or np.isnan(vertex_map[below_yidx, v_xidx]).any()
+                                or not virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])].map_bones[base_map_idx]
+                                or not virtual_vertices[tuple(vertex_map[below_yidx, v_xidx])].map_bones[base_map_idx]
+                            ):
                                 continue
 
                             above_weight = np.nan_to_num(
@@ -1967,6 +2219,22 @@ class PmxTailorExportService:
                         if (
                             not all_bone_vertical_distances[base_map_idx].any()
                             or not all_bone_horizonal_distances[base_map_idx].any()
+                            or np.isnan(vertex_maps[prev_map_idx][above_yidx, prev_xidx]).any()
+                            or np.isnan(vertex_maps[next_map_idx][above_yidx, target_next_xidx]).any()
+                            or np.isnan(vertex_maps[prev_map_idx][below_yidx, prev_xidx]).any()
+                            or np.isnan(vertex_maps[next_map_idx][below_yidx, target_next_xidx]).any()
+                            or not virtual_vertices[tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])].map_bones[
+                                prev_map_idx
+                            ]
+                            or not virtual_vertices[tuple(vertex_map[above_yidx, target_next_xidx])].map_bones[
+                                next_map_idx
+                            ]
+                            or not virtual_vertices[tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx])].map_bones[
+                                prev_map_idx
+                            ]
+                            or not virtual_vertices[
+                                tuple(vertex_maps[next_map_idx][below_yidx, target_next_xidx])
+                            ].map_bones[next_map_idx]
                         ):
                             continue
 
@@ -2034,13 +2302,13 @@ class PmxTailorExportService:
                                 deform_weights = total_weights / total_weights.sum(axis=0, keepdims=1)
 
                                 weight_bone_idx_0 = (
-                                    virtual_vertices[tuple(vertex_map[above_yidx, prev_xidx])]
-                                    .map_bones[base_map_idx]
+                                    virtual_vertices[tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])]
+                                    .map_bones[prev_map_idx]
                                     .index
                                 )
                                 weight_bone_idx_1 = (
-                                    virtual_vertices[tuple(vertex_map[above_yidx, target_next_xidx])]
-                                    .map_bones[base_map_idx]
+                                    virtual_vertices[tuple(vertex_maps[next_map_idx][above_yidx, target_next_xidx])]
+                                    .map_bones[next_map_idx]
                                     .index
                                 )
 
@@ -3080,9 +3348,10 @@ class PmxTailorExportService:
 
                     if xx > 0 and not target_regists[x - 1]:
                         # 前のキーが対象外だった場合、前のキーに今のキーの接続情報を追加しておく
-                        prev_vv = virtual_vertices[tuple(vertex_map[y, xx - 1])]
-                        prev_vv.connected_vvs.append(vkey)
-                        vv.connected_vvs.append(prev_vv.key)
+                        if not np.isnan(vertex_map[y, xx - 1]).any():
+                            prev_vv = virtual_vertices[tuple(vertex_map[y, xx - 1])]
+                            prev_vv.connected_vvs.append(vkey)
+                            vv.connected_vvs.append(prev_vv.key)
 
                     prev_xx = xx
 
@@ -3092,10 +3361,11 @@ class PmxTailorExportService:
             if not target_regists[0]:
                 # 最初のキーが対象外だった場合、最後のキーの接続情報を最初に追加しておく
                 for y, vkey in enumerate(vkeys_list[np.max(np.where(target_regists))]):
-                    prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
-                    prev_vv.connected_vvs.append(vkey)
-                    vv = virtual_vertices[vkey]
-                    vv.connected_vvs.append(prev_vv.key)
+                    if not np.isnan(vertex_map[y, 0]).any():
+                        prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
+                        prev_vv.connected_vvs.append(vkey)
+                        vv = virtual_vertices[vkey]
+                        vv.connected_vvs.append(prev_vv.key)
 
             vertex_maps.append(vertex_map)
 

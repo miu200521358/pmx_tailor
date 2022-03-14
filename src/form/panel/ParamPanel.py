@@ -254,10 +254,8 @@ class ParamPanel(BasePanel):
             # ボーンリストクリア
             self.bone_list = [""]
             for bone in self.frame.file_panel_ctrl.org_model_file_ctrl.data.bones.values():
-                for rigidbody in self.frame.file_panel_ctrl.org_model_file_ctrl.data.rigidbodies.values():
-                    if bone.index == rigidbody.bone_index and rigidbody.mode == 0:
-                        self.bone_list.append(bone.name)
-                        break
+                if bone.getVisibleFlag():
+                    self.bone_list.append(bone.name)
             # セットクリア
             self.on_clear_set(event)
             # 1件追加
@@ -382,18 +380,14 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("親ボーン *　"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_parent_bone_txt.SetToolTip(
-            logger.transtext(
-                "材質物理の起点となる親ボーン\nボーン追従剛体を持っているボーンのみが対象となります。\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）"
-            )
+            logger.transtext("材質物理の起点となる親ボーン\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
         )
         self.simple_parent_bone_txt.Wrap(-1)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
 
         self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
         self.simple_parent_bone_ctrl.SetToolTip(
-            logger.transtext(
-                "材質物理の起点となる親ボーン\nボーン追従剛体を持っているボーンのみが対象となります。\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）"
-            )
+            logger.transtext("材質物理の起点となる親ボーン\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
         )
         self.simple_parent_bone_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
@@ -2810,6 +2804,7 @@ class PhysicsParam:
         self.vertical_joint_spring_rot_y_spin.SetValue(params["vertical_joint_spring_rot_y"])
         self.vertical_joint_spring_rot_z_spin.SetValue(params["vertical_joint_spring_rot_z"])
         self.advance_vertical_joint_coefficient_spin.SetValue(params["vertical_joint_coefficient"])
+        self.on_vertical_joint(wx.EVT_CHECKBOX)
 
         # 横ジョイント -----------
         self.advance_horizonal_joint_valid_check.SetValue(params["horizonal_joint_valid"])
@@ -2832,6 +2827,7 @@ class PhysicsParam:
         self.horizonal_joint_spring_rot_y_spin.SetValue(params["horizonal_joint_spring_rot_y"])
         self.horizonal_joint_spring_rot_z_spin.SetValue(params["horizonal_joint_spring_rot_z"])
         self.advance_horizonal_joint_coefficient_spin.SetValue(params["horizonal_joint_coefficient"])
+        self.on_horizonal_joint(wx.EVT_CHECKBOX)
 
         # 斜めジョイント -----------
         self.advance_diagonal_joint_valid_check.SetValue(params["diagonal_joint_valid"])
@@ -2854,6 +2850,7 @@ class PhysicsParam:
         self.diagonal_joint_spring_rot_y_spin.SetValue(params["diagonal_joint_spring_rot_y"])
         self.diagonal_joint_spring_rot_z_spin.SetValue(params["diagonal_joint_spring_rot_z"])
         self.advance_diagonal_joint_coefficient_spin.SetValue(params["diagonal_joint_coefficient"])
+        self.on_diagonal_joint(wx.EVT_CHECKBOX)
 
         # 逆ジョイント -----------
         self.advance_reverse_joint_valid_check.SetValue(params["reverse_joint_valid"])
@@ -2876,6 +2873,7 @@ class PhysicsParam:
         self.reverse_joint_spring_rot_y_spin.SetValue(params["reverse_joint_spring_rot_y"])
         self.reverse_joint_spring_rot_z_spin.SetValue(params["reverse_joint_spring_rot_z"])
         self.advance_reverse_joint_coefficient_spin.SetValue(params["reverse_joint_coefficient"])
+        self.on_reverse_joint(wx.EVT_CHECKBOX)
 
     def on_param_export(self, event: wx.Event):
         params = self.get_param_export_data()
