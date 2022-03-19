@@ -288,7 +288,7 @@ cdef class MVector2D:
         self.__data[1] = y
 
     cpdef MVector2D copy(self):
-        return MVector2D(self.x(), self.y())
+        return MVector2D(float(self.x()), float(self.y()))
 
     def to_log(self):
         return "x: {0}, y: {1}".format(round(self.x(), 5), round(self.y(), 5))
@@ -310,7 +310,7 @@ cdef class MVector3D:
             self.__data = np.array([x, y, z], dtype=np.float64)
 
     cpdef MVector3D copy(self):
-        return MVector3D(self.x(), self.y(), self.z())
+        return MVector3D(float(self.x()), float(self.y()), float(self.z()))
 
     cpdef double length(self):
         return float(np.linalg.norm(self.data(), ord=2))
@@ -668,7 +668,7 @@ cdef class MVector4D:
             self.__data = np.array([x, y, z, w], dtype=np.float64)
 
     cpdef MVector4D copy(self):
-        return MVector4D(self.x(), self.y(), self.z(), self.w())
+        return MVector4D(float(self.x()), float(self.y()), float(self.z()), float(self.w()))
     
     cpdef double length(self):
         return np.linalg.norm(self.data(), ord=2)
@@ -957,7 +957,7 @@ cdef class MQuaternion:
             self.__data = np.array([w, x, y, z], dtype=np.float64)
 
     cpdef MQuaternion copy(self):
-        return MQuaternion(self.scalar(), self.x(), self.y(), self.z())
+        return MQuaternion(float(self.scalar()), float(self.x()), float(self.y()), float(self.z()))
     
     def __str__(self):
         return "MQuaternion({0}, {1}, {2}, {3})".format(self.scalar(), self.x(), self.y(), self.z())
