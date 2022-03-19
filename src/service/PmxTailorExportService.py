@@ -2143,9 +2143,7 @@ class PmxTailorExportService:
                         weights = np.array([1 for _ in range(len(weight_bone_idxs))])
 
                         # 正規化
-                        deform_weights = (weights / weights.sum(axis=0, keepdims=1)).tolist() + [0 for _ in range(3)]
-                        # 正規化が済んだ後に親ボーンリストを後ろに追加しておく
-                        weight_bone_idxs += [parent_bone.index for _ in range(4)]
+                        deform_weights = (weights / weights.sum(axis=0, keepdims=1)).tolist()
 
                         if np.count_nonzero(weight_bone_idxs) == 0:
                             continue
@@ -2158,6 +2156,10 @@ class PmxTailorExportService:
                                 deform_weights[0],
                             )
                         else:
+                            # 3つの場合にうまくいかないので、後ろに追加しておく
+                            deform_weights += [0 for _ in range(4)]
+                            weight_bone_idxs += [parent_bone.index for _ in range(4)]
+
                             vv.deform = Bdef4(
                                 weight_bone_idxs[0],
                                 weight_bone_idxs[1],
@@ -2335,7 +2337,7 @@ class PmxTailorExportService:
                             or not virtual_vertices[
                                 tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])
                             ].map_bones.get(prev_map_idx, None)
-                            or not virtual_vertices[tuple(vertex_map[above_yidx, next_xidx])].map_bones[next_map_idx]
+                            or not virtual_vertices[tuple(vertex_map[above_yidx, next_xidx])].map_bones.get(next_map_idx, None)
                             or not virtual_vertices[
                                 tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx])
                             ].map_bones.get(prev_map_idx, None)

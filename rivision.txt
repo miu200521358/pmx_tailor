@@ -288,9 +288,13 @@ https://fire.st/NM8BzbI
 PmxTailor_2.00.00_β06 (2022/03/20)
 ・残ウェイト計算を変更
 
+https://fire.st/fzpUJdo
+PmxTailor_2.00.00_β07 (2022/03/20)
+・ウェイト計算時に必要な頂点情報が取得できなかった場合、スルーする処理を追加
 
-
-
+https://fire.st/QERex0f
+PmxTailor_2.00.00_β08 (2022/03/20)
+・Bdef1の判定前に空ウェイトを乗せていてBdef4になっていたのを修正
 
 
 
