@@ -262,7 +262,7 @@ class PmxTailorExportService:
                     model, param_option, material_name, virtual_vertices, vertex_maps, vertex_map_orders
                 )
 
-                self.create_weight(
+                remaining_vertices = self.create_weight(
                     model,
                     param_option,
                     material_name,
@@ -272,6 +272,7 @@ class PmxTailorExportService:
                     all_bone_vertical_distances,
                     all_bone_horizonal_distances,
                     all_bone_connected,
+                    remaining_vertices,
                 )
 
                 # 残ウェイト
@@ -1591,7 +1592,7 @@ class PmxTailorExportService:
                 # ボーン進行方向(x)
                 x_direction_pos = (now_above_bone.position - now_below_bone.position).normalized()
                 # ボーン進行方向に対しての横軸(y)
-                if next_above_bone != now_above_bone:
+                if next_above_bone and now_above_bone and next_above_bone != now_above_bone:
                     y_direction_pos = (
                         next_above_bone.position - (prev_above_bone.position if prev_above_bone else now_above_bone)
                     ).normalized()
@@ -2041,6 +2042,7 @@ class PmxTailorExportService:
         all_bone_vertical_distances: dict,
         all_bone_horizonal_distances: dict,
         all_bone_connected: dict,
+        remaining_vertices: dict,
     ):
         logger.info("【%s】ウェイト生成", material_name, decoration=MLogger.DECORATION_LINE)
 
@@ -2063,7 +2065,8 @@ class PmxTailorExportService:
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any():
                         continue
 
-                    vv = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])]
+                    vkey = tuple(vertex_map[v_yidx, v_xidx])
+                    vv = virtual_vertices[vkey]
 
                     (
                         prev_map_idx,
@@ -2128,6 +2131,11 @@ class PmxTailorExportService:
                                 if weight_bone_idx not in model.vertices:
                                     model.vertices[weight_bone_idx] = []
                                 model.vertices[weight_bone_idx].append(rv)
+
+                        # 登録対象の場合、残対象から削除
+                        if vkey in remaining_vertices:
+                            del remaining_vertices[vkey]
+
                     elif np.where(regist_bones[v_yidx, :])[0].shape[0] > 1:
                         # 同じY位置にボーンがある場合、横のBDEF2登録対象
                         if v_xidx < regist_bones.shape[1] - 1 and regist_bones[target_v_yidx, (v_xidx + 1) :].any():
@@ -2180,6 +2188,11 @@ class PmxTailorExportService:
                             if weight_bone_idx_1 not in model.vertices:
                                 model.vertices[weight_bone_idx_1] = []
                             model.vertices[weight_bone_idx_1].append(rv)
+
+                        # 登録対象の場合、残対象から削除
+                        if vkey in remaining_vertices:
+                            del remaining_vertices[vkey]
+
                     elif np.where(regist_bones[:, v_xidx])[0].shape[0] > 1:
                         # 同じX位置にボーンがある場合、縦のBDEF2登録対象
                         if (
@@ -2197,6 +2210,10 @@ class PmxTailorExportService:
 
                                 # 逆登録
                                 model.vertices[weight_bone_idx_0].append(rv)
+
+                            # 登録対象の場合、残対象から削除
+                            if vkey in remaining_vertices:
+                                del remaining_vertices[vkey]
                         else:
                             if (
                                 not all_bone_vertical_distances[base_map_idx].any()
@@ -2243,10 +2260,14 @@ class PmxTailorExportService:
                                 if weight_bone_idx_1 not in model.vertices:
                                     model.vertices[weight_bone_idx_1] = []
                                 model.vertices[weight_bone_idx_1].append(rv)
+
+                            # 登録対象の場合、残対象から削除
+                            if vkey in remaining_vertices:
+                                del remaining_vertices[vkey]
                     else:
                         if next_connected and next_xidx == 0:
                             # 最後の頂点の場合、とりあえず次の距離を対象とする
-                            next_xidx = v_xidx + 1
+                            next_xidx = vertex_map.shape[1] - 1
                             target_next_xidx = 0
                         else:
                             target_next_xidx = next_xidx
@@ -2261,9 +2282,7 @@ class PmxTailorExportService:
                             or not virtual_vertices[tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])].map_bones[
                                 prev_map_idx
                             ]
-                            or not virtual_vertices[tuple(vertex_map[above_yidx, target_next_xidx])].map_bones[
-                                next_map_idx
-                            ]
+                            or not virtual_vertices[tuple(vertex_map[above_yidx, next_xidx])].map_bones[next_map_idx]
                             or not virtual_vertices[tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx])].map_bones[
                                 prev_map_idx
                             ]
@@ -2368,6 +2387,10 @@ class PmxTailorExportService:
                                     if weight_bone_idx_1 not in model.vertices:
                                         model.vertices[weight_bone_idx_1] = []
                                     model.vertices[weight_bone_idx_1].append(rv)
+
+                                # 登録対象の場合、残対象から削除
+                                if vkey in remaining_vertices:
+                                    del remaining_vertices[vkey]
                         else:
                             # ほぼ0のものは0に置換（円周用）
                             total_weights = np.array(
@@ -2427,10 +2450,18 @@ class PmxTailorExportService:
                                         model.vertices[weight_bone_idx_3] = []
                                     model.vertices[weight_bone_idx_3].append(rv)
 
+                                # 登録対象の場合、残対象から削除
+                                if vkey in remaining_vertices:
+                                    del remaining_vertices[vkey]
+
                     weight_cnt += len(vv.real_vertices)
                     if weight_cnt > 0 and weight_cnt // 1000 > prev_weight_cnt:
                         logger.info("-- --【No.%s】頂点ウェイト: %s個目:終了", base_map_idx + 1, weight_cnt)
                         prev_weight_cnt = weight_cnt // 1000
+
+        logger.info("-- --【No.%s】頂点ウェイト: %s個目:終了", base_map_idx + 1, weight_cnt)
+
+        return remaining_vertices
 
     def create_root_bone(
         self,
@@ -3840,10 +3871,6 @@ class PmxTailorExportService:
                     vertex_display_map[y, xx] = ":".join([str(v) for v in vv.vidxs()])
                     registed_vertices.append(vkey)
 
-                    # 登録対象の場合、残対象から削除
-                    if vkey in remaining_vertices:
-                        del remaining_vertices[vkey]
-
                     if xx > 0 and not target_regists[x - 1]:
                         # 前のキーが対象外だった場合、前のキーに今のキーの接続情報を追加しておく
                         if not np.isnan(vertex_map[y, xx - 1]).any():
@@ -4132,17 +4159,33 @@ class PmxTailorExportService:
     ):
         regist_bones = all_regist_bones[base_map_idx]
 
+        target_v_yidx = (
+            np.max(np.where(regist_bones[:v_yidx, v_xidx]))
+            if regist_bones[:v_yidx, v_xidx].any()
+            else np.max(np.where(regist_bones[:v_yidx, np.max(np.where(regist_bones[:v_yidx, :v_xidx])[0])]))
+            if np.where(regist_bones[:v_yidx, :v_xidx])[0].any()
+            else regist_bones.shape[0] - 1
+        )
+        target_v_xidx = (
+            np.max(np.where(regist_bones[target_v_yidx, : (v_xidx + 1)])[0])
+            if np.where(regist_bones[target_v_yidx, : (v_xidx + 1)])[0].any()
+            else regist_bones.shape[1] - 1
+        )
+
         max_v_xidx = (
-            np.max(np.where(regist_bones[v_yidx, :]))
-            if regist_bones[v_yidx, :].any()
-            else np.max(np.where(regist_bones[: (v_yidx + 1), :])[1])
-            if np.where(regist_bones[: (v_yidx + 1), :])[1].any()
+            np.max(np.where(regist_bones[target_v_yidx, :]))
+            if regist_bones[target_v_yidx, :].any() and np.max(np.where(regist_bones[target_v_yidx, :])) >= v_xidx
+            else np.max(np.where(regist_bones[: (target_v_yidx + 1), :])[1])
+            if np.where(regist_bones[: (target_v_yidx + 1), :])[1].any()
+            and np.max(np.where(regist_bones[: (target_v_yidx + 1), :])[1]) >= v_xidx
             else regist_bones.shape[1] - 1
         )
 
         max_v_yidx = (
-            np.max(np.where(regist_bones[:, v_xidx])[0])
-            if np.where(regist_bones[:, v_xidx])[0].any()
+            np.max(np.where(regist_bones[:, target_v_xidx])[0])
+            if np.where(regist_bones[:, target_v_xidx])[0].any()
+            else np.max(np.where(regist_bones[:, : (target_v_xidx + 1)])[0])
+            if np.where(regist_bones[:, : (target_v_xidx + 1)])[0].any()
             else regist_bones.shape[0] - 1
         )
 
@@ -4150,38 +4193,39 @@ class PmxTailorExportService:
         prev_map_idx = base_map_idx
         prev_connected = False
         if v_xidx == 0:
-            if len(all_bone_connected) == 1 and all_bone_connected[base_map_idx][v_yidx, max_v_xidx:].any():
+            if len(all_bone_connected) == 1 and all_bone_connected[base_map_idx][target_v_yidx, max_v_xidx:].any():
                 # 最後が先頭と繋がっている場合(最後の有効ボーンから最初までがどこか繋がっている場合）、最後と繋ぐ
                 prev_xidx = max_v_xidx
                 prev_map_idx = base_map_idx
                 prev_connected = True
             elif (
                 base_map_idx > 0
-                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[0] > v_yidx
-                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]][v_yidx, -1].any()
+                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[0] > target_v_yidx
+                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]][target_v_yidx, -1].any()
             ):
                 prev_map_idx = list(all_bone_connected.keys())[base_map_idx - 1]
                 prev_connected = True
                 # 最後が先頭と繋がっている場合(最後の有効ボーンから最初までがどこか繋がっている場合）、最後と繋ぐ
                 if (
-                    tuple(vertex_maps[prev_map_idx][v_yidx, -1]) == tuple(vertex_maps[base_map_idx][v_yidx, v_xidx])
-                    and all_bone_connected[prev_map_idx][v_yidx, -2].any()
+                    tuple(vertex_maps[prev_map_idx][target_v_yidx, -1])
+                    == tuple(vertex_maps[base_map_idx][target_v_yidx, v_xidx])
+                    and all_bone_connected[prev_map_idx][target_v_yidx, -2].any()
                 ):
                     # 前のボーンが同じ仮想頂点であり、かつそのもうひとつ前と繋がっている場合
                     prev_xidx = (
-                        np.max(np.where(all_regist_bones[prev_map_idx][v_yidx, :-1]))
-                        if all_regist_bones[prev_map_idx][v_yidx, :-1].any()
-                        else np.max(np.where(all_regist_bones[prev_map_idx][: (v_yidx + 1), :-1])[1])
-                        if np.where(all_regist_bones[prev_map_idx][: (v_yidx + 1), :-1])[1].any()
+                        np.max(np.where(all_regist_bones[prev_map_idx][target_v_yidx, :-1]))
+                        if all_regist_bones[prev_map_idx][target_v_yidx, :-1].any()
+                        else np.max(np.where(all_regist_bones[prev_map_idx][: (target_v_yidx + 1), :-1])[1])
+                        if np.where(all_regist_bones[prev_map_idx][: (target_v_yidx + 1), :-1])[1].any()
                         else 0
                     )
                 else:
                     # 前のボーンの仮想頂点が自分と違う場合、そのまま前のを採用
                     prev_xidx = (
-                        np.max(np.where(all_regist_bones[prev_map_idx][v_yidx, :]))
-                        if all_regist_bones[prev_map_idx][v_yidx, :].any()
-                        else np.max(np.where(all_regist_bones[prev_map_idx][: (v_yidx + 1), :])[1])
-                        if np.where(all_regist_bones[prev_map_idx][: (v_yidx + 1), :])[1].any()
+                        np.max(np.where(all_regist_bones[prev_map_idx][target_v_yidx, :]))
+                        if all_regist_bones[prev_map_idx][target_v_yidx, :].any()
+                        else np.max(np.where(all_regist_bones[prev_map_idx][: (target_v_yidx + 1), :])[1])
+                        if np.where(all_regist_bones[prev_map_idx][: (target_v_yidx + 1), :])[1].any()
                         else 0
                     )
         else:
@@ -4258,24 +4302,6 @@ class PmxTailorExportService:
                 else np.min(np.where(regist_bones[(v_yidx + 1) :, :v_xidx])[0]) + (v_yidx + 1)
                 if np.where(regist_bones[(v_yidx + 1) :, :v_xidx])[0].any()
                 else regist_bones.shape[0] - 1
-            )
-
-        if v_yidx < max_v_yidx:
-            target_v_yidx = v_yidx
-            target_v_xidx = v_xidx
-        else:
-            # Y末端は登録対象外なので、上の登録INDEXをそのまま割り当てる
-            target_v_yidx = (
-                np.max(np.where(regist_bones[:v_yidx, v_xidx]))
-                if regist_bones[:v_yidx, v_xidx].any()
-                else np.max(np.where(regist_bones[:v_yidx, np.max(np.where(regist_bones[v_yidx, :v_xidx])[0])]))
-                if np.where(regist_bones[v_yidx, :v_xidx])[0].any()
-                else regist_bones.shape[0] - 1
-            )
-            target_v_xidx = (
-                np.max(np.where(regist_bones[target_v_yidx, : (v_xidx + 1)])[0])
-                if np.where(regist_bones[target_v_yidx, : (v_xidx + 1)])[0].any()
-                else regist_bones.shape[1] - 1
             )
 
         return (
