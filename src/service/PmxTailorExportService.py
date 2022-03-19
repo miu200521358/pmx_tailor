@@ -1926,114 +1926,154 @@ class PmxTailorExportService:
         # 親ボーン
         parent_bone = model.bones[param_option["parent_bone_name"]]
 
+        # 塗り終わった頂点リスト
+        weighted_vkeys = list(set(list(virtual_vertices.keys())) - set(list(remaining_vertices.keys())))
+
+        weighted_poses = {}
+        for vkey in weighted_vkeys:
+            vv = virtual_vertices[vkey]
+            weighted_poses[vkey] = vv.position().data()
+
         for vkey, vv in remaining_vertices.items():
             if not vv.vidxs():
                 continue
 
-            surround_bone_vvs = self.get_surround_vvs(vv, virtual_vertices)
-
-            if len(surround_bone_vvs) < 1:
-                logger.warning("残ウェイト計算で関連ボーンが見つからなかった為、親ボーンウェイトのままスキップします。: 対象頂点[%s]", vv.vidxs())
-                continue
-
-            weigth_cnt = 1 if len(surround_bone_vvs) == 1 else 2 if len(surround_bone_vvs) == 2 else 4
-
-            # 位置をリストアップ
-            surround_bone_positions = []
-            for bone_vv in surround_bone_vvs:
-                surround_bone_positions.append(virtual_vertices[bone_vv].position().data())
-
-            # 近いのからウェイト対象分選ぶ
-            surround_distances = np.linalg.norm(
-                np.array(surround_bone_positions) - vv.position().data(), ord=2, axis=1
+            # ウェイト済み頂点のうち、最も近いのを抽出
+            weighted_diff_distances = np.linalg.norm(
+                np.array(list(weighted_poses.values())) - vv.position().data(), ord=2, axis=1
             )
-            weight_bone_vvs = np.array(surround_bone_vvs)[np.argsort(surround_distances)[:weigth_cnt]]
-            weight_bone_distances = np.sort(surround_distances)[:weigth_cnt]
-            reverse_weights = weight_bone_distances / weight_bone_distances.sum(axis=0, keepdims=1)
-            target_weights = 1 - reverse_weights
-            deform_weights = (target_weights / target_weights.sum(axis=0, keepdims=1)).tolist() + [0 for _ in range(4)]
+            nearest_vkey = list(weighted_poses.keys())[np.argmin(weighted_diff_distances)]
+            nearest_vv = virtual_vertices[nearest_vkey]
+            nearest_deform = nearest_vv.deform
 
-            weight_bone_index_0 = parent_bone.index
-            bvv = tuple(weight_bone_vvs[0])
-            for map_bone in virtual_vertices[bvv].map_bones.values():
-                if map_bone and map_bone.getVisibleFlag():
-                    weight_bone_index_0 = map_bone.index
+            if type(nearest_deform) is Bdef1:
+                logger.debug(
+                    f"remaining1 nearest_vv: {nearest_vv.vidxs()}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
+                )
 
-            weight_bone_index_1 = parent_bone.index
-            if len(weight_bone_vvs) > 1:
-                bvv = tuple(weight_bone_vvs[1])
-                for map_bone in virtual_vertices[bvv].map_bones.values():
-                    if map_bone and map_bone.getVisibleFlag():
-                        weight_bone_index_1 = map_bone.index
+                for rv in vv.real_vertices:
+                    rv.deform = Bdef1(nearest_deform.index0)
 
-            weight_bone_index_2 = parent_bone.index
-            if len(weight_bone_vvs) > 2:
-                bvv = tuple(weight_bone_vvs[2])
-                for map_bone in virtual_vertices[bvv].map_bones.values():
-                    if map_bone and map_bone.getVisibleFlag():
-                        weight_bone_index_2 = map_bone.index
+            elif type(nearest_deform) is Bdef2:
+                weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
+                weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
 
-            weight_bone_index_3 = parent_bone.index
-            if len(weight_bone_vvs) > 3:
-                bvv = tuple(weight_bone_vvs[3])
-                for map_bone in virtual_vertices[bvv].map_bones.values():
-                    if map_bone and map_bone.getVisibleFlag():
-                        weight_bone_index_3 = map_bone.index
+                bone1_distance = vv.position().distanceToPoint(weight_bone1.position)
+                bone2_distance = (
+                    vv.position().distanceToPoint(weight_bone2.position) if nearest_deform.weight0 < 1 else 0
+                )
 
-            for rv in vv.real_vertices:
-                if weigth_cnt == 1:
-                    cvv = tuple(weight_bone_vvs[0])
-                    for map_bone in virtual_vertices[cvv].map_bones.values():
-                        if map_bone and map_bone.getVisibleFlag() and cvv not in surround_bone_vvs:
-                            rv.deform = Bdef1(weight_bone_index_0)
-                elif weigth_cnt == 2:
-                    rv.deform = Bdef2(
-                        weight_bone_index_0,
-                        weight_bone_index_1,
-                        deform_weights[0],
+                weight_names = np.array([weight_bone1.name, weight_bone2.name])
+                if bone1_distance + bone2_distance != 0:
+                    total_weights = np.array(
+                        [
+                            bone1_distance / (bone1_distance + bone2_distance),
+                            bone2_distance / (bone1_distance + bone2_distance),
+                        ]
                     )
                 else:
-                    rv.deform = Bdef4(
-                        weight_bone_index_0,
-                        weight_bone_index_1,
-                        weight_bone_index_2,
-                        weight_bone_index_3,
-                        deform_weights[0],
-                        deform_weights[1],
-                        deform_weights[2],
-                        deform_weights[3],
+                    total_weights = np.array([1, 0])
+                    logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", vv.vidxs())
+                weights = total_weights / total_weights.sum(axis=0, keepdims=1)
+                weight_idxs = np.argsort(weights)
+
+                logger.debug(
+                    f"remaining2 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
+                )
+
+                if np.count_nonzero(weights) == 1:
+                    vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                elif np.count_nonzero(weights) == 2:
+                    vv.deform = Bdef2(
+                        model.bones[weight_names[weight_idxs[-1]]].index,
+                        model.bones[weight_names[weight_idxs[-2]]].index,
+                        weights[weight_idxs[-1]],
                     )
+                else:
+                    vv.deform = Bdef4(
+                        model.bones[weight_names[weight_idxs[-1]]].index,
+                        model.bones[weight_names[weight_idxs[-2]]].index,
+                        model.bones[weight_names[weight_idxs[-3]]].index,
+                        model.bones[weight_names[weight_idxs[-4]]].index,
+                        weights[weight_idxs[-1]],
+                        weights[weight_idxs[-2]],
+                        weights[weight_idxs[-3]],
+                        weights[weight_idxs[-4]],
+                    )
+
+                for rv in vv.real_vertices:
+                    rv.deform = vv.deform
+
+            elif type(nearest_deform) is Bdef4:
+                weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
+                weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
+                weight_bone3 = model.bones[model.bone_indexes[nearest_deform.index2]]
+                weight_bone4 = model.bones[model.bone_indexes[nearest_deform.index3]]
+
+                bone1_distance = (
+                    vv.position().distanceToPoint(weight_bone1.position) if nearest_deform.weight0 > 0 else 0
+                )
+                bone2_distance = (
+                    vv.position().distanceToPoint(weight_bone2.position) if nearest_deform.weight1 > 0 else 0
+                )
+                bone3_distance = (
+                    vv.position().distanceToPoint(weight_bone3.position) if nearest_deform.weight2 > 0 else 0
+                )
+                bone4_distance = (
+                    vv.position().distanceToPoint(weight_bone4.position) if nearest_deform.weight3 > 0 else 0
+                )
+                all_distance = bone1_distance + bone2_distance + bone3_distance + bone4_distance
+
+                weight_names = np.array([weight_bone1.name, weight_bone2.name, weight_bone3.name, weight_bone4.name])
+                if all_distance != 0:
+                    total_weights = np.array(
+                        [
+                            bone1_distance / all_distance,
+                            bone2_distance / all_distance,
+                            bone3_distance / all_distance,
+                            bone4_distance / all_distance,
+                        ]
+                    )
+                else:
+                    total_weights = np.array([1, bone2_distance, bone3_distance, bone4_distance])
+                    logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", vv.vidxs())
+                weights = total_weights / total_weights.sum(axis=0, keepdims=1)
+                weight_idxs = np.argsort(weights)
+
+                logger.debug(
+                    f"remaining4 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
+                )
+
+                if np.count_nonzero(weights) == 1:
+                    vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                elif np.count_nonzero(weights) == 2:
+                    vv.deform = Bdef2(
+                        model.bones[weight_names[weight_idxs[-1]]].index,
+                        model.bones[weight_names[weight_idxs[-2]]].index,
+                        weights[weight_idxs[-1]],
+                    )
+                else:
+                    vv.deform = Bdef4(
+                        model.bones[weight_names[weight_idxs[-1]]].index,
+                        model.bones[weight_names[weight_idxs[-2]]].index,
+                        model.bones[weight_names[weight_idxs[-3]]].index,
+                        model.bones[weight_names[weight_idxs[-4]]].index,
+                        weights[weight_idxs[-1]],
+                        weights[weight_idxs[-2]],
+                        weights[weight_idxs[-3]],
+                        weights[weight_idxs[-4]],
+                    )
+
+                for rv in vv.real_vertices:
+                    rv.deform = vv.deform
 
             vertex_cnt += 1
 
-            if vertex_cnt > 0 and vertex_cnt // 10 > prev_vertex_cnt:
+            if vertex_cnt > 0 and vertex_cnt // 100 > prev_vertex_cnt:
                 logger.info("-- 残ウェイト: %s個目:終了", vertex_cnt)
-                prev_vertex_cnt = vertex_cnt // 10
+                prev_vertex_cnt = vertex_cnt // 100
 
         logger.info("-- 残ウェイト: %s個目:終了", vertex_cnt)
-
-    def get_surround_vvs(self, vv: VirtualVertex, virtual_vertices: dict, surround_bone_vvs=[], loop=0):
-        surround_bone_vvs = list(set(surround_bone_vvs))
-
-        if len(surround_bone_vvs) > 6 or loop > 5:
-            return surround_bone_vvs
-
-        for cvv in vv.connected_vvs:
-            for map_bone in virtual_vertices[cvv].map_bones.values():
-                if map_bone and map_bone.getVisibleFlag() and cvv not in surround_bone_vvs:
-                    surround_bone_vvs.append(cvv)
-                    break
-
-            surround_bone_vvs.extend(
-                self.get_surround_vvs(virtual_vertices[cvv], virtual_vertices, surround_bone_vvs, loop + 1)
-            )
-
-        surround_bone_vvs = list(set(surround_bone_vvs))
-
-        if len(surround_bone_vvs) > 6 or loop > 5:
-            return surround_bone_vvs
-
-        return surround_bone_vvs
 
     def create_weight(
         self,
@@ -2089,7 +2129,7 @@ class PmxTailorExportService:
                         v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
                     )
 
-                    if regist_bones[v_yidx, v_xidx] and v_yidx == target_v_yidx and v_xidx == target_v_xidx:
+                    if regist_bones[v_yidx, v_xidx] and v_yidx < max_v_yidx:
                         # 同じ仮想頂点上に登録されているボーンが複数ある場合、均等に割る
                         weight_bone_idxs = list(
                             set(
@@ -2107,9 +2147,11 @@ class PmxTailorExportService:
                         # 正規化が済んだ後に親ボーンリストを後ろに追加しておく
                         weight_bone_idxs += [parent_bone.index for _ in range(4)]
 
-                        if np.count_nonzero(deform_weights) == 1:
+                        if np.count_nonzero(weight_bone_idxs) == 0:
+                            continue
+                        elif np.count_nonzero(weight_bone_idxs) == 1:
                             vv.deform = Bdef1(weight_bone_idxs[0])
-                        elif np.count_nonzero(deform_weights) == 2:
+                        elif np.count_nonzero(weight_bone_idxs) == 2:
                             vv.deform = Bdef2(
                                 weight_bone_idxs[0],
                                 weight_bone_idxs[1],
@@ -2124,6 +2166,7 @@ class PmxTailorExportService:
                                 deform_weights[0],
                                 deform_weights[1],
                                 deform_weights[2],
+                                deform_weights[3],
                             )
 
                         # 頂点位置にボーンが登録されている場合、BDEF1登録対象
@@ -2140,38 +2183,38 @@ class PmxTailorExportService:
                         if vkey in remaining_vertices:
                             del remaining_vertices[vkey]
 
-                    elif np.where(regist_bones[v_yidx, :])[0].shape[0] > 1:
+                    elif np.where(regist_bones[v_yidx, :])[0].shape[0] > 1 and v_yidx < max_v_yidx:
                         # 同じY位置にボーンがある場合、横のBDEF2登録対象
-                        if v_xidx < regist_bones.shape[1] - 1 and regist_bones[target_v_yidx, (v_xidx + 1) :].any():
+                        if v_xidx < regist_bones.shape[1] - 1 and regist_bones[v_yidx, (v_xidx + 1) :].any():
                             regist_next_xidx = next_xidx
                         else:
                             regist_next_xidx = 0
 
                         if (
                             not all_bone_horizonal_distances[base_map_idx].any()
-                            or np.isnan(vertex_maps[prev_map_idx][target_v_yidx, prev_xidx]).any()
-                            or np.isnan(vertex_maps[next_map_idx][target_v_yidx, regist_next_xidx]).any()
+                            or np.isnan(vertex_maps[prev_map_idx][v_yidx, prev_xidx]).any()
+                            or np.isnan(vertex_maps[next_map_idx][v_yidx, regist_next_xidx]).any()
+                            or not virtual_vertices[tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx])].map_bones.get(
+                                prev_map_idx, None
+                            )
                             or not virtual_vertices[
-                                tuple(vertex_maps[prev_map_idx][target_v_yidx, prev_xidx])
-                            ].map_bones.get(prev_map_idx, None)
-                            or not virtual_vertices[
-                                tuple(vertex_maps[next_map_idx][target_v_yidx, regist_next_xidx])
+                                tuple(vertex_maps[next_map_idx][v_yidx, regist_next_xidx])
                             ].map_bones.get(next_map_idx, None)
                         ):
                             continue
 
                         prev_weight = np.nan_to_num(
-                            np.sum(all_bone_horizonal_distances[base_map_idx][target_v_yidx, prev_xidx:v_xidx])
-                            / np.sum(all_bone_horizonal_distances[base_map_idx][target_v_yidx, prev_xidx:next_xidx])
+                            np.sum(all_bone_horizonal_distances[base_map_idx][v_yidx, prev_xidx:v_xidx])
+                            / np.sum(all_bone_horizonal_distances[base_map_idx][v_yidx, prev_xidx:next_xidx])
                         )
 
                         weight_bone_idx_0 = (
-                            virtual_vertices[tuple(vertex_maps[prev_map_idx][target_v_yidx, prev_xidx])]
+                            virtual_vertices[tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx])]
                             .map_bones[prev_map_idx]
                             .index
                         )
                         weight_bone_idx_1 = (
-                            virtual_vertices[tuple(vertex_maps[next_map_idx][target_v_yidx, regist_next_xidx])]
+                            virtual_vertices[tuple(vertex_maps[next_map_idx][v_yidx, regist_next_xidx])]
                             .map_bones[next_map_idx]
                             .index
                         )
@@ -2376,15 +2419,10 @@ class PmxTailorExportService:
                                     .index
                                 )
 
-                                vv.deform = Bdef4(
-                                    weight_bone_idx_0,
-                                    weight_bone_idx_1,
+                                vv.deform = Bdef2(
                                     weight_bone_idx_0,
                                     weight_bone_idx_1,
                                     deform_weights[0],
-                                    deform_weights[1],
-                                    0,
-                                    0,
                                 )
 
                                 for rv in vv.real_vertices:
@@ -3329,6 +3367,7 @@ class PmxTailorExportService:
             .data()[np.where(np.abs(base_vertical_axis.data()))]
         )[0]
         material_direction = 0 if material_direction < 0.1 else 0.1
+        logger.debug(f"material_direction: {material_direction}")
 
         logger.info("%s: 仮想頂点リストの生成", material_name)
 
@@ -3364,13 +3403,15 @@ class PmxTailorExportService:
                 # 面垂線
                 vv1 = v1.position - v0.position
                 vv2 = v2.position - v1.position
-                surface_normal = MVector3D.crossProduct(vv1, vv2).normalized() * base_reverse_axis
+                surface_normal = MVector3D.crossProduct(vv1, vv2).normalized()
 
                 # 親ボーンに対する向き
-                parent_direction = (v0.position - parent_bone.position).normalized() * base_reverse_axis
+                parent_direction = (v0.position - parent_bone.position).normalized()
 
                 # 親ボーンの向きとの内積
-                normal_dot = MVector3D.dotProduct(surface_normal, parent_direction)
+                normal_dot = MVector3D.dotProduct(
+                    surface_normal * base_reverse_axis, parent_direction * base_reverse_axis
+                )
 
                 if np.isclose(material_direction, 0):
                     # 水平の場合、軸の向きだけ考える
@@ -3491,17 +3532,6 @@ class PmxTailorExportService:
             logger.warning("対象範囲にエッジが見つけられなかった為、処理を終了します。\n面が表裏反転してないかご確認ください。", decoration=MLogger.DECORATION_BOX)
             return None, None, None, None
 
-        if logger.is_debug_level():
-            logger.debug("--------------------------")
-            for key, virtual_vertex in virtual_vertices.items():
-                logger.debug(f"[{key}] {virtual_vertex}")
-
-            logger.debug("--------------------------")
-            for (min_key, max_key), indexes in edge_pair_lkeys.items():
-                logger.debug(
-                    f"[{min_key}:{virtual_vertices[min_key].vidxs()}, {max_key}:{virtual_vertices[max_key].vidxs()}] {indexes}"
-                )
-
         edge_line_pairs = {}
         for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
             if len(line_iidxs) == 1:
@@ -3518,13 +3548,22 @@ class PmxTailorExportService:
 
         if logger.is_debug_level():
             logger.debug("--------------------------")
+            logger.debug("仮想頂点リスト")
             for key, virtual_vertex in virtual_vertices.items():
                 logger.debug(f"[{key}] {virtual_vertex}")
 
             logger.debug("--------------------------")
+            logger.debug("エッジリスト")
             for (min_key, max_key), indexes in edge_pair_lkeys.items():
                 logger.debug(
-                    f"[{min_key}:{virtual_vertices[min_key].vidxs()}, {max_key}:{virtual_vertices[max_key].vidxs()}] {indexes}"
+                    f"min[{min_key}:{virtual_vertices[min_key].vidxs()}], max[{max_key}:{virtual_vertices[max_key].vidxs()}] {indexes}"
+                )
+
+            logger.debug("--------------------------")
+            logger.debug("エッジペアリスト")
+            for v_key, pair_vkeys in edge_line_pairs.items():
+                logger.debug(
+                    f"key[{v_key}:{virtual_vertices[v_key].vidxs()}], pair[{pair_vkeys}:{[virtual_vertices[pair_vkey].vidxs() for pair_vkey in pair_vkeys]}]"
                 )
 
         logger.info("%s: エッジの抽出準備", material_name)
@@ -3535,7 +3574,7 @@ class PmxTailorExportService:
         while len(edge_vkeys) < len(edge_line_pairs.keys()):
             _, all_edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, None, all_edge_lines, edge_vkeys)
 
-        all_edge_lines = [els for els in all_edge_lines if len(els) > 4]
+        all_edge_lines = [els for els in all_edge_lines if len(els) > 2]
 
         for n, edge_lines in enumerate(all_edge_lines):
             logger.info(
