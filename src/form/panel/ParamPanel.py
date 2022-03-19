@@ -514,7 +514,7 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("プリーツ")],
+            choices=[logger.transtext("なし"), logger.transtext("スリット"), logger.transtext("プリーツ")],
         )
         self.simple_special_shape_ctrl.SetToolTip(
             logger.transtext("スカート等で特殊な処理が必要な形状\nデフォルトでは「なし」となっているので、必要に応じて形状を選択してください")
