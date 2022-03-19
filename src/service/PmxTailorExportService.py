@@ -1493,7 +1493,7 @@ class PmxTailorExportService:
                 next_now_bone = next_now_vv.map_bones.get(next_map_idx, None)
                 next_below_bone = next_below_vv.map_bones.get(next_map_idx, None)
 
-                if not (now_above_bone and now_below_bone):
+                if not (now_above_bone and now_below_bone and now_above_bone.index in model.vertices):
                     logger.warning(
                         "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
                         vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
@@ -1508,11 +1508,11 @@ class PmxTailorExportService:
                 v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[now_above_bone.index]]
 
                 # 前と繋がっている場合、前のボーンの頂点を追加する
-                if prev_connected and prev_now_bone:
+                if prev_connected and prev_now_bone and prev_now_bone.index in model.vertices:
                     v_poses += [(v.position * base_reverse_axis).data() for v in model.vertices[prev_now_bone.index]]
 
                 # 次と繋がっている場合、次のボーンの頂点を追加する
-                if next_connected and next_now_bone:
+                if next_connected and next_now_bone and next_now_bone.index in model.vertices:
                     v_poses += [(v.position * base_reverse_axis).data() for v in model.vertices[next_now_bone.index]]
 
                 # 重複は除外
