@@ -1592,7 +1592,7 @@ class PmxTailorExportService:
                 # ボーン進行方向(x)
                 x_direction_pos = (now_above_bone.position - now_below_bone.position).normalized()
                 # ボーン進行方向に対しての横軸(y)
-                if next_above_bone and now_above_bone and next_above_bone != now_above_bone:
+                if next_above_bone and now_above_bone and (prev_above_bone or next_above_bone != now_above_bone):
                     y_direction_pos = (
                         next_above_bone.position
                         - (prev_above_bone.position if prev_above_bone else now_above_bone.position)
@@ -2255,9 +2255,11 @@ class PmxTailorExportService:
                                 virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])].map_bones[base_map_idx].index
                             )
 
+                            vv.deform = Bdef1(weight_bone_idx_0)
+
                             # 末端がある場合、上のボーンでBDEF1
                             for rv in vv.real_vertices:
-                                rv.deform = Bdef1(weight_bone_idx_0)
+                                rv.deform = vv.deform
 
                                 # 逆登録
                                 model.vertices[weight_bone_idx_0].append(rv)
@@ -2337,7 +2339,9 @@ class PmxTailorExportService:
                             or not virtual_vertices[
                                 tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])
                             ].map_bones.get(prev_map_idx, None)
-                            or not virtual_vertices[tuple(vertex_map[above_yidx, next_xidx])].map_bones.get(next_map_idx, None)
+                            or not virtual_vertices[tuple(vertex_map[above_yidx, next_xidx])].map_bones.get(
+                                next_map_idx, None
+                            )
                             or not virtual_vertices[
                                 tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx])
                             ].map_bones.get(prev_map_idx, None)
@@ -2818,7 +2822,7 @@ class PmxTailorExportService:
 
                         if regist_bones[target_v_yidx, v_xidx]:
                             vv.map_bones[base_map_idx] = bone
-                            bone.index = len(tmp_all_bones)
+                            bone.index = len(tmp_all_bones) + len(model.bones)
 
                             if is_add_random:
                                 logger.warning("同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s", bone.name)
@@ -2872,7 +2876,7 @@ class PmxTailorExportService:
         for bone_name in sorted(list(set(list(registed_bone_names.values())))):
             bone = model.bones[bone_name]
             parent_bone = root_bone
-            if bone.parent_index != root_bone.index and bone.parent_index in registed_bone_names:
+            if bone.parent_index in registed_bone_names:
                 # 登録前のINDEXから名称を引っ張ってきて、それを新しいINDEXで置き換える
                 parent_bone = model.bones[registed_bone_names[bone.parent_index]]
                 bone.parent_index = parent_bone.index
@@ -3368,8 +3372,8 @@ class PmxTailorExportService:
             .normalized()
             .data()[np.where(np.abs(base_vertical_axis.data()))]
         )[0]
-        material_direction = 0 if material_direction < 0.1 else 0.1
-        logger.debug(f"material_direction: {material_direction}")
+        material_dot = 0 if material_direction < 0.1 else 0.1
+        logger.debug(f"material_direction: {material_direction} -> material_dot: {material_dot}")
 
         logger.info("%s: 仮想頂点リストの生成", material_name)
 
@@ -3424,7 +3428,7 @@ class PmxTailorExportService:
                 )
 
                 # 面法線と同じ向き場合、辺キー生成（表面のみを対象とする）
-                if normal_dot >= material_direction:
+                if normal_dot >= material_dot:
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
@@ -3592,8 +3596,6 @@ class PmxTailorExportService:
                 horizonal_edge_lines.append([])
                 vertical_edge_lines.append([])
 
-            edge_dots = []
-            direction_dots = []
             target_idx_poses = []
 
             for prev_edge_key, now_edge_key, next_edge_key in zip(
@@ -3601,63 +3603,69 @@ class PmxTailorExportService:
             ):
                 prev_edge_pos = virtual_vertices[prev_edge_key].position()
                 now_edge_pos = virtual_vertices[now_edge_key].position()
-                next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                edge_dots.append(
-                    MVector3D.dotProduct(
-                        (now_edge_pos - prev_edge_pos).normalized(), (next_edge_pos - now_edge_pos).normalized()
-                    )
-                )
-                direction_dots.append(
-                    MVector3D.dotProduct((now_edge_pos - prev_edge_pos).normalized(), base_vertical_axis)
-                )
-                # キーの主に動く方向の位置。スリットとかは位置が変動する
-                target_idx_poses.append(now_edge_key[target_idx])
-
-            # 方向の中央値
-            direction_dot_mean = np.mean(np.abs(direction_dots))
-            # 内積の前後差
-            edge_dot_diffs = np.diff(edge_dots)
-            # 最も内積前後差が大きい値
-            edge_dot_diff_max = np.max(np.abs(edge_dot_diffs))
+                if material_direction == 0:
+                    # 水平の場合
+                    # キーの主に動く方向の位置。Z固定
+                    target_idx_poses.append(now_edge_key[2])
+                else:
+                    # キーの主に動く方向の位置。スリットとかは位置が変動する
+                    target_idx_poses.append(now_edge_key[target_idx])
 
             # https://teratail.com/questions/162391
             # 差分近似
             target_idx_pose_f_prime = np.gradient(target_idx_poses)
             # 変曲点を求める
-            target_idx_pose_indices = np.where(np.diff(np.sign(target_idx_pose_f_prime)))[0]
+            target_idx_pose_f_prime_sign = np.sign(target_idx_pose_f_prime)
+            target_idx_pose_f_prime_diff = np.where(np.diff(target_idx_pose_f_prime_sign))[0]
 
-            logger.debug(
-                f"[{n:02d}] direction[{np.round(direction_dot_mean, 4)}], dot[{np.round(direction_dots, 4)}], edge_dot_diff_max[{round(edge_dot_diff_max, 4)}]"
-            )
-
-            if edge_dot_diff_max > 0.5 and param_option["special_shape"] == logger.transtext("スリット"):
-                # 内積差が大きく、角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
-                logger.debug(f"[{n:02d}] corner[{np.where(np.array(edge_dots) < 0.5)[0].tolist()}]")
-                slice_idxs = np.where(np.array(edge_dots) < 0.5)[0].tolist()
-                slice_idxs += [slice_idxs[0]]
-                for ssi, esi in zip(slice_idxs, slice_idxs[1:]):
+            if len(target_idx_pose_f_prime_diff) > 2 and param_option["special_shape"] != logger.transtext("エッジ不定形"):
+                target_idx_pose_indices = []
+                for d in target_idx_pose_f_prime_diff:
+                    if target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0:
+                        target_idx_pose_indices.append(d)
+                    else:
+                        target_idx_pose_indices.append(d + 1)
+                target_idx_pose_indices.append(target_idx_pose_f_prime.shape[0] - 1)
+                # 最後と最初を繋いでみる（角があれば垂直で落とされるはず）
+                target_idx_pose_indices.append(target_idx_pose_indices[0])
+                # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
+                for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
                     target_edge_lines = (
                         edge_lines[ssi : (esi + 1)] if 0 <= ssi < esi else edge_lines[ssi:] + edge_lines[: (esi + 1)]
                     )
-                    target_direction_dots = (
-                        direction_dots[(ssi + 1) : (esi + 1)]
+                    slice_target_idx_poses = (
+                        target_idx_poses[(ssi + 1) : (esi + 1)]
                         if 0 <= ssi < esi
-                        else direction_dots[(ssi + 1) :] + direction_dots[: (esi + 1)]
+                        else target_idx_poses[(ssi + 1) :] + target_idx_poses[: (esi + 1)]
                     )
 
-                    if np.round(np.mean(np.abs(target_direction_dots)), 3) <= np.round(direction_dot_mean, 3):
-                        # 同一方向の傾きがdirectionと垂直っぽければ、水平方向
+                    logger.debug(
+                        f"ssi[{ssi}], esi[{esi}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_edge_lines]}]"
+                    )
+
+                    if -threshold <= np.mean(np.abs(np.diff(slice_target_idx_poses))) <= threshold:
+                        # 同一方向の傾きに変化がなければ、水平方向
                         if 1 == len(all_edge_lines):
                             horizonal_edge_lines.append([])
                         horizonal_edge_lines[-1].append(target_edge_lines)
+                        logger.info(
+                            "-- %s: 水平エッジ %s",
+                            material_name,
+                            [(ed, virtual_vertices[ed].vidxs()) for ed in target_edge_lines],
+                        )
                     else:
-                        # 同一方向の傾きがdirectionと同じっぽければ、垂直方向
+                        # 同一方向の傾きに変化があれば、垂直方向
                         if 1 == len(all_edge_lines):
                             vertical_edge_lines.append([])
                         vertical_edge_lines[-1].append(target_edge_lines)
+                        logger.info(
+                            "-- %s: 垂直エッジ %s",
+                            material_name,
+                            [(ed, virtual_vertices[ed].vidxs()) for ed in target_edge_lines],
+                        )
             else:
-                # 内積差が小さい場合、エッジが均一に水平に繋がってるとみなす(一枚物は有り得ない)
+                # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす(一枚物は有り得ない)
                 if len(horizonal_edge_lines) == 0:
                     horizonal_edge_lines.append([])
                 horizonal_edge_lines[-1].append(edge_lines)
@@ -3713,9 +3721,39 @@ class PmxTailorExportService:
                 for ei, thkey in enumerate(the):
                     top_edge_poses.append(virtual_vertices[thkey].position().data())
 
+        if not bottom_horizonal_edge_lines:
+            logger.warning(
+                "物理方向に対して水平な下部エッジが見つけられなかった為、処理を終了します。\nVroid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                decoration=MLogger.DECORATION_BOX,
+            )
+            return None, None, None, None
+
+        logger.info("--------------")
+        bottom_keys = []
+        bottom_degrees = {}
+        bottom_edge_poses = []
+        for bi, bhel in enumerate(bottom_horizonal_edge_lines):
+            for hi, bhe in enumerate(bhel):
+                for ei, bhkey in enumerate(bhe):
+                    pos = virtual_vertices[bhkey].position().data()
+                    bottom_edge_poses.append(pos)
+
+        bottom_edge_mean_pos = MVector3D(np.mean(bottom_edge_poses, axis=0))
+        # 真後ろに最も近い位置
+        bottom_edge_start_pos = MVector3D(list(sorted(bottom_edge_poses, key=lambda x: (-x[2], abs(x[0]), -x[1])))[0])
+        if np.isclose(bottom_edge_start_pos.z(), bottom_edge_mean_pos.z(), rtol=0.01):
+            # 奥行きがほぼ同じ場合、ずらす
+            bottom_edge_mean_pos.setZ(bottom_edge_mean_pos.z() + (np.sign(bottom_edge_mean_pos.z() * 100)))
+
         top_edge_mean_pos = MVector3D(np.mean(top_edge_poses, axis=0))
         # 真後ろに最も近い位置
-        top_edge_start_pos = MVector3D(list(sorted(top_edge_poses, key=lambda x: (abs(x[0]), -x[2], -x[1])))[0])
+        top_edge_start_pos = MVector3D(list(sorted(top_edge_poses, key=lambda x: (-x[2], abs(x[0]), -x[1])))[0])
+        if np.isclose(top_edge_start_pos.z(), top_edge_mean_pos.z(), rtol=0.01):
+            # 奥行きがほぼ同じ場合、ずらす
+            top_edge_mean_pos.setZ(bottom_edge_mean_pos.z())
+        logger.info(
+            "%s: 水平エッジ上部 開始位置: [%s], 中央位置[%s]", material_name, top_edge_start_pos.to_log(), top_edge_mean_pos.to_log()
+        )
 
         for ti, thel in enumerate(top_horizonal_edge_lines):
             for hi, the in enumerate(thel):
@@ -3737,30 +3775,13 @@ class PmxTailorExportService:
                         round(top_degree1, 3),
                     )
 
-        if not bottom_horizonal_edge_lines:
-            logger.warning(
-                "物理方向に対して水平な下部エッジが見つけられなかった為、処理を終了します。\nVroid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
-                decoration=MLogger.DECORATION_BOX,
-            )
-            return None, None, None, None
-
         logger.info("--------------")
-        bottom_keys = []
-        bottom_degrees = {}
-        bottom_edge_poses = []
-        bottom_side_edge_poses = []
-        for bi, bhel in enumerate(bottom_horizonal_edge_lines):
-            for hi, bhe in enumerate(bhel):
-                for ei, bhkey in enumerate(bhe):
-                    pos = virtual_vertices[bhkey].position().data()
-                    bottom_edge_poses.append(pos)
-                    if np.sign(pos[2]) == np.sign(top_edge_start_pos.data()[2]):
-                        # 下部の対象エッジは上部と同じZ軸方向のみとする（検出だけ）
-                        bottom_side_edge_poses.append(pos)
 
-        bottom_edge_mean_pos = MVector3D(np.mean(bottom_edge_poses, axis=0))
-        bottom_edge_start_pos = MVector3D(
-            list(sorted(bottom_side_edge_poses, key=lambda x: (abs(x[0]), -x[2], -x[1])))[0]
+        logger.info(
+            "%s: 水平エッジ下部 開始位置: [%s], 中央位置[%s]",
+            material_name,
+            bottom_edge_start_pos.to_log(),
+            bottom_edge_mean_pos.to_log(),
         )
 
         for bi, bhel in enumerate(bottom_horizonal_edge_lines):
@@ -3836,7 +3857,7 @@ class PmxTailorExportService:
                             4,
                         )
                         if vscores and param_option["special_shape"] == logger.transtext("プリーツ")
-                        else round(np.sum(vscores), 4)
+                        else round(np.mean(vscores), 4)
                         if vscores
                         else "-",
                     )
@@ -3868,8 +3889,8 @@ class PmxTailorExportService:
                                         ss, weights=list(reversed((np.arange(1, len(ss) + 1) ** 2).tolist()))
                                     )
                                 else:
-                                    # 2個以上同じ始端から出ている場合はスコア合計を取る
-                                    total_scores[x] = np.sum(ss)
+                                    # 2個以上同じ始端から出ている場合はスコア平均を取る
+                                    total_scores[x] = np.mean(ss)
                                 logger.debug(
                                     f"target top: [{virtual_vertices[vkeys[0]].vidxs()}], bottom: [{virtual_vertices[vkeys[-1]].vidxs()}], total: {round(total_scores[x], 3)}"
                                 )
@@ -4127,7 +4148,7 @@ class PmxTailorExportService:
 
             score = (yaw_score * 20) + pitch_score + (roll_score * 2)
 
-            scores.append(score)
+            scores.append(score * (2 if to_key in top_keys else 1))
 
             logger.debug(
                 f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_next_vpos[{local_next_vpos.to_log()}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
@@ -4141,13 +4162,15 @@ class PmxTailorExportService:
         nearest_idx = np.argmax(scores)
         vertical_key = from_vv.connected_vvs[nearest_idx]
 
-        # 前の辺との内積差を考慮する（プリーツライン選択用）
+        # 前の辺との内積差を考慮する（プリーツライン選択用・デフォルトはTOPキーの場合に加算してるので、その分割り引く）
         prev_diff_dot = (
             MVector3D.dotProduct(
                 (virtual_vertices[vkeys[0]].position() - virtual_vertices[vkeys[1]].position()).normalized(),
                 (virtual_vertices[vertical_key].position() - virtual_vertices[vkeys[0]].position()).normalized(),
             )
             if len(vkeys) > 1 and param_option["special_shape"] == logger.transtext("プリーツ")
+            else 0.5
+            if vertical_key in top_keys
             else 1
         )
 

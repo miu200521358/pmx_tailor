@@ -366,9 +366,7 @@ class PhysicsParam:
         self.simple_material_sizer.Add(self.simple_material_txt, 0, wx.ALL, 5)
 
         self.simple_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
-        self.simple_material_ctrl.SetToolTip(
-            logger.transtext("物理を設定する材質を選択してください。\n裾など一部にのみ物理を設定したい場合、頂点データCSVを指定してください。")
-        )
+        self.simple_material_ctrl.SetToolTip(self.simple_material_txt.GetToolTipText())
         self.simple_material_ctrl.Bind(wx.EVT_CHOICE, self.set_material_name)
         self.simple_material_sizer.Add(self.simple_material_ctrl, 0, wx.ALL, 5)
 
@@ -386,9 +384,7 @@ class PhysicsParam:
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
 
         self.simple_parent_bone_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.bone_list)
-        self.simple_parent_bone_ctrl.SetToolTip(
-            logger.transtext("材質物理の起点となる親ボーン\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
-        )
+        self.simple_parent_bone_ctrl.SetToolTip(self.simple_parent_bone_txt.GetToolTipText())
         self.simple_parent_bone_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_ctrl, 0, wx.ALL, 5)
 
@@ -410,11 +406,7 @@ class PhysicsParam:
         self.simple_abb_ctrl = wx.TextCtrl(
             self.simple_window, id=wx.ID_ANY, size=wx.Size(70, -1), style=wx.TE_PROCESS_ENTER
         )
-        self.simple_abb_ctrl.SetToolTip(
-            logger.transtext(
-                "ボーン名などに使用する材質略称を半角6文字 or 全角3文字以内で入力してください。（任意変更可能。その場合は3文字まで）\nENTERキーを押すと過去に設定した物理設定を再設定します。(ボーンタブの値は再設定しません)"
-            )
-        )
+        self.simple_abb_ctrl.SetToolTip(self.simple_abb_txt.GetToolTipText())
         self.simple_abb_ctrl.SetMaxLength(6)
         self.simple_abb_ctrl.Bind(wx.EVT_TEXT, self.set_abb_name)
         self.simple_abb_ctrl.Bind(wx.EVT_TEXT_ENTER, self.set_abb_setting)
@@ -432,7 +424,7 @@ class PhysicsParam:
             id=wx.ID_ANY,
             choices=["", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
         )
-        self.simple_group_ctrl.SetToolTip(logger.transtext("剛体のグループ。初期設定では、自分自身のグループのみ非衝突として設定します。"))
+        self.simple_group_ctrl.SetToolTip(self.simple_group_txt.GetToolTipText())
         self.simple_group_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_group_ctrl, 0, wx.ALL, 5)
 
@@ -448,7 +440,7 @@ class PhysicsParam:
             id=wx.ID_ANY,
             choices=[logger.transtext("下"), logger.transtext("右"), logger.transtext("左")],
         )
-        self.simple_direction_ctrl.SetToolTip(logger.transtext("物理材質の向き(例：左腕側の物理を設定したい場合に「左」を設定して、物理が流れる方向を左方向に伸ばす)"))
+        self.simple_direction_ctrl.SetToolTip(self.simple_direction_txt.GetToolTipText())
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_direction_ctrl, 0, wx.ALL, 5)
 
@@ -467,17 +459,14 @@ class PhysicsParam:
             id=wx.ID_ANY,
             choices=[logger.transtext("そのまま"), logger.transtext("再利用"), logger.transtext("上書き")],
         )
-        self.simple_exist_physics_clear_ctrl.SetToolTip(
-            logger.transtext("指定された材質に割り当てられている既存物理（ボーン・剛体・ジョイント）がある場合の挙動\nそのまま：処理しない\n")
-            + logger.transtext("再利用：ボーンとウェイトは既存のものを利用し、剛体とジョイントだけ作り直す\n上書き：ボーン・剛体・ジョイントを削除して作り直す")
-        )
+        self.simple_exist_physics_clear_ctrl.SetToolTip(self.simple_exist_physics_clear_txt.GetToolTipText())
         self.simple_exist_physics_clear_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_exist_physics_clear_ctrl, 0, wx.ALL, 5)
 
         self.simple_primitive_txt = wx.StaticText(
             self.simple_window, wx.ID_ANY, logger.transtext("プリセット"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.simple_primitive_txt.SetToolTip(logger.transtext("物理の参考値プリセット"))
+        self.simple_primitive_txt.SetToolTip(logger.transtext("物理の参考値プリセット\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"))
         self.simple_primitive_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_primitive_txt, 0, wx.ALL, 5)
 
@@ -498,7 +487,7 @@ class PhysicsParam:
                 logger.transtext("単一揺れ物"),
             ],
         )
-        self.simple_primitive_ctrl.SetToolTip(logger.transtext("物理の参考値プリセット\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"))
+        self.simple_primitive_ctrl.SetToolTip(self.simple_primitive_txt.GetToolTipText())
         self.simple_primitive_ctrl.Bind(wx.EVT_CHOICE, self.set_simple_primitive)
         self.simple_header_grid_sizer.Add(self.simple_primitive_ctrl, 0, wx.ALL, 5)
 
@@ -506,7 +495,7 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("特殊形状"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_special_shape_txt.SetToolTip(
-            logger.transtext("スカート等で特殊な処理が必要な形状\nデフォルトでは「なし」となっているので、必要に応じて形状を選択してください")
+            logger.transtext("スカート等で特殊な処理が必要な形状\nエッジ不定形: VRoid製などで裾のポリ割がガタガタしてる場合\nプリーツ: ポリ割に折り返しがある場合")
         )
         self.simple_special_shape_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_txt, 0, wx.ALL, 5)
@@ -514,11 +503,9 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("スリット"), logger.transtext("プリーツ")],
+            choices=[logger.transtext("なし"), logger.transtext("エッジ不定形"), logger.transtext("プリーツ")],
         )
-        self.simple_special_shape_ctrl.SetToolTip(
-            logger.transtext("スカート等で特殊な処理が必要な形状\nデフォルトでは「なし」となっているので、必要に応じて形状を選択してください")
-        )
+        self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
         self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_ctrl, 0, wx.ALL, 5)
 
@@ -536,9 +523,7 @@ class PhysicsParam:
         self.simple_edge_material_sizer.Add(self.simple_edge_material_txt, 0, wx.ALL, 5)
 
         self.simple_edge_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
-        self.simple_edge_material_ctrl.SetToolTip(
-            logger.transtext("物理材質の裾にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます")
-        )
+        self.simple_edge_material_ctrl.SetToolTip(self.simple_edge_material_txt.GetToolTipText())
         self.simple_edge_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_edge_material_sizer.Add(self.simple_edge_material_ctrl, 0, wx.ALL, 5)
 
@@ -556,9 +541,7 @@ class PhysicsParam:
         self.simple_back_material_sizer.Add(self.simple_back_material_txt, 0, wx.ALL, 5)
 
         self.simple_back_material_ctrl = wx.Choice(self.simple_window, id=wx.ID_ANY, choices=self.frame.material_list)
-        self.simple_back_material_ctrl.SetToolTip(
-            logger.transtext("物理材質の裏面にあたる材質がある場合、選択してください。\n物理材質の最も近い頂点ウェイトを転写します")
-        )
+        self.simple_back_material_ctrl.SetToolTip(self.simple_back_material_txt.GetToolTipText())
         self.simple_back_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_back_material_sizer.Add(self.simple_back_material_ctrl, 0, wx.ALL, 5)
 
@@ -860,9 +843,7 @@ class PhysicsParam:
         self.density_type_ctrl = wx.Choice(
             self.advance_window, id=wx.ID_ANY, choices=[logger.transtext("頂点"), logger.transtext("距離")]
         )
-        self.density_type_ctrl.SetToolTip(
-            logger.transtext("頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）")
-        )
+        self.density_type_ctrl.SetToolTip(self.density_type_txt.GetToolTipText())
         self.density_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.density_type_ctrl, 0, wx.ALL, 5)
 
@@ -886,9 +867,7 @@ class PhysicsParam:
             id=wx.ID_ANY,
             choices=[logger.transtext("布"), logger.transtext("髪"), logger.transtext("胸"), logger.transtext("単一揺")],
         )
-        self.physics_type_ctrl.SetToolTip(
-            logger.transtext("布: 板剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)\n袖: カプセル剛体で縦を繋ぐ(※要ボーン定義)")
-        )
+        self.physics_type_ctrl.SetToolTip(self.physics_type_txt.GetToolTipText())
         self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
 
