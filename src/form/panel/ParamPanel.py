@@ -495,7 +495,7 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("特殊形状"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_special_shape_txt.SetToolTip(
-            logger.transtext("スカート等で特殊な処理が必要な形状\nエッジ不定形: VRoid製などで裾のポリ割がガタガタしてる場合\nプリーツ: ポリ割に折り返しがある場合")
+            logger.transtext("スカート等で特殊な処理が必要な形状\nエッジ不定形: 裾にフリルが付いてたり、波打ってたり、裾のポリ割が真っ直ぐではない場合\nプリーツ: ポリ割に折り返しがある場合")
         )
         self.simple_special_shape_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_txt, 0, wx.ALL, 5)

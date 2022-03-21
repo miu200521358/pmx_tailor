@@ -2850,6 +2850,8 @@ class PmxTailorExportService:
                 rbone = model.bones[rbone_name]
                 if (
                     rbone.position == bone.position
+                    and rbone.parent_index in model.bone_indexes
+                    and bone.parent_index in model.bone_indexes
                     and model.bones[model.bone_indexes[rbone.parent_index]].position
                     == model.bones[model.bone_indexes[bone.parent_index]].position
                 ):
@@ -3346,8 +3348,6 @@ class PmxTailorExportService:
         # 残頂点リスト
         remaining_vertices = {}
 
-        logger.info("%s: 材質頂点の傾き算出", material_name)
-
         parent_bone = model.bones[param_option["parent_bone_name"]]
 
         # 一旦全体の位置を把握
@@ -3372,15 +3372,14 @@ class PmxTailorExportService:
             .normalized()
             .data()[np.where(np.abs(base_vertical_axis.data()))]
         )[0]
-        material_dot = 0 if material_direction < 0.1 else 0.1
-        logger.debug(f"material_direction: {material_direction} -> material_dot: {material_dot}")
+        logger.info("%s: 材質頂点の傾き算出: %s", material_name, material_direction)
 
         logger.info("%s: 仮想頂点リストの生成", material_name)
 
         virtual_vertices = {}
 
         edge_pair_lkeys = {}
-        for index_idx in model.material_indices[material_name]:
+        for n, index_idx in enumerate(model.material_indices[material_name]):
             # 頂点の組み合わせから面INDEXを引く
             if (
                 model.indices[index_idx][0] not in target_vertices
@@ -3412,7 +3411,9 @@ class PmxTailorExportService:
                 surface_normal = MVector3D.crossProduct(vv1, vv2).normalized()
 
                 # 親ボーンに対する向き
-                parent_direction = (v0.position - parent_bone.position).normalized()
+                parent_direction = (
+                    ((v0.position + v1.position + v2.position) / 3) - parent_bone.position
+                ).normalized()
 
                 # 親ボーンの向きとの内積
                 normal_dot = MVector3D.dotProduct(
@@ -3428,7 +3429,7 @@ class PmxTailorExportService:
                 )
 
                 # 面法線と同じ向き場合、辺キー生成（表面のみを対象とする）
-                if normal_dot >= material_dot:
+                if normal_dot > 0:
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
@@ -3454,9 +3455,12 @@ class PmxTailorExportService:
                     if index_idx not in back_indexes:
                         back_indexes.append(index_idx)
 
+            if n > 0 and n % 500 == 0:
+                logger.info("-- メッシュ確認: %s個目:終了", n)
+
         if param_option["special_shape"] == logger.transtext("プリーツ"):
             # プリーツは折りたたみ面を裏面として扱ってるため、裏面の頂点を仮想頂点の連結先として登録する
-            for index_idx in back_indexes:
+            for n, index_idx in enumerate(back_indexes):
                 (v0_idx, v1_idx, v2_idx) = model.indices[index_idx]
 
                 for v_idx, ov1_idx, ov2_idx in [
@@ -3517,9 +3521,12 @@ class PmxTailorExportService:
                             edge_pair_lkeys[lkey] = []
                         if index_idx not in edge_pair_lkeys[lkey]:
                             edge_pair_lkeys[lkey].append(index_idx)
+
+                if n > 0 and n % 500 == 0:
+                    logger.info("-- 裏メッシュ確認: %s個目:終了", n)
         else:
             # デフォルトは面の頂点だけ保持し直す
-            for index_idx in back_indexes:
+            for n, index_idx in enumerate(back_indexes):
                 for v_idx in model.indices[index_idx]:
                     v = model.vertex_dict[v_idx]
                     v_key = v.position.to_key(threshold)
@@ -3530,6 +3537,9 @@ class PmxTailorExportService:
                     ):
                         back_vertices.append(v_idx)
 
+                if n > 0 and n % 1000 == 0:
+                    logger.info("-- 裏メッシュ確認: %s個目:終了", n)
+
         if not virtual_vertices:
             logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
             return None, None, None, None
@@ -3539,8 +3549,32 @@ class PmxTailorExportService:
             return None, None, None, None
 
         edge_line_pairs = {}
-        for (min_vkey, max_vkey), line_iidxs in edge_pair_lkeys.items():
+        for n, ((min_vkey, max_vkey), line_iidxs) in enumerate(edge_pair_lkeys.items()):
+            is_pair = False
             if len(line_iidxs) == 1:
+                is_pair = True
+            elif param_option["special_shape"] != logger.transtext("プリーツ"):
+                surface_dots = []
+                for index_idx in line_iidxs:
+                    (v0_idx, v1_idx, v2_idx) = model.indices[index_idx]
+
+                    v0 = model.vertex_dict[v0_idx]
+                    v1 = model.vertex_dict[v1_idx]
+                    v2 = model.vertex_dict[v2_idx]
+
+                    # 面垂線
+                    vv1 = v1.position - v0.position
+                    vv2 = v2.position - v1.position
+                    surface_normal = MVector3D.crossProduct(vv1, vv2).normalized()
+                    surface_dots.append(MVector3D.dotProduct(surface_normal, MVector3D(0, 1, 0)))
+
+                logger.debug(f"line_iidxs: [{line_iidxs}], surface_dots: [{surface_dots}]")
+
+                if np.where(np.unique(np.sign(surface_dots), return_counts=True)[1] == 1)[0].shape[0]:
+                    # 面法線が1つしかないやつがあった場合、厚みのある材質で折り返しと共有しているとみなして、ペアリストに追加
+                    is_pair = True
+
+            if is_pair:
                 if min_vkey not in virtual_vertices or max_vkey not in virtual_vertices:
                     continue
 
@@ -3551,6 +3585,9 @@ class PmxTailorExportService:
 
                 edge_line_pairs[min_vkey].append(max_vkey)
                 edge_line_pairs[max_vkey].append(min_vkey)
+
+            if n > 0 and n % 500 == 0:
+                logger.info("-- 辺確認: %s個目:終了", n)
 
         if logger.is_debug_level():
             logger.debug("--------------------------")
@@ -3619,7 +3656,11 @@ class PmxTailorExportService:
             target_idx_pose_f_prime_sign = np.sign(target_idx_pose_f_prime)
             target_idx_pose_f_prime_diff = np.where(np.diff(target_idx_pose_f_prime_sign))[0]
 
-            if len(target_idx_pose_f_prime_diff) > 2 and param_option["special_shape"] != logger.transtext("エッジ不定形"):
+            if (
+                len(target_idx_pose_f_prime_diff) > 2
+                and param_option["special_shape"] != logger.transtext("エッジ不定形")
+                and param_option["special_shape"] != logger.transtext("プリーツ")
+            ):
                 target_idx_pose_indices = []
                 for d in target_idx_pose_f_prime_diff:
                     if target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0:
@@ -3708,7 +3749,9 @@ class PmxTailorExportService:
 
         if not top_horizonal_edge_lines:
             logger.warning(
-                "物理方向に対して水平な上部エッジが見つけられなかった為、処理を終了します。\nVroid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                "物理方向に対して水平な上部エッジが見つけられなかった為、処理を終了します。\n"
+                + "「エッジの抽出準備」で検出されたエッジが2つある場合、「特殊形状」オプションで「エッジ不定形」を選んでいただくと、水平エッジとして処理されます。\n"
+                + "VRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
             )
             return None, None, None, None
@@ -3723,7 +3766,9 @@ class PmxTailorExportService:
 
         if not bottom_horizonal_edge_lines:
             logger.warning(
-                "物理方向に対して水平な下部エッジが見つけられなかった為、処理を終了します。\nVroid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                "物理方向に対して水平な下部エッジが見つけられなかった為、処理を終了します。\n"
+                + "「エッジの抽出準備」で検出されたエッジが2つある場合、「特殊形状」オプションで「エッジ不定形」を選んでいただくと、水平エッジとして処理されます。\n"
+                + "VRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
             )
             return None, None, None, None
@@ -3963,6 +4008,15 @@ class PmxTailorExportService:
                         prev_vv.connected_vvs.append(vkey)
                         vv = virtual_vertices[vkey]
                         vv.connected_vvs.append(prev_vv.key)
+
+            remove_yidxs = []
+            for v_yidx in range(vertex_map.shape[0]):
+                if np.isnan(vertex_map[v_yidx, :]).all():
+                    # 全部nanの場合、削除対象
+                    remove_yidxs.append(v_yidx)
+
+            vertex_map = np.delete(vertex_map, remove_yidxs, axis=0)
+            vertex_display_map = np.delete(vertex_display_map, remove_yidxs, axis=0)
 
             for v_yidx in range(vertex_map.shape[0]):
                 for v_xidx in range(vertex_map.shape[1]):
