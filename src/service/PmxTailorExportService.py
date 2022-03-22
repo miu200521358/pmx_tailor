@@ -1592,7 +1592,11 @@ class PmxTailorExportService:
                 # ボーン進行方向(x)
                 x_direction_pos = (now_above_bone.position - now_below_bone.position).normalized()
                 # ボーン進行方向に対しての横軸(y)
-                if next_above_bone and now_above_bone and (prev_above_bone or next_above_bone != now_above_bone):
+                if (
+                    next_above_bone
+                    and now_above_bone
+                    and ((prev_above_bone and prev_above_bone != now_above_bone) or next_above_bone != now_above_bone)
+                ):
                     y_direction_pos = (
                         next_above_bone.position
                         - (prev_above_bone.position if prev_above_bone else now_above_bone.position)
@@ -1754,45 +1758,26 @@ class PmxTailorExportService:
                             org_rigidbody.param.mass = rigidbody_mass * 1.5
                             # バランサー剛体のサイズ
                             shape_size = MVector3D(
-                                org_rigidbody.shape_size.x() * 0.5,
-                                (org_rigidbody.shape_size.y() + rigidbody_volume.y()) * 5,
+                                0.5,
+                                (org_rigidbody.shape_size.y() + rigidbody_volume.y()) * 2,
                                 org_rigidbody.shape_size.z(),
                             )
                         else:
-                            if param_option["physics_type"] in [logger.transtext("胸")]:
-                                # バランサー剛体のサイズ
-                                shape_size = MVector3D(
-                                    org_rigidbody.shape_size.x() * 0.5,
-                                    org_rigidbody.shape_size.y() * 1.5,
-                                    org_rigidbody.shape_size.z(),
-                                )
-                            else:
-                                # バランサー剛体のサイズ
-                                shape_size = MVector3D(
-                                    org_rigidbody.shape_size.x() * 0.5,
-                                    org_rigidbody.shape_size.y() * 0.8,
-                                    org_rigidbody.shape_size.z(),
-                                )
+                            # バランサー剛体のサイズ
+                            shape_size = MVector3D(0.5, org_rigidbody.shape_size.y(), org_rigidbody.shape_size.z())
 
                         # 名前にバランサー追加
                         rigidbody_name = f"B-{org_rigidbody.name}"
 
                         # バランサー剛体の回転
-                        if param_option["physics_type"] in [logger.transtext("胸")]:
-                            # 胸は90度だけ回す
-                            shape_qq = org_rigidbody.shape_qq.copy()
-                            shape_qq *= MQuaternion.fromEulerAngles(
-                                90, 90 * (1 if "左" in org_rigidbody.name else -1), 0
-                            )
+                        if org_axis.y() < 0:
+                            # 下を向いてたらY方向に反転
+                            shape_qq = MQuaternion.fromEulerAngles(0, 180, 0)
+                            shape_qq *= org_rigidbody.shape_qq.copy()
                         else:
-                            if org_axis.y() < 0:
-                                # 下を向いてたらY方向に反転
-                                shape_qq = MQuaternion.fromEulerAngles(0, 180, 0)
-                                shape_qq *= org_rigidbody.shape_qq.copy()
-                            else:
-                                # 上を向いてたらX方向にも反転
-                                shape_qq = MQuaternion.fromEulerAngles(0, 0, 180)
-                                shape_qq *= org_rigidbody.shape_qq.copy()
+                            # 上を向いてたらX方向に反転
+                            shape_qq = org_rigidbody.shape_qq.copy()
+                            shape_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                         shape_euler = shape_qq.toEulerAngles()
                         shape_rotation_radians = MVector3D(
@@ -1803,6 +1788,9 @@ class PmxTailorExportService:
                         mat = MMatrix4x4()
                         mat.setToIdentity()
                         mat.translate(org_rigidbody.shape_position)
+                        mat.rotate(org_rigidbody.shape_qq)
+                        mat.translate(MVector3D(0, org_rigidbody.shape_size.y() / 2, 0))
+                        mat.rotate(org_rigidbody.shape_qq.inverted())
                         mat.rotate(shape_qq)
 
                         # バランサー剛体の位置
@@ -3429,7 +3417,7 @@ class PmxTailorExportService:
                 )
 
                 # 面法線と同じ向き場合、辺キー生成（表面のみを対象とする）
-                if normal_dot > 0:
+                if np.sign(normal_dot) > 0:
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
@@ -3570,7 +3558,10 @@ class PmxTailorExportService:
 
                 logger.debug(f"line_iidxs: [{line_iidxs}], surface_dots: [{surface_dots}]")
 
-                if np.where(np.unique(np.sign(surface_dots), return_counts=True)[1] == 1)[0].shape[0]:
+                minus_surface = np.where(np.array(surface_dots) < -0.1)[0]
+                plus_surface = np.where(np.array(surface_dots) >= -0.1)[0]
+
+                if minus_surface.shape[0] == 1 or plus_surface.shape[0] == 1:
                     # 面法線が1つしかないやつがあった場合、厚みのある材質で折り返しと共有しているとみなして、ペアリストに追加
                     is_pair = True
 
