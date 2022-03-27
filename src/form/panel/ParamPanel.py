@@ -598,7 +598,7 @@ class PhysicsParam:
             self.simple_window,
             wx.ID_ANY,
             0.1,
-            0.01,
+            0.02,
             0.5,
             0.01,
             self.simple_threshold_label,
