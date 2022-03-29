@@ -3741,15 +3741,12 @@ class PmxTailorExportService:
             # 移動量の最大の1/2を閾値とする
             horizonal_threshold = np.max(np.abs(np.diff(target_idx_poses))) / 2
 
-            # https://teratail.com/questions/162391
-            # 差分近似
-            target_idx_pose_f_prime = np.gradient(target_idx_poses)
-            # 変曲点を求める
-            target_idx_pose_f_prime_sign = np.sign(np.round(target_idx_pose_f_prime, 5))
+            # 変曲点を求める(検出の細かさに応じて、許容値も変える)
+            target_idx_pose_f_prime_sign = np.sign(np.round(np.diff(target_idx_poses), int(0.1 / threshold)))
             # 変化の大きな箇所を求める
             target_idx_pose_f_prime_diff = np.where(np.diff(target_idx_pose_f_prime_sign))[0]
 
-            if len(target_idx_pose_f_prime_diff) / 2 <= 2 or horizonal_threshold < 0.2:
+            if len(target_idx_pose_f_prime_diff) <= 2 or horizonal_threshold < threshold * 2:
                 # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす(一枚物は有り得ない)
                 if len(horizonal_edge_lines) == 0:
                     horizonal_edge_lines.append([])
@@ -3761,15 +3758,26 @@ class PmxTailorExportService:
                     [(ed, virtual_vertices[ed].vidxs()) for ed in edge_lines],
                 )
             else:
+                # 変曲点で分離が必要な場合、最初と最後が繋がっている可能性があるので、一旦繋いでみる
+                # 変曲点を求める(検出の細かさに応じて、許容値も変える)
+                target_idx_pose_f_prime_sign2 = np.sign(
+                    np.round(
+                        np.diff(target_idx_poses + target_idx_poses[: (target_idx_pose_f_prime_diff[0] + 1)]),
+                        int(0.1 / threshold),
+                    )
+                )
+                # 変化の大きな箇所を求める
+                target_idx_pose_f_prime_diff2 = np.where(np.diff(target_idx_pose_f_prime_sign2))[0].tolist()
+                target_idx_pose_f_prime_diff2 += target_idx_pose_f_prime_diff2[:2]
+
                 target_idx_pose_indices = []
-                for d in target_idx_pose_f_prime_diff:
-                    if target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0:
+                for d in target_idx_pose_f_prime_diff2[:-1]:
+                    if len(target_idx_pose_f_prime_sign) >= d + 1 or (
+                        target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0
+                    ):
                         target_idx_pose_indices.append(d)
                     else:
                         target_idx_pose_indices.append(d + 1)
-                target_idx_pose_indices.append(target_idx_pose_f_prime.shape[0] - 1)
-                # 最後と最初を繋いでみる（角があれば垂直で落とされるはず）
-                target_idx_pose_indices.append(target_idx_pose_indices[0])
                 # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
                 is_prev_vertical = False
                 prev_vertical_key = None
@@ -4470,6 +4478,7 @@ class PmxTailorExportService:
                 prev_connected = True
             elif (
                 base_map_idx > 0
+                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[1] > 1
                 and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[0] > target_v_yidx
                 and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]][target_v_yidx, -1].any()
             ):
@@ -4479,6 +4488,7 @@ class PmxTailorExportService:
                 if (
                     tuple(vertex_maps[prev_map_idx][target_v_yidx, -1])
                     == tuple(vertex_maps[base_map_idx][target_v_yidx, v_xidx])
+                    and all_bone_connected[prev_map_idx].shape[1] > 2
                     and all_bone_connected[prev_map_idx][target_v_yidx, -2].any()
                 ):
                     # 前のボーンが同じ仮想頂点であり、かつそのもうひとつ前と繋がっている場合
