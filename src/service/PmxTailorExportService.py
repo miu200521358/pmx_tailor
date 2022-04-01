@@ -129,11 +129,20 @@ class PmxTailorExportService:
             model = self.options.pmx_model
             model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor"
 
-            # 保持ボーンは全設定を確認する
-            saved_bone_names = self.get_saved_bone_names(model)
+            # 既存物理を削除する
+            is_clear = False
+            for pidx, param_option in enumerate(self.options.param_options):
+                if param_option["exist_physics_clear"] == logger.transtext("上書き"):
+                    is_clear = True
+
+            if is_clear:
+                model = self.clear_physics(model)
+
+                if not model:
+                    return False
 
             for pidx, param_option in enumerate(self.options.param_options):
-                if not self.create_physics(model, param_option, saved_bone_names):
+                if not self.create_physics(model, param_option):
                     return False
 
             # 最後に出力
@@ -160,11 +169,349 @@ class PmxTailorExportService:
         finally:
             logging.shutdown()
 
-    def get_saved_bone_names(self, model: PmxModel):
-        # TODO
-        return []
+    def clear_physics(self, model: PmxModel):
+        logger.info("既存物理削除", decoration=MLogger.DECORATION_LINE)
+        target_vertices = []
 
-    def create_physics(self, model: PmxModel, param_option: dict, saved_bone_names: list):
+        for param_option in self.options.param_options:
+            material_name = param_option["material_name"]
+
+            if param_option["exist_physics_clear"] == logger.transtext("上書き"):
+                # 頂点CSVが指定されている場合、対象頂点リスト生成
+                if param_option["vertices_csv"]:
+                    try:
+                        with open(param_option["vertices_csv"], encoding="cp932", mode="r") as f:
+                            reader = csv.reader(f)
+                            next(reader)  # ヘッダーを読み飛ばす
+                            for row in reader:
+                                if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
+                                    target_vertices.append(int(row[1]))
+                    except Exception:
+                        continue
+                else:
+                    target_vertices.extend(list(model.material_vertices[material_name]))
+
+            if len(target_vertices) > 0 and len(target_vertices) % 1000 == 0:
+                logger.info("-- 頂点確認: %s個目:終了", len(target_vertices))
+
+        # 重複除去
+        target_vertices = list(set(target_vertices))
+
+        if not target_vertices:
+            logger.warning("削除対象頂点が取得できなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
+            return None
+
+        weighted_bone_indecies = []
+
+        # 処理対象全頂点のウェイトボーンを確認
+        for n, vidx in enumerate(target_vertices):
+            v = model.vertex_dict[vidx]
+
+            if type(v.deform) is Bdef1:
+                weighted_bone_indecies.append(v.deform.index0)
+            if type(v.deform) is Bdef2 or type(v.deform) is Sdef:
+                if 0 < v.deform.weight0 < 1:
+                    weighted_bone_indecies.append(v.deform.index0)
+                if 0 < (1 - v.deform.weight0) < 1:
+                    weighted_bone_indecies.append(v.deform.index1)
+            elif type(v.deform) is Bdef4:
+                if 0 < v.deform.weight0 < 1:
+                    weighted_bone_indecies.append(v.deform.index0)
+                if 0 < v.deform.weight1 < 1:
+                    weighted_bone_indecies.append(v.deform.index1)
+                if 0 < v.deform.weight2 < 1:
+                    weighted_bone_indecies.append(v.deform.index2)
+                if 0 < v.deform.weight3 < 1:
+                    weighted_bone_indecies.append(v.deform.index3)
+
+            if n > 0 and n % 1000 == 0:
+                logger.info("-- ウェイト確認: %s個目:終了", n)
+
+        semi_standard_bone_indecies = [-1]
+        for bone_name in SEMI_STANDARD_BONE_NAMES:
+            semi_standard_bone_indecies.append(model.bones[bone_name].index)
+
+        for bone in model.bones.values():
+            # 子ボーンも削除
+            if (
+                bone.parent_index in model.bone_indexes
+                and bone.index not in weighted_bone_indecies
+                and bone.parent_index in weighted_bone_indecies
+                and bone.name not in SEMI_STANDARD_BONE_NAMES
+            ):
+                weighted_bone_indecies.append(bone.index)
+
+            # 中心ボーンもあれば削除
+            if (
+                bone.index in weighted_bone_indecies
+                and bone.parent_index in model.bone_indexes
+                and "中心" in model.bone_indexes[bone.parent_index]
+                and bone.parent_index not in weighted_bone_indecies
+            ):
+                weighted_bone_indecies.append(bone.parent_index)
+
+        # 重複除去(ついでに準標準ボーンも対象から削除)
+        weighted_bone_indecies = list(sorted(list(set(weighted_bone_indecies) - set(semi_standard_bone_indecies))))
+
+        is_executable = True
+        for bone_index in weighted_bone_indecies:
+            if bone_index not in model.bone_indexes:
+                continue
+            bone = model.bones[model.bone_indexes[bone_index]]
+
+            for morph in model.org_morphs.values():
+                if morph.morph_type == 2:
+                    for offset in morph.offsets:
+                        if type(offset) is BoneMorphData:
+                            if offset.bone_index == bone.index:
+                                logger.error(
+                                    "削除対象ボーンがボーンモーフとして登録されているため、削除出来ません。\n"
+                                    + "事前にボーンモーフから外すか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s), モーフ名: %s",
+                                    bone.name,
+                                    morph.name,
+                                    decoration=MLogger.DECORATION_BOX,
+                                )
+                                is_executable = False
+
+            for sub_bone in model.bones.values():
+                if sub_bone.parent_index == bone.index and sub_bone.index not in weighted_bone_indecies:
+                    logger.error(
+                        "削除対象ボーンが削除対象外ボーンの親ボーンとして登録されているため、削除出来ません。\n"
+                        + "事前に親子関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外子ボーン: %s(%s)",
+                        bone.name,
+                        bone.index,
+                        sub_bone.name,
+                        sub_bone.index,
+                        decoration=MLogger.DECORATION_BOX,
+                    )
+                    is_executable = False
+
+                if (
+                    (sub_bone.getExternalRotationFlag() or sub_bone.getExternalTranslationFlag())
+                    and sub_bone.effect_index == bone.index
+                    and sub_bone.index not in weighted_bone_indecies
+                ):
+                    logger.error(
+                        "削除対象ボーンが削除対象外ボーンの付与親ボーンとして登録されているため、削除出来ません。\n"
+                        + "事前に付与関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外付与子ボーン: %s(%s)",
+                        bone.name,
+                        bone.index,
+                        sub_bone.name,
+                        sub_bone.index,
+                        decoration=MLogger.DECORATION_BOX,
+                    )
+                    is_executable = False
+
+                if sub_bone.getIkFlag():
+                    if sub_bone.ik.target_index == bone.index and sub_bone.index not in weighted_bone_indecies:
+                        logger.error(
+                            "削除対象ボーンが削除対象外ボーンのリンクターゲットボーンとして登録されているため、削除出来ません。\n"
+                            + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)",
+                            bone.name,
+                            bone.index,
+                            sub_bone.name,
+                            sub_bone.index,
+                            decoration=MLogger.DECORATION_BOX,
+                        )
+                        is_executable = False
+
+                    for link in sub_bone.ik.link:
+                        if link.bone_index == bone.index and sub_bone.index not in weighted_bone_indecies:
+                            logger.error(
+                                "削除対象ボーンが削除対象外ボーンのリンクボーンとして登録されているため、削除出来ません。\n"
+                                + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)",
+                                bone.name,
+                                bone.index,
+                                sub_bone.name,
+                                sub_bone.index,
+                                decoration=MLogger.DECORATION_BOX,
+                            )
+                            is_executable = False
+
+            if n > 0 and n % 20 == 0:
+                logger.info("-- ウェイトボーンチェック確認: %s個目:終了", n)
+
+        if not is_executable:
+            return None
+
+        weighted_rigidbody_indexes = {}
+        for rigidbody in model.rigidbodies.values():
+            if (
+                rigidbody.index not in list(weighted_rigidbody_indexes.values())
+                and rigidbody.bone_index in weighted_bone_indecies
+                and model.bone_indexes[rigidbody.bone_index] not in SEMI_STANDARD_BONE_NAMES
+            ):
+                weighted_rigidbody_indexes[rigidbody.name] = rigidbody.index
+
+        weighted_joint_indexes = {}
+        for joint in model.joints.values():
+            if joint.name not in list(weighted_joint_indexes.values()) and joint.rigidbody_index_a in list(
+                weighted_rigidbody_indexes.values()
+            ):
+                weighted_joint_indexes[joint.name] = joint.name
+            if joint.name not in list(weighted_joint_indexes.values()) and joint.rigidbody_index_b in list(
+                weighted_rigidbody_indexes.values()
+            ):
+                weighted_joint_indexes[joint.name] = joint.name
+
+        logger.info("ジョイント削除: %s", ", ".join((weighted_joint_indexes.keys())))
+
+        # 削除
+        for joint_name in weighted_joint_indexes.keys():
+            del model.joints[joint_name]
+
+        logger.info("剛体削除: %s", ", ".join(list(weighted_rigidbody_indexes.keys())))
+
+        for rigidbody_name in weighted_rigidbody_indexes.keys():
+            del model.rigidbodies[rigidbody_name]
+
+        logger.info("ボーン削除: %s", ", ".join([model.bone_indexes[bone_index] for bone_index in weighted_bone_indecies]))
+
+        for bone_index in weighted_bone_indecies:
+            del model.bones[model.bone_indexes[bone_index]]
+
+        reset_rigidbodies = {}
+        for ridx, (rigidbody_name, rigidbody) in enumerate(model.rigidbodies.items()):
+            reset_rigidbodies[rigidbody.index] = {"name": rigidbody_name, "index": ridx}
+            model.rigidbodies[rigidbody_name].index = ridx
+
+        reset_bones = {}
+        for bidx, (bone_name, bone) in enumerate(model.bones.items()):
+            reset_bones[bone.index] = {"name": bone_name, "index": bidx}
+            model.bones[bone_name].index = bidx
+            model.bone_indexes[bidx] = bone_name
+
+        logger.info("ジョイント再設定")
+
+        for n, (joint_name, joint) in enumerate(model.joints.items()):
+            if joint.rigidbody_index_a in reset_rigidbodies:
+                joint.rigidbody_index_a = reset_rigidbodies[joint.rigidbody_index_a]["index"]
+            if joint.rigidbody_index_b in reset_rigidbodies:
+                joint.rigidbody_index_b = reset_rigidbodies[joint.rigidbody_index_b]["index"]
+
+            if n > 0 and n % 100 == 0:
+                logger.info("-- ジョイント再設定: %s個目:終了", n)
+
+        logger.info("剛体再設定")
+
+        for n, rigidbody in enumerate(model.rigidbodies.values()):
+            if rigidbody.bone_index in reset_bones:
+                rigidbody.bone_index = reset_bones[rigidbody.bone_index]["index"]
+            else:
+                rigidbody.bone_index = -1
+
+            if n > 0 and n % 100 == 0:
+                logger.info("-- 剛体再設定: %s個目:終了", n)
+
+        logger.info("表示枠再設定")
+
+        for n, display_slot in enumerate(model.display_slots.values()):
+            new_references = []
+            for display_type, bone_idx in display_slot.references:
+                if display_type == 0:
+                    if bone_idx in reset_bones:
+                        new_references.append((display_type, reset_bones[bone_idx]["index"]))
+                else:
+                    new_references.append((display_type, bone_idx))
+            display_slot.references = new_references
+
+            if n > 0 and n % 100 == 0:
+                logger.info("-- 表示枠再設定: %s個目:終了", n)
+
+        logger.info("モーフ再設定")
+
+        for n, morph in enumerate(model.org_morphs.values()):
+            if morph.morph_type == 2:
+                new_offsets = []
+                for offset in morph.offsets:
+                    if type(offset) is BoneMorphData:
+                        if offset.bone_index in reset_bones:
+                            offset.bone_index = reset_bones[offset.bone_index]["index"]
+                            new_offsets.append(offset)
+                        else:
+                            offset.bone_index = -1
+                            new_offsets.append(offset)
+                    else:
+                        new_offsets.append(offset)
+                morph.offsets = new_offsets
+
+            if n > 0 and n % 100 == 0:
+                logger.info("-- モーフ再設定: %s個目:終了", n)
+
+        logger.info("ボーン再設定")
+
+        for n, bone in enumerate(model.bones.values()):
+            if bone.parent_index in reset_bones:
+                bone.parent_index = reset_bones[bone.parent_index]["index"]
+            else:
+                bone.parent_index = -1
+
+            if bone.getConnectionFlag():
+                if bone.tail_index in reset_bones:
+                    bone.tail_index = reset_bones[bone.tail_index]["index"]
+                else:
+                    bone.tail_index = -1
+
+            if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag():
+                if bone.effect_index in reset_bones:
+                    bone.effect_index = reset_bones[bone.effect_index]["index"]
+                else:
+                    bone.effect_index = -1
+
+            if bone.getIkFlag():
+                if bone.ik.target_index in reset_bones:
+                    bone.ik.target_index = reset_bones[bone.ik.target_index]["index"]
+                    for link in bone.ik.link:
+                        link.bone_index = reset_bones[link.bone_index]["index"]
+                else:
+                    bone.ik.target_index = -1
+                    for link in bone.ik.link:
+                        link.bone_index = -1
+
+            if n > 0 and n % 100 == 0:
+                logger.info("-- ボーン再設定: %s個目:終了", n)
+
+        logger.info("頂点再設定")
+
+        for n, vertex in enumerate(model.vertex_dict.values()):
+            if type(vertex.deform) is Bdef1:
+                vertex.deform.index0 = (
+                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
+                )
+            elif type(vertex.deform) is Bdef2:
+                vertex.deform.index0 = (
+                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
+                )
+                vertex.deform.index1 = (
+                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else -1
+                )
+            elif type(vertex.deform) is Bdef4:
+                vertex.deform.index0 = (
+                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
+                )
+                vertex.deform.index1 = (
+                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else -1
+                )
+                vertex.deform.index2 = (
+                    reset_bones[vertex.deform.index2]["index"] if vertex.deform.index2 in reset_bones else -1
+                )
+                vertex.deform.index3 = (
+                    reset_bones[vertex.deform.index3]["index"] if vertex.deform.index3 in reset_bones else -1
+                )
+            elif type(vertex.deform) is Sdef:
+                vertex.deform.index0 = (
+                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
+                )
+                vertex.deform.index1 = (
+                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else -1
+                )
+
+            if n > 0 and n % 1000 == 0:
+                logger.info("-- 頂点再設定: %s個目:終了", n)
+
+        return model
+
+    def create_physics(self, model: PmxModel, param_option: dict):
         model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"
         model.comment += f"\r\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
         model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"
@@ -3772,7 +4119,7 @@ class PmxTailorExportService:
 
                 target_idx_pose_indices = []
                 for d in target_idx_pose_f_prime_diff2[:-1]:
-                    if len(target_idx_pose_f_prime_sign) >= d + 1 or (
+                    if len(target_idx_pose_f_prime_sign) >= d + 1 and (
                         target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0
                     ):
                         target_idx_pose_indices.append(d)
