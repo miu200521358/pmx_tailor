@@ -134,10 +134,15 @@ class ParamPanel(BasePanel):
                 return  # the user changed their mind
 
             ng_setting_names = []
-            for i, cidx in enumerate(choiceDialog.GetSelections()):
+            last_pidx = -1
+            for cidx in choiceDialog.GetSelections():
                 # 選択された数だけ設定追加
-                if i > 0:
-                    # 1番目以降はまずエリア追加
+                for pidx, physics_param in enumerate(self.physics_list):
+                    param, result = physics_param.get_param_options(pidx, False)
+                    if param:
+                        last_pidx = pidx
+                if last_pidx >= 0:
+                    # 1番目以降もしくは既に設定されている場合、エリア追加
                     self.on_add(event)
 
                 try:
@@ -170,6 +175,8 @@ class ParamPanel(BasePanel):
                                     self.physics_list[-1].bone_grid.GetTable().SetValue(r, c, target_bone_name)
                 except Exception:
                     ng_setting_names.append(file_names[cidx])
+
+                last_pidx += 1
 
             if len(ng_setting_names) == 0:
                 dialog = wx.MessageDialog(
@@ -495,7 +502,9 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("特殊形状"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_special_shape_txt.SetToolTip(
-            logger.transtext("スカート等で特殊な処理が必要な形状\nエッジ不定形: 裾にフリルが付いてたり、波打ってたり、裾のポリ割が真っ直ぐではない場合\nプリーツ: ポリ割に折り返しがある場合")
+            logger.transtext(
+                "スカート等で特殊な処理が必要な形状\nエッジ不定形: 裾にフリルが付いてたり、波打ってたり、裾のポリ割が真っ直ぐではない場合\nプリーツ: ポリ割に折り返しがある場合（厚みがあるとうまくいきません）"
+            )
         )
         self.simple_special_shape_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_txt, 0, wx.ALL, 5)
@@ -589,7 +598,7 @@ class PhysicsParam:
         self.simple_grid_sizer.Add(self.simple_threshold_label, 0, wx.ALL, 5)
 
         self.simple_threshold_min_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("0.1"), wx.DefaultPosition, wx.DefaultSize, 0
+            self.simple_window, wx.ID_ANY, logger.transtext("0.02"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_threshold_min_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_threshold_min_label, 0, wx.ALL, 5)
@@ -3101,7 +3110,7 @@ class PhysicsParam:
 
     def on_vertical_joint(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        self.advance_vertical_joint_coefficient_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
+        self.advance_vertical_joint_coefficient_spin.Enable(self.advance_vertical_joint_valid_check.GetValue())
         self.vertical_joint_mov_x_min_spin.Enable(self.advance_vertical_joint_valid_check.GetValue())
         self.vertical_joint_mov_x_max_spin.Enable(self.advance_vertical_joint_valid_check.GetValue())
         self.vertical_joint_mov_y_min_spin.Enable(self.advance_vertical_joint_valid_check.GetValue())

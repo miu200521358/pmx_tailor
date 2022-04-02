@@ -1990,7 +1990,7 @@ class PmxTailorExportService:
                 mat.rotate(shape_qq)
 
                 # 身体の方にちょっと寄せる
-                shape_position = mat * MVector3D(0, 0, 0.07)
+                shape_position = mat * MVector3D(0, 0, -0.05)
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1
@@ -3837,7 +3837,8 @@ class PmxTailorExportService:
                     )
 
                 # 面法線と同じ向き場合、辺キー生成（表面のみを対象とする）
-                if np.sign(normal_dot) > 0:
+                # プリーツは厚みがないとみなす
+                if np.sign(normal_dot) > 0 or param_option["special_shape"] == logger.transtext("プリーツ"):
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
@@ -3860,97 +3861,12 @@ class PmxTailorExportService:
                         remaining_vertices[v0_key] = virtual_vertices[v0_key]
                 else:
                     # 裏面に登録
-                    if index_idx not in back_indexes:
-                        back_indexes.append(index_idx)
+                    back_vertices.append(v0_idx)
 
             n += 1
 
             if n > 0 and n % 500 == 0:
                 logger.info("-- メッシュ確認: %s個目:終了", n)
-
-        if param_option["special_shape"] == logger.transtext("プリーツ"):
-            # プリーツは折りたたみ面を裏面として扱ってるため、裏面の頂点を仮想頂点の連結先として登録する
-            for n, index_idx in enumerate(back_indexes):
-                (v0_idx, v1_idx, v2_idx) = model.indices[index_idx]
-
-                for v_idx, ov1_idx, ov2_idx in [
-                    (v0_idx, v1_idx, v2_idx),
-                    (v1_idx, v2_idx, v0_idx),
-                    (v2_idx, v0_idx, v1_idx),
-                ]:
-                    v = model.vertex_dict[v_idx]
-                    ov1 = model.vertex_dict[ov1_idx]
-                    ov2 = model.vertex_dict[ov2_idx]
-
-                    v_key = v.position.to_key(threshold)
-                    ov1_key = ov1.position.to_key(threshold)
-                    ov2_key = ov2.position.to_key(threshold)
-
-                    if v_idx not in back_vertices and (
-                        v_key not in virtual_vertices
-                        or (v_key in virtual_vertices and v_idx not in virtual_vertices[v_key].real_vertices)
-                    ):
-                        back_vertices.append(v_idx)
-
-                    if v_key in virtual_vertices:
-                        if ov1_key not in virtual_vertices[v_key].connected_vvs:
-                            virtual_vertices[v_key].connected_vvs.append(ov1_key)
-                        if index_idx not in virtual_vertices[v_key].indexes:
-                            virtual_vertices[v_key].indexes.append(index_idx)
-                        if ov2_key not in virtual_vertices[v_key].connected_vvs:
-                            virtual_vertices[v_key].connected_vvs.append(ov2_key)
-                        if index_idx not in virtual_vertices[v_key].indexes:
-                            virtual_vertices[v_key].indexes.append(index_idx)
-                        if ov1_key in virtual_vertices and ov2_key not in virtual_vertices:
-                            # v と ov1 がいて、ov2がいない場合、辺を共有する
-                            lkey = (min(v_key, ov1_key), max(v_key, ov1_key))
-                            if lkey not in edge_pair_lkeys:
-                                edge_pair_lkeys[lkey] = []
-                            if index_idx not in edge_pair_lkeys[lkey]:
-                                edge_pair_lkeys[lkey].append(index_idx)
-                        if ov2_key in virtual_vertices and ov1_key not in virtual_vertices:
-                            lkey = (min(v_key, ov2_key), max(v_key, ov2_key))
-                            if lkey not in edge_pair_lkeys:
-                                edge_pair_lkeys[lkey] = []
-                            if index_idx not in edge_pair_lkeys[lkey]:
-                                edge_pair_lkeys[lkey].append(index_idx)
-
-                    if v_key in virtual_vertices and ov1_key in virtual_vertices and ov2_key in virtual_vertices:
-                        lkey = (min(v_key, ov1_key), max(v_key, ov1_key))
-                        if lkey not in edge_pair_lkeys:
-                            edge_pair_lkeys[lkey] = []
-                        if index_idx not in edge_pair_lkeys[lkey]:
-                            edge_pair_lkeys[lkey].append(index_idx)
-                        lkey = (min(ov1_key, ov2_key), max(ov1_key, ov2_key))
-                        if lkey not in edge_pair_lkeys:
-                            edge_pair_lkeys[lkey] = []
-                        if index_idx not in edge_pair_lkeys[lkey]:
-                            edge_pair_lkeys[lkey].append(index_idx)
-                        lkey = (min(v_key, ov2_key), max(v_key, ov2_key))
-                        if lkey not in edge_pair_lkeys:
-                            edge_pair_lkeys[lkey] = []
-                        if index_idx not in edge_pair_lkeys[lkey]:
-                            edge_pair_lkeys[lkey].append(index_idx)
-
-                if n > 0 and n % 500 == 0:
-                    logger.info("-- 裏メッシュ確認: %s個目:終了", n)
-        else:
-            n = 0
-            # デフォルトは面の頂点だけ保持し直す
-            for index_idx in back_indexes:
-                for v_idx in model.indices[index_idx]:
-                    v = model.vertex_dict[v_idx]
-                    v_key = v.position.to_key(threshold)
-
-                    if v_idx not in back_vertices and (
-                        v_key not in virtual_vertices
-                        or (v_key in virtual_vertices and v_idx not in virtual_vertices[v_key].real_vertices)
-                    ):
-                        back_vertices.append(v_idx)
-
-                n += 1
-                if n > 0 and n % 1000 == 0:
-                    logger.info("-- 裏メッシュ確認: %s個目:終了", n)
 
         if not virtual_vertices:
             logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
@@ -4119,7 +4035,7 @@ class PmxTailorExportService:
 
                 target_idx_pose_indices = []
                 for d in target_idx_pose_f_prime_diff2[:-1]:
-                    if len(target_idx_pose_f_prime_sign) >= d + 1 and (
+                    if len(target_idx_pose_f_prime_sign) > d + 1 and (
                         target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0
                     ):
                         target_idx_pose_indices.append(d)
