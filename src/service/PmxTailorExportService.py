@@ -1776,7 +1776,7 @@ class PmxTailorExportService:
                 ).abs()
             ).data()[target_idx]
             # 厚みは比較キーの数分だけ作る
-            rigidbody_limit_thicks = np.linspace(0.15, distance / 3 * 0.15, len(vv_keys))
+            rigidbody_limit_thicks = np.linspace(0.2, distance / 3 * 0.2, len(vv_keys))
 
             for v_yidx, v_xidx in zip(np.where(regist_bones[:-1, :])[0], np.where(regist_bones[:-1, :])[1]):
                 rigidbody_bone_key = tuple(vertex_map[v_yidx, v_xidx])
@@ -1990,7 +1990,7 @@ class PmxTailorExportService:
                 mat.rotate(shape_qq)
 
                 # 身体の方にちょっと寄せる
-                shape_position = mat * MVector3D(0, 0, -0.05)
+                shape_position = mat * MVector3D(0, 0, -0.03)
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1
