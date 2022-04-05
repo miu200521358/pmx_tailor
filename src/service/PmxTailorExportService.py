@@ -1674,9 +1674,10 @@ class PmxTailorExportService:
         created_rigidbodies = {}
         created_rigidbody_vvs = {}
         # 剛体の質量
-        created_rigidbody_masses = {}
-        created_rigidbody_linear_dampings = {}
-        created_rigidbody_angular_dampings = {}
+        # created_rigidbody_masses = {}
+        # created_rigidbody_linear_dampings = {}
+        # created_rigidbody_angular_dampings = {}
+        # created_rigidbody_volumes = {}
         prev_rigidbody_cnt = 0
 
         # 剛体情報
@@ -2001,13 +2002,6 @@ class PmxTailorExportService:
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1
-                mass = param_rigidbody.param.mass * shape_size.x() * shape_size.y() * shape_size.z()
-                linear_damping = (
-                    param_rigidbody.param.linear_damping * shape_size.x() * shape_size.y() * shape_size.z()
-                )
-                angular_damping = (
-                    param_rigidbody.param.angular_damping * shape_size.x() * shape_size.y() * shape_size.z()
-                )
 
                 vv.map_rigidbodies[base_map_idx] = RigidBody(
                     vv.map_bones[base_map_idx].name,
@@ -2019,9 +2013,9 @@ class PmxTailorExportService:
                     shape_size,
                     shape_position,
                     shape_rotation_radians,
-                    mass,
-                    linear_damping,
-                    angular_damping,
+                    rigidbody_masses[v_yidx],
+                    linear_dampings[v_yidx],
+                    angular_dampings[v_yidx],
                     param_rigidbody.param.restitution,
                     param_rigidbody.param.friction,
                     mode,
@@ -2038,9 +2032,12 @@ class PmxTailorExportService:
                     created_rigidbodies[(v_yidx, vv.map_rigidbodies[base_map_idx].name)] = vv.map_rigidbodies[
                         base_map_idx
                     ]
-                    created_rigidbody_masses[vv.map_rigidbodies[base_map_idx].name] = mass
-                    created_rigidbody_linear_dampings[vv.map_rigidbodies[base_map_idx].name] = linear_damping
-                    created_rigidbody_angular_dampings[vv.map_rigidbodies[base_map_idx].name] = angular_damping
+                    # created_rigidbody_masses[vv.map_rigidbodies[base_map_idx].name] = mass
+                    # created_rigidbody_linear_dampings[vv.map_rigidbodies[base_map_idx].name] = linear_damping
+                    # created_rigidbody_angular_dampings[vv.map_rigidbodies[base_map_idx].name] = angular_damping
+                    # created_rigidbody_volumes[vv.map_rigidbodies[base_map_idx].name] = (
+                    #     shape_size.x() * shape_size.y() * shape_size.z()
+                    # )
                 else:
                     # 既に保持済みの剛体である場合、前のを参照する
                     vv.map_rigidbodies[base_map_idx] = created_rigidbodies[
@@ -2051,55 +2048,54 @@ class PmxTailorExportService:
                     logger.info("-- -- 【No.%s】剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
                     prev_rigidbody_cnt = len(created_rigidbodies) // 50
 
-        min_mass = 0
-        min_linear_damping = 0
-        min_angular_damping = 0
+        # min_mass = 0
+        # min_linear_damping = 0
+        # min_angular_damping = 0
+        # min_volume = 0
 
-        max_mass = 0
-        max_linear_damping = 0
-        max_angular_damping = 0
+        # max_mass = 0
+        # max_linear_damping = 0
+        # max_angular_damping = 0
+        # max_volume = 0
 
-        if len(created_rigidbody_masses.values()) > 0:
-            min_mass = np.min(list(created_rigidbody_masses.values()))
-            min_linear_damping = np.min(list(created_rigidbody_linear_dampings.values()))
-            min_angular_damping = np.min(list(created_rigidbody_angular_dampings.values()))
+        # if len(created_rigidbody_masses.values()) > 0:
+        #     min_mass = np.min(list(created_rigidbody_masses.values()))
+        #     min_linear_damping = np.min(list(created_rigidbody_linear_dampings.values()))
+        #     min_angular_damping = np.min(list(created_rigidbody_angular_dampings.values()))
+        #     min_volume = np.min(list(created_rigidbody_volumes.values()))
 
-            max_mass = np.max(list(created_rigidbody_masses.values()))
-            max_linear_damping = np.max(list(created_rigidbody_linear_dampings.values()))
-            max_angular_damping = np.max(list(created_rigidbody_angular_dampings.values()))
+        #     max_mass = np.max(list(created_rigidbody_masses.values()))
+        #     max_linear_damping = np.max(list(created_rigidbody_linear_dampings.values()))
+        #     max_angular_damping = np.max(list(created_rigidbody_angular_dampings.values()))
+        #     max_volume = np.max(list(created_rigidbody_volumes.values()))
 
         for (v_yidx, rigidbody_name) in sorted(created_rigidbodies.keys()):
             # 剛体を登録
             rigidbody = created_rigidbodies[(v_yidx, rigidbody_name)]
             rigidbody.index = len(model.rigidbodies)
+            # y_ratio = (v_yidx + 1) / len(v_yidxs)
+            # volume_ratio = (
+            #     (created_rigidbody_volumes[rigidbody_name] - min_volume) / (max_volume - min_volume)
+            #     if min_volume != max_volume
+            #     else 1
+            # )
 
-            # 質量と減衰は面積に応じた値に変換
-            if min_mass != max_mass:
-                rigidbody.param.mass = calc_ratio(
-                    rigidbody.param.mass,
-                    max_mass,
-                    min_mass,
-                    param_rigidbody.param.mass,
-                    param_rigidbody.param.mass * coefficient,
-                )
+            # # 質量と減衰は最大を決めて再割り当て
+            # rigidbody.param.linear_damping = calc_ratio(
+            #     rigidbody.param.linear_damping,
+            #     min_linear_damping,
+            #     max_linear_damping,
+            #     param_rigidbody.param.linear_damping,
+            #     min(max_linear_damping, 0.9999),
+            # )
 
-            if min_linear_damping != max_linear_damping:
-                rigidbody.param.linear_damping = calc_ratio(
-                    rigidbody.param.linear_damping,
-                    max_linear_damping,
-                    min_linear_damping,
-                    param_rigidbody.param.linear_damping,
-                    min(0.99999, param_rigidbody.param.linear_damping * coefficient),
-                )
-
-            if min_angular_damping != max_angular_damping:
-                rigidbody.param.angular_damping = calc_ratio(
-                    rigidbody.param.angular_damping,
-                    max_angular_damping,
-                    min_angular_damping,
-                    param_rigidbody.param.angular_damping,
-                    min(0.99999, param_rigidbody.param.angular_damping * coefficient),
-                )
+            # rigidbody.param.angular_damping = calc_ratio(
+            #     rigidbody.param.angular_damping,
+            #     min_angular_damping,
+            #     max_angular_damping,
+            #     param_rigidbody.param.angular_damping,
+            #     min(max_angular_damping, 0.9999),
+            # )
 
             if rigidbody.name in model.rigidbodies:
                 logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
