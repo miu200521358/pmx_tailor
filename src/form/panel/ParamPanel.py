@@ -623,46 +623,46 @@ class PhysicsParam:
         self.simple_threshold_max_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_threshold_max_label, 0, wx.ALL, 5)
 
-        # 物理の細かさスライダー
-        self.simple_fineness_txt = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("細かさ"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_fineness_txt.SetToolTip(logger.transtext("材質の物理の細かさ。ボーン・剛体・ジョイントの細かさ等に影響します。"))
-        self.simple_fineness_txt.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_fineness_txt, 0, wx.ALL, 5)
+        # # 物理の細かさスライダー
+        # self.simple_fineness_txt = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("細かさ"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_fineness_txt.SetToolTip(logger.transtext("材質の物理の細かさ。ボーン・剛体・ジョイントの細かさ等に影響します。"))
+        # self.simple_fineness_txt.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_fineness_txt, 0, wx.ALL, 5)
 
-        self.simple_fineness_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("（3.4）"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_fineness_label.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_fineness_label, 0, wx.ALL, 5)
+        # self.simple_fineness_label = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("（3.4）"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_fineness_label.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_fineness_label, 0, wx.ALL, 5)
 
-        self.simple_fineness_min_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("小"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_fineness_min_label.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_fineness_min_label, 0, wx.ALL, 5)
+        # self.simple_fineness_min_label = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("小"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_fineness_min_label.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_fineness_min_label, 0, wx.ALL, 5)
 
-        self.simple_fineness_slider = FloatSliderCtrl(
-            self.simple_window,
-            wx.ID_ANY,
-            3.4,
-            1,
-            10,
-            0.1,
-            self.simple_fineness_label,
-            wx.DefaultPosition,
-            (350, 30),
-            wx.SL_HORIZONTAL,
-        )
-        self.simple_fineness_slider.Bind(wx.EVT_SCROLL_CHANGED, self.set_fineness)
-        self.simple_grid_sizer.Add(self.simple_fineness_slider, 1, wx.ALL | wx.EXPAND, 5)
+        # self.simple_fineness_slider = FloatSliderCtrl(
+        #     self.simple_window,
+        #     wx.ID_ANY,
+        #     3.4,
+        #     1,
+        #     10,
+        #     0.1,
+        #     self.simple_fineness_label,
+        #     wx.DefaultPosition,
+        #     (350, 30),
+        #     wx.SL_HORIZONTAL,
+        # )
+        # self.simple_fineness_slider.Bind(wx.EVT_SCROLL_CHANGED, self.set_fineness)
+        # self.simple_grid_sizer.Add(self.simple_fineness_slider, 1, wx.ALL | wx.EXPAND, 5)
 
-        self.simple_fineness_max_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("大"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_fineness_max_label.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_fineness_max_label, 0, wx.ALL, 5)
+        # self.simple_fineness_max_label = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("大"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_fineness_max_label.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_fineness_max_label, 0, wx.ALL, 5)
 
         # 剛体の質量スライダー
         self.simple_mass_txt = wx.StaticText(
@@ -1004,7 +1004,7 @@ class PhysicsParam:
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_coefficient_txt, 0, wx.ALL, 5)
 
         self.rigidbody_coefficient_spin = wx.SpinCtrlDouble(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1.2", min=1, max=10, initial=1.2, inc=0.1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1.2", min=1, max=20, initial=1.2, inc=0.1
         )
         self.rigidbody_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
@@ -1703,7 +1703,7 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("制限係数"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.advance_diagonal_joint_coefficient_txt.SetToolTip(
-            logger.transtext("根元ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+            logger.transtext("末端ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
         )
         self.advance_diagonal_joint_coefficient_txt.Wrap(-1)
         self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_coefficient_txt, 0, wx.ALL, 5)
@@ -2028,7 +2028,7 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("制限係数"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.advance_reverse_joint_coefficient_txt.SetToolTip(
-            logger.transtext("根元ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+            logger.transtext("末端ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
         )
         self.advance_reverse_joint_coefficient_txt.Wrap(-1)
         self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_coefficient_txt, 0, wx.ALL, 5)
@@ -2471,7 +2471,7 @@ class PhysicsParam:
             params["special_shape"] = self.simple_special_shape_ctrl.GetStringSelection()
             params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
             params["threshold"] = self.simple_threshold_slider.GetValue()
-            params["fineness"] = self.simple_fineness_slider.GetValue()
+            # params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
             params["air_resistance"] = self.simple_air_resistance_slider.GetValue()
             params["shape_maintenance"] = self.simple_shape_maintenance_slider.GetValue()
@@ -2750,7 +2750,7 @@ class PhysicsParam:
     def set_param_import_data(self, params: dict):
         # 簡易版オプションデータ -------------
         self.simple_threshold_slider.SetValue(params.get("threshold", 0.1))
-        self.simple_fineness_slider.SetValue(params.get("fineness", 3.4))
+        # self.simple_fineness_slider.SetValue(params.get("fineness", 3.4))
         self.simple_mass_slider.SetValue(params.get("mass", 0.5))
         self.simple_air_resistance_slider.SetValue(params.get("air_resistance", 1.8))
         self.simple_shape_maintenance_slider.SetValue(params.get("shape_maintenance", 1.5))
@@ -2906,7 +2906,7 @@ class PhysicsParam:
 
         # 簡易版オプションデータ -------------
         params["threshold"] = self.simple_threshold_slider.GetValue()
-        params["fineness"] = self.simple_fineness_slider.GetValue()
+        # params["fineness"] = self.simple_fineness_slider.GetValue()
         params["mass"] = self.simple_mass_slider.GetValue()
         params["air_resistance"] = self.simple_air_resistance_slider.GetValue()
         params["shape_maintenance"] = self.simple_shape_maintenance_slider.GetValue()
@@ -3324,18 +3324,19 @@ class PhysicsParam:
 
         return bone_grid, max_r + 1, max_c + 1, is_boned
 
-    def set_fineness(self, event: wx.Event):
-        self.main_frame.file_panel_ctrl.on_change_file(event)
-        self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.3))
-        self.horizonal_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.7))
-        # self.bone_thinning_out_check.SetValue((self.simple_fineness_slider.GetValue() // 1.2) % 2 == 0)
+    # def set_fineness(self, event: wx.Event):
+    #     self.main_frame.file_panel_ctrl.on_change_file(event)
+    #     self.vertical_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.3))
+    #     self.horizonal_bone_density_spin.SetValue(int(self.simple_fineness_slider.GetValue() // 1.7))
+    #     # self.bone_thinning_out_check.SetValue((self.simple_fineness_slider.GetValue() // 1.2) % 2 == 0)
 
     def set_mass(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸"):
             self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() / 30)
         else:
-            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
+            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() * 5)
+        self.rigidbody_coefficient_spin.SetValue(self.simple_mass_slider.GetValue() / 1.5)
         self.set_air_resistance(event)
 
     def set_simple_primitive(self, event: wx.Event):
@@ -3498,7 +3499,7 @@ class PhysicsParam:
                             )
                             * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())
                         )
-                        * 2
+                        * 1.2
                     ),
                 ),
             )
@@ -3518,7 +3519,7 @@ class PhysicsParam:
                             )
                             * (self.simple_mass_slider.GetValue() / self.simple_mass_slider.GetMax())
                         )
-                        * 1.5
+                        * 1.2
                     ),
                 ),
             )
@@ -3615,34 +3616,34 @@ class PhysicsParam:
 
             self.advance_vertical_joint_coefficient_spin.SetValue(base_joint_val * 20)
 
-            vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 1))
-            self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
-            self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
+            vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 2))
+            self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot / 1)
+            self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot / 1)
             self.vertical_joint_rot_y_min_spin.SetValue(-vertical_joint_rot / 1.5)
             self.vertical_joint_rot_y_max_spin.SetValue(vertical_joint_rot / 1.5)
-            self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot / 1.5)
-            self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot / 1.5)
+            self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot / 3)
+            self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot / 3)
 
             spring_rot = max(0, min(180, base_spring_val * 10))
             self.vertical_joint_spring_rot_x_spin.SetValue(spring_rot)
             self.vertical_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.vertical_joint_spring_rot_z_spin.SetValue(spring_rot)
 
-            # horizonal_joint_mov = base_joint_val / 2
-            # self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov)
-            # self.horizonal_joint_mov_z_max_spin.SetValue(horizonal_joint_mov)
+            horizonal_joint_mov = base_joint_val * 2
+            self.horizonal_joint_mov_x_min_spin.SetValue(-horizonal_joint_mov)
+            self.horizonal_joint_mov_x_max_spin.SetValue(horizonal_joint_mov)
 
-            self.advance_horizonal_joint_coefficient_spin.SetValue(base_joint_val * 30)
+            self.advance_horizonal_joint_coefficient_spin.SetValue(base_joint_val * 10)
 
-            horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 2))
-            self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot / 1.5)
-            self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot / 1.5)
+            horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 1))
+            self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot / 1)
+            self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot / 1)
             self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_rot / 1.5)
             self.horizonal_joint_rot_y_max_spin.SetValue(horizonal_joint_rot / 1.5)
-            self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
-            self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
+            self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot / 3)
+            self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot / 3)
 
-            spring_rot = max(0, min(180, base_spring_val * 20))
+            spring_rot = max(0, min(180, base_spring_val * 10))
             self.horizonal_joint_spring_rot_x_spin.SetValue(spring_rot)
             self.horizonal_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.horizonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -3697,7 +3698,7 @@ class PhysicsParam:
         self.simple_edge_material_ctrl.SetStringSelection("")
         self.simple_primitive_ctrl.SetStringSelection("")
         self.simple_threshold_slider.SetValue(0.1)
-        self.simple_fineness_slider.SetValue(3.4)
+        # self.simple_fineness_slider.SetValue(3.4)
         self.simple_mass_slider.SetValue(1.5)
         self.simple_air_resistance_slider.SetValue(1.8)
         self.simple_shape_maintenance_slider.SetValue(1.5)
@@ -3711,7 +3712,7 @@ class PhysicsParam:
         # self.bone_thinning_out_check.SetValue(0)
 
         self.set_material_name(event)
-        self.set_fineness(event)
+        # self.set_fineness(event)
         self.set_mass(event)
         self.set_air_resistance(event)
         self.set_shape_maintenance(event)

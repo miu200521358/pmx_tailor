@@ -115,7 +115,6 @@ class PmxTailorExportService:
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('材質')}: {param_option['material_name']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('密集度')}: {param_option['threshold']}"
-                service_data_txt = f"{service_data_txt}\n　　{logger.transtext('細かさ')}: {param_option['fineness']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('質量')}: {param_option['mass']}"
                 service_data_txt = (
                     f"{service_data_txt}\n　　{logger.transtext('柔らかさ')}: {param_option['air_resistance']}"
@@ -514,7 +513,7 @@ class PmxTailorExportService:
     def create_physics(self, model: PmxModel, param_option: dict):
         model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"
         model.comment += f"\r\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
-        model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"
+        # model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"
         model.comment += f", {logger.transtext('質量')}: {param_option['mass']}"
         model.comment += f", {logger.transtext('柔らかさ')}: {param_option['air_resistance']}"
         model.comment += f", {logger.transtext('張り')}: {param_option['shape_maintenance']}"
@@ -675,12 +674,14 @@ class PmxTailorExportService:
 
             vertex_map = vertex_maps[base_map_idx]
 
-            # 上下はY軸比較, 左右はX軸比較
-            target_idx = 1 if param_option["direction"] in ["上", "下"] else 0
-            target_direction = 1 if param_option["direction"] in ["上", "右"] else -1
-
+            # # 上下はY軸比較, 左右はX軸比較
+            # target_idx = 1 if param_option["direction"] in ["上", "下"] else 0
+            # target_direction = 1 if param_option["direction"] in ["上", "右"] else -1
             # キーは比較対象＋向きで昇順
-            vv_keys = sorted(np.unique(vertex_map[np.where(regist_bones)][:, target_idx]) * target_direction)
+            # vv_keys = sorted(np.unique(vertex_map[np.where(regist_bones)][:, target_idx]) * target_direction)
+
+            # キーは縦段の数分生成
+            vv_keys = sorted(np.unique(np.where(regist_bones)[0]))
 
             # 縦ジョイント情報
             (
@@ -790,8 +791,9 @@ class PmxTailorExportService:
                     # 剛体はくっついてない場合があるので、その場合はワーニングは出さずにスルー
                     continue
 
-                bone_y_idx = np.where(vv_keys == bone_key[target_idx] * target_direction)[0]
-                bone_y_idx = bone_y_idx[0] if bone_y_idx else 0
+                # bone_y_idx = np.where(vv_keys == bone_key[target_idx] * target_direction)[0]
+                # bone_y_idx = bone_y_idx[0] if bone_y_idx else 0
+                bone_y_idx = v_yidx
 
                 (
                     prev_map_idx,
@@ -860,15 +862,10 @@ class PmxTailorExportService:
                             vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
                         )
                     else:
-                        # 剛体進行方向(x)
-                        x_direction_pos = (
-                            vv.map_bones[base_map_idx].position - tail_vv.map_bones[base_map_idx].position
-                        ).normalized()
-                        # 剛体進行方向に対しての縦軸(y)
-                        y_direction_pos = (
-                            (vv.normal().normalized() + tail_vv.normal().normalized()) / 2
-                        ).normalized() * -1
-                        joint_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
+                        if v_yidx == 0:
+                            joint_qq = b_rigidbody.shape_qq
+                        else:
+                            joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
 
                         joint_key, joint = self.build_joint(
                             "↓",
@@ -913,15 +910,10 @@ class PmxTailorExportService:
 
                                 tail_vv = now_above_vv
 
-                            # 剛体進行方向(x)
-                            x_direction_pos = (
-                                tail_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
-                            ).normalized()
-                            # 剛体進行方向に対しての縦軸(y)
-                            y_direction_pos = (
-                                (vv.normal().normalized() + tail_vv.normal().normalized()) / 2
-                            ).normalized() * -1
-                            joint_qq = MQuaternion.fromDirection(y_direction_pos, x_direction_pos)
+                            if v_yidx == 0:
+                                joint_qq = a_rigidbody.shape_qq
+                            else:
+                                joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
 
                             joint_key, joint = self.build_joint(
                                 "↑",
@@ -1373,7 +1365,6 @@ class PmxTailorExportService:
         spring_constant_rot_zs = 0
 
         if param_joint:
-            # 縦ジョイント
             limit_min_mov_xs = MBezierUtils.intersect_by_x(
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
@@ -1684,8 +1675,8 @@ class PmxTailorExportService:
         created_rigidbody_vvs = {}
         # 剛体の質量
         created_rigidbody_masses = {}
-        created_rigidbody_linear_dampinges = {}
-        created_rigidbody_angular_dampinges = {}
+        created_rigidbody_linear_dampings = {}
+        created_rigidbody_angular_dampings = {}
         prev_rigidbody_cnt = 0
 
         # 剛体情報
@@ -1776,7 +1767,23 @@ class PmxTailorExportService:
                 ).abs()
             ).data()[target_idx]
             # 厚みは比較キーの数分だけ作る
-            rigidbody_limit_thicks = np.linspace(0.2, distance / 3 * 0.2, len(vv_keys))
+            rigidbody_limit_thicks = np.linspace(0.2, distance / 3 * 0.15, len(vv_keys))
+
+            # 縦段INDEX
+            v_yidxs = sorted(np.unique(np.where(regist_bones[:-1, :])[0]))
+            rigidbody_masses = np.linspace(
+                param_rigidbody.param.mass * coefficient, param_rigidbody.param.mass, len(v_yidxs)
+            )
+            linear_dampings = np.linspace(
+                min(0.99999, param_rigidbody.param.linear_damping * coefficient),
+                param_rigidbody.param.linear_damping,
+                len(v_yidxs),
+            )
+            angular_dampings = np.linspace(
+                min(0.99999, param_rigidbody.param.angular_damping * coefficient),
+                param_rigidbody.param.angular_damping,
+                len(v_yidxs),
+            )
 
             for v_yidx, v_xidx in zip(np.where(regist_bones[:-1, :])[0], np.where(regist_bones[:-1, :])[1]):
                 rigidbody_bone_key = tuple(vertex_map[v_yidx, v_xidx])
@@ -1936,7 +1943,7 @@ class PmxTailorExportService:
                     not prev_connected
                     and next_connected
                     and next_now_bone
-                    or (next_connected and next_now_bone and param_option["special_shape"] == logger.transtext("プリーツ"))
+                    # or (next_connected and next_now_bone and param_option["special_shape"] == logger.transtext("プリーツ"))
                 ):
                     # 前が繋がってない場合、次との中間とする
                     mean_position = MVector3D(
@@ -1978,7 +1985,7 @@ class PmxTailorExportService:
                     y_direction_pos = MVector3D(1, 0, 0)
                 # ボーン進行方向に対しての縦軸(z)
                 z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
-                shape_qq = MQuaternion.fromDirection(z_direction_pos * -1, x_direction_pos)
+                shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                 shape_euler = shape_qq.toEulerAngles()
                 shape_rotation_radians = MVector3D(
                     math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
@@ -2022,19 +2029,23 @@ class PmxTailorExportService:
                 vv.map_rigidbodies[base_map_idx].shape_qq = shape_qq
 
                 # 別途保持しておく
-                if vv.map_rigidbodies[base_map_idx].name not in created_rigidbodies:
+                if (v_yidx, vv.map_rigidbodies[base_map_idx].name) not in created_rigidbodies:
                     if base_map_idx not in created_rigidbody_vvs:
                         created_rigidbody_vvs[base_map_idx] = {}
                     if v_xidx not in created_rigidbody_vvs[base_map_idx]:
                         created_rigidbody_vvs[base_map_idx][v_xidx] = {}
                     created_rigidbody_vvs[base_map_idx][v_xidx][v_yidx] = vv
-                    created_rigidbodies[vv.map_rigidbodies[base_map_idx].name] = vv.map_rigidbodies[base_map_idx]
+                    created_rigidbodies[(v_yidx, vv.map_rigidbodies[base_map_idx].name)] = vv.map_rigidbodies[
+                        base_map_idx
+                    ]
                     created_rigidbody_masses[vv.map_rigidbodies[base_map_idx].name] = mass
-                    created_rigidbody_linear_dampinges[vv.map_rigidbodies[base_map_idx].name] = linear_damping
-                    created_rigidbody_angular_dampinges[vv.map_rigidbodies[base_map_idx].name] = angular_damping
+                    created_rigidbody_linear_dampings[vv.map_rigidbodies[base_map_idx].name] = linear_damping
+                    created_rigidbody_angular_dampings[vv.map_rigidbodies[base_map_idx].name] = angular_damping
                 else:
                     # 既に保持済みの剛体である場合、前のを参照する
-                    vv.map_rigidbodies[base_map_idx] = created_rigidbodies[vv.map_rigidbodies[base_map_idx].name]
+                    vv.map_rigidbodies[base_map_idx] = created_rigidbodies[
+                        (v_yidx, vv.map_rigidbodies[base_map_idx].name)
+                    ]
 
                 if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 50 > prev_rigidbody_cnt:
                     logger.info("-- -- 【No.%s】剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
@@ -2050,16 +2061,16 @@ class PmxTailorExportService:
 
         if len(created_rigidbody_masses.values()) > 0:
             min_mass = np.min(list(created_rigidbody_masses.values()))
-            min_linear_damping = np.min(list(created_rigidbody_linear_dampinges.values()))
-            min_angular_damping = np.min(list(created_rigidbody_angular_dampinges.values()))
+            min_linear_damping = np.min(list(created_rigidbody_linear_dampings.values()))
+            min_angular_damping = np.min(list(created_rigidbody_angular_dampings.values()))
 
             max_mass = np.max(list(created_rigidbody_masses.values()))
-            max_linear_damping = np.max(list(created_rigidbody_linear_dampinges.values()))
-            max_angular_damping = np.max(list(created_rigidbody_angular_dampinges.values()))
+            max_linear_damping = np.max(list(created_rigidbody_linear_dampings.values()))
+            max_angular_damping = np.max(list(created_rigidbody_angular_dampings.values()))
 
-        for rigidbody_name in sorted(created_rigidbodies.keys()):
+        for (v_yidx, rigidbody_name) in sorted(created_rigidbodies.keys()):
             # 剛体を登録
-            rigidbody = created_rigidbodies[rigidbody_name]
+            rigidbody = created_rigidbodies[(v_yidx, rigidbody_name)]
             rigidbody.index = len(model.rigidbodies)
 
             # 質量と減衰は面積に応じた値に変換
@@ -2071,21 +2082,23 @@ class PmxTailorExportService:
                     param_rigidbody.param.mass,
                     param_rigidbody.param.mass * coefficient,
                 )
+
             if min_linear_damping != max_linear_damping:
                 rigidbody.param.linear_damping = calc_ratio(
                     rigidbody.param.linear_damping,
                     max_linear_damping,
                     min_linear_damping,
                     param_rigidbody.param.linear_damping,
-                    min(0.9999999, param_rigidbody.param.linear_damping * coefficient),
+                    min(0.99999, param_rigidbody.param.linear_damping * coefficient),
                 )
+
             if min_angular_damping != max_angular_damping:
                 rigidbody.param.angular_damping = calc_ratio(
                     rigidbody.param.angular_damping,
                     max_angular_damping,
                     min_angular_damping,
                     param_rigidbody.param.angular_damping,
-                    min(0.9999999, param_rigidbody.param.angular_damping * coefficient),
+                    min(0.99999, param_rigidbody.param.angular_damping * coefficient),
                 )
 
             if rigidbody.name in model.rigidbodies:
