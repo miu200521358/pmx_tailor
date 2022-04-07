@@ -3629,7 +3629,7 @@ class PhysicsParam:
             self.vertical_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.vertical_joint_spring_rot_z_spin.SetValue(spring_rot)
 
-            horizonal_joint_mov = base_joint_val * 2
+            horizonal_joint_mov = 1 - base_joint_val * 3
             self.horizonal_joint_mov_x_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_x_max_spin.SetValue(horizonal_joint_mov)
 

@@ -34,7 +34,18 @@ from mmd.PmxData import (
     BoneMorphData,
 )
 from mmd.PmxWriter import PmxWriter
-from module.MMath import MVector2D, MVector3D, MVector4D, MQuaternion, MMatrix4x4
+from module.MMath import (
+    MVector2D,
+    MVector3D,
+    MVector4D,
+    MQuaternion,
+    MMatrix4x4,
+    MPoint,
+    MLine,
+    MSegment,
+    MSphere,
+    MCapsule,
+)
 from utils.MLogger import MLogger
 from utils.MException import SizingException, MKilledException
 import utils.MBezierUtils as MBezierUtils
@@ -228,7 +239,8 @@ class PmxTailorExportService:
 
         semi_standard_bone_indecies = [-1]
         for bone_name in SEMI_STANDARD_BONE_NAMES:
-            semi_standard_bone_indecies.append(model.bones[bone_name].index)
+            if bone_name in model.bones:
+                semi_standard_bone_indecies.append(model.bones[bone_name].index)
 
         for bone in model.bones.values():
             # 子ボーンも削除
@@ -627,7 +639,7 @@ class PmxTailorExportService:
                 # 裏ウェイト
                 self.create_back_weight(model, param_option, material_name, virtual_vertices, back_vertices)
 
-            root_rigidbody = self.create_rigidbody(
+            root_rigidbody, parent_bone_rigidbody = self.create_rigidbody(
                 model,
                 param_option,
                 material_name,
@@ -648,6 +660,7 @@ class PmxTailorExportService:
                 all_regist_bones,
                 all_bone_connected,
                 root_rigidbody,
+                parent_bone_rigidbody,
             )
 
         return True
@@ -662,6 +675,7 @@ class PmxTailorExportService:
         all_regist_bones: dict,
         all_bone_connected: dict,
         root_rigidbody: RigidBody,
+        parent_bone_rigidbody: RigidBody,
     ):
         logger.info("【%s】ジョイント生成", material_name, decoration=MLogger.DECORATION_LINE)
 
@@ -790,6 +804,21 @@ class PmxTailorExportService:
                 if not vv.map_rigidbodies.get(base_map_idx, None):
                     # 剛体はくっついてない場合があるので、その場合はワーニングは出さずにスルー
                     continue
+
+                # 親剛体の計算用カプセル
+                mat = MMatrix4x4()
+                mat.setToIdentity()
+                mat.translate(parent_bone_rigidbody.shape_position)
+                mat.rotate(parent_bone_rigidbody.shape_qq)
+
+                parent_capsule = MCapsule(
+                    MSegment(
+                        mat * MVector3D(-parent_bone_rigidbody.shape_size.y(), 0, 0),
+                        parent_bone_rigidbody.shape_position,
+                        mat * MVector3D(parent_bone_rigidbody.shape_size.y(), 0, 0),
+                    ),
+                    parent_bone_rigidbody.shape_size.x(),
+                )
 
                 # bone_y_idx = np.where(vv_keys == bone_key[target_idx] * target_direction)[0]
                 # bone_y_idx = bone_y_idx[0] if bone_y_idx else 0
@@ -1059,6 +1088,59 @@ class PmxTailorExportService:
                         joint_pos = (now_point + now_next_point) / 2
                         joint_qq = MQuaternion.slerp(a_rigidbody.shape_qq, b_rigidbody.shape_qq, 0.5)
 
+                        ratio = 1
+                        for n in range(10):
+                            check_ratio = 1 + (n * 0.05)
+
+                            a_mat = MMatrix4x4()
+                            a_mat.setToIdentity()
+                            a_mat.translate(a_rigidbody.shape_position)
+                            a_mat.rotate(a_rigidbody.shape_qq)
+
+                            a_length = np.mean(a_rigidbody.shape_size.data()) * check_ratio
+
+                            a_capsule = MCapsule(
+                                MSegment(
+                                    a_mat * MVector3D(-a_length, 0, 0),
+                                    a_rigidbody.shape_position,
+                                    a_mat * MVector3D(a_length, 0, 0),
+                                ),
+                                a_length * check_ratio,
+                            )
+
+                            a_col = is_col_capsule_capsule(parent_capsule, a_capsule)
+                            b_col = False
+
+                            if not a_col:
+                                b_mat = MMatrix4x4()
+                                b_mat.setToIdentity()
+                                b_mat.translate(b_rigidbody.shape_position)
+                                b_mat.rotate(b_rigidbody.shape_qq)
+
+                                b_length = np.mean(b_rigidbody.shape_size.data()) * check_ratio
+
+                                b_capsule = MCapsule(
+                                    MSegment(
+                                        b_mat * MVector3D(-b_length, 0, 0),
+                                        b_rigidbody.shape_position,
+                                        b_mat * MVector3D(b_length, 0, 0),
+                                    ),
+                                    b_length * check_ratio,
+                                )
+
+                                b_col = is_col_capsule_capsule(parent_capsule, b_capsule)
+
+                            if a_col or b_col:
+                                # 剛体のどちらかが衝突していたらその分動きを制限する
+                                ratio = n * 0.01
+                                logger.info(
+                                    "親剛体と距離が近接しているため、横ジョイントの可動域を制限します。剛体A: %s, 剛体B: %s, 制限率: %s",
+                                    a_rigidbody.name,
+                                    b_rigidbody.name,
+                                    ratio,
+                                )
+                                break
+
                         joint_key, joint = self.build_joint(
                             "→",
                             2,
@@ -1085,6 +1167,7 @@ class PmxTailorExportService:
                             horizonal_spring_constant_rot_xs,
                             horizonal_spring_constant_rot_ys,
                             horizonal_spring_constant_rot_zs,
+                            ratio,
                         )
                         created_joints[joint_key] = joint
 
@@ -1289,6 +1372,7 @@ class PmxTailorExportService:
         spring_constant_rot_xs: np.ndarray,
         spring_constant_rot_ys: np.ndarray,
         spring_constant_rot_zs: np.ndarray,
+        ratio=1,
     ):
         joint_name = f"{direction_mark}|{a_rigidbody.name}|{b_rigidbody.name}"
         joint_key = f"{direction_idx}:{a_rigidbody.index:09d}:{b_rigidbody.index:09d}"
@@ -1307,34 +1391,34 @@ class PmxTailorExportService:
             joint_pos,
             joint_rotation_radians,
             MVector3D(
-                limit_min_mov_xs[bone_y_idx],
-                limit_min_mov_ys[bone_y_idx],
-                limit_min_mov_zs[bone_y_idx],
+                limit_min_mov_xs[bone_y_idx] * ratio,
+                limit_min_mov_ys[bone_y_idx] * ratio,
+                limit_min_mov_zs[bone_y_idx] * ratio,
             ),
             MVector3D(
-                limit_max_mov_xs[bone_y_idx],
-                limit_max_mov_ys[bone_y_idx],
-                limit_max_mov_zs[bone_y_idx],
+                limit_max_mov_xs[bone_y_idx] * ratio,
+                limit_max_mov_ys[bone_y_idx] * ratio,
+                limit_max_mov_zs[bone_y_idx] * ratio,
             ),
             MVector3D(
-                math.radians(limit_min_rot_xs[bone_y_idx]),
-                math.radians(limit_min_rot_ys[bone_y_idx]),
-                math.radians(limit_min_rot_zs[bone_y_idx]),
+                math.radians(limit_min_rot_xs[bone_y_idx] * ratio),
+                math.radians(limit_min_rot_ys[bone_y_idx] * ratio),
+                math.radians(limit_min_rot_zs[bone_y_idx] * ratio),
             ),
             MVector3D(
-                math.radians(limit_max_rot_xs[bone_y_idx]),
-                math.radians(limit_max_rot_ys[bone_y_idx]),
-                math.radians(limit_max_rot_zs[bone_y_idx]),
+                math.radians(limit_max_rot_xs[bone_y_idx] * ratio),
+                math.radians(limit_max_rot_ys[bone_y_idx] * ratio),
+                math.radians(limit_max_rot_zs[bone_y_idx] * ratio),
             ),
             MVector3D(
-                spring_constant_mov_xs[bone_y_idx],
-                spring_constant_mov_ys[bone_y_idx],
-                spring_constant_mov_zs[bone_y_idx],
+                spring_constant_mov_xs[bone_y_idx] * ratio,
+                spring_constant_mov_ys[bone_y_idx] * ratio,
+                spring_constant_mov_zs[bone_y_idx] * ratio,
             ),
             MVector3D(
-                spring_constant_rot_xs[bone_y_idx],
-                spring_constant_rot_ys[bone_y_idx],
-                spring_constant_rot_zs[bone_y_idx],
+                spring_constant_rot_xs[bone_y_idx] * ratio,
+                spring_constant_rot_ys[bone_y_idx] * ratio,
+                spring_constant_rot_zs[bone_y_idx] * ratio,
             ),
         )
         return joint_key, joint
@@ -1992,13 +2076,13 @@ class PmxTailorExportService:
                     math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
                 )
 
-                mat = MMatrix4x4()
-                mat.setToIdentity()
-                mat.translate(mean_position)
-                mat.rotate(shape_qq)
+                # mat = MMatrix4x4()
+                # mat.setToIdentity()
+                # mat.translate(mean_position)
+                # mat.rotate(shape_qq)
 
-                # 身体の方にちょっと寄せる
-                shape_position = mat * MVector3D(0, 0, -0.03)
+                # # 身体の方にちょっと寄せる
+                # shape_position = mat * MVector3D(0, 0, -0.03)
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1
@@ -2011,7 +2095,7 @@ class PmxTailorExportService:
                     param_rigidbody.no_collision_group,
                     rigidbody_shape_type,
                     shape_size,
-                    shape_position,
+                    mean_position,
                     shape_rotation_radians,
                     rigidbody_masses[v_yidx],
                     linear_dampings[v_yidx],
@@ -2244,7 +2328,7 @@ class PmxTailorExportService:
 
             logger.info("-- バランサー剛体: %s個目:終了", len(created_rigidbodies))
 
-        return root_rigidbody
+        return root_rigidbody, parent_bone_rigidbody
 
     def create_back_weight(
         self, model: PmxModel, param_option: dict, material_name: str, virtual_vertices: dict, back_vertices: list
@@ -4044,8 +4128,11 @@ class PmxTailorExportService:
 
                 target_idx_pose_indices = []
                 for d in target_idx_pose_f_prime_diff2[:-1]:
-                    if len(target_idx_pose_f_prime_sign) > d + 1 and (
-                        target_idx_pose_f_prime_sign[d] != 0 and target_idx_pose_f_prime_sign[d + 1] == 0
+                    if (
+                        len(target_idx_pose_f_prime_sign) > d + 1
+                        and target_idx_pose_f_prime_sign[d] != 0
+                        and target_idx_pose_f_prime_sign[d + 1] == 0
+                        and target_idx_pose_f_prime_sign[d + 1] > target_idx_pose_f_prime_sign[d]
                     ):
                         target_idx_pose_indices.append(d)
                     else:
@@ -4880,6 +4967,157 @@ def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax
 
 def randomname(n) -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=n))
+
+
+# http://marupeke296.com/COL_3D_No27_CapsuleCapsule.html
+# 点と直線の最短距離
+# p : 点
+# l : 直線
+# h : 点から下ろした垂線の足（戻り値）
+# t :ベクトル係数（戻り値）
+# 戻り値: 最短距離
+def calc_point_line_dist(point: MPoint, line: MLine):
+    v_length_square = line.vector_start.lengthSquared()
+    t = 0.0
+    if v_length_square > 0.0:
+        t = MVector3D.dotProduct(line.vector_start.normalized(), (point - line.point).normalized()) / v_length_square
+
+    h = line.point + line.vector_start * t
+    return (h - point).length(), h, t
+
+
+# ∠p1p2p3は鋭角?
+def is_sharp_angle(p1: MPoint, p2: MPoint, p3: MPoint):
+    return MVector3D.dotProduct((p1.normalized() - p2.normalized()), (p3.normalized() - p2.normalized())) > 0
+
+
+# 点と線分の最短距離
+# p : 点
+# seg : 線分
+# h : 最短距離となる端点（戻り値）
+# t : 端点位置（ t < 0: 始点の外, 0 <= t <= 1: 線分内, t > 1: 終点の外 ）
+# 戻り値: 最短距離
+def calc_point_segment_dist(point: MPoint, segment: MSegment):
+
+    end_point = segment.vector_end
+
+    # 垂線の長さ、垂線の足の座標及びtを算出
+    min_length, h, t = calc_point_line_dist(point, MLine(segment.point, end_point - segment.point))
+
+    if not is_sharp_angle(point, segment.point, end_point):
+        # 始点側の外側
+        return (segment.point - point).length(), segment.point, t
+    elif not is_sharp_angle(point, end_point, segment.point):
+        # 終点側の外側
+        return (end_point - point).length(), end_point, t
+
+    return min_length, h, t
+
+
+# 2直線の最短距離
+# l1 : L1
+# l2 : L2
+# p1 : L1側の垂線の足（戻り値）
+# p2 : L2側の垂線の足（戻り値）
+# t1 : L1側のベクトル係数（戻り値）
+# t2 : L2側のベクトル係数（戻り値）
+# 戻り値: 最短距離
+def calc_line_line_dist(l1: MLine, l2: MLine):
+
+    # 2直線が平行？
+    if MVector3D.dotProduct(l1.vector_start.normalized(), l2.vector_start.normalized()) == 1:
+        # 点P11と直線L2の最短距離の問題に帰着
+        min_length, p2, t2 = calc_point_line_dist(l1.point, l2)
+        return min_length, l1.point, p2, 0.0, t2
+
+    # 2直線はねじれ関係
+    DV1V2 = MVector3D.dotProduct(l1.vector_start.normalized(), l2.vector_start.normalized())
+    DV1V1 = l1.vector_start.lengthSquared()
+    DV2V2 = l2.vector_start.lengthSquared()
+    P21P11 = l1.point - l2.point
+
+    t1 = (
+        DV1V2 * MVector3D.dotProduct(l2.vector_start.normalized(), P21P11.normalized())
+        - DV2V2 * MVector3D.dotProduct(l1.vector_start.normalized(), P21P11.normalized())
+    ) / (DV1V1 * DV2V2 - DV1V2 * DV1V2)
+    p1 = l1.vector_start * t1
+    t2 = MVector3D.dotProduct(l2.vector_start.normalized(), (p1 - l2.point).normalized()) / DV2V2
+    p2 = l2.vector_start * t2
+
+    return (p2 - p1).length(), p1, p2, t1, t2
+
+
+# 2線分の最短距離
+# s1 : S1(線分1)
+# s2 : S2(線分2)
+# p1 : S1側の垂線の足（戻り値）
+# p2 : S2側の垂線の足（戻り値）
+# t1 : S1側のベクトル係数（戻り値）
+# t2 : S2側のベクトル係数（戻り値）
+# 戻り値: 最短距離
+def calc_segment_segment_dist(s1: MSegment, s2: MSegment):
+
+    # S1が縮退している？
+    if s1.vector_start.lengthSquared() < 0.00001:
+        # S2も縮退？
+        if s2.vector_start.lengthSquared() < 0.00001:
+            # 点と点の距離の問題に帰着
+            return (s2.point - s1.point).length(), s1.point, s2.point, 0, 0
+        else:
+            # S1の始点とS2の最短問題に帰着
+            min_length, p2, t2 = calc_point_segment_dist(s1.point, s2)
+            return min_length, s1.point, p2, 0.0, max(0, min(1, t2))
+
+    # S2が縮退している？
+    elif s2.vector_start.lengthSquared() < 0.00001:
+        # S2の始点とS1の最短問題に帰着
+        min_length, p2, t2 = calc_point_segment_dist(s2.point, s1)
+        return min_length, s2.point, p2, 0.0, t2
+
+    # 線分同士 ------
+
+    # 2線分が平行だったら垂線の端点の一つをP1に仮決定
+    if MVector3D.dotProduct(s1.vector_start.normalized(), s2.vector_start.normalized()) == 1:
+        p1 = s1.point
+        t1 = 0
+        min_length, p2, t2 = calc_point_segment_dist(s1.point, s2)
+        if 0 <= t2 <= 1:
+            return min_length, p1, p2, t1, t2
+    else:
+        # 線分はねじれの関係
+        # 2直線間の最短距離を求めて仮のt1,t2を求める
+        min_length, p1, p2, t1, t2 = calc_line_line_dist(s1, s2)
+        if 0 <= t1 <= 1 and 0 <= t2 <= 1:
+            return min_length, p1, p2, t1, t2
+
+    # 垂線の足が外にある事が判明
+    # S1側のt1を0～1の間にクランプして垂線を降ろす
+    t1 = max(0, min(1, t1))
+    p1 = s1.vector_start + s1.vector_start * t1
+    min_length, p2, t2 = calc_point_segment_dist(p1, s2)
+    if 0 <= t2 <= 1:
+        return min_length, p1, p2, t1, t2
+
+    # S2側が外だったのでS2側をクランプ、S1に垂線を降ろす
+    t2 = max(0, min(1, t2))
+    p2 = s2.vector_start + s2.vector_start * t2
+    min_length, p1, t1 = calc_point_segment_dist(p2, s1)
+    if 0 <= t1 <= 1:
+        return min_length, p1, p2, t1, t2
+
+    # 双方の端点が最短と判明
+    t1 = max(0, min(1, t1))
+    p1 = s1.vector_start + s1.vector_start * t1
+    return (p2 - p1).length(), p1, p2, t1, t2
+
+
+# カプセル同士の衝突判定
+# c1 : S1(線分1)
+# c2 : S2(線分2)
+# 戻り値: 衝突していたらtrue
+def is_col_capsule_capsule(c1: MCapsule, c2: MCapsule):
+    distance, p1, p2, t1, t2 = calc_segment_segment_dist(c1.segment, c2.segment)
+    return distance <= c1.radius + c2.radius
 
 
 # # https://stackoverflow.com/questions/52088966/nearest-intersection-point-to-many-lines-in-python

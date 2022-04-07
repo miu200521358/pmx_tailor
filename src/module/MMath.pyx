@@ -294,6 +294,43 @@ cdef class MVector2D:
         return "x: {0}, y: {1}".format(round(self.x(), 5), round(self.y(), 5))
 
 
+class MPoint:
+
+    def __init__(self, p=MVector3D()):
+        self.point = p
+
+    def get_point(self, f: float):
+        return self.point * f
+
+
+class MLine:
+
+    def __init__(self, p=MPoint(), v=MVector3D()):
+        self.point = p
+        self.vector_start = v
+
+
+class MSegment(MLine):
+
+    def __init__(self, p=MPoint(), sv=MVector3D(), ev=MVector3D()):
+        super().__init__(p, sv)
+        self.vector_end = ev
+
+
+class MSphere:
+
+    def __init__(self, p=MPoint(), r=1.0):
+        self.point = p
+        self.radius = r
+
+
+class MCapsule:
+
+    def __init__(self, s=MSegment(), r=0.0):
+        self.segment = s
+        self.radius = r
+
+
 cdef class MVector3D:
 
     def __init__(self, x=0.0, y=0.0, z=0.0):
