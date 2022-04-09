@@ -1393,6 +1393,12 @@ class PhysicsParam:
 
         self.advance_horizonal_joint_sizer.Add(self.advance_horizonal_joint_head_sizer, 0, wx.ALL, 5)
 
+        self.advance_horizonal_joint_restruct_check = wx.CheckBox(
+            self.advance_window, wx.ID_ANY, logger.transtext("親剛体距離制限")
+        )
+        self.advance_horizonal_joint_restruct_check.SetToolTip(logger.transtext("親剛体との距離が近い場合にジョイントの可動域を制限するか否か"))
+        self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_restruct_check, 0, wx.ALL, 5)
+
         self.advance_horizonal_joint_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         # 移動X(最小)
@@ -2597,6 +2603,7 @@ class PhysicsParam:
                         self.horizonal_joint_spring_rot_z_spin.GetValue(),
                     ),
                 )
+            params["horizonal_joint_restruct"] = self.advance_horizonal_joint_restruct_check.GetValue()
             params["horizonal_joint_coefficient"] = self.advance_horizonal_joint_coefficient_spin.GetValue()
 
             params["diagonal_joint"] = None
@@ -2814,6 +2821,7 @@ class PhysicsParam:
         self.horizonal_joint_spring_rot_x_spin.SetValue(params["horizonal_joint_spring_rot_x"])
         self.horizonal_joint_spring_rot_y_spin.SetValue(params["horizonal_joint_spring_rot_y"])
         self.horizonal_joint_spring_rot_z_spin.SetValue(params["horizonal_joint_spring_rot_z"])
+        self.advance_horizonal_joint_restruct_check.SetValue(params.get("horizonal_joint_restruct", 1))
         self.advance_horizonal_joint_coefficient_spin.SetValue(params["horizonal_joint_coefficient"])
         self.on_horizonal_joint(wx.EVT_CHECKBOX)
 
@@ -2971,6 +2979,7 @@ class PhysicsParam:
         params["horizonal_joint_spring_rot_x"] = self.horizonal_joint_spring_rot_x_spin.GetValue()
         params["horizonal_joint_spring_rot_y"] = self.horizonal_joint_spring_rot_y_spin.GetValue()
         params["horizonal_joint_spring_rot_z"] = self.horizonal_joint_spring_rot_z_spin.GetValue()
+        params["horizonal_joint_restruct"] = self.advance_horizonal_joint_restruct_check.GetValue()
         params["horizonal_joint_coefficient"] = self.advance_horizonal_joint_coefficient_spin.GetValue()
 
         # 斜めジョイント -----------
@@ -3132,6 +3141,7 @@ class PhysicsParam:
 
     def on_horizonal_joint(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
+        self.advance_horizonal_joint_restruct_check.Enable(self.advance_horizonal_joint_valid_check.GetValue())
         self.advance_horizonal_joint_coefficient_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
         self.horizonal_joint_mov_x_min_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
         self.horizonal_joint_mov_x_max_spin.Enable(self.advance_horizonal_joint_valid_check.GetValue())
@@ -3342,6 +3352,7 @@ class PhysicsParam:
     def set_simple_primitive(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_rigidbody_balancer_ctrl.SetValue(0)
+        self.advance_horizonal_joint_restruct_check.SetValue(1)
 
         if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))
