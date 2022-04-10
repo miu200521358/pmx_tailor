@@ -4003,34 +4003,52 @@ class PmxTailorExportService:
                     mean_poses.append(now_edge_pos.data()[target_idx])
 
         target_mean = np.mean(mean_poses)
-        top_edge_keys = []
-        bottom_edge_keys = []
+        all_top_edge_keys = []
+        all_bottom_edge_keys = []
 
-        # 半分で分ける(下右は大きい方、上左は小さい方)
-        for n, edge_lines in enumerate(all_edge_lines):
-            if param_option["direction"] in ["下", "右"]:
-                if len(np.where(np.array(target_idx_poses[n]) > target_mean)) > 0:
-                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) > target_mean)]:
-                        top_edge_keys.append(tuple(key))
-                if len(np.where(np.array(target_idx_poses[n]) < target_mean)) > 0:
-                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) < target_mean)]:
-                        bottom_edge_keys.append(tuple(key))
-            else:
-                if len(np.where(np.array(target_idx_poses[n]) < target_mean)) > 0:
-                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) < target_mean)]:
-                        top_edge_keys.append(tuple(key))
-                if len(np.where(np.array(target_idx_poses[n]) > target_mean)) > 0:
-                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) > target_mean)]:
-                        bottom_edge_keys.append(tuple(key))
+        if len(all_edge_lines) == 2:
+            # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
+            for n, (edge_lines, target_poses) in enumerate(zip(all_edge_lines, target_idx_poses)):
+                if param_option["direction"] in ["下", "右"]:
+                    if np.max(target_poses) >= target_mean:
+                        all_top_edge_keys.append(edge_lines)
+                    if np.min(target_poses) <= target_mean:
+                        all_bottom_edge_keys.append(edge_lines)
+                else:
+                    if np.max(target_poses) >= target_mean:
+                        all_bottom_edge_keys.append(edge_lines)
+                    if np.min(target_poses) <= target_mean:
+                        all_top_edge_keys.append(edge_lines)
+        else:
+            # エッジが2つではない場合、半分で分ける(下右は大きい方、上左は小さい方)
+            for n, (edge_lines, target_poses) in enumerate(zip(all_edge_lines, target_idx_poses)):
+                if param_option["direction"] in ["下", "右"]:
+                    if np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)].shape[0] > 0:
+                        all_top_edge_keys.append([])
+                        for key in np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)]:
+                            all_top_edge_keys[-1].append(tuple(key))
+                    if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
+                        all_bottom_edge_keys.append([])
+                        for key in np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)]:
+                            all_bottom_edge_keys[-1].append(tuple(key))
+                else:
+                    if len(np.where(np.array(target_poses) < target_mean)) > 0:
+                        all_top_edge_keys.append([])
+                        for key in np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)]:
+                            all_top_edge_keys[-1].append(tuple(key))
+                    if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
+                        all_bottom_edge_keys.append([])
+                        for key in np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)]:
+                            all_bottom_edge_keys[-1].append(tuple(key))
 
-        if not top_edge_keys:
+        if not all_top_edge_keys:
             logger.warning(
                 "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
             )
             return None, None, None, None
 
-        if not bottom_edge_keys:
+        if not all_bottom_edge_keys:
             logger.warning(
                 "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
@@ -4038,20 +4056,18 @@ class PmxTailorExportService:
             return None, None, None, None
 
         top_edge_poses = []
-        for key in top_edge_keys:
-            top_edge_poses.append(virtual_vertices[key].position().data())
+        for top_edge_keys in all_top_edge_keys:
+            for key in top_edge_keys:
+                top_edge_poses.append(virtual_vertices[key].position().data())
 
         top_edge_median_pos = MVector3D(np.median(top_edge_poses, axis=0))
 
         bottom_edge_poses = []
-        for key in bottom_edge_keys:
-            bottom_edge_poses.append(virtual_vertices[key].position().data())
+        for bottom_edge_keys in all_bottom_edge_keys:
+            for key in bottom_edge_keys:
+                bottom_edge_poses.append(virtual_vertices[key].position().data())
 
         bottom_edge_median_pos = MVector3D(np.median(bottom_edge_poses, axis=0))
-        # # 中央から真後ろ
-        # bottom_edge_start_pos = MVector3D(
-        #     0, 0, MVector3D(bottom_edge_median_pos * np.abs(base_vertical_axis.data())).length()
-        # ) + MVector3D(bottom_edge_median_pos * np.abs(base_vertical_axis.data()))
 
         # できるだけ評価軸は離して登録する
         if param_option["direction"] in ["下"]:
@@ -4078,315 +4094,290 @@ class PmxTailorExportService:
             "%s: エッジ下部 中央位置[%s] 半径[%s]", material_name, bottom_edge_median_pos.to_log(), round(bottom_radius, 4)
         )
 
-        # # 下部の回転量を計算しておく
-        # bottom_degrees = []
-        # for bottom_key in bottom_edge_keys:
-        #     bottom_degrees.append(
-        #         self.calc_arc_degree(
-        #             bottom_edge_start_pos,
-        #             bottom_edge_median_pos,
-        #             virtual_vertices[tuple(bottom_key)].position(),
-        #             base_vertical_axis,
-        #             base_reverse_axis,
-        #         )
-        #     )
-
-        logger.info("--------------------------")
-        all_vkeys = []
-        all_scores = []
-        # 上部の円周に応じて回す
-        for ti, bottom_key in enumerate(bottom_edge_keys):
-            bottom_target_pos = virtual_vertices[bottom_key].position()
-            # 中心から見た処理対象仮想頂点の位置
-            bottom_local_pos = (bottom_target_pos - bottom_edge_median_pos) * base_reverse_axis
-            # 上部の理想位置をざっくり比率から求めておく
-            top_target_pos = top_edge_median_pos + (bottom_local_pos * (top_radius / bottom_radius))
-
-            vkeys, vscores = self.create_vertex_line_map(
-                bottom_key,
-                top_target_pos,
-                bottom_key,
-                top_edge_keys,
-                virtual_vertices,
-                base_vertical_axis,
-                [bottom_key],
-                [1],
-                param_option,
-            )
-            logger.info(
-                "頂点ルート走査[%s]: 始端: %s -> 終端: %s, スコア: %s",
-                f"{(ti + 1):03d}",
-                virtual_vertices[vkeys[0]].vidxs() if vkeys else "NG",
-                virtual_vertices[vkeys[-1]].vidxs(),
-                round(
-                    np.average(vscores, weights=list(reversed((np.arange(1, len(vscores) + 1) ** 2).tolist()))),
-                    4,
-                )
-                if vscores and param_option["special_shape"] == logger.transtext("プリーツ")
-                else round(np.mean(vscores), 4)
-                if vscores
-                else "-",
-            )
-            if len(vkeys) > 1:
-                all_vkeys.append(vkeys)
-                all_scores.append(vscores)
-
-        logger.info("%s: 絶対頂点マップの生成", material_name)
-
-        # XYの最大と最小の抽出
-        xu = np.unique([i for i, vk in enumerate(all_vkeys)])
-        # Yは全マップの最大値分確保する
-        yu = np.unique([i for vks in all_vkeys for i, vk in enumerate(vks)])
-
-        # 存在しない頂点INDEXで二次元配列初期化
-        tmp_vertex_map = np.full((len(yu), len(xu), 3), (np.nan, np.nan, np.nan))
-        registed_vertices = []
-
-        xx = 0
-        for x, (vkeys, scores) in enumerate(zip(all_vkeys, all_scores)):
-            is_regist = [True for y in vkeys]
-            for px, pvkeys in enumerate(all_vkeys):
-                if x == px:
-                    continue
-                for y, vkey in enumerate(vkeys):
-                    if vkey in pvkeys:
-                        # 他で登録されているキーがある場合は登録対象外
-                        is_regist[y] = False
-
-            if not np.count_nonzero(is_regist):
-                # 登録対象外の場合、スルー
-                continue
-
-            # # デフォルトでは真ん中に配置
-            # y_offset = int((tmp_vertex_map.shape[0] / 2) - (len(vkeys) / 2))
-            # if x > 0:
-            #     # 1以上は隣と繋がってる箇所を探す
-            #     target_vkey_y = int(len(vkeys) / 2)
-            #     target_vkey = vkeys[target_vkey_y]
-            #     connected_vyidxs = []
-            #     connected_vposes = []
-            #     for vy, vk in enumerate(tmp_vertex_map[:, xx - 1]):
-            #         if np.isnan(vk).any():
-            #             continue
-
-            #         if target_vkey in virtual_vertices[tuple(vk)].connected_vvs:
-            #             connected_vyidxs.append(vy)
-            #             connected_vposes.append(virtual_vertices[tuple(vk)].position().data())
-
-            #     if len(connected_vyidxs) > 0:
-            #         # 繋がってる箇所がある場合、評価対象と近い方に揃える
-            #         y_offset = (
-            #             connected_vyidxs[
-            #                 np.argmin(
-            #                     np.linalg.norm(
-            #                         np.array(connected_vposes)
-            #                         - virtual_vertices[tuple(target_vkey)].position().data(),
-            #                         ord=2,
-            #                         axis=1,
-            #                     )
-            #                 )
-            #             ]
-            #             - target_vkey_y
-            #         )
-
-            for y, vkey in enumerate(vkeys):
-                vv = virtual_vertices[vkey]
-                if not vv.vidxs():
-                    continue
-
-                logger.debug(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
-
-                tmp_vertex_map[y, xx] = vkey
-                registed_vertices.append(vkey)
-
-            xx += 1
-            logger.debug("-------")
-
-        # 各頂点の結合
-        tmp_bone_connected = np.zeros((tmp_vertex_map.shape[0], tmp_vertex_map.shape[1]), dtype=np.int)
-        for v_yidx in range(tmp_vertex_map.shape[0]):
-            v_xidx = -1
-            for v_xidx in range(0, tmp_vertex_map.shape[1] - 1):
-                if (
-                    not np.isnan(tmp_vertex_map[v_yidx, v_xidx]).any()
-                    and not np.isnan(tmp_vertex_map[v_yidx, v_xidx + 1]).any()
-                    and tuple(tmp_vertex_map[v_yidx, v_xidx])
-                    in virtual_vertices[tuple(tmp_vertex_map[v_yidx, v_xidx + 1])].connected_vvs
-                ):
-                    # 前の仮想頂点と繋がっている場合、True
-                    tmp_bone_connected[v_yidx, v_xidx] = True
-                else:
-                    tmp_bone_connected[v_yidx, v_xidx] = False
-
-            v_xidx += 1
-            if (
-                not np.isnan(tmp_vertex_map[v_yidx, v_xidx]).any()
-                and not np.isnan(tmp_vertex_map[v_yidx, 0]).any()
-                and tuple(tmp_vertex_map[v_yidx, 0])
-                in virtual_vertices[tuple(tmp_vertex_map[v_yidx, v_xidx])].connected_vvs
-            ):
-                # 横の仮想頂点と繋がっている場合
-                tmp_bone_connected[v_yidx, v_xidx] = True
-
-        connected_vertex_map = np.copy(tmp_vertex_map)
-        bone_connected = np.copy(tmp_bone_connected)
-        for v_xidx in range(0, tmp_vertex_map.shape[1]):
-            if (
-                np.count_nonzero(tmp_bone_connected[:, v_xidx]) < (connected_vertex_map.shape[0] / 2 - 1) * 0.7
-                and np.count_nonzero(tmp_bone_connected[:, -1]) > 0
-            ):
-                # どこか完全に分断されていて、かつ最後が最初と繋がってる箇所がある場合、ぐるっとずらす
-                connected_vertex_map = np.full(
-                    (tmp_vertex_map.shape[0], tmp_vertex_map.shape[1], 3), (np.nan, np.nan, np.nan)
-                )
-
-                connected_vertex_map[:, : (tmp_vertex_map.shape[1] - v_xidx - 1)] = tmp_vertex_map[:, (v_xidx + 1) :]
-                connected_vertex_map[:, (tmp_vertex_map.shape[1] - v_xidx - 1) :] = tmp_vertex_map[:, : (v_xidx + 1)]
-
-                bone_connected[:, : (tmp_bone_connected.shape[1] - v_xidx - 1)] = tmp_bone_connected[:, (v_xidx + 1) :]
-                bone_connected[:, (tmp_bone_connected.shape[1] - v_xidx - 1) :] = tmp_bone_connected[:, : (v_xidx + 1)]
-                break
-
         vertex_maps = []
-        prev_x = 0
-        x_count = 0
-        for v_xidx in range(connected_vertex_map.shape[1]):
-            x_count += 1
-            if (
-                np.count_nonzero(bone_connected[:, v_xidx]) < (connected_vertex_map.shape[0] / 2 - 1) * 0.7
-                or v_xidx == connected_vertex_map.shape[1] - 1
-            ):
-                logger.info("-- 絶対頂点マップ[%s]: マップ生成", v_xidx + 1)
+        logger.info("-----------")
 
-                # 規定以上横が繋がってない箇所がある・最後の場合、分ける
-                vertex_map = np.full((connected_vertex_map.shape[0], x_count, 3), (np.nan, np.nan, np.nan))
-                vertex_map = connected_vertex_map[:, prev_x : (prev_x + x_count)]
+        for bi, bottom_edge_keys in enumerate(all_bottom_edge_keys):
+            all_vkeys = []
+            mean_scores = []
+            for ti, bottom_key in enumerate(bottom_edge_keys):
+                bottom_target_pos = virtual_vertices[bottom_key].position()
+                # 中心から見た処理対象仮想頂点の位置
+                bottom_local_pos = (bottom_target_pos - bottom_edge_median_pos) * base_reverse_axis
+                # 上部の理想位置をざっくり比率から求めておく
+                top_target_pos = top_edge_median_pos + (bottom_local_pos * (top_radius / bottom_radius))
 
-                # Y軸方向の削除
-                remove_yidxs = []
-                for v_yidx in range(vertex_map.shape[0]):
-                    if np.isnan(vertex_map[v_yidx, :]).all():
-                        # 全部nanの場合、削除対象
-                        remove_yidxs.append(v_yidx)
+                vkeys, vscores = self.create_vertex_line_map(
+                    bottom_key,
+                    top_target_pos,
+                    bottom_key,
+                    all_top_edge_keys,
+                    virtual_vertices,
+                    base_vertical_axis,
+                    [bottom_key],
+                    [1],
+                    param_option,
+                )
+                score = 0
+                if vscores:
+                    if param_option["special_shape"] == logger.transtext("プリーツ"):
+                        # プリーツはスコアの重み付平均を取る
+                        score = np.average(
+                            vscores, weights=list(reversed((np.arange(1, len(vscores) + 1) ** 2).tolist()))
+                        )
+                    else:
+                        # スコア平均を取る
+                        score = np.mean(vscores)
 
-                # Y軸方向は上が揃ってるところからスタート
-                for v_yidx in range(vertex_map.shape[0]):
-                    if not np.isnan(vertex_map[v_yidx, :]).any():
-                        break
-                    elif v_yidx not in remove_yidxs:
-                        remove_yidxs.append(v_yidx)
+                logger.info(
+                    "%s: 頂点ルート走査[%s]: 始端: %s -> 終端: %s, スコア: %s",
+                    material_name,
+                    f"{(ti + 1):03d}",
+                    virtual_vertices[vkeys[0]].vidxs() if vkeys else "NG",
+                    virtual_vertices[vkeys[-1]].vidxs(),
+                    round(score, 4) if vscores else "-",
+                )
+                if len(vkeys) > 1:
+                    all_vkeys.append(vkeys)
+                    mean_scores.append(score)
 
-                vertex_map = np.delete(vertex_map, remove_yidxs, axis=0)
+            logger.info("-----------")
+            logger.info("%s: 頂点マップ[%s]: 登録対象チェック", material_name, f"{(bi + 1):03d}")
 
-                # X軸方向の削除
-                remove_xidxs = []
-                for v_xidx in range(vertex_map.shape[1]):
-                    if np.isnan(vertex_map[:, v_xidx]).all():
-                        # 全部nanの場合、削除対象
-                        remove_xidxs.append(v_xidx)
+            # XYの最大と最小の抽出
+            xu = np.unique([i for i, vk in enumerate(all_vkeys)])
+            # Yは全マップの最大値分確保する
+            yu = np.unique([i for vks in all_vkeys for i, vk in enumerate(vks)])
 
-                vertex_map = np.delete(vertex_map, remove_xidxs, axis=1)
+            # 存在しない頂点INDEXで二次元配列初期化
+            tmp_vertex_map = np.full((len(yu), len(xu), 3), (np.nan, np.nan, np.nan))
+            tmp_score_map = np.full(len(xu), 0.0, dtype=np.float)
+            registed_vertices = []
 
-                # マップ表示
-                vertex_display_map = np.full((vertex_map.shape[0], x_count), "None  ")
-                for y in range(vertex_map.shape[0]):
-                    for x in range(vertex_map.shape[1]):
-                        if np.isnan(vertex_map[y, x]).any():
+            xx = 0
+            for x, (vkeys, score) in enumerate(zip(all_vkeys, mean_scores)):
+                is_regists = [True for y in vkeys]
+                for px, pvkeys in enumerate(all_vkeys):
+                    if x == px:
+                        continue
+                    for y, vkey in enumerate(vkeys):
+                        if vkey in pvkeys:
+                            # 他で登録されているキーがある場合は登録対象外
+                            is_regists[y] = False
+
+                if not np.count_nonzero(is_regists):
+                    # 登録対象外の場合、スルー
+                    continue
+
+                for y, vkey in enumerate(vkeys):
+                    vv = virtual_vertices[vkey]
+                    if not vv.vidxs():
+                        continue
+
+                    logger.debug(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
+
+                    tmp_vertex_map[y, xx] = vkey
+                    registed_vertices.append(vkey)
+
+                tmp_score_map[xx] = score
+
+                xx += 1
+                logger.debug("-------")
+
+            logger.info("%s: 頂点マップ[%s]: 不要軸削除", material_name, f"{(bi + 1):03d}")
+
+            # Y軸方向の削除
+            remove_yidxs = []
+            for v_yidx in range(tmp_vertex_map.shape[0]):
+                if np.isnan(tmp_vertex_map[v_yidx, :]).all():
+                    # 全部nanの場合、削除対象
+                    remove_yidxs.append(v_yidx)
+
+            # Y軸方向は上が揃ってるところからスタート
+            for v_yidx in range(tmp_vertex_map.shape[0]):
+                if not np.isnan(tmp_vertex_map[v_yidx, :]).any():
+                    break
+                elif v_yidx not in remove_yidxs:
+                    remove_yidxs.append(v_yidx)
+
+            tmp_vertex_map = np.delete(tmp_vertex_map, remove_yidxs, axis=0)
+
+            # X軸方向の削除
+            remove_xidxs = []
+            for v_xidx in range(tmp_vertex_map.shape[1]):
+                if np.isnan(tmp_vertex_map[:, v_xidx]).all():
+                    # 全部nanの場合、削除対象
+                    remove_xidxs.append(v_xidx)
+
+            tmp_vertex_map = np.delete(tmp_vertex_map, remove_xidxs, axis=1)
+            tmp_score_map = np.delete(tmp_score_map, remove_xidxs, axis=0)
+
+            logger.info("%s: 頂点マップ[%s]: 頂点ルート決定", material_name, f"{(bi + 1):03d}")
+
+            top_key_cnts = dict(Counter([tuple(vm) for vm in tmp_vertex_map[0, :]]))
+            target_regists = [False for _ in range(tmp_vertex_map.shape[1])]
+
+            if np.max(list(top_key_cnts.values())) > 1:
+                # 同じ始端から2つ以上の末端に繋がっている場合
+                for top_key, cnt in top_key_cnts.items():
+                    total_scores = {}
+                    for x, (top_vkey, score) in enumerate(zip(tmp_vertex_map[0, :], tmp_score_map)):
+                        if tuple(top_vkey) == tuple(top_key):
+                            total_scores[x] = score
+                    # 最もスコアが大きい列を登録対象とする
+                    target_regists[list(total_scores.keys())[np.argmax(list(total_scores.values()))]] = True
+            else:
+                # 全部1個ずつ繋がっている場合はそのまま登録
+                target_regists = [True for _ in range(tmp_vertex_map.shape[1])]
+
+            logger.debug(f"target_regists: {target_regists}")
+
+            logger.info("%s: 頂点マップ[%s]: マップ生成", material_name, f"{(bi + 1):03d}")
+
+            # XYの最大と最小の抽出
+            xu = np.unique([i for i in range(tmp_vertex_map.shape[1]) if target_regists[i]])
+
+            # 存在しない頂点INDEXで二次元配列初期化
+            vertex_map = np.full((tmp_vertex_map.shape[0], len(xu), 3), (np.nan, np.nan, np.nan))
+            vertex_display_map = np.full((tmp_vertex_map.shape[0], len(xu)), "None  ")
+            registed_vertices = []
+
+            prev_xx = 0
+            xx = 0
+            for x in range(tmp_vertex_map.shape[1]):
+                if not target_regists[x]:
+                    # 登録対象外の場合、接続仮想頂点リストにだけは追加する
+                    for y, vkey in enumerate(tmp_vertex_map[:, x]):
+                        if np.isnan(vertex_map[y, prev_xx]).any():
                             continue
-                        vv = virtual_vertices[tuple(vertex_map[y, x])]
-                        vertex_display_map[y, x] = ":".join([str(v) for v in vv.vidxs()])
+                        prev_vv = virtual_vertices[tuple(vertex_map[y, prev_xx])]
+                        vv = virtual_vertices[tuple(vkey)]
+                        prev_vv.connected_vvs.extend(vv.connected_vvs)
+                    continue
 
+                for y, vkey in enumerate(tmp_vertex_map[:, x]):
+                    vkey = tuple(vkey)
+                    vv = virtual_vertices[vkey]
+                    vv.map_bones[bi] = None
+                    if not vv.vidxs():
+                        prev_xx = xx
+                        continue
+
+                    logger.debug(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
+
+                    vertex_map[y, xx] = vkey
+                    vertex_display_map[y, xx] = ":".join([str(v) for v in vv.vidxs()])
+                    registed_vertices.append(vkey)
+
+                    if xx > 0 and not target_regists[x - 1]:
+                        # 前のキーが対象外だった場合、前のキーに今のキーの接続情報を追加しておく
+                        if not np.isnan(vertex_map[y, xx - 1]).any():
+                            prev_vv = virtual_vertices[tuple(vertex_map[y, xx - 1])]
+                            prev_vv.connected_vvs.append(vkey)
+                            vv.connected_vvs.append(prev_vv.key)
+
+                    prev_xx = xx
+
+                xx += 1
+                logger.debug("-------")
+
+            if not target_regists[0]:
+                # 最初のキーが対象外だった場合、最後のキーの接続情報を最初に追加しておく
+                for y, vkey in enumerate(vertex_map[:, np.max(np.where(target_regists))]):
+                    if not np.isnan(vertex_map[y, 0]).any():
+                        vkey = tuple(vkey)
+                        prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
+                        prev_vv.connected_vvs.append(vkey)
+                        vv = virtual_vertices[vkey]
+                        vv.connected_vvs.append(prev_vv.key)
+
+            logger.info("%s: 頂点マップ[%s]: 仮想頂点生成", material_name, f"{(bi + 1):03d}")
+
+            for v_yidx in range(vertex_map.shape[0]):
+                for v_xidx in range(vertex_map.shape[1]):
+                    if np.isnan(vertex_map[v_yidx, v_xidx]).any():
+                        # ない場合、仮想頂点を設定する
+                        nearest_v_yidx = (
+                            np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0][
+                                np.argmin(np.abs(np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0] - v_yidx))
+                            ]
+                            if np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0].any()
+                            else 0
+                        )
+                        nearest_v_xidx = (
+                            np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0][
+                                np.argmin(np.abs(np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0] - v_xidx))
+                            ]
+                            if np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0].any()
+                            else 0
+                        )
+                        nearest_above_v_yidx = (
+                            np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0][
+                                np.argmin(
+                                    np.abs(
+                                        np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0]
+                                        - nearest_v_yidx
+                                    )
+                                )
+                            ]
+                            if np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0].any()
+                            else 0
+                        )
+                        above_yidx = (
+                            np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0][
+                                np.argmin(np.abs(np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0] - v_yidx))
+                            ]
+                            if np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0].any()
+                            else 0
+                        )
+                        above_above_yidx = (
+                            np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0][
+                                np.argmin(
+                                    np.abs(np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0] - above_yidx)
+                                )
+                            ]
+                            if np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0].any()
+                            else 0
+                        )
+
+                        nearest_vv = virtual_vertices[tuple(vertex_map[nearest_v_yidx, nearest_v_xidx])]
+                        nearest_above_vv = virtual_vertices[tuple(vertex_map[nearest_above_v_yidx, nearest_v_xidx])]
+                        above_vv = virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])]
+                        above_above_vv = virtual_vertices[tuple(vertex_map[above_above_yidx, v_xidx])]
+
+                        # 直近頂点の上下距離
+                        nearest_distance = nearest_vv.position().distanceToPoint(nearest_above_vv.position())
+
+                        # ボーン進行方向(x)
+                        x_direction_pos = (above_above_vv.position() - above_vv.position()).normalized()
+                        # ボーン進行方向に対しての横軸(y)
+                        y_direction_pos = MVector3D(1, 0, 0)
+                        # ボーン進行方向に対しての縦軸(z)
+                        z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
+                        above_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+
+                        mat = MMatrix4x4()
+                        mat.setToIdentity()
+                        mat.translate(above_vv.position())
+                        mat.rotate(above_qq)
+
+                        # 仮想頂点の位置
+                        target_position = mat * MVector3D(0, -nearest_distance, 0)
+                        target_key = target_position.to_key(threshold)
+                        if target_key not in virtual_vertices:
+                            virtual_vertices[target_key] = VirtualVertex(target_key)
+                        virtual_vertices[target_key].positions.append(target_position.data())
+                        vertex_map[v_yidx, v_xidx] = target_key
+
+            if vertex_map.any():
                 logger.info(
                     "\n".join([", ".join(vertex_display_map[vx, :]) for vx in range(vertex_display_map.shape[0])]),
                     translate=False,
                 )
 
-                # for v_yidx in range(vertex_map.shape[0]):
-                #     for v_xidx in range(vertex_map.shape[1]):
-                #         if np.isnan(vertex_map[v_yidx, v_xidx]).any():
-                #             # ない場合、仮想頂点を設定する
-                #             nearest_v_yidx = (
-                #                 np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0][
-                #                     np.argmin(np.abs(np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0] - v_yidx))
-                #                 ]
-                #                 if np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0].any()
-                #                 else 0
-                #             )
-                #             nearest_v_xidx = (
-                #                 np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0][
-                #                     np.argmin(
-                #                         np.abs(np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0] - v_xidx)
-                #                     )
-                #                 ]
-                #                 if np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0].any()
-                #                 else 0
-                #             )
-                #             nearest_above_v_yidx = (
-                #                 np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0][
-                #                     np.argmin(
-                #                         np.abs(
-                #                             np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0]
-                #                             - nearest_v_yidx
-                #                         )
-                #                     )
-                #                 ]
-                #                 if np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0].any()
-                #                 else 0
-                #             )
-                #             above_yidx = (
-                #                 np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0][
-                #                     np.argmin(np.abs(np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0] - v_yidx))
-                #                 ]
-                #                 if np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0].any()
-                #                 else 0
-                #             )
-                #             above_above_yidx = (
-                #                 np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0][
-                #                     np.argmin(
-                #                         np.abs(np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0] - above_yidx)
-                #                     )
-                #                 ]
-                #                 if np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0].any()
-                #                 else 0
-                #             )
+                vertex_maps.append(vertex_map)
 
-                #             nearest_vv = virtual_vertices[tuple(vertex_map[nearest_v_yidx, nearest_v_xidx])]
-                #             nearest_above_vv = virtual_vertices[
-                #                 tuple(vertex_map[nearest_above_v_yidx, nearest_v_xidx])
-                #             ]
-                #             above_vv = virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])]
-                #             above_above_vv = virtual_vertices[tuple(vertex_map[above_above_yidx, v_xidx])]
-
-                #             # 直近頂点の上下距離
-                #             nearest_distance = nearest_vv.position().distanceToPoint(nearest_above_vv.position())
-
-                #             # ボーン進行方向(x)
-                #             x_direction_pos = (above_above_vv.position() - above_vv.position()).normalized()
-                #             # ボーン進行方向に対しての横軸(y)
-                #             y_direction_pos = MVector3D(1, 0, 0)
-                #             # ボーン進行方向に対しての縦軸(z)
-                #             z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
-                #             above_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-
-                #             mat = MMatrix4x4()
-                #             mat.setToIdentity()
-                #             mat.translate(above_vv.position())
-                #             mat.rotate(above_qq)
-
-                #             # 仮想頂点の位置
-                #             target_position = mat * MVector3D(0, -nearest_distance, 0)
-                #             target_key = target_position.to_key(threshold)
-                #             if target_key not in virtual_vertices:
-                #                 virtual_vertices[target_key] = VirtualVertex(target_key)
-                #             virtual_vertices[target_key].positions.append(target_position.data())
-                #             vertex_map[v_yidx, v_xidx] = target_key
-
-                logger.info("-- 絶対頂点マップ: %s個目:終了 ---------", v_xidx + 1)
-
-                if vertex_map.any():
-                    vertex_maps.append(vertex_map)
-                    prev_x += x_count
-                    x_count = 0
+            logger.info("%s: 頂点マップ[%s]: 終了 ---------", material_name, f"{(bi + 1):03d}")
 
         logger.debug("-----------------------")
 
