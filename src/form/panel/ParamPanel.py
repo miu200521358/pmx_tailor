@@ -502,9 +502,7 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("特殊形状"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_special_shape_txt.SetToolTip(
-            logger.transtext(
-                "スカート等で特殊な処理が必要な形状\nエッジ不定形: 裾にフリルが付いてたり、波打ってたり、裾のポリ割が真っ直ぐではない場合\nプリーツ: ポリ割に折り返しがある場合（厚みがあるとうまくいきません）"
-            )
+            logger.transtext("スカート等で特殊な処理が必要な形状\nプリーツ: ポリ割に折り返しがある場合（厚みがあるとうまくいきません）")
         )
         self.simple_special_shape_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_txt, 0, wx.ALL, 5)
@@ -512,7 +510,7 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("エッジ不定形"), logger.transtext("プリーツ")],
+            choices=[logger.transtext("なし"), logger.transtext("プリーツ")],
         )
         self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
         self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -592,7 +590,7 @@ class PhysicsParam:
         self.simple_grid_sizer.Add(self.simple_threshold_txt, 0, wx.ALL, 5)
 
         self.simple_threshold_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("（0.1）"), wx.DefaultPosition, wx.DefaultSize, 0
+            self.simple_window, wx.ID_ANY, logger.transtext("（0.05）"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_threshold_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_threshold_label, 0, wx.ALL, 5)
@@ -606,7 +604,7 @@ class PhysicsParam:
         self.simple_threshold_slider = FloatSliderCtrl(
             self.simple_window,
             wx.ID_ANY,
-            0.1,
+            0.05,
             0.02,
             0.5,
             0.01,
@@ -2756,7 +2754,7 @@ class PhysicsParam:
 
     def set_param_import_data(self, params: dict):
         # 簡易版オプションデータ -------------
-        self.simple_threshold_slider.SetValue(params.get("threshold", 0.1))
+        self.simple_threshold_slider.SetValue(params.get("threshold", 0.05))
         # self.simple_fineness_slider.SetValue(params.get("fineness", 3.4))
         self.simple_mass_slider.SetValue(params.get("mass", 0.5))
         self.simple_air_resistance_slider.SetValue(params.get("air_resistance", 1.8))
@@ -3708,7 +3706,7 @@ class PhysicsParam:
         self.simple_back_material_ctrl.SetStringSelection("")
         self.simple_edge_material_ctrl.SetStringSelection("")
         self.simple_primitive_ctrl.SetStringSelection("")
-        self.simple_threshold_slider.SetValue(0.1)
+        self.simple_threshold_slider.SetValue(0.05)
         # self.simple_fineness_slider.SetValue(3.4)
         self.simple_mass_slider.SetValue(1.5)
         self.simple_air_resistance_slider.SetValue(1.8)

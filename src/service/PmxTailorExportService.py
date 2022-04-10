@@ -691,7 +691,7 @@ class PmxTailorExportService:
             # # 上下はY軸比較, 左右はX軸比較
             # target_idx = 1 if param_option["direction"] in ["上", "下"] else 0
             # target_direction = 1 if param_option["direction"] in ["上", "右"] else -1
-            # キーは比較対象＋向きで昇順
+            # # キーは比較対象＋向きで昇順
             # vv_keys = sorted(np.unique(vertex_map[np.where(regist_bones)][:, target_idx]) * target_direction)
 
             # キーは縦段の数分生成
@@ -822,7 +822,7 @@ class PmxTailorExportService:
 
                 # bone_y_idx = np.where(vv_keys == bone_key[target_idx] * target_direction)[0]
                 # bone_y_idx = bone_y_idx[0] if bone_y_idx else 0
-                bone_y_idx = v_yidx
+                bone_y_idx = np.where(np.array(vv_keys) == v_yidx)[0][0]
 
                 (
                     prev_map_idx,
@@ -2001,7 +2001,7 @@ class PmxTailorExportService:
                 elif rigidbody_shape_type == 1:
                     # 箱剛体の場合
                     shape_size = MVector3D(
-                        x_size * 0.27,
+                        x_size * (0.27 if prev_connected or next_connected else 0.5),
                         max(0.25, (y_size * 0.5)),
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
@@ -2014,61 +2014,31 @@ class PmxTailorExportService:
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
-                if prev_connected and prev_now_bone and prev_below_bone and not next_connected:
-                    # 後が繋がってない場合、前との中間とする
-                    mean_position = MVector3D(
-                        np.mean(
-                            [
-                                now_above_bone.position.data(),
-                                now_below_bone.position.data(),
-                                prev_now_bone.position.data(),
-                                prev_below_bone.position.data(),
-                            ],
-                            axis=0,
-                        )
+                # 自身の中間
+                mean_position = MVector3D(
+                    np.mean(
+                        [
+                            now_above_bone.position.data(),
+                            now_below_bone.position.data(),
+                        ],
+                        axis=0,
                     )
-                elif (
-                    not prev_connected
-                    and next_connected
-                    and next_now_bone
-                    # or (next_connected and next_now_bone and param_option["special_shape"] == logger.transtext("プリーツ"))
-                ):
-                    # 前が繋がってない場合、次との中間とする
-                    mean_position = MVector3D(
-                        np.mean(
-                            [
-                                now_above_bone.position.data(),
-                                now_below_bone.position.data(),
-                                next_now_bone.position.data(),
-                                next_below_bone.position.data(),
-                            ],
-                            axis=0,
-                        )
-                    )
-                else:
-                    # それ以外は自身の中間
-                    mean_position = MVector3D(
-                        np.mean(
-                            [
-                                now_above_bone.position.data(),
-                                now_below_bone.position.data(),
-                            ],
-                            axis=0,
-                        )
-                    )
+                )
 
                 # ボーン進行方向(x)
                 x_direction_pos = (now_above_bone.position - now_below_bone.position).normalized()
                 # ボーン進行方向に対しての横軸(y)
                 if (
                     next_above_bone
-                    and now_above_bone
-                    and ((prev_above_bone and prev_above_bone != now_above_bone) or next_above_bone != now_above_bone)
+                    and next_above_bone != now_above_bone
+                    and prev_above_bone
+                    and prev_above_bone != now_above_bone
                 ):
-                    y_direction_pos = (
-                        next_above_bone.position
-                        - (prev_above_bone.position if prev_above_bone else now_above_bone.position)
-                    ).normalized()
+                    y_direction_pos = (next_above_bone.position - prev_above_bone.position).normalized()
+                elif next_above_bone and next_above_bone != now_above_bone and now_above_bone:
+                    y_direction_pos = (next_above_bone.position - now_above_bone.position).normalized()
+                elif prev_above_bone and prev_above_bone != now_above_bone and now_above_bone:
+                    y_direction_pos = (now_above_bone.position - prev_above_bone.position).normalized()
                 else:
                     y_direction_pos = MVector3D(1, 0, 0)
                 # ボーン進行方向に対しての縦軸(z)
@@ -3143,13 +3113,13 @@ class PmxTailorExportService:
             prev_bone_cnt = 0
             bone_cnt = 0
 
-            # ボーン登録有無
-            regist_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
-            all_regist_bones[base_map_idx] = regist_bones
-
             if base_map_idx not in vertex_map_orders:
                 # ボーン生成対象外の場合、とりあえず枠だけ作ってスルー
                 continue
+
+            # ボーン登録有無
+            regist_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
+            all_regist_bones[base_map_idx] = regist_bones
 
             logger.info("--【No.%s】ボーン生成", base_map_idx + 1)
 
@@ -3914,7 +3884,7 @@ class PmxTailorExportService:
 
                 # 面法線と同じ向き場合、辺キー生成（表面のみを対象とする）
                 # プリーツは厚みがないとみなす
-                if normal_dot > 0 or param_option["special_shape"] == logger.transtext("プリーツ"):
+                if normal_dot > 0.4 or param_option["special_shape"] == logger.transtext("プリーツ"):
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
@@ -4002,9 +3972,11 @@ class PmxTailorExportService:
         all_edge_lines = []
         edge_vkeys = []
         while len(edge_vkeys) < len(edge_line_pairs.keys()):
-            _, all_edge_lines, edge_vkeys = self.get_edge_lines(edge_line_pairs, None, all_edge_lines, edge_vkeys)
+            _, all_edge_lines, edge_vkeys = self.get_edge_lines(
+                edge_line_pairs, None, all_edge_lines, edge_vkeys, param_option
+            )
 
-        all_edge_lines = [els for els in all_edge_lines if len(els) > 2]
+        all_edge_lines = [els for els in all_edge_lines if len(els) > 4]
 
         for n, edge_lines in enumerate(all_edge_lines):
             logger.info(
@@ -4038,18 +4010,18 @@ class PmxTailorExportService:
         for n, edge_lines in enumerate(all_edge_lines):
             if param_option["direction"] in ["下", "右"]:
                 if len(np.where(np.array(target_idx_poses[n]) > target_mean)) > 0:
-                    top_edge_keys.extend(np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) > target_mean)])
+                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) > target_mean)]:
+                        top_edge_keys.append(tuple(key))
                 if len(np.where(np.array(target_idx_poses[n]) < target_mean)) > 0:
-                    bottom_edge_keys.extend(
-                        np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) < target_mean)]
-                    )
+                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) < target_mean)]:
+                        bottom_edge_keys.append(tuple(key))
             else:
                 if len(np.where(np.array(target_idx_poses[n]) < target_mean)) > 0:
-                    top_edge_keys.extend(np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) < target_mean)])
+                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) < target_mean)]:
+                        top_edge_keys.append(tuple(key))
                 if len(np.where(np.array(target_idx_poses[n]) > target_mean)) > 0:
-                    bottom_edge_keys.extend(
-                        np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) > target_mean)]
-                    )
+                    for key in np.array(edge_lines)[np.where(np.array(target_idx_poses[n]) > target_mean)]:
+                        bottom_edge_keys.append(tuple(key))
 
         if not top_edge_keys:
             logger.warning(
@@ -4067,19 +4039,19 @@ class PmxTailorExportService:
 
         top_edge_poses = []
         for key in top_edge_keys:
-            top_edge_poses.append(virtual_vertices[tuple(key)].position().data())
+            top_edge_poses.append(virtual_vertices[key].position().data())
 
         top_edge_median_pos = MVector3D(np.median(top_edge_poses, axis=0))
 
         bottom_edge_poses = []
         for key in bottom_edge_keys:
-            bottom_edge_poses.append(virtual_vertices[tuple(key)].position().data())
+            bottom_edge_poses.append(virtual_vertices[key].position().data())
 
         bottom_edge_median_pos = MVector3D(np.median(bottom_edge_poses, axis=0))
-        # 中央から真後ろ
-        bottom_edge_start_pos = MVector3D(
-            0, 0, MVector3D(bottom_edge_median_pos * np.abs(base_vertical_axis.data())).length()
-        ) + MVector3D(bottom_edge_median_pos * np.abs(base_vertical_axis.data()))
+        # # 中央から真後ろ
+        # bottom_edge_start_pos = MVector3D(
+        #     0, 0, MVector3D(bottom_edge_median_pos * np.abs(base_vertical_axis.data())).length()
+        # ) + MVector3D(bottom_edge_median_pos * np.abs(base_vertical_axis.data()))
 
         # できるだけ評価軸は離して登録する
         if param_option["direction"] in ["下"]:
@@ -4106,25 +4078,24 @@ class PmxTailorExportService:
             "%s: エッジ下部 中央位置[%s] 半径[%s]", material_name, bottom_edge_median_pos.to_log(), round(bottom_radius, 4)
         )
 
-        # 下部の回転量を計算しておく
-        bottom_degrees = []
-        for bottom_key in bottom_edge_keys:
-            bottom_degrees.append(
-                self.calc_arc_degree(
-                    bottom_edge_start_pos,
-                    bottom_edge_median_pos,
-                    virtual_vertices[tuple(bottom_key)].position(),
-                    base_vertical_axis,
-                    base_reverse_axis,
-                )
-            )
+        # # 下部の回転量を計算しておく
+        # bottom_degrees = []
+        # for bottom_key in bottom_edge_keys:
+        #     bottom_degrees.append(
+        #         self.calc_arc_degree(
+        #             bottom_edge_start_pos,
+        #             bottom_edge_median_pos,
+        #             virtual_vertices[tuple(bottom_key)].position(),
+        #             base_vertical_axis,
+        #             base_reverse_axis,
+        #         )
+        #     )
 
         logger.info("--------------------------")
         all_vkeys = []
         all_scores = []
         # 上部の円周に応じて回す
-        for ti, bottom_degree_idx in enumerate(np.argsort(bottom_degrees)):
-            bottom_key = tuple(bottom_edge_keys[bottom_degree_idx])
+        for ti, bottom_key in enumerate(bottom_edge_keys):
             bottom_target_pos = virtual_vertices[bottom_key].position()
             # 中心から見た処理対象仮想頂点の位置
             bottom_local_pos = (bottom_target_pos - bottom_edge_median_pos) * base_reverse_axis
@@ -4135,6 +4106,7 @@ class PmxTailorExportService:
                 bottom_key,
                 top_target_pos,
                 bottom_key,
+                top_edge_keys,
                 virtual_vertices,
                 base_vertical_axis,
                 [bottom_key],
@@ -4170,29 +4142,55 @@ class PmxTailorExportService:
         tmp_vertex_map = np.full((len(yu), len(xu), 3), (np.nan, np.nan, np.nan))
         registed_vertices = []
 
-        full_yvkeys = []
-        for x, (vkeys, scores) in enumerate(zip(all_vkeys, all_scores)):
-            if max(yu) == len(vkeys) - 1:
-                # 全部埋まってるののリストを出しておく
-                full_yvkeys.extend(vkeys)
-
         xx = 0
         for x, (vkeys, scores) in enumerate(zip(all_vkeys, all_scores)):
-            # 全件埋まってる場合は元々登録対象
-            is_regist = max(yu) == len(vkeys) - 1
-            for y, vkey in enumerate(vkeys):
-                if vkey not in full_yvkeys:
-                    # 件数足りなくても登録されてないキーがある場合は登録対象
-                    is_regist = True
-                    break
+            is_regist = [True for y in vkeys]
+            for px, pvkeys in enumerate(all_vkeys):
+                if x == px:
+                    continue
+                for y, vkey in enumerate(vkeys):
+                    if vkey in pvkeys:
+                        # 他で登録されているキーがある場合は登録対象外
+                        is_regist[y] = False
 
-            if not is_regist:
+            if not np.count_nonzero(is_regist):
                 # 登録対象外の場合、スルー
                 continue
 
+            # # デフォルトでは真ん中に配置
+            # y_offset = int((tmp_vertex_map.shape[0] / 2) - (len(vkeys) / 2))
+            # if x > 0:
+            #     # 1以上は隣と繋がってる箇所を探す
+            #     target_vkey_y = int(len(vkeys) / 2)
+            #     target_vkey = vkeys[target_vkey_y]
+            #     connected_vyidxs = []
+            #     connected_vposes = []
+            #     for vy, vk in enumerate(tmp_vertex_map[:, xx - 1]):
+            #         if np.isnan(vk).any():
+            #             continue
+
+            #         if target_vkey in virtual_vertices[tuple(vk)].connected_vvs:
+            #             connected_vyidxs.append(vy)
+            #             connected_vposes.append(virtual_vertices[tuple(vk)].position().data())
+
+            #     if len(connected_vyidxs) > 0:
+            #         # 繋がってる箇所がある場合、評価対象と近い方に揃える
+            #         y_offset = (
+            #             connected_vyidxs[
+            #                 np.argmin(
+            #                     np.linalg.norm(
+            #                         np.array(connected_vposes)
+            #                         - virtual_vertices[tuple(target_vkey)].position().data(),
+            #                         ord=2,
+            #                         axis=1,
+            #                     )
+            #                 )
+            #             ]
+            #             - target_vkey_y
+            #         )
+
             for y, vkey in enumerate(vkeys):
                 vv = virtual_vertices[vkey]
-                vv.map_bones[0] = None
                 if not vv.vidxs():
                     continue
 
@@ -4203,24 +4201,6 @@ class PmxTailorExportService:
 
             xx += 1
             logger.debug("-------")
-
-        # Y軸方向の削除
-        remove_yidxs = []
-        for v_yidx in range(tmp_vertex_map.shape[0]):
-            if np.isnan(tmp_vertex_map[v_yidx, :]).all():
-                # 全部nanの場合、削除対象
-                remove_yidxs.append(v_yidx)
-
-        tmp_vertex_map = np.delete(tmp_vertex_map, remove_yidxs, axis=0)
-
-        # X軸方向の削除
-        remove_xidxs = []
-        for v_xidx in range(tmp_vertex_map.shape[1]):
-            if np.isnan(tmp_vertex_map[:, v_xidx]).all():
-                # 全部nanの場合、削除対象
-                remove_xidxs.append(v_xidx)
-
-        tmp_vertex_map = np.delete(tmp_vertex_map, remove_xidxs, axis=1)
 
         # 各頂点の結合
         tmp_bone_connected = np.zeros((tmp_vertex_map.shape[0], tmp_vertex_map.shape[1]), dtype=np.int)
@@ -4235,6 +4215,8 @@ class PmxTailorExportService:
                 ):
                     # 前の仮想頂点と繋がっている場合、True
                     tmp_bone_connected[v_yidx, v_xidx] = True
+                else:
+                    tmp_bone_connected[v_yidx, v_xidx] = False
 
             v_xidx += 1
             if (
@@ -4250,7 +4232,7 @@ class PmxTailorExportService:
         bone_connected = np.copy(tmp_bone_connected)
         for v_xidx in range(0, tmp_vertex_map.shape[1]):
             if (
-                np.count_nonzero(tmp_bone_connected[:, v_xidx]) < (connected_vertex_map.shape[0] - 1) * 0.7
+                np.count_nonzero(tmp_bone_connected[:, v_xidx]) < (connected_vertex_map.shape[0] / 2 - 1) * 0.7
                 and np.count_nonzero(tmp_bone_connected[:, -1]) > 0
             ):
                 # どこか完全に分断されていて、かつ最後が最初と繋がってる箇所がある場合、ぐるっとずらす
@@ -4271,19 +4253,46 @@ class PmxTailorExportService:
         for v_xidx in range(connected_vertex_map.shape[1]):
             x_count += 1
             if (
-                np.count_nonzero(bone_connected[:, v_xidx]) < (connected_vertex_map.shape[0] - 1) * 0.7
+                np.count_nonzero(bone_connected[:, v_xidx]) < (connected_vertex_map.shape[0] / 2 - 1) * 0.7
                 or v_xidx == connected_vertex_map.shape[1] - 1
             ):
-                logger.info("-- 絶対頂点マップ[%s]: マップ生成", len(vertex_maps) + 1)
+                logger.info("-- 絶対頂点マップ[%s]: マップ生成", v_xidx + 1)
 
                 # 規定以上横が繋がってない箇所がある・最後の場合、分ける
                 vertex_map = np.full((connected_vertex_map.shape[0], x_count, 3), (np.nan, np.nan, np.nan))
                 vertex_map = connected_vertex_map[:, prev_x : (prev_x + x_count)]
 
+                # Y軸方向の削除
+                remove_yidxs = []
+                for v_yidx in range(vertex_map.shape[0]):
+                    if np.isnan(vertex_map[v_yidx, :]).all():
+                        # 全部nanの場合、削除対象
+                        remove_yidxs.append(v_yidx)
+
+                # Y軸方向は上が揃ってるところからスタート
+                for v_yidx in range(vertex_map.shape[0]):
+                    if not np.isnan(vertex_map[v_yidx, :]).any():
+                        break
+                    elif v_yidx not in remove_yidxs:
+                        remove_yidxs.append(v_yidx)
+
+                vertex_map = np.delete(vertex_map, remove_yidxs, axis=0)
+
+                # X軸方向の削除
+                remove_xidxs = []
+                for v_xidx in range(vertex_map.shape[1]):
+                    if np.isnan(vertex_map[:, v_xidx]).all():
+                        # 全部nanの場合、削除対象
+                        remove_xidxs.append(v_xidx)
+
+                vertex_map = np.delete(vertex_map, remove_xidxs, axis=1)
+
                 # マップ表示
-                vertex_display_map = np.full((connected_vertex_map.shape[0], x_count), "None  ")
+                vertex_display_map = np.full((vertex_map.shape[0], x_count), "None  ")
                 for y in range(vertex_map.shape[0]):
                     for x in range(vertex_map.shape[1]):
+                        if np.isnan(vertex_map[y, x]).any():
+                            continue
                         vv = virtual_vertices[tuple(vertex_map[y, x])]
                         vertex_display_map[y, x] = ":".join([str(v) for v in vv.vidxs()])
 
@@ -4292,91 +4301,92 @@ class PmxTailorExportService:
                     translate=False,
                 )
 
-                for v_yidx in range(vertex_map.shape[0]):
-                    for v_xidx in range(vertex_map.shape[1]):
-                        if np.isnan(vertex_map[v_yidx, v_xidx]).any():
-                            # ない場合、仮想頂点を設定する
-                            nearest_v_yidx = (
-                                np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0][
-                                    np.argmin(np.abs(np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0] - v_yidx))
-                                ]
-                                if np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0].any()
-                                else 0
-                            )
-                            nearest_v_xidx = (
-                                np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0][
-                                    np.argmin(
-                                        np.abs(np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0] - v_xidx)
-                                    )
-                                ]
-                                if np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0].any()
-                                else 0
-                            )
-                            nearest_above_v_yidx = (
-                                np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0][
-                                    np.argmin(
-                                        np.abs(
-                                            np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0]
-                                            - nearest_v_yidx
-                                        )
-                                    )
-                                ]
-                                if np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0].any()
-                                else 0
-                            )
-                            above_yidx = (
-                                np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0][
-                                    np.argmin(np.abs(np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0] - v_yidx))
-                                ]
-                                if np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0].any()
-                                else 0
-                            )
-                            above_above_yidx = (
-                                np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0][
-                                    np.argmin(
-                                        np.abs(np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0] - above_yidx)
-                                    )
-                                ]
-                                if np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0].any()
-                                else 0
-                            )
+                # for v_yidx in range(vertex_map.shape[0]):
+                #     for v_xidx in range(vertex_map.shape[1]):
+                #         if np.isnan(vertex_map[v_yidx, v_xidx]).any():
+                #             # ない場合、仮想頂点を設定する
+                #             nearest_v_yidx = (
+                #                 np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0][
+                #                     np.argmin(np.abs(np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0] - v_yidx))
+                #                 ]
+                #                 if np.where(~np.isnan(vertex_map[:, v_xidx, 0]))[0].any()
+                #                 else 0
+                #             )
+                #             nearest_v_xidx = (
+                #                 np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0][
+                #                     np.argmin(
+                #                         np.abs(np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0] - v_xidx)
+                #                     )
+                #                 ]
+                #                 if np.where(~np.isnan(vertex_map[nearest_v_yidx, :, 0]))[0].any()
+                #                 else 0
+                #             )
+                #             nearest_above_v_yidx = (
+                #                 np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0][
+                #                     np.argmin(
+                #                         np.abs(
+                #                             np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0]
+                #                             - nearest_v_yidx
+                #                         )
+                #                     )
+                #                 ]
+                #                 if np.where(~np.isnan(vertex_map[:nearest_v_yidx, nearest_v_xidx, 0]))[0].any()
+                #                 else 0
+                #             )
+                #             above_yidx = (
+                #                 np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0][
+                #                     np.argmin(np.abs(np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0] - v_yidx))
+                #                 ]
+                #                 if np.where(~np.isnan(vertex_map[:v_yidx, v_xidx, 0]))[0].any()
+                #                 else 0
+                #             )
+                #             above_above_yidx = (
+                #                 np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0][
+                #                     np.argmin(
+                #                         np.abs(np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0] - above_yidx)
+                #                     )
+                #                 ]
+                #                 if np.where(~np.isnan(vertex_map[:above_yidx, v_xidx, 0]))[0].any()
+                #                 else 0
+                #             )
 
-                            nearest_vv = virtual_vertices[tuple(vertex_map[nearest_v_yidx, nearest_v_xidx])]
-                            nearest_above_vv = virtual_vertices[
-                                tuple(vertex_map[nearest_above_v_yidx, nearest_v_xidx])
-                            ]
-                            above_vv = virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])]
-                            above_above_vv = virtual_vertices[tuple(vertex_map[above_above_yidx, v_xidx])]
+                #             nearest_vv = virtual_vertices[tuple(vertex_map[nearest_v_yidx, nearest_v_xidx])]
+                #             nearest_above_vv = virtual_vertices[
+                #                 tuple(vertex_map[nearest_above_v_yidx, nearest_v_xidx])
+                #             ]
+                #             above_vv = virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])]
+                #             above_above_vv = virtual_vertices[tuple(vertex_map[above_above_yidx, v_xidx])]
 
-                            # 直近頂点の上下距離
-                            nearest_distance = nearest_vv.position().distanceToPoint(nearest_above_vv.position())
+                #             # 直近頂点の上下距離
+                #             nearest_distance = nearest_vv.position().distanceToPoint(nearest_above_vv.position())
 
-                            # ボーン進行方向(x)
-                            x_direction_pos = (above_above_vv.position() - above_vv.position()).normalized()
-                            # ボーン進行方向に対しての横軸(y)
-                            y_direction_pos = MVector3D(1, 0, 0)
-                            # ボーン進行方向に対しての縦軸(z)
-                            z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
-                            above_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                #             # ボーン進行方向(x)
+                #             x_direction_pos = (above_above_vv.position() - above_vv.position()).normalized()
+                #             # ボーン進行方向に対しての横軸(y)
+                #             y_direction_pos = MVector3D(1, 0, 0)
+                #             # ボーン進行方向に対しての縦軸(z)
+                #             z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
+                #             above_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
 
-                            mat = MMatrix4x4()
-                            mat.setToIdentity()
-                            mat.translate(above_vv.position())
-                            mat.rotate(above_qq)
+                #             mat = MMatrix4x4()
+                #             mat.setToIdentity()
+                #             mat.translate(above_vv.position())
+                #             mat.rotate(above_qq)
 
-                            # 仮想頂点の位置
-                            target_position = mat * MVector3D(0, -nearest_distance, 0)
-                            target_key = target_position.to_key(threshold)
-                            if target_key not in virtual_vertices:
-                                virtual_vertices[target_key] = VirtualVertex(target_key)
-                            virtual_vertices[target_key].positions.append(target_position.data())
-                            vertex_map[v_yidx, v_xidx] = target_key
+                #             # 仮想頂点の位置
+                #             target_position = mat * MVector3D(0, -nearest_distance, 0)
+                #             target_key = target_position.to_key(threshold)
+                #             if target_key not in virtual_vertices:
+                #                 virtual_vertices[target_key] = VirtualVertex(target_key)
+                #             virtual_vertices[target_key].positions.append(target_position.data())
+                #             vertex_map[v_yidx, v_xidx] = target_key
 
-                logger.info("-- 絶対頂点マップ: %s個目:終了 ---------", len(vertex_maps) + 1)
+                logger.info("-- 絶対頂点マップ: %s個目:終了 ---------", v_xidx + 1)
 
-                vertex_maps.append(vertex_map)
-                prev_x += x_count
-                x_count = 0
+                if vertex_map.any():
+                    vertex_maps.append(vertex_map)
+                    prev_x += x_count
+                    x_count = 0
 
         logger.debug("-----------------------")
 
@@ -4387,6 +4397,7 @@ class PmxTailorExportService:
         bottom_key: tuple,
         top_pos: MVector3D,
         from_key: tuple,
+        top_edge_keys: list,
         virtual_vertices: dict,
         base_vertical_axis: MVector3D,
         vkeys: list,
@@ -4487,10 +4498,15 @@ class PmxTailorExportService:
         vkeys.insert(0, vertical_key)
         vscores.insert(0, np.max(scores) * prev_diff_dot)
 
+        if vertical_key in top_edge_keys:
+            # 上端に辿り着いたら終了
+            return vkeys, vscores
+
         return self.create_vertex_line_map(
             bottom_key,
             top_pos,
             vertical_key,
+            top_edge_keys,
             virtual_vertices,
             base_vertical_axis,
             vkeys,
@@ -4515,27 +4531,61 @@ class PmxTailorExportService:
             # ほぼ真後ろを向いてる場合、固定で180度を入れておく
             degree = 180
 
+        if degree < 180:
+            return degree + 360
+
         return degree
 
-    def get_edge_lines(self, edge_line_pairs: dict, start_vkey: tuple, edge_lines: list, edge_vkeys: list, loop=0):
+    def get_edge_lines(
+        self, edge_line_pairs: dict, start_vkey: tuple, edge_lines: list, edge_vkeys: list, param_option: dict, loop=0
+    ):
         if len(edge_vkeys) >= len(edge_line_pairs.keys()) or loop > 500:
             return start_vkey, edge_lines, edge_vkeys
 
         if not start_vkey:
-            # X(中央揃え) - Z(降順) - Y(降順)
-            sorted_edge_line_pairs = sorted(
-                list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (abs(x[0]), -x[2], -x[1])
-            )
+            if param_option["direction"] == logger.transtext("上"):
+                # Y(昇順) - X(中央揃え) - Z(降順)
+                sorted_edge_line_pairs = sorted(
+                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (x[1], abs(x[0]), -x[2])
+                )
+            elif param_option["direction"] == logger.transtext("右"):
+                # X(降順) - Y(降順) - Z(降順)
+                sorted_edge_line_pairs = sorted(
+                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (-x[0], -x[1], -x[2])
+                )
+            elif param_option["direction"] == logger.transtext("左"):
+                # X(昇順) - Y(降順) - Z(降順)
+                sorted_edge_line_pairs = sorted(
+                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (x[0], -x[1], -x[2])
+                )
+            else:
+                # 下: Y(降順) - X(中央揃え) - Z(降順)
+                sorted_edge_line_pairs = sorted(
+                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (-x[1], abs(x[0]), -x[2])
+                )
             start_vkey = sorted_edge_line_pairs[0]
             edge_lines.append([start_vkey])
             edge_vkeys.append(start_vkey)
 
-        for next_vkey in sorted(edge_line_pairs[start_vkey], key=lambda x: (x[0], x[2], -x[1])):
+        if param_option["direction"] == logger.transtext("上"):
+            # X(中央揃え) - Z(降順) - Y(昇順)
+            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (abs(x[0]), -x[2], x[1]))
+        elif param_option["direction"] == logger.transtext("右"):
+            # Y(降順) - Z(降順) - X(降順)
+            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (-x[1], -x[2], -x[0]))
+        elif param_option["direction"] == logger.transtext("左"):
+            # Y(降順) - Z(降順) - X(昇順)
+            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (-x[1], -x[2], x[0]))
+        else:
+            # 下: X(中央揃え) - Z(降順) - Y(降順)
+            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (abs(x[0]), -x[2], -x[1]))
+
+        for next_vkey in sorted_edge_line_pairs:
             if next_vkey not in edge_vkeys:
                 edge_lines[-1].append(next_vkey)
                 edge_vkeys.append(next_vkey)
                 start_vkey, edge_lines, edge_vkeys = self.get_edge_lines(
-                    edge_line_pairs, next_vkey, edge_lines, edge_vkeys, loop + 1
+                    edge_line_pairs, next_vkey, edge_lines, edge_vkeys, param_option, loop + 1
                 )
 
         return None, edge_lines, edge_vkeys
