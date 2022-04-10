@@ -4186,6 +4186,16 @@ class PmxTailorExportService:
 
             logger.info("%s: 頂点マップ[%s]: 不要軸削除", material_name, f"{(bi + 1):03d}")
 
+            # X軸方向の削除
+            remove_xidxs = []
+            for v_xidx in range(tmp_vertex_map.shape[1]):
+                if np.isnan(tmp_vertex_map[:, v_xidx]).all():
+                    # 全部nanの場合、削除対象
+                    remove_xidxs.append(v_xidx)
+
+            tmp_vertex_map = np.delete(tmp_vertex_map, remove_xidxs, axis=1)
+            tmp_score_map = np.delete(tmp_score_map, remove_xidxs, axis=0)
+
             # Y軸方向の削除
             remove_yidxs = []
             for v_yidx in range(tmp_vertex_map.shape[0]):
@@ -4201,16 +4211,6 @@ class PmxTailorExportService:
                     remove_yidxs.append(v_yidx)
 
             tmp_vertex_map = np.delete(tmp_vertex_map, remove_yidxs, axis=0)
-
-            # X軸方向の削除
-            remove_xidxs = []
-            for v_xidx in range(tmp_vertex_map.shape[1]):
-                if np.isnan(tmp_vertex_map[:, v_xidx]).all():
-                    # 全部nanの場合、削除対象
-                    remove_xidxs.append(v_xidx)
-
-            tmp_vertex_map = np.delete(tmp_vertex_map, remove_xidxs, axis=1)
-            tmp_score_map = np.delete(tmp_score_map, remove_xidxs, axis=0)
 
             logger.info("%s: 頂点マップ[%s]: 頂点ルート決定", material_name, f"{(bi + 1):03d}")
 
