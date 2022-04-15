@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 from cmath import isnan
+from locale import normalize
 import logging
 import os
 import traceback
@@ -3003,6 +3004,9 @@ class PmxTailorExportService:
     ):
         logger.info("【%s】ボーン生成", material_name, decoration=MLogger.DECORATION_LINE)
 
+        # 閾値
+        threshold = param_option["threshold"]
+
         # 中心ボーン生成
 
         # 略称
@@ -3310,7 +3314,7 @@ class PmxTailorExportService:
                 # 登録対象外だった場合、前に登録されているボーン名を参照する
                 registed_bone_names[bone.index] = rbone_name
                 # 仮想頂点に紐付くボーンも統一する
-                vv = virtual_vertices[bone.position.to_key(param_option["threshold"])]
+                vv = virtual_vertices[bone.position.to_key(threshold)]
                 for midx in vv.map_bones.keys():
                     vv.map_bones[midx] = rbone
 
@@ -3608,12 +3612,13 @@ class PmxTailorExportService:
         bone_grid = param_option["bone_grid"]
         bone_grid_cols = param_option["bone_grid_cols"]
         bone_grid_rows = param_option["bone_grid_rows"]
-        # 閾値
-        threshold = param_option["threshold"]
 
         logger.info("【%s】ボーンマップ生成", material_name, decoration=MLogger.DECORATION_LINE)
 
         logger.info("%s: ウェイトボーンの確認", material_name)
+
+        # 閾値
+        threshold = param_option["threshold"]
 
         virtual_vertices = {}
 
@@ -3824,7 +3829,7 @@ class PmxTailorExportService:
         logger.info("%s: 仮想頂点リストの生成", material_name)
 
         virtual_vertices = {}
-        index_surface_dots = {}
+        index_surface_normals = {}
         edge_pair_lkeys = {}
         n = 0
         for index_idx in model.material_indices[material_name]:
@@ -3866,26 +3871,41 @@ class PmxTailorExportService:
                 parent_intersect = parent_bone.position * base_reverse_axis + MVector3D(
                     mean_pos * np.abs(base_vertical_axis.data())
                 )
-
-                # 面法線と親ボーンへの向きとの内積
-                normal_dot = MVector3D.dotProduct(surface_normal, (mean_pos - parent_intersect).normalized())
+                # 面垂線と軸ベクトルとの内積
+                direction_dot = MVector3D.dotProduct(surface_normal, base_vertical_axis)
 
                 if np.isclose(material_direction, 0):
                     # 水平の場合、軸の向きだけ考える
-                    normal_dot = surface_normal.data()[target_idx]
+                    intersect = surface_normal.data()[target_idx]
+                    intersect_vec = base_vertical_axis
+                else:
+                    # 面垂線と親ボーンとの交点
+                    intersect_vec, intersect_tt, intersect_uu, intersect_len = calc_intersect(
+                        mean_pos,
+                        mean_pos + surface_normal * 1000,
+                        parent_bone.position + -base_vertical_axis * 1000,
+                        parent_bone.position + base_vertical_axis * 1000,
+                    )
+                    logger.debug(
+                        f"tt[{round(intersect_tt, 5)}], uu[{round(intersect_uu, 5)}], len[{round(intersect_len, 5)}], iv[{intersect_vec.to_log()}]"
+                    )
+                    # どちらかが範囲内なら表。両方とも範囲外なら裏
+                    intersect = 0 <= intersect_tt <= 1 or 0 <= intersect_uu <= 1
 
-                # 面法線と同じ向き場合、辺キー生成（表面のみを対象とする）
+                # 面法線と同じ向き場合かつ面垂線の向きが軸ベクトルに近くない場合、辺キー生成（表面のみを対象とする）
                 # プリーツは厚みがないとみなす
-                if normal_dot > 0 or param_option["special_shape"] == logger.transtext("プリーツ"):
+                if (intersect > 0 and direction_dot < 0.5) or param_option["special_shape"] == logger.transtext(
+                    "プリーツ"
+                ):
                     lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
                     if index_idx not in edge_pair_lkeys[lkey]:
                         edge_pair_lkeys[lkey].append(index_idx)
 
-                    if lkey not in index_surface_dots:
-                        index_surface_dots[lkey] = []
-                    index_surface_dots[lkey].append(normal_dot)
+                    if lkey not in index_surface_normals:
+                        index_surface_normals[lkey] = []
+                    index_surface_normals[lkey].append(surface_normal)
 
                     # 仮想頂点登録（該当頂点対象）
                     if v0_key not in virtual_vertices:
@@ -3897,13 +3917,13 @@ class PmxTailorExportService:
                         remaining_vertices[v0_key] = virtual_vertices[v0_key]
 
                     logger.debug(
-                        f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}], pd[{parent_intersect.to_log()}], dot[{round(normal_dot, 5)}]"
+                        f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}], pd[{parent_intersect.to_log()}]"
                     )
                 else:
                     # 裏面に登録
                     back_vertices.append(v0_idx)
                     logger.debug(
-                        f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}], pd[{parent_intersect.to_log()}], dot[{round(normal_dot, 5)}]"
+                        f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}], pd[{parent_intersect.to_log()}]"
                     )
 
             n += 1
@@ -3922,17 +3942,25 @@ class PmxTailorExportService:
         logger.debug("--------------------------")
         edge_line_pairs = {}
         for n, ((min_vkey, max_vkey), line_iidxs) in enumerate(edge_pair_lkeys.items()):
+            surface_normals = index_surface_normals[(min_vkey, max_vkey)]
             is_pair = False
-            if len(line_iidxs) == 1:
+            if len(line_iidxs) <= 1:
                 is_pair = True
 
                 logger.debug(
                     f"○ min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], only-one-index"
                 )
             else:
-                logger.debug(
-                    f"× min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], multi-index"
-                )
+                surface_dots = [MVector3D.dotProduct(surface_normals[0], sn) for sn in surface_normals]
+                surface_dot_diffs = np.abs(np.array(surface_dots) - surface_dots[0])
+                if np.where(surface_dot_diffs < 0.2)[0].shape[0] == 1:
+                    logger.debug(
+                        f"△ min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], surface_dots[{[round(sd, 4) for sd in surface_dots]}], surface_diffs[{[round(sd, 4) for sd in surface_dot_diffs]}], surface-one-index"
+                    )
+                else:
+                    logger.debug(
+                        f"× min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], surface_dots[{[round(sd, 4) for sd in surface_dots]}], surface_diffs[{[round(sd, 4) for sd in surface_dot_diffs]}], multi-index"
+                    )
 
             if is_pair:
                 if min_vkey not in virtual_vertices or max_vkey not in virtual_vertices:
@@ -3950,18 +3978,6 @@ class PmxTailorExportService:
                 logger.info("-- 辺確認: %s個目:終了", n)
 
         if logger.is_debug_level():
-            logger.debug("--------------------------")
-            logger.debug("仮想頂点リスト")
-            for key, virtual_vertex in virtual_vertices.items():
-                logger.debug(f"[{key}] {virtual_vertex}")
-
-            logger.debug("--------------------------")
-            logger.debug("エッジリスト")
-            for (min_key, max_key), indexes in edge_pair_lkeys.items():
-                logger.debug(
-                    f"min[{min_key}:{virtual_vertices[min_key].vidxs()}], max[{max_key}:{virtual_vertices[max_key].vidxs()}] indexes[{indexes}]"
-                )
-
             logger.debug("--------------------------")
             logger.debug("エッジペアリスト")
             for v_key, pair_vkeys in edge_line_pairs.items():
@@ -4004,7 +4020,9 @@ class PmxTailorExportService:
                     mean_poses.append(now_edge_pos.data()[target_idx])
 
         target_mean = np.mean(mean_poses)
+        # topは全部並列
         all_top_edge_keys = []
+        # bottomはエッジが分かれてたら分ける
         all_bottom_edge_keys = []
 
         if len(all_edge_lines) == 2:
@@ -4012,31 +4030,29 @@ class PmxTailorExportService:
             for n, (edge_lines, target_poses) in enumerate(zip(all_edge_lines, target_idx_poses)):
                 if param_option["direction"] in ["下", "右"]:
                     if np.max(target_poses) >= target_mean:
-                        all_top_edge_keys.append(edge_lines)
+                        all_top_edge_keys = edge_lines
                     if np.min(target_poses) <= target_mean:
                         all_bottom_edge_keys.append(edge_lines)
                 else:
                     if np.max(target_poses) >= target_mean:
                         all_bottom_edge_keys.append(edge_lines)
                     if np.min(target_poses) <= target_mean:
-                        all_top_edge_keys.append(edge_lines)
+                        all_top_edge_keys = edge_lines
         else:
             # エッジが2つではない場合、半分で分ける(下右は大きい方、上左は小さい方)
             for n, (edge_lines, target_poses) in enumerate(zip(all_edge_lines, target_idx_poses)):
                 if param_option["direction"] in ["下", "右"]:
                     if np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)].shape[0] > 0:
-                        all_top_edge_keys.append([])
                         for key in np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)]:
-                            all_top_edge_keys[-1].append(tuple(key))
+                            all_top_edge_keys.append(tuple(key))
                     if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
                         all_bottom_edge_keys.append([])
                         for key in np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)]:
                             all_bottom_edge_keys[-1].append(tuple(key))
                 else:
                     if len(np.where(np.array(target_poses) < target_mean)) > 0:
-                        all_top_edge_keys.append([])
                         for key in np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)]:
-                            all_top_edge_keys[-1].append(tuple(key))
+                            all_top_edge_keys.append(tuple(key))
                     if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
                         all_bottom_edge_keys.append([])
                         for key in np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)]:
@@ -4057,9 +4073,8 @@ class PmxTailorExportService:
             return None, None, None, None
 
         top_edge_poses = []
-        for top_edge_keys in all_top_edge_keys:
-            for key in top_edge_keys:
-                top_edge_poses.append(virtual_vertices[key].position().data())
+        for key in all_top_edge_keys:
+            top_edge_poses.append(virtual_vertices[key].position().data())
 
         top_edge_mean_pos = MVector3D(np.mean(top_edge_poses, axis=0))
         top_edge_start_pos = MVector3D(
@@ -4275,7 +4290,7 @@ class PmxTailorExportService:
 
             tmp_vertex_map = np.delete(tmp_vertex_map, remove_yidxs, axis=0)
 
-            if not tmp_vertex_map:
+            if not tmp_vertex_map.any():
                 continue
 
             logger.info("%s: 頂点マップ[%s]: 頂点ルート決定", material_name, f"{(bi + 1):03d}")
@@ -4408,13 +4423,13 @@ class PmxTailorExportService:
             split_xs = []
             for x in range(tmp_vertex_map.shape[1]):
                 if not target_regists[x]:
-                    # 登録対象外の場合、接続仮想頂点リストにだけは追加する
-                    for y, vkey in enumerate(tmp_vertex_map[:, x]):
-                        if np.isnan(vkey).any() or np.isnan(vertex_map[y, prev_xx]).any():
-                            continue
-                        prev_vv = virtual_vertices[tuple(vertex_map[y, prev_xx])]
-                        vv = virtual_vertices[tuple(vkey)]
-                        prev_vv.connected_vvs.extend(vv.connected_vvs)
+                    # # 登録対象外の場合、接続仮想頂点リストにだけは追加する
+                    # for y, vkey in enumerate(tmp_vertex_map[:, x]):
+                    #     if np.isnan(vkey).any() or np.isnan(vertex_map[y, prev_xx]).any():
+                    #         continue
+                    #     prev_vv = virtual_vertices[tuple(vertex_map[y, prev_xx])]
+                    #     vv = virtual_vertices[tuple(vkey)]
+                    #     prev_vv.connected_vvs.extend(vv.connected_vvs)
                     continue
 
                 if target_splits[x]:
@@ -4426,9 +4441,9 @@ class PmxTailorExportService:
                     vkey = tuple(vkey)
                     vv = virtual_vertices[vkey]
                     vv.map_bones[bi] = None
-                    if not vv.vidxs():
-                        prev_xx = xx
-                        continue
+                    # if not vv.vidxs():
+                    #     prev_xx = xx
+                    #     continue
 
                     logger.debug(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
 
@@ -4436,27 +4451,27 @@ class PmxTailorExportService:
                     vertex_display_map[y, xx] = ":".join([str(v) for v in vv.vidxs()])
                     registed_vertices.append(vkey)
 
-                    if xx > 0 and not target_regists[x - 1]:
-                        # 前のキーが対象外だった場合、前のキーに今のキーの接続情報を追加しておく
-                        if not np.isnan(vertex_map[y, xx - 1]).any():
-                            prev_vv = virtual_vertices[tuple(vertex_map[y, xx - 1])]
-                            prev_vv.connected_vvs.append(vkey)
-                            vv.connected_vvs.append(prev_vv.key)
+                    # if xx > 0 and not target_regists[x - 1]:
+                    #     # 前のキーが対象外だった場合、前のキーに今のキーの接続情報を追加しておく
+                    #     if not np.isnan(vertex_map[y, xx - 1]).any():
+                    #         prev_vv = virtual_vertices[tuple(vertex_map[y, xx - 1])]
+                    #         prev_vv.connected_vvs.append(vkey)
+                    #         vv.connected_vvs.append(prev_vv.key)
 
-                    prev_xx = xx
+                    # prev_xx = xx
 
                 xx += 1
                 logger.debug("-------")
 
-            if not target_regists[0]:
-                # 最初のキーが対象外だった場合、最後のキーの接続情報を最初に追加しておく
-                for y, vkey in enumerate(vertex_map[:, -1]):
-                    if not np.isnan(vertex_map[y, 0]).any():
-                        vkey = tuple(vkey)
-                        prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
-                        prev_vv.connected_vvs.append(vkey)
-                        vv = virtual_vertices[vkey]
-                        vv.connected_vvs.append(prev_vv.key)
+            # if not target_regists[0]:
+            #     # 最初のキーが対象外だった場合、最後のキーの接続情報を最初に追加しておく
+            #     for y, vkey in enumerate(vertex_map[:, -1]):
+            #         if not np.isnan(vertex_map[y, 0]).any():
+            #             vkey = tuple(vkey)
+            #             prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
+            #             prev_vv.connected_vvs.append(vkey)
+            #             vv = virtual_vertices[vkey]
+            #             vv.connected_vvs.append(prev_vv.key)
 
             if vertex_map.any():
                 target_vertex_maps = []
@@ -4674,10 +4689,12 @@ class PmxTailorExportService:
             to_pos = to_vv.position()
 
             direction_dot = MVector3D.dotProduct(top_x_pos, (to_pos - from_pos).normalized())
-            if to_key in vkeys or direction_dot <= 0.3:
+            if to_key in vkeys or direction_dot < 0.3:
                 # 到達済み、反対方向のベクトルには行かせない
                 scores.append(0)
-                logger.debug(f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], 対象外")
+                logger.debug(
+                    f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], 対象外"
+                )
                 continue
 
             mat = MMatrix4x4()
@@ -5214,42 +5231,46 @@ def is_col_capsule_capsule(c1: MCapsule, c2: MCapsule):
 #     fac = -MVector3D.dotProduct(Q1, w) / dot
 #     x = u * fac
 
-#     return x
+#     return x, fac
 
 
-# # https://stackoverflow.com/questions/34602761/intersecting-3d-lines
-# def calc_intersect(P0: MVector3D, P1: MVector3D, Q0: MVector3D, Q1: MVector3D) -> MVector3D:
-#     # Direction vectors
-#     DP = (P1 - P0).normalized()
-#     DQ = (Q1 - Q0).normalized()
+# https://stackoverflow.com/questions/34602761/intersecting-3d-lines
+def calc_intersect(P0: MVector3D, P1: MVector3D, Q0: MVector3D, Q1: MVector3D) -> MVector3D:
+    # Direction vectors
+    DP = (P1 - P0).normalized()
+    DQ = (Q1 - Q0).normalized()
 
-#     # start difference vector
-#     PQ = (Q0 - P0).normalized()
+    # start difference vector
+    PQ = (Q0 - P0).normalized()
 
-#     # Find values
-#     a = MVector3D.dotProduct(DP, DP)
-#     b = MVector3D.dotProduct(DP, DQ)
-#     c = MVector3D.dotProduct(DQ, DQ)
-#     d = MVector3D.dotProduct(DP, PQ)
-#     e = MVector3D.dotProduct(DQ, PQ)
+    # Find values
+    a = MVector3D.dotProduct(DP, DP)
+    b = MVector3D.dotProduct(DP, DQ)
+    c = MVector3D.dotProduct(DQ, DQ)
+    d = MVector3D.dotProduct(DP, PQ)
+    e = MVector3D.dotProduct(DQ, PQ)
 
-#     # Find discriminant
-#     DD = a * c - b * d
+    # Find discriminant
+    DD = a * c - b * b
 
-#     if np.isclose(DD, 0):
-#         return None
+    # segments are parallel, and consider special case of (partial) coincidence
+    if np.isclose(DD, 0):
+        return MVector3D(), -1, -1, -1
 
-#     # Find parameters for the closest points on lines
-#     tt = (b * e - c * d) / DD
-#     uu = (a * e - b * d) / DD
+    # Find parameters for the closest points on lines
+    tt = (b * e - c * d) / DD
+    uu = (a * e - b * d) / DD
 
-#     # if not (0 <= tt <= 1 and 0 <= uu <= 1):
-#     #     return None
+    Pt = P0 + (DP * tt)
+    Qu = Q0 + (DQ * uu)
 
-#     Pt = DP * (P0 + tt)
-#     Qu = DQ * (Q0 + uu)
+    length = Pt.distanceToPoint(Qu)
 
-#     return Pt
+    # # If any parameter is out of range 0..1, then segments don't intersect
+    # if not (0 <= tt <= 1 and 0 <= uu <= 1):
+    #     return Pt, tt, uu, np.iinfo(np.int32).max
+
+    return Pt, tt, uu, length
 
 
 SEMI_STANDARD_BONE_NAMES = [
