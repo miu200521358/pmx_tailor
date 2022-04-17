@@ -524,7 +524,7 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("裾材質　　"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_edge_material_txt.SetToolTip(
-            logger.transtext("物理材質の裾にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます")
+            logger.transtext("物理材質の裾（など別材質）にあたる材質がある場合、選択してください。\n物理材質のボーン割りに応じてウェイトを割り当てます")
         )
         self.simple_edge_material_txt.Wrap(-1)
         self.simple_edge_material_sizer.Add(self.simple_edge_material_txt, 0, wx.ALL, 5)
@@ -533,6 +533,24 @@ class PhysicsParam:
         self.simple_edge_material_ctrl.SetToolTip(self.simple_edge_material_txt.GetToolTipText())
         self.simple_edge_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_edge_material_sizer.Add(self.simple_edge_material_ctrl, 0, wx.ALL, 5)
+
+        # 追加裾材質ダイアログ
+        self.simple_extend_edge_choice_ctrl = wx.MultiChoiceDialog(
+            self.frame,
+            logger.transtext("追加で裾材質を指定したい場合に選択してください。\n裾の裏は裏材質に割り当ててください"),
+            caption="追加裾材質選択",
+            choices=self.frame.material_list,
+            style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE,
+        )
+        self.simple_extend_edge_choice_ctrl.Hide()
+
+        # 追加裾材質ボタン
+        self.simple_extend_edge_btn_ctrl = wx.Button(
+            self.simple_window, wx.ID_ANY, logger.transtext("追加裾材質"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.simple_extend_edge_btn_ctrl.SetToolTip(logger.transtext("追加で裾材質を指定したい場合に選択してください。\n裾の裏は裏材質に割り当ててください"))
+        self.simple_extend_edge_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_click_extend_edge)
+        self.simple_edge_material_sizer.Add(self.simple_extend_edge_btn_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_edge_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
@@ -551,6 +569,24 @@ class PhysicsParam:
         self.simple_back_material_ctrl.SetToolTip(self.simple_back_material_txt.GetToolTipText())
         self.simple_back_material_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.simple_back_material_sizer.Add(self.simple_back_material_ctrl, 0, wx.ALL, 5)
+
+        # 追加裏材質ダイアログ
+        self.simple_extend_back_choice_ctrl = wx.MultiChoiceDialog(
+            self.frame,
+            logger.transtext("追加で裏材質を指定したい場合に選択してください。"),
+            caption="追加裏材質選択",
+            choices=self.frame.material_list,
+            style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE,
+        )
+        self.simple_extend_back_choice_ctrl.Hide()
+
+        # 追加裏材質ボタン
+        self.simple_extend_back_btn_ctrl = wx.Button(
+            self.simple_window, wx.ID_ANY, logger.transtext("追加裏材質"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.simple_extend_back_btn_ctrl.SetToolTip(logger.transtext("追加で裏材質を指定したい場合に選択してください。"))
+        self.simple_extend_back_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_click_extend_back)
+        self.simple_back_material_sizer.Add(self.simple_extend_back_btn_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_back_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
@@ -818,7 +854,7 @@ class PhysicsParam:
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_txt, 0, wx.ALL, 5)
 
         self.vertical_bone_density_spin = wx.SpinCtrl(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(50, -1), value="1", min=1, max=20, initial=1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(50, -1), value="2", min=1, max=20, initial=2
         )
         self.vertical_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.vertical_bone_density_spin, 0, wx.ALL, 5)
@@ -2458,7 +2494,13 @@ class PhysicsParam:
                 "primitive": self.simple_primitive_ctrl.GetStringSelection(),
                 "special_shape": self.simple_special_shape_ctrl.GetStringSelection(),
                 "back_material_name": self.simple_back_material_ctrl.GetStringSelection(),
+                "back_extend_material_names": ",".join(
+                    [str(cidx) for cidx in self.simple_extend_back_choice_ctrl.GetSelections()]
+                ),
                 "edge_material_name": self.simple_edge_material_ctrl.GetStringSelection(),
+                "edge_extend_material_names": ",".join(
+                    [str(cidx) for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()]
+                ),
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
                 "params": self.get_param_export_data(),
             }
@@ -2467,7 +2509,13 @@ class PhysicsParam:
             # 簡易版オプションデータ -------------
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
             params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
+            params["back_extend_material_names"] = [
+                self.frame.material_list[cidx] for cidx in self.simple_extend_back_choice_ctrl.GetSelections()
+            ]
             params["edge_material_name"] = self.simple_edge_material_ctrl.GetStringSelection()
+            params["edge_extend_material_names"] = [
+                self.frame.material_list[cidx] for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()
+            ]
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
             params["direction"] = self.simple_direction_ctrl.GetStringSelection()
@@ -3241,8 +3289,16 @@ class PhysicsParam:
                 )
             if not self.simple_back_material_ctrl.GetStringSelection():
                 self.simple_back_material_ctrl.SetStringSelection(abb_setting.get("back_material_name", ""))
+            if not self.simple_extend_back_choice_ctrl.GetSelections():
+                for cidx in abb_setting.get("back_extend_material_names", "").split(","):
+                    if cidx:
+                        self.simple_edge_material_ctrl.SetSelection(int(cidx))
             if not self.simple_edge_material_ctrl.GetStringSelection():
                 self.simple_edge_material_ctrl.SetStringSelection(abb_setting.get("edge_material_name", ""))
+            if not self.simple_extend_edge_choice_ctrl.GetSelections():
+                for cidx in abb_setting.get("edge_extend_material_names", "").split(","):
+                    if cidx:
+                        self.simple_extend_edge_choice_ctrl.SetSelection(int(cidx))
             if not self.vertices_csv_file_ctrl.path():
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
 
@@ -3633,7 +3689,7 @@ class PhysicsParam:
             self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot / 3)
             self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot / 3)
 
-            spring_rot = max(0, min(180, base_spring_val * 10))
+            spring_rot = max(0, min(180, base_spring_val * 8))
             self.vertical_joint_spring_rot_x_spin.SetValue(spring_rot)
             self.vertical_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.vertical_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -3652,7 +3708,7 @@ class PhysicsParam:
             self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot / 3)
             self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot / 3)
 
-            spring_rot = max(0, min(180, base_spring_val * 10))
+            spring_rot = max(0, min(180, base_spring_val * 8))
             self.horizonal_joint_spring_rot_x_spin.SetValue(spring_rot)
             self.horizonal_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.horizonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -3667,7 +3723,7 @@ class PhysicsParam:
             self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
             self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
 
-            spring_rot = max(0, min(180, base_spring_val * 5))
+            spring_rot = max(0, min(180, base_spring_val * 3))
             self.diagonal_joint_spring_rot_x_spin.SetValue(spring_rot)
             self.diagonal_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.diagonal_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -3682,7 +3738,7 @@ class PhysicsParam:
             self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
             self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
 
-            spring_rot = max(0, min(180, base_spring_val * 5))
+            spring_rot = max(0, min(180, base_spring_val * 3))
             self.reverse_joint_spring_rot_x_spin.SetValue(spring_rot)
             self.reverse_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.reverse_joint_spring_rot_z_spin.SetValue(spring_rot)
@@ -3817,6 +3873,14 @@ class PhysicsParam:
                         self.weighted_bone_names[tail_bone_idx].append(bone_name)
                         registed_bone_names.append(bone_name)
             logger.debug("weighted_bone_names[%s]: %s", tail_bone_idx, self.weighted_bone_names[tail_bone_idx])
+
+    def on_click_extend_edge(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
+        self.simple_extend_edge_choice_ctrl.ShowModal()
+
+    def on_click_extend_back(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
+        self.simple_extend_back_choice_ctrl.ShowModal()
 
 
 def calc_ratio(ratio: float, oldmin: float, oldmax: float, newmin: float, newmax: float):
