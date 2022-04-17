@@ -3682,10 +3682,11 @@ class PhysicsParam:
             self.advance_vertical_joint_coefficient_spin.SetValue(base_joint_val * 20)
 
             vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 2))
+            vertical_joint_y_rot = max(0, min(90, 90 - base_joint_val * 90 * 2))
             self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot / 1)
             self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot / 1)
-            self.vertical_joint_rot_y_min_spin.SetValue(-vertical_joint_rot / 1.5)
-            self.vertical_joint_rot_y_max_spin.SetValue(vertical_joint_rot / 1.5)
+            self.vertical_joint_rot_y_min_spin.SetValue(-vertical_joint_y_rot / 1.5)
+            self.vertical_joint_rot_y_max_spin.SetValue(vertical_joint_y_rot / 1.5)
             self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot / 3)
             self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot / 3)
 
@@ -3701,10 +3702,11 @@ class PhysicsParam:
             self.advance_horizonal_joint_coefficient_spin.SetValue(base_joint_val * 10)
 
             horizonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 1))
+            horizonal_joint_y_rot = max(0, min(90, 90 - base_joint_val * 90 * 1))
             self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot / 1)
             self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot / 1)
-            self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_rot / 1.5)
-            self.horizonal_joint_rot_y_max_spin.SetValue(horizonal_joint_rot / 1.5)
+            self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_y_rot / 1.5)
+            self.horizonal_joint_rot_y_max_spin.SetValue(horizonal_joint_y_rot / 1.5)
             self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot / 3)
             self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot / 3)
 
@@ -3716,10 +3718,11 @@ class PhysicsParam:
             self.advance_diagonal_joint_coefficient_spin.SetValue(base_joint_val * 10)
 
             diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 0.75))
+            diagonal_joint_y_rot = max(0, min(90, 90 - base_joint_val * 90 * 0.75))
             self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
             self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
-            self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_rot)
-            self.diagonal_joint_rot_y_max_spin.SetValue(diagonal_joint_rot)
+            self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_y_rot)
+            self.diagonal_joint_rot_y_max_spin.SetValue(diagonal_joint_y_rot)
             self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
             self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
 
@@ -3731,10 +3734,11 @@ class PhysicsParam:
             self.advance_reverse_joint_coefficient_spin.SetValue(base_joint_val * 10)
 
             reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 0.5))
+            reverse_joint_y_rot = max(0, min(90, 90 - base_joint_val * 90 * 0.5))
             self.reverse_joint_rot_x_min_spin.SetValue(-reverse_joint_rot)
             self.reverse_joint_rot_x_max_spin.SetValue(reverse_joint_rot)
-            self.reverse_joint_rot_y_min_spin.SetValue(-reverse_joint_rot)
-            self.reverse_joint_rot_y_max_spin.SetValue(reverse_joint_rot)
+            self.reverse_joint_rot_y_min_spin.SetValue(-reverse_joint_y_rot)
+            self.reverse_joint_rot_y_max_spin.SetValue(reverse_joint_y_rot)
             self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
             self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
 
