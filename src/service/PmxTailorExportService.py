@@ -1174,8 +1174,8 @@ class PmxTailorExportService:
                         ratio = 1
                         if param_option["horizonal_joint_restruct"]:
                             # 親剛体との距離制限を加える場合
-                            for n in range(10):
-                                check_ratio = 1 + (n * 0.02)
+                            for n in range(6):
+                                check_ratio = 1 + ((n + 1) * 0.06)
 
                                 a_mat = MMatrix4x4()
                                 a_mat.setToIdentity()
@@ -1217,7 +1217,7 @@ class PmxTailorExportService:
 
                                 if a_col or b_col:
                                     # 剛体のどちらかが衝突していたらその分動きを制限する
-                                    ratio = n * 0.1
+                                    ratio = n * 0.05
                                     logger.info(
                                         "親剛体と距離が近接しているため、横ジョイントの可動域を制限します。剛体A: %s, 剛体B: %s, 制限率: %s",
                                         a_rigidbody.name,
@@ -4303,13 +4303,16 @@ class PmxTailorExportService:
         horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
 
         # 変曲点を求める
-        target_idx_pose_f_prime_diff = np.where(np.diff(np.sign(np.gradient(np.round(all_top_edge_poses, 1)))))[0]
+        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_poses)) >= threshold)[0]
+        # target_idx_pose_f_prime_diff = np.where(
+        #     np.diff(np.sign(np.gradient(np.round(np.array(all_top_edge_poses) * 100))))
+        # )[0]
 
-        if len(target_idx_pose_f_prime_diff) <= 2:
+        if len(target_idx_pose_f_prime_diff) < 2:
             # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす
             horizonal_top_edge_keys = all_top_edge_keys
         else:
-            target_idx_pose_indices = [0] + target_idx_pose_f_prime_diff.tolist() + [len(all_top_edge_poses)]
+            target_idx_pose_indices = [0] + (target_idx_pose_f_prime_diff + 1).tolist() + [len(all_top_edge_poses)]
 
             # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
             for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
@@ -4526,8 +4529,10 @@ class PmxTailorExportService:
 
             # XYの最大と最小の抽出
             xu = np.unique([i for i, vk in enumerate(all_vkeys)])
-            # Yは全マップの最大値分確保する
+            # Yは全マップの中央値を確保する
             yu = np.unique([i for vks in all_vkeys for i, vk in enumerate(vks)])
+            # yの数の中央値
+            median_ys = np.median([len(vks) for vks in all_vkeys])
 
             # 存在しない頂点INDEXで二次元配列初期化
             tmp_vertex_map = np.full((len(yu), len(xu), 3), (np.nan, np.nan, np.nan))
@@ -4601,10 +4606,6 @@ class PmxTailorExportService:
             target_regists = [False for _ in range(tmp_vertex_map.shape[1])]
             # target_splits = [False for _ in range(tmp_vertex_map.shape[1])]
 
-            # # Yの数
-            # map_ys = [len(tmp_vertex_map[:, xi]) for xi in range(tmp_vertex_map.shape[1])]
-            # # median_ys = np.median(map_ys)
-
             bottom_keys = {}
             for x, (top_vkey, bottom_vkey) in enumerate(zip(tmp_vertex_map[0, :], tmp_vertex_map[-1, :])):
                 top_vkey = tuple(top_vkey)
@@ -4632,11 +4633,12 @@ class PmxTailorExportService:
                     #     "プリーツ"
                     # ):
                     total_scores = {}
-                    for x, (top_vkey, bottom_vkey, score) in enumerate(
-                        zip(tmp_vertex_map[0, :], tmp_vertex_map[-1, :], tmp_score_map)
+                    for x, (top_vkey, bottom_vkey, vks, score) in enumerate(
+                        zip(tmp_vertex_map[0, :], tmp_vertex_map[-1, :], all_vkeys, tmp_score_map)
                     ):
                         if tuple(top_vkey) == tuple(top_key):
-                            total_scores[x] = score
+                            # Yの個数は中央値ベースで考える
+                            total_scores[x] = score * abs(1 / (len(vks) + 1 - median_ys))
                             # logger.debug(
                             #     f"x[{x}], top_vkey[{tuple(top_vkey)}][{virtual_vertices[tuple(top_vkey)].vidxs()}], "
                             #     + f"bottom_vkey[{tuple(bottom_vkey)}][{virtual_vertices[tuple(bottom_vkey)].vidxs()}], "
@@ -4802,7 +4804,7 @@ class PmxTailorExportService:
             if not target_regists[0]:
                 # 最初のキーが対象外だった場合、最後のキーの接続情報を最初に追加しておく
                 for y, vkey in enumerate(vertex_map[:, -1]):
-                    if not np.isnan(vertex_map[y, 0]).any():
+                    if not np.isnan(vertex_map[y, 0]).any() and not np.isnan(vkey).any():
                         vkey = tuple(vkey)
                         prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
                         prev_vv.connected_vvs.append(vkey)
@@ -5084,11 +5086,20 @@ class PmxTailorExportService:
                 else 1
             )
 
+            if prev_dot < 0.7:
+                # ズレた方向には行かせない
+                scores.append(0)
+                prev_dots.append(0)
+                logger.debug(
+                    f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, 前ズレ方向"
+                )
+                continue
+
             score = (yaw_score * 20) + pitch_score + (roll_score * 2)
 
             # scores.append(score * (2 if to_key in top_keys else 1))
             scores.append(score)
-            prev_dots.append(prev_dot)
+            prev_dots.append(prev_dot * direction_dot)
 
             logger.debug(
                 f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], prev_dot[{prev_dot}], local_next_vpos[{local_next_vpos.to_log()}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
