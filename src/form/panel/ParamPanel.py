@@ -590,7 +590,7 @@ class PhysicsParam:
         self.simple_grid_sizer.Add(self.simple_threshold_txt, 0, wx.ALL, 5)
 
         self.simple_threshold_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("（0.05）"), wx.DefaultPosition, wx.DefaultSize, 0
+            self.simple_window, wx.ID_ANY, logger.transtext("（0.1）"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_threshold_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_threshold_label, 0, wx.ALL, 5)
@@ -604,9 +604,9 @@ class PhysicsParam:
         self.simple_threshold_slider = FloatSliderCtrl(
             self.simple_window,
             wx.ID_ANY,
-            0.05,
+            0.1,
             0.005,
-            0.2,
+            0.3,
             0.001,
             self.simple_threshold_label,
             wx.DefaultPosition,
@@ -616,7 +616,7 @@ class PhysicsParam:
         self.simple_grid_sizer.Add(self.simple_threshold_slider, 1, wx.ALL | wx.EXPAND, 5)
 
         self.simple_threshold_max_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("0.2"), wx.DefaultPosition, wx.DefaultSize, 0
+            self.simple_window, wx.ID_ANY, logger.transtext("0.3"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_threshold_max_label.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_threshold_max_label, 0, wx.ALL, 5)
