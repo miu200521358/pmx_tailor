@@ -2159,10 +2159,18 @@ class PmxTailorExportService:
                 elif rigidbody_shape_type == 1:
                     # 箱剛体の場合
                     shape_size = MVector3D(
-                        x_size * (0.17 if prev_connected or next_connected else 0.5),
+                        x_size
+                        * (
+                            0.27
+                            if prev_connected and next_connected
+                            else 0.32
+                            if prev_connected or next_connected
+                            else 0.5
+                        ),
                         max(0.25, (y_size * (0.5 if 0 < v_yidx < max_v_yidx else 0.3))),
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
+
                 else:
                     # カプセル剛体の場合
                     shape_size = MVector3D(
@@ -2206,6 +2214,7 @@ class PmxTailorExportService:
                     math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
                 )
 
+                # 基本はボーンの位置に剛体
                 shape_position = target_bone.position
 
                 if 0 == v_yidx:
@@ -2224,6 +2233,25 @@ class PmxTailorExportService:
 
                     # ちょっと上に寄せる
                     shape_position = mat * MVector3D(0, shape_size.y() / 2, 0)
+
+                if rigidbody_shape_type == 1:
+                    # 箱剛体かつ端の場合
+                    if prev_connected and not next_connected:
+                        mat = MMatrix4x4()
+                        mat.setToIdentity()
+                        mat.translate(shape_position)
+                        mat.rotate(shape_qq)
+
+                        # ちょっとprevに寄せる
+                        shape_position = mat * MVector3D(shape_size.x() / 2, 0)
+                    elif not prev_connected and next_connected:
+                        mat = MMatrix4x4()
+                        mat.setToIdentity()
+                        mat.translate(shape_position)
+                        mat.rotate(shape_qq)
+
+                        # ちょっとnextに寄せる
+                        shape_position = mat * MVector3D(-shape_size.x() / 2, 0)
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1
