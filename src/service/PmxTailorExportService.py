@@ -1064,6 +1064,7 @@ class PmxTailorExportService:
                                 or (a_rigidbody.name == b_rigidbody.name)
                                 or a_rigidbody.index < 0
                                 or b_rigidbody.index < 0
+                                or not now_below_vv
                             ):
                                 joint_axis_up = (
                                     now_below_vv.map_bones[base_map_idx].position - vv.map_bones[base_map_idx].position
@@ -3846,6 +3847,7 @@ class PmxTailorExportService:
         virtual_vertices = {}
 
         # ウェイトボーンリスト取得
+        weighted_vertex_positions = {}
         weighted_bone_pairs = []
         for n, v_idx in enumerate(model.material_vertices[material_name]):
             if v_idx not in target_vertices:
@@ -3856,6 +3858,12 @@ class PmxTailorExportService:
             if v_key not in virtual_vertices:
                 virtual_vertices[v_key] = VirtualVertex(v_key)
             virtual_vertices[v_key].append([v], [], [])
+
+            for weighted_bone_idx in v.deform.get_idx_list(weight=0.1):
+                # ウェイトを持ってるボーンのINDEXを保持
+                if weighted_bone_idx not in weighted_vertex_positions:
+                    weighted_vertex_positions[weighted_bone_idx] = []
+                weighted_vertex_positions[weighted_bone_idx].append(v.position.data())
 
             if type(v.deform) is Bdef2 or type(v.deform) is Sdef:
                 if 0 < v.deform.weight0 < 1:
@@ -3904,16 +3912,17 @@ class PmxTailorExportService:
                 for grid_row in range(bone_grid_rows):
                     bone_name = bone_grid[grid_row][grid_col]
                     bone = model.bones.get(bone_name, None)
-                    if not bone_name or not bone:
+                    if not bone_name or not bone or bone.index not in weighted_vertex_positions:
                         continue
 
-                    # ボーンの位置で登録する
-                    nearest_v_key = bone.position.to_key(threshold)
+                    # ウェイトを持つボーンの場合
+
+                    # ウェイト頂点の中心を保持
+                    nearest_v_key = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0)).to_key(threshold)
                     if nearest_v_key not in virtual_vertices:
                         virtual_vertices[nearest_v_key] = VirtualVertex(nearest_v_key)
 
-                    # 最もボーンに近い頂点に紐付くボーンとして登録
-                    virtual_vertices[nearest_v_key].positions.append(bone.position.data())
+                    # ウェイト頂点の中心頂点に紐付くボーンとして登録
                     virtual_vertices[nearest_v_key].map_bones[0] = bone
                     vertex_map[grid_row, grid_col] = nearest_v_key
                     regist_bones[grid_row, grid_col] = True
@@ -3963,20 +3972,22 @@ class PmxTailorExportService:
                 vertex_map = np.full((len(valid_bone_grid_rows), 1, 3), (np.nan, np.nan, np.nan))
                 # 横との接続は一切なし
                 bone_connected = np.zeros((len(valid_bone_grid_rows), 1), dtype=np.int)
-                regist_bones = np.full((len(valid_bone_grid_rows), 1), 1, dtype=np.int)
+                regist_bones = np.zeros((len(valid_bone_grid_rows), 1), dtype=np.int)
 
                 for grid_row in valid_bone_grid_rows:
                     bone_name = bone_grid[grid_row][grid_col]
                     bone = model.bones.get(bone_name, None)
-                    if not bone_name or not bone:
+                    if not bone_name or not bone or bone.index not in weighted_vertex_positions:
                         continue
 
-                    # ボーンの位置で登録する
-                    nearest_v_key = bone.position.to_key(threshold)
+                    # ウェイトを持つボーンの場合
+
+                    # ウェイト頂点の中心を保持
+                    nearest_v_key = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0)).to_key(threshold)
                     if nearest_v_key not in virtual_vertices:
                         virtual_vertices[nearest_v_key] = VirtualVertex(nearest_v_key)
 
-                    # 最もボーンに近い頂点に紐付くボーンとして登録
+                    # ウェイト頂点の中心頂点に紐付くボーンとして登録
                     virtual_vertices[nearest_v_key].map_bones[grid_col] = bone
                     vertex_map[grid_row, 0] = nearest_v_key
                     regist_bones[grid_row, 0] = True
