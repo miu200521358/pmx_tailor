@@ -152,6 +152,9 @@ class ParamPanel(BasePanel):
                         self.physics_list[-1].simple_material_ctrl.SetStringSelection(
                             vroid2pmx_setting["material_name"]
                         )
+                        self.physics_list[-1].simple_back_material_ctrl.SetStringSelection(
+                            vroid2pmx_setting.get("back_material_name", "")
+                        )
                         self.physics_list[-1].simple_parent_bone_ctrl.SetStringSelection(
                             vroid2pmx_setting["parent_bone_name"]
                         )

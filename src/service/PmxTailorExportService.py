@@ -125,6 +125,7 @@ class PmxTailorExportService:
             for pidx, param_option in enumerate(self.options.param_options):
                 service_data_txt = f"{service_data_txt}\n　【No.{pidx + 1}】 --------- "
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('材質')}: {param_option['material_name']}"
+                service_data_txt = f"{service_data_txt}\n　　{logger.transtext('略称')}: {param_option['abb_name']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('密集度')}: {param_option['threshold']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('質量')}: {param_option['mass']}"
@@ -525,7 +526,8 @@ class PmxTailorExportService:
 
     def create_physics(self, model: PmxModel, param_option: dict):
         model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"
-        model.comment += f"\r\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
+        model.comment += f"\r\n　　{logger.transtext('略称')}: {param_option['abb_name']}"
+        model.comment += f", {logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
         # model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"
         model.comment += f", {logger.transtext('質量')}: {param_option['mass']}"
         model.comment += f", {logger.transtext('柔らかさ')}: {param_option['air_resistance']}"
@@ -678,7 +680,7 @@ class PmxTailorExportService:
         root_rigidbody: RigidBody,
         parent_bone_rigidbody: RigidBody,
     ):
-        logger.info("【%s】ジョイント生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】ジョイント生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         # ジョイント生成
         created_joints = {}
@@ -1904,16 +1906,11 @@ class PmxTailorExportService:
         root_bone: Bone,
         base_reverse_axis: MVector3D,
     ):
-        logger.info("【%s】剛体生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】剛体生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         # 剛体生成
         created_rigidbodies = {}
         created_rigidbody_vvs = {}
-        # 剛体の質量
-        # created_rigidbody_masses = {}
-        # created_rigidbody_linear_dampings = {}
-        # created_rigidbody_angular_dampings = {}
-        # created_rigidbody_volumes = {}
         prev_rigidbody_cnt = 0
 
         # 剛体情報
@@ -1954,6 +1951,13 @@ class PmxTailorExportService:
 
             model.rigidbodies[parent_bone.name] = parent_bone_rigidbody
 
+        top_bone_positions = []
+        for vertex_map in vertex_maps:
+            for vkey in vertex_map[0, :]:
+                if np.isnan(vkey).any() or tuple(vkey) not in virtual_vertices:
+                    continue
+                top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
+
         root_rigidbody = self.get_rigidbody(model, root_bone.name)
         if not root_rigidbody:
             # 中心剛体を接触なしボーン追従剛体で生成
@@ -1965,7 +1969,7 @@ class PmxTailorExportService:
                 0,
                 0,
                 MVector3D(0.5, 0.5, 0.5),
-                parent_bone_rigidbody.shape_position,
+                MVector3D(np.mean(top_bone_positions, axis=0)),
                 MVector3D(),
                 1,
                 0.5,
@@ -2051,8 +2055,12 @@ class PmxTailorExportService:
                     v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
                 )
 
-                target_above_yidx = v_yidx if v_yidx < max_v_yidx else above_yidx
-                target_below_yidx = below_yidx if v_yidx < max_v_yidx else v_yidx
+                if param_option["exist_physics_clear"] == logger.transtext("再利用"):
+                    target_above_yidx = v_yidx
+                    target_below_yidx = below_yidx
+                else:
+                    target_above_yidx = v_yidx if v_yidx < max_v_yidx else above_yidx
+                    target_below_yidx = below_yidx if v_yidx < max_v_yidx else v_yidx
 
                 prev_above_vv = (
                     virtual_vertices.get(tuple(vertex_maps[prev_map_idx][target_above_yidx, prev_xidx]), None)
@@ -2063,12 +2071,6 @@ class PmxTailorExportService:
                 prev_now_vv = (
                     virtual_vertices.get(tuple(vertex_maps[prev_map_idx][target_above_yidx, prev_xidx]), None)
                     if vertex_maps[prev_map_idx].shape[0] > target_above_yidx
-                    and vertex_maps[prev_map_idx].shape[1] > prev_xidx
-                    else None
-                )
-                prev_below_vv = (
-                    virtual_vertices.get(tuple(vertex_maps[prev_map_idx][target_below_yidx, prev_xidx]), None)
-                    if vertex_maps[prev_map_idx].shape[0] > target_below_yidx
                     and vertex_maps[prev_map_idx].shape[1] > prev_xidx
                     else None
                 )
@@ -2086,22 +2088,9 @@ class PmxTailorExportService:
                     and vertex_maps[next_map_idx].shape[1] > next_xidx
                     else None
                 )
-                next_below_vv = (
-                    virtual_vertices.get(tuple(vertex_maps[next_map_idx][target_below_yidx, next_xidx]), None)
-                    if vertex_maps[next_map_idx].shape[0] > target_below_yidx
-                    and vertex_maps[next_map_idx].shape[1] > next_xidx
-                    else None
-                )
 
                 if not (
-                    prev_now_vv
-                    and prev_above_vv
-                    and prev_below_vv
-                    and now_above_vv
-                    and now_below_vv
-                    and next_above_vv
-                    and next_now_vv
-                    and next_below_vv
+                    prev_now_vv and prev_above_vv and now_above_vv and now_below_vv and next_above_vv and next_now_vv
                 ):
                     logger.warning(
                         "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
@@ -2111,28 +2100,36 @@ class PmxTailorExportService:
 
                 prev_above_bone = prev_above_vv.map_bones.get(prev_map_idx, None)
                 prev_now_bone = prev_now_vv.map_bones.get(prev_map_idx, None)
-                prev_below_bone = prev_below_vv.map_bones.get(prev_map_idx, None)
                 now_above_bone = now_above_vv.map_bones.get(base_map_idx, None)
                 now_below_bone = now_below_vv.map_bones.get(base_map_idx, None)
                 next_above_bone = next_above_vv.map_bones.get(next_map_idx, None)
                 next_now_bone = next_now_vv.map_bones.get(next_map_idx, None)
-                next_below_bone = next_below_vv.map_bones.get(next_map_idx, None)
 
-                if not (now_above_bone and now_below_bone and now_above_bone.index in model.vertices):
+                if not (now_above_bone and now_below_bone):
                     logger.warning(
                         "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
                         vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
                     )
                     continue
 
-                target_bone = now_above_bone if v_yidx < max_v_yidx else now_below_bone
+                if param_option["exist_physics_clear"] == logger.transtext("再利用"):
+                    target_bone = now_above_bone
+                else:
+                    target_bone = now_above_bone if v_yidx < max_v_yidx else now_below_bone
+
+                if not (target_bone.index in model.vertices):
+                    logger.warning(
+                        "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                        vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
+                    )
+                    continue
 
                 # 剛体の厚みINDEX
                 rigidbody_y_idx = np.where(vv_keys == rigidbody_bone_key[target_idx] * target_direction)[0]
                 if not rigidbody_y_idx:
                     rigidbody_y_idx = 0
 
-                v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[now_above_bone.index]]
+                v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[target_bone.index]]
 
                 # 前と繋がっている場合、前のボーンの頂点を追加する
                 if prev_connected and prev_now_bone and prev_now_bone.index in model.vertices:
@@ -2218,41 +2215,44 @@ class PmxTailorExportService:
                 # 基本はボーンの位置に剛体
                 shape_position = target_bone.position
 
-                if 0 == v_yidx:
-                    mat = MMatrix4x4()
-                    mat.setToIdentity()
-                    mat.translate(target_bone.position)
-                    mat.rotate(shape_qq)
-
-                    # ちょっと下に寄せる
-                    shape_position = mat * MVector3D(0, -shape_size.y() / 2, 0)
-                elif max_v_yidx == v_yidx:
-                    mat = MMatrix4x4()
-                    mat.setToIdentity()
-                    mat.translate(target_bone.position)
-                    mat.rotate(shape_qq)
-
-                    # ちょっと上に寄せる
-                    shape_position = mat * MVector3D(0, shape_size.y() / 2, 0)
-
-                if rigidbody_shape_type == 1:
-                    # 箱剛体かつ端の場合
-                    if prev_connected and not next_connected:
+                if param_option["exist_physics_clear"] == logger.transtext("再利用"):
+                    shape_position = (now_above_bone.position + now_below_bone.position) / 2
+                else:
+                    if 0 == v_yidx:
                         mat = MMatrix4x4()
                         mat.setToIdentity()
-                        mat.translate(shape_position)
+                        mat.translate(target_bone.position)
                         mat.rotate(shape_qq)
 
-                        # ちょっとprevに寄せる
-                        shape_position = mat * MVector3D(shape_size.x() / 2, 0)
-                    elif not prev_connected and next_connected:
+                        # ちょっと下に寄せる
+                        shape_position = mat * MVector3D(0, -shape_size.y() / 2, 0)
+                    elif max_v_yidx == v_yidx:
                         mat = MMatrix4x4()
                         mat.setToIdentity()
-                        mat.translate(shape_position)
+                        mat.translate(target_bone.position)
                         mat.rotate(shape_qq)
 
-                        # ちょっとnextに寄せる
-                        shape_position = mat * MVector3D(-shape_size.x() / 2, 0)
+                        # ちょっと上に寄せる
+                        shape_position = mat * MVector3D(0, shape_size.y() / 2, 0)
+
+                    if rigidbody_shape_type == 1:
+                        # 箱剛体かつ端の場合
+                        if prev_connected and not next_connected:
+                            mat = MMatrix4x4()
+                            mat.setToIdentity()
+                            mat.translate(shape_position)
+                            mat.rotate(shape_qq)
+
+                            # ちょっとprevに寄せる
+                            shape_position = mat * MVector3D(shape_size.x() / 2, 0)
+                        elif not prev_connected and next_connected:
+                            mat = MMatrix4x4()
+                            mat.setToIdentity()
+                            mat.translate(shape_position)
+                            mat.rotate(shape_qq)
+
+                            # ちょっとnextに寄せる
+                            shape_position = mat * MVector3D(-shape_size.x() / 2, 0)
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1
@@ -2513,7 +2513,7 @@ class PmxTailorExportService:
         if not back_vertices:
             return
 
-        logger.info("【%s】裏ウェイト生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】裏ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         weight_cnt = 0
         prev_weight_cnt = 0
@@ -2545,7 +2545,7 @@ class PmxTailorExportService:
     def create_remaining_weight(
         self, model: PmxModel, param_option: dict, material_name: str, virtual_vertices: dict, remaining_vertices: dict
     ):
-        logger.info("【%s】残ウェイト生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】残ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         vertex_cnt = 0
         prev_vertex_cnt = 0
@@ -2733,7 +2733,7 @@ class PmxTailorExportService:
         all_bone_connected: dict,
         remaining_vertices: dict,
     ):
-        logger.info("【%s】ウェイト生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         # 親ボーン
         parent_bone = model.bones[param_option["parent_bone_name"]]
@@ -3174,12 +3174,7 @@ class PmxTailorExportService:
 
         return remaining_vertices
 
-    def create_root_bone(
-        self,
-        model: PmxModel,
-        param_option: dict,
-        material_name: str,
-    ):
+    def create_root_bone(self, model: PmxModel, param_option: dict, material_name: str, root_pos: MVector3D):
         # 略称
         abb_name = param_option["abb_name"]
         # 表示枠名
@@ -3191,7 +3186,7 @@ class PmxTailorExportService:
         root_bone = Bone(
             f"{abb_name}中心",
             f"{abb_name}Root",
-            parent_bone.position,
+            root_pos,
             parent_bone.index,
             0,
             0x0000 | 0x0002 | 0x0004 | 0x0008 | 0x0010,
@@ -3219,7 +3214,7 @@ class PmxTailorExportService:
         vertex_maps: dict,
         vertex_map_orders: dict,
     ):
-        logger.info("【%s】ボーン生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】ボーン生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         # 閾値
         threshold = param_option["threshold"]
@@ -3234,7 +3229,9 @@ class PmxTailorExportService:
         parent_bone = model.bones[param_option["parent_bone_name"]]
 
         # 中心ボーン
-        display_name, root_bone = self.create_root_bone(model, param_option, material_name)
+        display_name, root_bone = self.create_root_bone(
+            model, param_option, material_name, parent_bone.position.copy()
+        )
 
         logger.info("【%s】頂点距離の算出", material_name)
 
@@ -3579,7 +3576,7 @@ class PmxTailorExportService:
         virtual_vertices: dict,
         vertex_maps: list,
     ):
-        logger.info("【%s】胸物理生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】胸物理生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         for base_map_idx, vertex_map in enumerate(vertex_maps):
             for v_xidx in range(vertex_map.shape[1]):
@@ -3837,7 +3834,7 @@ class PmxTailorExportService:
         bone_grid_cols = param_option["bone_grid_cols"]
         bone_grid_rows = param_option["bone_grid_rows"]
 
-        logger.info("【%s】ボーンマップ生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】ボーンマップ生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         logger.info("%s: ウェイトボーンの確認", material_name)
 
@@ -3902,6 +3899,7 @@ class PmxTailorExportService:
         all_bone_connected = {}
         all_regist_bones = {}
         vertex_maps = []
+        nearest_pos = MVector3D()
 
         if param_option["physics_type"] in [logger.transtext("布")]:
             vertex_map = np.full((bone_grid_rows, bone_grid_cols, 3), (np.nan, np.nan, np.nan))
@@ -3912,20 +3910,32 @@ class PmxTailorExportService:
                 for grid_row in range(bone_grid_rows):
                     bone_name = bone_grid[grid_row][grid_col]
                     bone = model.bones.get(bone_name, None)
-                    if not bone_name or not bone or bone.index not in weighted_vertex_positions:
+                    if not bone_name or not bone:
                         continue
 
-                    # ウェイトを持つボーンの場合
+                    if bone.index not in weighted_vertex_positions:
+                        # ウェイトを持たないボーンの場合
 
-                    # ウェイト頂点の中心を保持
-                    nearest_v_key = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0)).to_key(threshold)
+                        # ボーン位置を保持
+                        nearest_pos = bone.position.copy()
+                        nearest_v_key = bone.position.to_key(threshold)
+                        # 登録は対象外
+                        regist_bones[grid_row, grid_col] = False
+                    else:
+                        # ウェイトを持つボーンの場合
+
+                        # ウェイト頂点の中心を保持
+                        nearest_pos = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0))
+                        nearest_v_key = nearest_pos.to_key(threshold)
+                        # ウェイト頂点の中心頂点に紐付くボーンとして登録
+                        regist_bones[grid_row, grid_col] = True
+
                     if nearest_v_key not in virtual_vertices:
                         virtual_vertices[nearest_v_key] = VirtualVertex(nearest_v_key)
 
-                    # ウェイト頂点の中心頂点に紐付くボーンとして登録
-                    virtual_vertices[nearest_v_key].map_bones[0] = bone
+                    virtual_vertices[nearest_v_key].positions.append(nearest_pos.data())
+                    virtual_vertices[nearest_v_key].map_bones[grid_col] = bone
                     vertex_map[grid_row, grid_col] = nearest_v_key
-                    regist_bones[grid_row, grid_col] = True
 
                     logger.info("-- 仮想ボーン: %s: 終了", bone.name)
 
@@ -3977,20 +3987,32 @@ class PmxTailorExportService:
                 for grid_row in valid_bone_grid_rows:
                     bone_name = bone_grid[grid_row][grid_col]
                     bone = model.bones.get(bone_name, None)
-                    if not bone_name or not bone or bone.index not in weighted_vertex_positions:
+                    if not bone_name or not bone:
                         continue
 
-                    # ウェイトを持つボーンの場合
+                    if bone.index not in weighted_vertex_positions:
+                        # ウェイトを持たないボーンの場合
 
-                    # ウェイト頂点の中心を保持
-                    nearest_v_key = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0)).to_key(threshold)
+                        # ボーン位置を保持
+                        nearest_pos = bone.position.copy()
+                        nearest_v_key = bone.position.to_key(threshold)
+                        # 登録は対象外
+                        regist_bones[grid_row, 0] = False
+                    else:
+                        # ウェイトを持つボーンの場合
+
+                        # ウェイト頂点の中心を保持
+                        nearest_pos = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0))
+                        nearest_v_key = nearest_pos.to_key(threshold)
+                        # ウェイト頂点の中心頂点に紐付くボーンとして登録
+                        regist_bones[grid_row, 0] = True
+
                     if nearest_v_key not in virtual_vertices:
                         virtual_vertices[nearest_v_key] = VirtualVertex(nearest_v_key)
 
-                    # ウェイト頂点の中心頂点に紐付くボーンとして登録
+                    virtual_vertices[nearest_v_key].positions.append(nearest_pos.data())
                     virtual_vertices[nearest_v_key].map_bones[grid_col] = bone
                     vertex_map[grid_row, 0] = nearest_v_key
-                    regist_bones[grid_row, 0] = True
 
                     logger.info("-- 仮想ボーン: %s: 終了", bone.name)
 
@@ -3998,10 +4020,19 @@ class PmxTailorExportService:
                 all_regist_bones[grid_col] = regist_bones
                 vertex_maps.append(vertex_map)
 
+        top_bone_positions = []
+        for vertex_map in vertex_maps:
+            for vkey in vertex_map[0, :]:
+                if np.isnan(vkey).any() or tuple(vkey) not in virtual_vertices:
+                    continue
+                top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
+
         # 中心ボーン
         root_bone = None
         if is_root_bone:
-            _, root_bone = self.create_root_bone(model, param_option, material_name)
+            _, root_bone = self.create_root_bone(
+                model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0))
+            )
 
         return virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone
 
@@ -4015,7 +4046,7 @@ class PmxTailorExportService:
         base_reverse_axis: MVector3D,
         target_idx: int,
     ):
-        logger.info("【%s】頂点マップ生成", material_name, decoration=MLogger.DECORATION_LINE)
+        logger.info("【%s:%s】頂点マップ生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         # 閾値
         threshold = param_option["threshold"]
