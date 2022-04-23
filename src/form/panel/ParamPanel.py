@@ -316,6 +316,15 @@ class ParamPanel(BasePanel):
             logger.error("有効な物理設定が1件も設定されていません。\nモデルを選択しなおした場合、物理設定は初期化されます。", decoration=MLogger.DECORATION_BOX)
             return []
 
+        for pidx, param in enumerate(params):
+            physics_parent = param.get("physics_parent", 0)
+            if physics_parent and physics_parent == pidx + 1:
+                logger.error("%s番目の物理親のインデックスに自分自身が指定されています。", pidx + 1, decoration=MLogger.DECORATION_BOX)
+                return []
+            elif physics_parent and physics_parent > len(params) - 1:
+                logger.error("%s番目の物理親のインデックスが物理設定個数を超えて指定されています。", pidx + 1, decoration=MLogger.DECORATION_BOX)
+                return []
+
         return params
 
 
@@ -448,7 +457,7 @@ class PhysicsParam:
         self.simple_direction_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("下"), logger.transtext("右"), logger.transtext("左")],
+            choices=[logger.transtext("下"), logger.transtext("上"), logger.transtext("右"), logger.transtext("左")],
         )
         self.simple_direction_ctrl.SetToolTip(self.simple_direction_txt.GetToolTipText())
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -505,7 +514,9 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("特殊形状"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_special_shape_txt.SetToolTip(
-            logger.transtext("スカート等で特殊な処理が必要な形状\nプリーツ: ポリ割に折り返しがある場合（厚みがあるとうまくいきません）")
+            logger.transtext(
+                "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）"
+            )
         )
         self.simple_special_shape_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_txt, 0, wx.ALL, 5)
@@ -513,7 +524,7 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("プリーツ")],
+            choices=[logger.transtext("なし"), logger.transtext("全て表面")],
         )
         self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
         self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -2379,6 +2390,30 @@ class PhysicsParam:
         self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_reverse_joint_sizer, 0, wx.ALL, 5)
 
+        # 詳細オプションブロック -------------------------------
+        self.advance_option_grid_sizer = wx.StaticBoxSizer(
+            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("詳細オプション")), orient=wx.VERTICAL
+        )
+        self.advance_option_grid_sizer = wx.FlexGridSizer(0, 8, 0, 0)
+
+        # 物理親
+        physics_parent_tooltip = logger.transtext("物理的に親となる物理設定番号。物理親を設定すると設定した物理の上端が物理親の下端に紐付けられます。")
+        self.physics_parent_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("物理親"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.physics_parent_txt.SetToolTip(physics_parent_tooltip)
+        self.physics_parent_txt.Wrap(-1)
+        self.advance_option_grid_sizer.Add(self.physics_parent_txt, 0, wx.ALL, 5)
+
+        self.physics_parent_spin = wx.SpinCtrl(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(50, -1), value="0", min=0, max=20, initial=0
+        )
+        self.physics_parent_spin.SetToolTip(physics_parent_tooltip)
+        self.physics_parent_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_option_grid_sizer.Add(self.physics_parent_spin, 0, wx.ALL, 5)
+
+        self.advance_param_sizer.Add(self.advance_option_grid_sizer, 0, wx.ALL, 5)
+
         # ボーン版 ------------------
         self.bone_sizer = wx.StaticBoxSizer(
             wx.StaticBox(self.bone_window, wx.ID_ANY, "【No.{0}】".format(param_no + 1)), orient=wx.VERTICAL
@@ -2505,6 +2540,7 @@ class PhysicsParam:
                     [str(cidx) for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()]
                 ),
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
+                "physics_parent": self.physics_parent_spin.GetValue(),
                 "params": self.get_param_export_data(),
             }
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
@@ -2538,6 +2574,7 @@ class PhysicsParam:
             params["bone_thinning_out"] = False
             params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
             params["density_type"] = self.density_type_ctrl.GetStringSelection()
+            params["physics_parent"] = int(self.physics_parent_spin.GetValue())
 
             # 自身を非衝突対象
             no_collision_group = 0
@@ -3304,6 +3341,8 @@ class PhysicsParam:
                         self.simple_extend_edge_choice_ctrl.SetSelection(int(cidx))
             if not self.vertices_csv_file_ctrl.path():
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
+            if not self.physics_parent_spin.GetValue():
+                self.physics_parent_spin.SetValue(int(abb_setting.get("physics_parent", 0)))
 
             # 物理パラメーターも設定する
             self.set_param_import_data(abb_setting["params"])
