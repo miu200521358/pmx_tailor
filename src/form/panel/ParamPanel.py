@@ -629,47 +629,47 @@ class PhysicsParam:
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
 
-        # 材質頂点密集度
-        self.simple_threshold_txt = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("密集度"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_threshold_txt.SetToolTip(
-            logger.transtext("材質の密集の度合い。\n値を大きくすると、ある程度ばらけた頂点もひとつの頂点として扱います。\n値を小さくすると、細かいメッシュも別頂点として処理できます。")
-        )
-        self.simple_threshold_txt.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_threshold_txt, 0, wx.ALL, 5)
+        # # 材質頂点密集度
+        # self.simple_threshold_txt = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("密集度"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_threshold_txt.SetToolTip(
+        #     logger.transtext("材質の密集の度合い。\n値を大きくすると、ある程度ばらけた頂点もひとつの頂点として扱います。\n値を小さくすると、細かいメッシュも別頂点として処理できます。")
+        # )
+        # self.simple_threshold_txt.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_threshold_txt, 0, wx.ALL, 5)
 
-        self.simple_threshold_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("（0.1）"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_threshold_label.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_threshold_label, 0, wx.ALL, 5)
+        # self.simple_threshold_label = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("（0.1）"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_threshold_label.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_threshold_label, 0, wx.ALL, 5)
 
-        self.simple_threshold_min_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("0.005"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_threshold_min_label.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_threshold_min_label, 0, wx.ALL, 5)
+        # self.simple_threshold_min_label = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("0.005"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_threshold_min_label.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_threshold_min_label, 0, wx.ALL, 5)
 
-        self.simple_threshold_slider = FloatSliderCtrl(
-            self.simple_window,
-            wx.ID_ANY,
-            0.1,
-            0.005,
-            0.3,
-            0.001,
-            self.simple_threshold_label,
-            wx.DefaultPosition,
-            (350, 30),
-            wx.SL_HORIZONTAL,
-        )
-        self.simple_grid_sizer.Add(self.simple_threshold_slider, 1, wx.ALL | wx.EXPAND, 5)
+        # self.simple_threshold_slider = FloatSliderCtrl(
+        #     self.simple_window,
+        #     wx.ID_ANY,
+        #     0.1,
+        #     0.005,
+        #     0.3,
+        #     0.001,
+        #     self.simple_threshold_label,
+        #     wx.DefaultPosition,
+        #     (350, 30),
+        #     wx.SL_HORIZONTAL,
+        # )
+        # self.simple_grid_sizer.Add(self.simple_threshold_slider, 1, wx.ALL | wx.EXPAND, 5)
 
-        self.simple_threshold_max_label = wx.StaticText(
-            self.simple_window, wx.ID_ANY, logger.transtext("0.3"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.simple_threshold_max_label.Wrap(-1)
-        self.simple_grid_sizer.Add(self.simple_threshold_max_label, 0, wx.ALL, 5)
+        # self.simple_threshold_max_label = wx.StaticText(
+        #     self.simple_window, wx.ID_ANY, logger.transtext("0.3"), wx.DefaultPosition, wx.DefaultSize, 0
+        # )
+        # self.simple_threshold_max_label.Wrap(-1)
+        # self.simple_grid_sizer.Add(self.simple_threshold_max_label, 0, wx.ALL, 5)
 
         # # 物理の細かさスライダー
         # self.simple_fineness_txt = wx.StaticText(
@@ -2561,7 +2561,7 @@ class PhysicsParam:
             params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection()
             params["special_shape"] = self.simple_special_shape_ctrl.GetStringSelection()
             params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
-            params["threshold"] = self.simple_threshold_slider.GetValue()
+            # params["threshold"] = self.simple_threshold_slider.GetValue()
             # params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
             params["air_resistance"] = self.simple_air_resistance_slider.GetValue()
@@ -2842,7 +2842,7 @@ class PhysicsParam:
 
     def set_param_import_data(self, params: dict):
         # 簡易版オプションデータ -------------
-        self.simple_threshold_slider.SetValue(params.get("threshold", 0.05))
+        # self.simple_threshold_slider.SetValue(params.get("threshold", 0.05))
         # self.simple_fineness_slider.SetValue(params.get("fineness", 3.4))
         self.simple_mass_slider.SetValue(params.get("mass", 0.5))
         self.simple_air_resistance_slider.SetValue(params.get("air_resistance", 1.8))
@@ -2999,7 +2999,7 @@ class PhysicsParam:
         params = {}
 
         # 簡易版オプションデータ -------------
-        params["threshold"] = self.simple_threshold_slider.GetValue()
+        # params["threshold"] = self.simple_threshold_slider.GetValue()
         # params["fineness"] = self.simple_fineness_slider.GetValue()
         params["mass"] = self.simple_mass_slider.GetValue()
         params["air_resistance"] = self.simple_air_resistance_slider.GetValue()
@@ -3808,7 +3808,7 @@ class PhysicsParam:
         self.simple_back_material_ctrl.SetStringSelection("")
         self.simple_edge_material_ctrl.SetStringSelection("")
         self.simple_primitive_ctrl.SetStringSelection("")
-        self.simple_threshold_slider.SetValue(0.05)
+        # self.simple_threshold_slider.SetValue(0.05)
         # self.simple_fineness_slider.SetValue(3.4)
         self.simple_mass_slider.SetValue(1.5)
         self.simple_air_resistance_slider.SetValue(1.8)

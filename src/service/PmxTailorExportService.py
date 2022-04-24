@@ -127,7 +127,6 @@ class PmxTailorExportService:
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('材質')}: {param_option['material_name']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('略称')}: {param_option['abb_name']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
-                service_data_txt = f"{service_data_txt}\n　　{logger.transtext('密集度')}: {param_option['threshold']}"
                 service_data_txt = f"{service_data_txt}\n　　{logger.transtext('質量')}: {param_option['mass']}"
                 service_data_txt = (
                     f"{service_data_txt}\n　　{logger.transtext('柔らかさ')}: {param_option['air_resistance']}"
@@ -716,7 +715,7 @@ class PmxTailorExportService:
                     model, param_option, material_name, target_vertices
                 )
             else:
-                vertex_maps, virtual_vertices, remaining_vertices, back_vertices = self.create_vertex_map(
+                vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold = self.create_vertex_map(
                     model,
                     param_option,
                     material_name,
@@ -748,7 +747,7 @@ class PmxTailorExportService:
                     all_bone_horizonal_distances,
                     all_bone_connected,
                 ) = self.create_bone(
-                    model, param_option, material_name, virtual_vertices, vertex_maps, vertex_map_orders
+                    model, param_option, material_name, virtual_vertices, vertex_maps, vertex_map_orders, threshold
                 )
 
                 remaining_vertices = self.create_weight(
@@ -762,13 +761,16 @@ class PmxTailorExportService:
                     all_bone_horizonal_distances,
                     all_bone_connected,
                     remaining_vertices,
+                    threshold,
                 )
 
                 # 残ウェイト
-                self.create_remaining_weight(model, param_option, material_name, virtual_vertices, remaining_vertices)
+                self.create_remaining_weight(
+                    model, param_option, material_name, virtual_vertices, remaining_vertices, threshold
+                )
 
                 # 裏ウェイト
-                self.create_back_weight(model, param_option, material_name, virtual_vertices, back_vertices)
+                self.create_back_weight(model, param_option, material_name, virtual_vertices, back_vertices, threshold)
 
             root_rigidbody, parent_bone_rigidbody = self.create_rigidbody(
                 model,
@@ -1219,7 +1221,7 @@ class PmxTailorExportService:
                         if param_option["horizonal_joint_restruct"]:
                             # 親剛体との距離制限を加える場合
                             for n in range(6):
-                                check_ratio = 1 + ((n + 1) * 0.06)
+                                check_ratio = 1 + (n * 0.06)
 
                                 a_mat = MMatrix4x4()
                                 a_mat.setToIdentity()
@@ -2084,8 +2086,8 @@ class PmxTailorExportService:
 
                 prev_above_bone = prev_above_vv.map_bones.get(prev_map_idx, None) if prev_above_vv else None
                 prev_now_bone = prev_now_vv.map_bones.get(prev_map_idx, None) if prev_now_vv else None
-                now_above_bone = now_above_vv.map_bones.get(base_map_idx, None) if now_above_vv else None
                 now_now_bone = now_now_vv.map_bones.get(base_map_idx, None)
+                now_above_bone = now_above_vv.map_bones.get(base_map_idx, now_now_bone)
                 now_below_bone = now_below_vv.map_bones.get(base_map_idx, None)
                 next_above_bone = next_above_vv.map_bones.get(next_map_idx, None) if next_above_vv else None
                 next_now_bone = next_now_vv.map_bones.get(next_map_idx, None) if next_now_vv else None
@@ -2205,22 +2207,15 @@ class PmxTailorExportService:
                 if param_option["exist_physics_clear"] == logger.transtext("再利用"):
                     shape_position = (now_now_bone.position + now_below_bone.position) / 2
                 else:
-                    # if 0 == v_yidx:
-                    #     mat = MMatrix4x4()
-                    #     mat.setToIdentity()
-                    #     mat.translate(shape_position)
-                    #     mat.rotate(shape_qq)
+                    if max_v_yidx == v_yidx:
+                        # 末端は自身のボーンに合わせる
+                        mat = MMatrix4x4()
+                        mat.setToIdentity()
+                        mat.translate(now_below_bone.position)
+                        mat.rotate(shape_qq)
 
-                    #     # ちょっと下に寄せる
-                    #     shape_position = mat * MVector3D(0, -shape_size.y() / 2, 0)
-                    # elif max_v_yidx == v_yidx:
-                    #     mat = MMatrix4x4()
-                    #     mat.setToIdentity()
-                    #     mat.translate(shape_position)
-                    #     mat.rotate(shape_qq)
-
-                    #     # ちょっと上に寄せる
-                    #     shape_position = mat * MVector3D(0, shape_size.y() / 2, 0)
+                        # ちょっと上に寄せる
+                        shape_position = mat * MVector3D(0, shape_size.y() / 2, 0)
 
                     if rigidbody_shape_type == 1:
                         # 箱剛体かつ端の場合
@@ -2487,8 +2482,19 @@ class PmxTailorExportService:
 
         return root_rigidbody, parent_bone_rigidbody
 
-    def create_back_weight(
+    def change_parent_weight(
         self, model: PmxModel, param_option: dict, material_name: str, virtual_vertices: dict, back_vertices: list
+    ):
+        logger.info("【%s:%s】親ボーンウェイト置換", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
+
+    def create_back_weight(
+        self,
+        model: PmxModel,
+        param_option: dict,
+        material_name: str,
+        virtual_vertices: dict,
+        back_vertices: list,
+        threshold: float,
     ):
         if param_option["back_material_name"]:
             # 表面で残った裏頂点と裏材質で指定されている頂点を全部対象とする
@@ -2530,15 +2536,18 @@ class PmxTailorExportService:
         logger.info("-- 裏頂点ウェイト: %s個目:終了", weight_cnt)
 
     def create_remaining_weight(
-        self, model: PmxModel, param_option: dict, material_name: str, virtual_vertices: dict, remaining_vertices: dict
+        self,
+        model: PmxModel,
+        param_option: dict,
+        material_name: str,
+        virtual_vertices: dict,
+        remaining_vertices: dict,
+        threshold: float,
     ):
         logger.info("【%s:%s】残ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
         vertex_cnt = 0
         prev_vertex_cnt = 0
-
-        # 親ボーン
-        parent_bone = model.bones[param_option["parent_bone_name"]]
 
         # 塗り終わった頂点リスト
         weighted_vkeys = list(set(list(virtual_vertices.keys())) - set(list(remaining_vertices.keys())))
@@ -2547,9 +2556,6 @@ class PmxTailorExportService:
         for vkey in weighted_vkeys:
             vv = virtual_vertices[vkey]
             weighted_poses[vkey] = vv.position().data()
-
-        # 閾値
-        threshold = param_option["threshold"]
 
         # 裾材質を追加
         if param_option["edge_material_name"] or param_option["edge_extend_material_names"]:
@@ -2719,6 +2725,7 @@ class PmxTailorExportService:
         all_bone_horizonal_distances: dict,
         all_bone_connected: dict,
         remaining_vertices: dict,
+        threshold: float,
     ):
         logger.info("【%s:%s】ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
@@ -3200,11 +3207,9 @@ class PmxTailorExportService:
         virtual_vertices: dict,
         vertex_maps: dict,
         vertex_map_orders: dict,
+        threshold: float,
     ):
         logger.info("【%s:%s】ボーン生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
-
-        # 閾値
-        threshold = param_option["threshold"]
 
         # 中心ボーン生成
 
@@ -3858,8 +3863,8 @@ class PmxTailorExportService:
 
         logger.info("%s: ウェイトボーンの確認", material_name)
 
-        # 閾値
-        threshold = param_option["threshold"]
+        # 閾値(とりあえず固定値)
+        threshold = 0.0001
 
         virtual_vertices = {}
 
@@ -4068,9 +4073,6 @@ class PmxTailorExportService:
     ):
         logger.info("【%s:%s】頂点マップ生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
-        # 閾値
-        threshold = param_option["threshold"]
-
         # 裏面頂点リスト
         back_vertices = []
         # 残頂点リスト
@@ -4081,10 +4083,16 @@ class PmxTailorExportService:
         # 一旦全体の位置を把握
         n = 0
         vertex_positions = {}
-        for vertex_idx in model.material_vertices[material_name]:
-            if vertex_idx not in target_vertices:
-                continue
-            vertex_positions[vertex_idx] = model.vertex_dict[vertex_idx].position.data()
+        pair_vertex_positions = {}
+        for index_idx in model.material_indices[material_name]:
+            for v0_idx, v1_idx in zip(
+                model.indices[index_idx],
+                model.indices[index_idx][1:] + [model.indices[index_idx][0]],
+            ):
+                if v0_idx not in target_vertices or v1_idx not in target_vertices:
+                    continue
+                vertex_positions[v0_idx] = model.vertex_dict[v0_idx].position.data()
+                pair_vertex_positions[v1_idx] = model.vertex_dict[v1_idx].position.data()
 
             n += 1
             if n > 0 and n % 1000 == 0:
@@ -4092,7 +4100,7 @@ class PmxTailorExportService:
 
         if not vertex_positions:
             logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
-            return None, None, None, None
+            return None, None, None, None, None
 
         # 各頂点の位置との差分から距離を測る
         v_distances = np.linalg.norm(
@@ -4109,7 +4117,16 @@ class PmxTailorExportService:
             .normalized()
             .data()[np.where(np.abs(base_vertical_axis.data()))]
         )[0]
-        logger.info("%s: 材質頂点の傾き算出: %s", material_name, material_direction)
+        logger.info("%s: 材質頂点の傾き算出: %s", material_name, round(material_direction, 5))
+
+        # 頂点同士の距離
+        v_pair_distances = np.linalg.norm(
+            (np.array(list(vertex_positions.values())) - np.array(list(pair_vertex_positions.values()))), ord=2, axis=1
+        )
+        # 面を形成する頂点同士の距離から閾値生成
+        threshold = np.min(v_pair_distances[v_pair_distances > 0]) * 0.8
+
+        logger.info("%s: 材質頂点の閾値算出: %s", material_name, round(threshold, 5))
 
         logger.info("%s: 仮想頂点リストの生成", material_name)
 
@@ -4218,11 +4235,11 @@ class PmxTailorExportService:
 
         if not virtual_vertices:
             logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
-            return None, None, None, None
+            return None, None, None, None, None
 
         if not edge_pair_lkeys:
             logger.warning("対象範囲にエッジが見つけられなかった為、処理を終了します。\n面が表裏反転してないかご確認ください。", decoration=MLogger.DECORATION_BOX)
-            return None, None, None, None
+            return None, None, None, None, None
 
         logger.debug("--------------------------")
         edge_line_pairs = {}
@@ -4377,14 +4394,14 @@ class PmxTailorExportService:
                 "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
             )
-            return None, None, None, None
+            return None, None, None, None, None
 
         if not all_bottom_edge_keys:
             logger.warning(
                 "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
             )
-            return None, None, None, None
+            return None, None, None, None, None
 
         horizonal_top_edge_keys = []
         vertical_top_edge_keys = []
@@ -4444,7 +4461,7 @@ class PmxTailorExportService:
                 "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
                 decoration=MLogger.DECORATION_BOX,
             )
-            return None, None, None, None
+            return None, None, None, None, None
 
         logger.info(
             "-- %s: 上部エッジ %s",
@@ -4849,7 +4866,7 @@ class PmxTailorExportService:
 
         logger.debug("-----------------------")
 
-        return vertex_maps, virtual_vertices, remaining_vertices, back_vertices
+        return vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold
 
     def create_vertex_line_map(
         self,
