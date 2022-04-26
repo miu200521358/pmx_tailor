@@ -499,37 +499,91 @@ class PmxTailorExportService:
 
         logger.info("頂点再設定")
 
+        parent_bone = model.bones[param_option["parent_bone_name"]]
+
         for n, vertex in enumerate(model.vertex_dict.values()):
             if type(vertex.deform) is Bdef1:
                 vertex.deform.index0 = (
-                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
+                    reset_bones[vertex.deform.index0]["index"]
+                    if vertex.deform.index0 in reset_bones
+                    else parent_bone.index
                 )
             elif type(vertex.deform) is Bdef2:
-                vertex.deform.index0 = (
-                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
-                )
-                vertex.deform.index1 = (
-                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else -1
-                )
+                v_indices = [
+                    (reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0),
+                    (reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0),
+                ]
+                v_weights = [
+                    (vertex.deform.weight0 if v_indices[0] else 0),
+                ]
+                v_weights.append(1 - v_weights[0])
+
+                v_weights_idxs = np.nonzero(v_weights)[0]
+                v_indices = np.array(v_indices)[v_weights_idxs]
+                v_weights = np.array(v_weights)[v_weights_idxs]
+
+                if len(v_indices) == 0:
+                    vertex.deform = Bdef1(parent_bone.index)
+                elif len(v_indices) == 1:
+                    vertex.deform = Bdef1(v_indices[0])
+                else:
+                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                    vertex.deform = Bdef2(v_indices[0], v_indices[1], deform_weights[0])
             elif type(vertex.deform) is Bdef4:
-                vertex.deform.index0 = (
-                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
-                )
-                vertex.deform.index1 = (
-                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else -1
-                )
-                vertex.deform.index2 = (
-                    reset_bones[vertex.deform.index2]["index"] if vertex.deform.index2 in reset_bones else -1
-                )
-                vertex.deform.index3 = (
-                    reset_bones[vertex.deform.index3]["index"] if vertex.deform.index3 in reset_bones else -1
-                )
+                v_indices = [
+                    (reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0),
+                    (reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0),
+                    (reset_bones[vertex.deform.index2]["index"] if vertex.deform.index2 in reset_bones else 0),
+                    (reset_bones[vertex.deform.index3]["index"] if vertex.deform.index3 in reset_bones else 0),
+                ]
+                v_weights = [
+                    (vertex.deform.weight0 if v_indices[0] else 0),
+                    (vertex.deform.weight1 if v_indices[1] else 0),
+                    (vertex.deform.weight2 if v_indices[2] else 0),
+                    (vertex.deform.weight3 if v_indices[3] else 0),
+                ]
+                v_weights_idxs = np.nonzero(v_weights)[0]
+                v_indices = np.array(v_indices)[v_weights_idxs]
+                v_weights = np.array(v_weights)[v_weights_idxs]
+
+                if len(v_indices) == 0:
+                    vertex.deform = Bdef1(parent_bone.index)
+                elif len(v_indices) == 1:
+                    vertex.deform = Bdef1(v_indices[0])
+                elif len(v_indices) == 2:
+                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                    vertex.deform = Bdef2(v_indices[0], v_indices[1], deform_weights[0])
+                elif len(v_indices) == 3:
+                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                    vertex.deform = Bdef4(
+                        v_indices[0],
+                        v_indices[1],
+                        v_indices[2],
+                        parent_bone.index,
+                        deform_weights[0],
+                        deform_weights[1],
+                        deform_weights[2],
+                        0,
+                    )
+                else:
+                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                    vertex.deform = Bdef4(
+                        v_indices[0],
+                        v_indices[1],
+                        v_indices[2],
+                        v_indices[3],
+                        deform_weights[0],
+                        deform_weights[1],
+                        deform_weights[2],
+                        deform_weights[3],
+                    )
+
             elif type(vertex.deform) is Sdef:
                 vertex.deform.index0 = (
-                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else -1
+                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0
                 )
                 vertex.deform.index1 = (
-                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else -1
+                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0
                 )
 
             if n > 0 and n % 1000 == 0:
