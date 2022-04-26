@@ -4657,15 +4657,7 @@ class PmxTailorExportService:
 
                         for yidx, vkey in enumerate(vkeys):
                             lkey = (min(prev_vkey, vkey), max(prev_vkey, vkey))
-                            prev_lkey = (
-                                (
-                                    min(prev_vkeys[prev_yidx + 1], vkeys[yidx + 1]),
-                                    max(prev_vkeys[prev_yidx + 1], vkeys[yidx + 1]),
-                                )
-                                if len(prev_vkeys) - 1 > prev_yidx and len(vkeys) - 1 > yidx
-                                else None
-                            )
-                            if lkey in edge_pair_lkeys and prev_lkey and prev_lkey in edge_pair_lkeys:
+                            if lkey in edge_pair_lkeys or prev_vkey == vkey:
                                 connected_prev_yidx = prev_yidx
                                 connected_yidx = yidx
                                 break
@@ -4675,10 +4667,10 @@ class PmxTailorExportService:
 
                     if connected_yidx >= 0:
                         # エッジが繋がっている場合、その位置に合わせる
-                        # 繋がってる prev_yidx の位置
-                        y_offset = prev_y_offset + connected_prev_yidx
-                        # prevとnowのyidxの位置差
-                        y_offset -= connected_yidx
+                        # ただし、Yの個数は超さないようにする
+                        y_offset = min(
+                            tmp_vertex_map.shape[0] - len(vkeys), prev_y_offset + connected_prev_yidx - connected_yidx
+                        )
 
                 for y, vkey in enumerate(vkeys):
                     vv = virtual_vertices[vkey]
@@ -5067,7 +5059,7 @@ class PmxTailorExportService:
             vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
             roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
 
-            if yaw_score < 0.7:
+            if yaw_score < 0.5:
                 # ズレた方向には行かせない
                 scores.append(0)
                 prev_dots.append(0)
@@ -5085,14 +5077,14 @@ class PmxTailorExportService:
                 else 1
             )
 
-            if prev_dot < 0.7:
-                # ズレた方向には行かせない
-                scores.append(0)
-                prev_dots.append(0)
-                logger.debug(
-                    f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, 前ズレ方向"
-                )
-                continue
+            # if prev_dot < 0.5:
+            #     # ズレた方向には行かせない
+            #     scores.append(0)
+            #     prev_dots.append(0)
+            #     logger.debug(
+            #         f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, 前ズレ方向"
+            #     )
+            #     continue
 
             score = (yaw_score * 20) + pitch_score + (roll_score * 2)
 
