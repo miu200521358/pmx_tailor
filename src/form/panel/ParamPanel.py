@@ -877,7 +877,9 @@ class PhysicsParam:
         self.horizonal_bone_density_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("横密度"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_bone_density_txt.SetToolTip(logger.transtext("ボーンの横方向のメッシュに対する密度"))
+        self.horizonal_bone_density_txt.SetToolTip(
+            logger.transtext("ボーンの横方向の裾メッシュに対する密度\n根元と裾でメッシュの細かさが異なる場合、裾側のメッシュで数えてください。")
+        )
         self.horizonal_bone_density_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_txt, 0, wx.ALL, 5)
 
@@ -886,6 +888,22 @@ class PhysicsParam:
         )
         self.horizonal_bone_density_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_bone_grid_sizer.Add(self.horizonal_bone_density_spin, 0, wx.ALL, 5)
+
+        # 横オフセット
+        self.horizonal_bone_offset_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("横オフセット"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_bone_offset_txt.SetToolTip(
+            logger.transtext("横密度を2以上にした場合のボーンの配置をずらすオフセット値。\n＋の場合…右方向にずらす。－の場合…左方向にずらす。")
+        )
+        self.horizonal_bone_offset_txt.Wrap(-1)
+        self.advance_bone_grid_sizer.Add(self.horizonal_bone_offset_txt, 0, wx.ALL, 5)
+
+        self.horizonal_bone_offset_spin = wx.SpinCtrl(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(50, -1), value="0", min=-100, max=100, initial=0
+        )
+        self.horizonal_bone_offset_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_bone_grid_sizer.Add(self.horizonal_bone_offset_spin, 0, wx.ALL, 5)
 
         # 密度計算タイプ
         self.density_type_txt = wx.StaticText(
@@ -908,25 +926,6 @@ class PhysicsParam:
         # self.bone_thinning_out_check = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("間引き")
         # self.bone_thinning_out_check.SetToolTip("ボーン密度が均一になるよう間引きするか否か")
         # self.advance_bone_grid_sizer.Add(self.bone_thinning_out_check, 0, wx.ALL, 5)
-
-        # 物理タイプ
-        self.physics_type_txt = wx.StaticText(
-            self.advance_window, wx.ID_ANY, logger.transtext("物理タイプ"), wx.DefaultPosition, wx.DefaultSize, 0
-        )
-        self.physics_type_txt.SetToolTip(
-            logger.transtext("布: 板剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)\n袖: カプセル剛体で縦を繋ぐ(※要ボーン定義)")
-        )
-        self.physics_type_txt.Wrap(-1)
-        self.advance_bone_grid_sizer.Add(self.physics_type_txt, 0, wx.ALL, 5)
-
-        self.physics_type_ctrl = wx.Choice(
-            self.advance_window,
-            id=wx.ID_ANY,
-            choices=[logger.transtext("布"), logger.transtext("髪"), logger.transtext("胸"), logger.transtext("単一揺")],
-        )
-        self.physics_type_ctrl.SetToolTip(self.physics_type_txt.GetToolTipText())
-        self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
-        self.advance_bone_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
 
         self.advance_bone_sizer.Add(self.advance_bone_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_bone_sizer, 0, wx.ALL, 5)
@@ -2396,6 +2395,25 @@ class PhysicsParam:
         )
         self.advance_option_grid_sizer = wx.FlexGridSizer(0, 8, 0, 0)
 
+        # 物理タイプ
+        self.physics_type_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("物理タイプ"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.physics_type_txt.SetToolTip(
+            logger.transtext("布: 板剛体で縦横を繋ぐ\n髪: カプセル剛体で縦を繋ぐ(※要ボーン定義)\n袖: カプセル剛体で縦を繋ぐ(※要ボーン定義)")
+        )
+        self.physics_type_txt.Wrap(-1)
+        self.advance_option_grid_sizer.Add(self.physics_type_txt, 0, wx.ALL, 5)
+
+        self.physics_type_ctrl = wx.Choice(
+            self.advance_window,
+            id=wx.ID_ANY,
+            choices=[logger.transtext("布"), logger.transtext("髪"), logger.transtext("胸"), logger.transtext("単一揺")],
+        )
+        self.physics_type_ctrl.SetToolTip(self.physics_type_txt.GetToolTipText())
+        self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_option_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
+
         # 物理親
         physics_parent_tooltip = logger.transtext("物理的に親となる物理設定番号。物理親を設定すると設定した物理の上端が物理親の下端に紐付けられます。")
         self.physics_parent_txt = wx.StaticText(
@@ -2570,6 +2588,7 @@ class PhysicsParam:
             # 詳細版オプションデータ -------------
             params["vertical_bone_density"] = int(self.vertical_bone_density_spin.GetValue())
             params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
+            params["horizonal_bone_offset"] = int(self.horizonal_bone_offset_spin.GetValue())
             # params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
             params["bone_thinning_out"] = False
             params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
@@ -2851,6 +2870,7 @@ class PhysicsParam:
         # 詳細版オプションデータ -------------
         self.vertical_bone_density_spin.SetValue(params["vertical_bone_density"])
         self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
+        self.horizonal_bone_offset_spin.SetValue(params.get("horizonal_bone_offset", 0))
         self.physics_type_ctrl.SetStringSelection(params["physics_type"])
         self.density_type_ctrl.SetStringSelection(params.get("density_type", "頂点"))
 
@@ -3008,6 +3028,7 @@ class PhysicsParam:
         # 詳細版オプションデータ -------------
         params["vertical_bone_density"] = int(self.vertical_bone_density_spin.GetValue())
         params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
+        params["horizonal_bone_offset"] = int(self.horizonal_bone_offset_spin.GetValue())
         # params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
         params["bone_thinning_out"] = False
         params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
