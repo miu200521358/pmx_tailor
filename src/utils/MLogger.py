@@ -14,7 +14,7 @@ import cython
 from utils.MException import MKilledException
 
 
-class MLogger():
+class MLogger:
 
     DECORATION_IN_BOX = "in_box"
     DECORATION_BOX = "box"
@@ -27,12 +27,12 @@ class MLogger():
     FULL = 15
     DEBUG_INFO = 16
     INFO_DEBUG = 22
-    DEBUG = logging.DEBUG       # 10
-    INFO = logging.INFO         # 20
+    DEBUG = logging.DEBUG  # 10
+    INFO = logging.INFO  # 20
     WARNING = logging.WARNING
     ERROR = logging.ERROR
     CRITICAL = logging.CRITICAL
-    
+
     # 翻訳モード
     # 読み取り専用：翻訳リストにない文字列は入力文字列をそのまま出力する
     MODE_READONLY = 0
@@ -51,7 +51,7 @@ class MLogger():
     langs = ["en_US", "ja_JP", "zh_CN"]
     # 出力対象言語
     target_lang = "ja_JP"
-    
+
     messages = {}
     logger = None
 
@@ -83,7 +83,7 @@ class MLogger():
     def time(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = self.TIMER
         kwargs["time"] = True
         self.print_logger(msg, *args, **kwargs)
@@ -91,7 +91,7 @@ class MLogger():
     def info_debug(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = self.INFO_DEBUG
         kwargs["time"] = True
         self.print_logger(msg, *args, **kwargs)
@@ -99,7 +99,7 @@ class MLogger():
     def debug_info(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = self.DEBUG_INFO
         kwargs["time"] = True
         self.print_logger(msg, *args, **kwargs)
@@ -111,19 +111,19 @@ class MLogger():
         kwargs["level"] = self.TEST
         kwargs["time"] = True
         self.print_logger(msg, *args, **kwargs)
-    
+
     def debug(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = logging.DEBUG
         kwargs["time"] = True
         self.print_logger(msg, *args, **kwargs)
-    
+
     def info(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = logging.INFO
         self.print_logger(msg, *args, **kwargs)
 
@@ -133,14 +133,14 @@ class MLogger():
 
         if fnos and len(fnos) > 0 and fnos[-1] > 0:
             last_fno = fnos[-1]
-        
+
         if not fnos and kwargs and "last_fno" in kwargs and kwargs["last_fno"] > 0:
             last_fno = kwargs["last_fno"]
 
         if last_fno > 0:
             if not kwargs:
                 kwargs = {}
-                
+
             kwargs["level"] = logging.INFO
             log_msg = "-- {0}フレーム目:終了({1}％){2}".format(fno, round((fno / last_fno) * 100, 3), msg)
             self.print_logger(log_msg, *args, **kwargs)
@@ -148,24 +148,24 @@ class MLogger():
     def warning(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = logging.WARNING
         self.print_logger(msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = logging.ERROR
         self.print_logger(msg, *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
         if not kwargs:
             kwargs = {}
-            
+
         kwargs["level"] = logging.CRITICAL
         self.print_logger(msg, *args, **kwargs)
-    
+
     def is_debug_level(self):
         return self.default_level <= MLogger.DEBUG
 
@@ -203,20 +203,33 @@ class MLogger():
 
             # ログレコード生成
             if args and isinstance(args[0], Exception) or (args and len(args) > 1 and isinstance(args[0], Exception)):
-                log_record = self.logger.makeRecord('name', target_level, "(unknown file)", 0, "{0}\n\n{1}".format(msg, traceback.format_exc()), None, None, self.module_name)
+                log_record = self.logger.makeRecord(
+                    "name",
+                    target_level,
+                    "(unknown file)",
+                    0,
+                    "{0}\n\n{1}".format(msg, traceback.format_exc()),
+                    None,
+                    None,
+                    self.module_name,
+                )
             else:
-                log_record = self.logger.makeRecord('name', target_level, "(unknown file)", 0, msg, args, None, self.module_name)
-            
+                log_record = self.logger.makeRecord(
+                    "name", target_level, "(unknown file)", 0, msg, args, None, self.module_name
+                )
+
             target_decoration = kwargs.pop("decoration", None)
             title = kwargs.pop("title", None)
             is_time = kwargs.pop("time", None)
 
             if is_time:
                 # 時間表記が必要な場合、表記追加
-                print_msg = "{message} [{funcName}]({now:%H:%M:%S.%f})".format(message=log_record.getMessage(), funcName=self.module_name, now=datetime.now())
+                print_msg = "{message} [{funcName}]({now:%H:%M:%S.%f})".format(
+                    message=log_record.getMessage(), funcName=self.module_name, now=datetime.now()
+                )
             else:
                 print_msg = "{message}".format(message=log_record.getMessage())
-            
+
             if target_decoration:
                 if target_decoration == MLogger.DECORATION_BOX:
                     output_msg = self.create_box_message(print_msg, target_level, title)
@@ -228,12 +241,14 @@ class MLogger():
                     output_msg = self.create_simple_message(print_msg, target_level, title)
             else:
                 output_msg = self.create_simple_message(print_msg, target_level, title)
-        
+
             # 出力
             try:
                 if self.child or self.is_file:
                     # 子スレッドの場合はレコードを再生成してでコンソールとGUI両方出力
-                    log_record = self.logger.makeRecord('name', target_level, "(unknown file)", 0, output_msg, None, None, self.module_name)
+                    log_record = self.logger.makeRecord(
+                        "name", target_level, "(unknown file)", 0, output_msg, None, None, self.module_name
+                    )
                     self.logger.handle(log_record)
                 else:
                     # サイジングスレッドは、printとloggerで分けて出力
@@ -241,7 +256,7 @@ class MLogger():
                     self.logger.handle(log_record)
             except Exception as e:
                 raise e
-            
+
     def create_box_message(self, msg, level, title=None):
         msg_block = []
         msg_block.append("■■■■■■■■■■■■■■■■■")
@@ -283,11 +298,11 @@ class MLogger():
 
     def create_simple_message(self, msg, level, title=None):
         msg_block = []
-        
+
         for msg_line in msg.split("\n"):
             # msg_block.append("[{0}] {1}".format(logging.getLevelName(level)[0], msg_line))
             msg_block.append(msg_line)
-        
+
         return "\n".join(msg_block)
 
     def transtext(self, msg):
@@ -301,18 +316,18 @@ class MLogger():
             for lang in self.langs:
                 messages_path = self.get_message_path(lang)
                 try:
-                    with open(messages_path, 'r', encoding="utf-8") as f:
+                    with open(messages_path, "r", encoding="utf-8") as f:
                         msgs = json.load(f)
 
                         if msg not in msgs:
                             # ない場合、追加(オリジナル言語の場合、そのまま。違う場合は空欄)
                             msgs[msg] = msg if self.target_lang == lang else ""
 
-                        with open(messages_path, 'w', encoding="utf-8") as f:
-                            json.dump(msgs, f, ensure_ascii=False)
+                        with open(messages_path, "w", encoding="utf-8") as wf:
+                            json.dump(msgs, wf, ensure_ascii=False)
                 except Exception:
                     print("*** Message Update ERROR ***\n%s", traceback.format_exc())
-        
+
         return trans_msg
 
     @classmethod
@@ -331,7 +346,7 @@ class MLogger():
                 os.makedirs(os.path.dirname(messages_path), exist_ok=True)
                 if not os.path.exists(messages_path):
                     try:
-                        with open(messages_path, 'w', encoding="utf-8") as f:
+                        with open(messages_path, "w", encoding="utf-8") as f:
                             json.dump({}, f, ensure_ascii=False)
                     except Exception:
                         print("*** Message Dump ERROR ***\n%s", traceback.format_exc())
@@ -351,7 +366,7 @@ class MLogger():
 
         # メッセージファイルパス
         try:
-            with open(cls.get_message_path(cls.target_lang), 'r', encoding="utf-8") as f:
+            with open(cls.get_message_path(cls.target_lang), "r", encoding="utf-8") as f:
                 cls.messages = json.load(f)
         except Exception:
             print("*** Message Load ERROR ***\n%s", traceback.format_exc())
@@ -363,7 +378,7 @@ class MLogger():
 
 # リソースファイルのパス
 def resource_path(relative):
-    if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "_MEIPASS"):
         return os.path.join(sys._MEIPASS, relative)
     return os.path.join(relative)
 
