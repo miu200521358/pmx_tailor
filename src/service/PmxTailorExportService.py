@@ -202,7 +202,7 @@ class PmxTailorExportService:
             material_name = param_option["material_name"]
 
             if param_option["exist_physics_clear"] == logger.transtext("上書き"):
-                # 頂点CSVが指定されている場合、対象頂点リスト生成
+                # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
                 if param_option["vertices_csv"]:
                     try:
                         with open(param_option["vertices_csv"], encoding="cp932", mode="r") as f:
@@ -716,7 +716,7 @@ class PmxTailorExportService:
 
         material_name = param_option["material_name"]
 
-        # 頂点CSVが指定されている場合、対象頂点リスト生成
+        # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["vertices_csv"]:
             target_vertices = []
             try:
@@ -727,7 +727,7 @@ class PmxTailorExportService:
                         if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
                             target_vertices.append(int(row[1]))
             except Exception:
-                logger.warning("頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                logger.warning("物理対象頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
                 return False, None, None
         else:
             target_vertices = list(model.material_vertices[material_name])
@@ -822,6 +822,9 @@ class PmxTailorExportService:
                 self.create_remaining_weight(
                     model, param_option, material_name, virtual_vertices, remaining_vertices, threshold
                 )
+
+                # グラデウェイト
+                self.create_grad_weight(model, param_option, material_name, virtual_vertices, threshold)
 
                 # 裏ウェイト
                 self.create_back_weight(model, param_option, material_name, virtual_vertices, back_vertices, threshold)
@@ -2533,10 +2536,95 @@ class PmxTailorExportService:
 
         return root_rigidbody, parent_bone_rigidbody
 
-    def change_parent_weight(
-        self, model: PmxModel, param_option: dict, material_name: str, virtual_vertices: dict, back_vertices: list
+    def create_grad_weight(
+        self,
+        model: PmxModel,
+        param_option: dict,
+        material_name: str,
+        virtual_vertices: dict,
+        threshold: float,
     ):
-        logger.info("【%s:%s】親ボーンウェイト置換", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
+
+        # 物理グラデーション対象頂点CSVが指定されている場合、対象頂点リスト生成
+        if not param_option["vertices_grad_csv"]:
+            return
+
+        logger.info(
+            "【%s:%s】グラデーションウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE
+        )
+
+        target_vertices = {}
+        try:
+            with open(param_option["vertices_grad_csv"], encoding="cp932", mode="r") as f:
+                reader = csv.reader(f)
+                next(reader)  # ヘッダーを読み飛ばす
+                for row in reader:
+                    if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
+                        vidx = int(row[1])
+                        v = model.vertex_dict[vidx]
+                        v_key = v.position.to_key(threshold)
+                        if v_key not in target_vertices:
+                            target_vertices[v_key] = VirtualVertex(v_key)
+                            target_vertices[v_key].append([v], [], [])
+        except Exception:
+            logger.warning("物理グラデーション対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
+            return
+
+        # 親ボーン
+        parent_bone = model.bones[param_option["parent_bone_name"]]
+
+        # 物理設定対象ボーン
+        physics_bones = {}
+        # 親ボーンも対象とする
+        physics_bones[parent_bone.index] = parent_bone.position.data()
+        for vv in virtual_vertices.values():
+            bones = [b for b in vv.map_bones.values() if b]
+            for bone in bones:
+                physics_bones[bone.index] = bone.position.data()
+
+        weight_cnt = 0
+        prev_weight_cnt = 0
+
+        for vkey, vv in target_vertices.items():
+            if not vv.vidxs():
+                continue
+            # 物理設定対象ボーンと親ボーンとの中間の距離
+            physics_bone_distances = (
+                np.linalg.norm(
+                    np.array(list(physics_bones.values()))
+                    - np.mean([parent_bone.position.data(), vv.position().data()], axis=0),
+                    ord=2,
+                    axis=1,
+                )
+                ** 2
+            )
+            # 近いの4つを選ぶ
+            deform_bone_indices = np.array(list(physics_bones.keys()))[np.argsort(physics_bone_distances)[:4]]
+            # ウェイトは近い方が値が大きい
+            deform_distances = np.sort(physics_bone_distances)[:4]
+            deform_weights = 1 / deform_distances
+            deform_normalized_weights = deform_weights / deform_weights.sum(axis=0, keepdims=1)
+
+            vv.deform = Bdef4(
+                deform_bone_indices[0],
+                deform_bone_indices[1],
+                deform_bone_indices[2],
+                deform_bone_indices[3],
+                deform_normalized_weights[0],
+                deform_normalized_weights[1],
+                deform_normalized_weights[2],
+                deform_normalized_weights[3],
+            )
+
+            for rv in vv.real_vertices:
+                rv.deform = vv.deform
+
+            weight_cnt += 1
+            if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
+                logger.info("-- グラデーション頂点ウェイト: %s個目:終了", weight_cnt)
+                prev_weight_cnt = weight_cnt // 200
+
+        logger.info("-- グラデーション頂点ウェイト: %s個目:終了", weight_cnt)
 
     def create_back_weight(
         self,
@@ -3546,10 +3634,9 @@ class PmxTailorExportService:
                         bone.local_z_vector *= MVector3D(-1, 1, -1)
                         bone.flag |= 0x0008 | 0x0800
 
-                        # ボーンデータ自体は常に登録しておく
-                        vv.map_bones[base_map_idx] = bone
-
                         if regist_bones[target_v_yidx, v_xidx]:
+                            # 登録対象の場合のみボーン保持
+                            vv.map_bones[base_map_idx] = bone
                             bone.index = len(tmp_all_bones) + len(model.bones)
 
                             if is_add_random:

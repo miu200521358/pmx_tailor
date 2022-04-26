@@ -608,8 +608,8 @@ class PhysicsParam:
         self.vertices_csv_file_ctrl = HistoryFilePickerCtrl(
             self.main_frame,
             self.simple_window,
-            logger.transtext("対象頂点CSV"),
-            logger.transtext("対象頂点CSVファイルを開く"),
+            logger.transtext("物理対象頂点CSV"),
+            logger.transtext("物理対象頂点CSVファイルを開く"),
             ("csv"),
             wx.FLP_DEFAULT_STYLE,
             logger.transtext(
@@ -626,6 +626,29 @@ class PhysicsParam:
         )
         self.vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
         self.simple_param_sizer.Add(self.vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
+
+        # 物理グラデCSVファイルコントロール
+        self.vertices_grad_csv_file_ctrl = HistoryFilePickerCtrl(
+            self.main_frame,
+            self.simple_window,
+            logger.transtext("物理グラデーション対象頂点CSV"),
+            logger.transtext("物理グラデーション対象頂点CSVファイルを開く"),
+            ("csv"),
+            wx.FLP_DEFAULT_STYLE,
+            logger.transtext(
+                "物理対象頂点CSVを指定しており、かつ物理そのものは設定しないがウェイトを物理ボーンで塗り直したい頂点がある場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+            ),
+            file_model_spacer=0,
+            title_parts_ctrl=None,
+            title_parts2_ctrl=None,
+            file_histories_key="vertices_grad_csv",
+            is_change_output=False,
+            is_aster=False,
+            is_save=False,
+            set_no=0,
+        )
+        self.vertices_grad_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.vertices_grad_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
 
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
 
@@ -2536,10 +2559,16 @@ class PhysicsParam:
                 return params, False
 
             if self.vertices_csv_file_ctrl.path() and not os.path.exists(self.vertices_csv_file_ctrl.path()):
-                logger.error("頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
+                logger.error("物理対象頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
+                return params, False
+
+            if self.vertices_grad_csv_file_ctrl.path() and not os.path.exists(self.vertices_grad_csv_file_ctrl.path()):
+                logger.error("物理グラデーション対象頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
                 return params, False
 
             self.vertices_csv_file_ctrl.save()
+            self.vertices_grad_csv_file_ctrl.save()
+
             if self.simple_abb_ctrl.GetValue() not in self.main_frame.file_hitories["abb_setting"]:
                 self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {}
             self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {
@@ -2558,6 +2587,7 @@ class PhysicsParam:
                     [str(cidx) for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()]
                 ),
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
+                "vertices_grad_csv": self.vertices_grad_csv_file_ctrl.path(),
                 "physics_parent": self.physics_parent_spin.GetValue(),
                 "params": self.get_param_export_data(),
             }
@@ -2579,6 +2609,7 @@ class PhysicsParam:
             params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection()
             params["special_shape"] = self.simple_special_shape_ctrl.GetStringSelection()
             params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
+            params["vertices_grad_csv"] = self.vertices_grad_csv_file_ctrl.path()
             # params["threshold"] = self.simple_threshold_slider.GetValue()
             # params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -3362,6 +3393,8 @@ class PhysicsParam:
                         self.simple_extend_edge_choice_ctrl.SetSelection(int(cidx))
             if not self.vertices_csv_file_ctrl.path():
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
+            if not self.vertices_grad_csv_file_ctrl.path():
+                self.vertices_grad_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_grad_csv", ""))
             if not self.physics_parent_spin.GetValue():
                 self.physics_parent_spin.SetValue(int(abb_setting.get("physics_parent", 0)))
 
