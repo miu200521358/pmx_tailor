@@ -1194,7 +1194,7 @@ class PmxTailorExportService:
                                 joint_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
 
                                 joint_key, joint = self.build_joint(
-                                    "｜",
+                                    "↑",
                                     1,
                                     bone_y_idx,
                                     a_rigidbody,
@@ -1505,7 +1505,7 @@ class PmxTailorExportService:
                                 joint_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
 
                                 joint_key, joint = self.build_joint(
-                                    "＝",
+                                    "←",
                                     4,
                                     bone_y_idx,
                                     a_rigidbody,
@@ -2846,6 +2846,9 @@ class PmxTailorExportService:
 
         if not back_vertices:
             return
+
+        # 重複を除外
+        back_vertices = list(set(back_vertices))
 
         logger.info("【%s:%s】裏ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
@@ -4402,6 +4405,12 @@ class PmxTailorExportService:
         remaining_vertices = {}
 
         parent_bone = model.bones[param_option["parent_bone_name"]]
+        # 親ボーンの傾き
+        parent_direction = parent_bone.tail_position.normalized()
+        if parent_bone.tail_index >= 0 and parent_bone.tail_index in model.bone_indexes:
+            parent_direction = (
+                (model.bones[model.bone_indexes[parent_bone.tail_index]].position) - parent_bone.position
+            ).normalized()
 
         # 一旦全体の位置を把握
         n = 0
@@ -4494,13 +4503,8 @@ class PmxTailorExportService:
 
                 # 面の中心
                 mean_pos = MVector3D(np.mean([v0.position.data(), v1.position.data(), v2.position.data()], axis=0))
-
-                # 面の評価軸の位置と親ボーンのそれ以外の軸で、面の中心から大体水平の位置を算出
-                parent_intersect = parent_bone.position * base_reverse_axis + MVector3D(
-                    mean_pos * np.abs(base_vertical_axis.data())
-                )
                 # 面垂線と軸ベクトルとの内積
-                direction_dot = MVector3D.dotProduct(surface_normal, base_vertical_axis)
+                direction_dot = MVector3D.dotProduct(surface_normal, parent_direction)
 
                 if np.isclose(material_direction, 0):
                     # 水平の場合、軸の向きだけ考える
@@ -4511,8 +4515,8 @@ class PmxTailorExportService:
                     intersect_vec, intersect_tt, intersect_uu, intersect_len = calc_intersect(
                         mean_pos,
                         mean_pos + surface_normal * 1000,
-                        parent_bone.position + -base_vertical_axis * 1000,
-                        parent_bone.position + base_vertical_axis * 1000,
+                        parent_bone.position + -parent_direction * 1000,
+                        parent_bone.position + parent_direction * 1000,
                     )
                     logger.debug(
                         f"tt[{round(intersect_tt, 5)}], uu[{round(intersect_uu, 5)}], len[{round(intersect_len, 5)}], iv[{intersect_vec.to_log()}]"
@@ -4545,13 +4549,13 @@ class PmxTailorExportService:
                         remaining_vertices[v0_key] = virtual_vertices[v0_key]
 
                     logger.debug(
-                        f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}], pd[{parent_intersect.to_log()}]"
+                        f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
                     )
                 else:
                     # 裏面に登録
                     back_vertices.append(v0_idx)
                     logger.debug(
-                        f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}], pd[{parent_intersect.to_log()}]"
+                        f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
                     )
 
             n += 1

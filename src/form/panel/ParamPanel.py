@@ -3064,11 +3064,11 @@ class PhysicsParam:
             params["material_name"] = self.simple_material_ctrl.GetStringSelection()
             params["back_material_name"] = self.simple_back_material_ctrl.GetStringSelection()
             params["back_extend_material_names"] = [
-                self.frame.material_list[cidx] for cidx in self.simple_extend_back_choice_ctrl.GetSelections()
+                self.frame.material_list[cidx + 1] for cidx in self.simple_extend_back_choice_ctrl.GetSelections()
             ]
             params["edge_material_name"] = self.simple_edge_material_ctrl.GetStringSelection()
             params["edge_extend_material_names"] = [
-                self.frame.material_list[cidx] for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()
+                self.frame.material_list[cidx + 1] for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()
             ]
             params["parent_bone_name"] = self.simple_parent_bone_ctrl.GetStringSelection()
             params["abb_name"] = self.simple_abb_ctrl.GetValue()
