@@ -401,7 +401,7 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("親ボーン *　"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_parent_bone_txt.SetToolTip(
-            logger.transtext("材質物理の起点となる親ボーン\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します）")
+            logger.transtext("材質物理の起点となる親ボーン\n（指定された親ボーンの子に「○○中心」ボーンを追加して、それを起点に物理を設定します。切替オプションあり）")
         )
         self.simple_parent_bone_txt.Wrap(-1)
         self.simple_parent_bone_sizer.Add(self.simple_parent_bone_txt, 0, wx.ALL, 5)
@@ -557,7 +557,7 @@ class PhysicsParam:
             self.frame,
             logger.transtext("追加で裾材質を指定したい場合に選択してください。\n裾の裏は裏材質に割り当ててください"),
             caption="追加裾材質選択",
-            choices=self.frame.material_list,
+            choices=self.frame.material_list[1:],
             style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE,
         )
         self.simple_extend_edge_choice_ctrl.Hide()
@@ -593,7 +593,7 @@ class PhysicsParam:
             self.frame,
             logger.transtext("追加で裏材質を指定したい場合に選択してください。"),
             caption="追加裏材質選択",
-            choices=self.frame.material_list,
+            choices=self.frame.material_list[1:],
             style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE,
         )
         self.simple_extend_back_choice_ctrl.Hide()
@@ -2841,10 +2841,10 @@ class PhysicsParam:
         self.advance_param_sizer.Add(self.advance_horizonal_reverse_joint_sizer, 0, wx.ALL, 5)
 
         # 詳細オプションブロック -------------------------------
-        self.advance_option_grid_sizer = wx.StaticBoxSizer(
+        self.advance_option_sizer = wx.StaticBoxSizer(
             wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("詳細オプション")), orient=wx.VERTICAL
         )
-        self.advance_option_grid_sizer = wx.FlexGridSizer(0, 8, 0, 0)
+        self.advance_option_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         # 物理接続タイプ
         self.parent_type_txt = wx.StaticText(
@@ -2882,6 +2882,25 @@ class PhysicsParam:
         self.physics_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_option_grid_sizer.Add(self.physics_type_ctrl, 0, wx.ALL, 5)
 
+        # ジョイント位置タイプ
+        self.joint_pos_type_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ジョイント位置"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.joint_pos_type_txt.SetToolTip(
+            logger.transtext("ボーン間: ボーンとボーンの間にジョイントが入る\nボーン位置: ボーンの位置にジョイントが入る\n※既存設定「再利用」時は無効")
+        )
+        self.joint_pos_type_txt.Wrap(-1)
+        self.advance_option_grid_sizer.Add(self.joint_pos_type_txt, 0, wx.ALL, 5)
+
+        self.joint_pos_type_ctrl = wx.Choice(
+            self.advance_window,
+            id=wx.ID_ANY,
+            choices=[logger.transtext("ボーン間"), logger.transtext("ボーン位置")],
+        )
+        self.joint_pos_type_ctrl.SetToolTip(self.joint_pos_type_txt.GetToolTipText())
+        self.joint_pos_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_option_grid_sizer.Add(self.joint_pos_type_ctrl, 0, wx.ALL, 5)
+
         # 物理親
         physics_parent_tooltip = logger.transtext("物理的に親となる物理設定番号。物理親を設定すると設定した物理の上端が物理親の下端に紐付けられます。")
         self.physics_parent_txt = wx.StaticText(
@@ -2898,7 +2917,8 @@ class PhysicsParam:
         self.physics_parent_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_option_grid_sizer.Add(self.physics_parent_spin, 0, wx.ALL, 5)
 
-        self.advance_param_sizer.Add(self.advance_option_grid_sizer, 0, wx.ALL, 5)
+        self.advance_option_sizer.Add(self.advance_option_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
+        self.advance_param_sizer.Add(self.advance_option_sizer, 0, wx.ALL, 5)
 
         # ボーン版 ------------------
         self.bone_sizer = wx.StaticBoxSizer(
@@ -3035,6 +3055,7 @@ class PhysicsParam:
                 "vertices_grad_csv": self.vertices_grad_csv_file_ctrl.path(),
                 "physics_parent": self.physics_parent_spin.GetValue(),
                 "parent_type": self.parent_type_ctrl.GetStringSelection(),
+                "joint_pos_type": self.joint_pos_type_ctrl.GetStringSelection(),
                 "params": self.get_param_export_data(),
             }
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
@@ -3072,6 +3093,7 @@ class PhysicsParam:
             params["density_type"] = self.density_type_ctrl.GetStringSelection()
             params["physics_parent"] = int(self.physics_parent_spin.GetValue())
             params["parent_type"] = self.parent_type_ctrl.GetStringSelection()
+            params["joint_pos_type"] = self.joint_pos_type_ctrl.GetStringSelection()
 
             # 自身を非衝突対象
             no_collision_group = 0
@@ -3400,7 +3422,8 @@ class PhysicsParam:
         self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
         self.horizonal_bone_offset_spin.SetValue(params.get("horizonal_bone_offset", 0))
         self.physics_type_ctrl.SetStringSelection(params["physics_type"])
-        self.density_type_ctrl.SetStringSelection(params.get("density_type", "頂点"))
+        self.density_type_ctrl.SetStringSelection(params.get("density_type", logger.transtext("頂点")))
+        self.joint_pos_type_ctrl.SetStringSelection(params.get("joint_pos_type", logger.transtext("ボーン間")))
 
         # 剛体 ---------------
         self.advance_rigidbody_shape_type_ctrl.SetSelection(params["rigidbody_shape_type"])
@@ -3577,8 +3600,6 @@ class PhysicsParam:
         params = {}
 
         # 簡易版オプションデータ -------------
-        # params["threshold"] = self.simple_threshold_slider.GetValue()
-        # params["fineness"] = self.simple_fineness_slider.GetValue()
         params["mass"] = self.simple_mass_slider.GetValue()
         params["air_resistance"] = self.simple_air_resistance_slider.GetValue()
         params["shape_maintenance"] = self.simple_shape_maintenance_slider.GetValue()
@@ -3587,10 +3608,10 @@ class PhysicsParam:
         params["vertical_bone_density"] = int(self.vertical_bone_density_spin.GetValue())
         params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
         params["horizonal_bone_offset"] = int(self.horizonal_bone_offset_spin.GetValue())
-        # params["bone_thinning_out"] = self.bone_thinning_out_check.GetValue()
         params["bone_thinning_out"] = False
         params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
         params["density_type"] = self.density_type_ctrl.GetStringSelection()
+        params["joint_pos_type"] = self.joint_pos_type_ctrl.GetStringSelection()
 
         # 剛体 ---------------
         params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
@@ -4085,6 +4106,7 @@ class PhysicsParam:
         self.advance_horizonal_joint_restruct_check.SetValue(1)
         self.rigidbody_root_thicks_spin.SetValue(0.2)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
+        self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
 
         if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))
@@ -4485,6 +4507,7 @@ class PhysicsParam:
         self.physics_type_ctrl.SetStringSelection(logger.transtext("布"))
         self.density_type_ctrl.SetStringSelection(logger.transtext("頂点"))
         self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
+        self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
 
         self.set_material_name(event)
         # self.set_fineness(event)
