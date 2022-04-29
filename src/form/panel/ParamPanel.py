@@ -1110,6 +1110,61 @@ class PhysicsParam:
         self.advance_rigidbody_sizer.Add(self.advance_rigidbody_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_rigidbody_sizer, 0, wx.ALL, 5)
 
+        # 剛体の厚みブロック -------------------------------
+        self.advance_rigidbody_thicks_sizer = wx.StaticBoxSizer(
+            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("剛体の厚み")), orient=wx.VERTICAL
+        )
+        self.advance_rigidbody_thicks_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
+
+        # 根元厚み
+        self.rigidbody_root_thicks_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("根元厚み"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.rigidbody_root_thicks_txt.SetToolTip(logger.transtext("根元剛体の厚み"))
+        self.rigidbody_root_thicks_txt.Wrap(-1)
+        self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_root_thicks_txt, 0, wx.ALL, 5)
+
+        self.rigidbody_root_thicks_spin = wx.SpinCtrlDouble(
+            self.advance_window,
+            id=wx.ID_ANY,
+            size=wx.Size(90, -1),
+            value="0.2",
+            min=0.01,
+            max=10,
+            initial=0.2,
+            inc=0.01,
+        )
+        self.rigidbody_root_thicks_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_root_thicks_spin, 0, wx.ALL, 5)
+
+        # 末端厚み
+        self.rigidbody_end_thicks_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("末端厚み"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.rigidbody_end_thicks_txt.SetToolTip(logger.transtext("末端剛体の厚み"))
+        self.rigidbody_end_thicks_txt.Wrap(-1)
+        self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_end_thicks_txt, 0, wx.ALL, 5)
+
+        self.rigidbody_end_thicks_spin = wx.SpinCtrlDouble(
+            self.advance_window,
+            id=wx.ID_ANY,
+            size=wx.Size(90, -1),
+            value="0.2",
+            min=0.01,
+            max=10,
+            initial=0.2,
+            inc=0.01,
+        )
+        self.rigidbody_end_thicks_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_end_thicks_spin, 0, wx.ALL, 5)
+
+        self.advance_rigidbody_thicks_sizer.Add(self.advance_rigidbody_thicks_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
+        self.advance_param_sizer.Add(self.advance_rigidbody_thicks_sizer, 0, wx.ALL, 5)
+
         # 縦ジョイントブロック -------------------------------
         self.advance_vertical_joint_sizer = wx.StaticBoxSizer(
             wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("縦ジョイント")), orient=wx.VERTICAL
@@ -3047,6 +3102,9 @@ class PhysicsParam:
             params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
             params["rigidbody_balancer"] = self.advance_rigidbody_balancer_ctrl.GetValue()
 
+            params["rigidbody_root_thicks"] = self.rigidbody_root_thicks_spin.GetValue()
+            params["rigidbody_end_thicks"] = self.rigidbody_end_thicks_spin.GetValue()
+
             params["vertical_joint"] = None
             if self.advance_vertical_joint_valid_check.GetValue():
                 params["vertical_joint"] = Joint(
@@ -3354,6 +3412,9 @@ class PhysicsParam:
         self.rigidbody_coefficient_spin.SetValue(params["rigidbody_coefficient"])
         self.advance_rigidbody_balancer_ctrl.SetValue(params["rigidbody_balancer"])
 
+        self.rigidbody_root_thicks_spin.SetValue(params.get("rigidbody_root_thicks", 0.2))
+        self.rigidbody_end_thicks_spin.SetValue(params.get("rigidbody_end_thicks", 0.2))
+
         # 縦ジョイント -----------
         self.advance_vertical_joint_valid_check.SetValue(params["vertical_joint_valid"])
         self.vertical_joint_mov_x_min_spin.SetValue(params["vertical_joint_mov_x_min"])
@@ -3540,6 +3601,9 @@ class PhysicsParam:
         params["rigidbody_friction"] = self.rigidbody_friction_spin.GetValue()
         params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
         params["rigidbody_balancer"] = self.advance_rigidbody_balancer_ctrl.GetValue()
+
+        params["rigidbody_root_thicks"] = self.rigidbody_root_thicks_spin.GetValue()
+        params["rigidbody_end_thicks"] = self.rigidbody_end_thicks_spin.GetValue()
 
         # 縦ジョイント -----------
         params["vertical_joint_valid"] = self.advance_vertical_joint_valid_check.GetValue()
@@ -4019,6 +4083,8 @@ class PhysicsParam:
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_rigidbody_balancer_ctrl.SetValue(0)
         self.advance_horizonal_joint_restruct_check.SetValue(1)
+        self.rigidbody_root_thicks_spin.SetValue(0.2)
+        self.rigidbody_end_thicks_spin.SetValue(0.2)
 
         if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))

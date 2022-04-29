@@ -2061,21 +2061,10 @@ class PmxTailorExportService:
 
             # キーは比較対象＋向きで昇順
             vv_keys = sorted(np.unique(vertex_map[np.where(regist_bones)][:, target_idx]) * target_direction)
-            # 全体の比較対象の距離
-            vv_distances = sorted(
-                vertex_map[np.where(~np.isnan(vertex_map))].reshape(
-                    int(np.where(~np.isnan(vertex_map))[0].shape[0] / 3), 3
-                ),
-                key=lambda x: x[target_idx],
-            )
-            distance = (
-                (
-                    virtual_vertices[tuple(vv_distances[0])].position()
-                    - virtual_vertices[tuple(vv_distances[-1])].position()
-                ).abs()
-            ).data()[target_idx]
             # 厚みは比較キーの数分だけ作る
-            rigidbody_limit_thicks = np.linspace(0.2, distance / 3 * 0.15, len(vv_keys))
+            rigidbody_limit_thicks = np.linspace(
+                param_option["rigidbody_root_thicks"], param_option["rigidbody_end_thicks"], len(vv_keys)
+            )
 
             # 縦段INDEX
             v_yidxs = list(range(regist_bones.shape[0]))
