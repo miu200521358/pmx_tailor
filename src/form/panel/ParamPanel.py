@@ -2091,330 +2091,699 @@ class PhysicsParam:
         self.advance_diagonal_joint_sizer.Add(self.advance_diagonal_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_diagonal_joint_sizer, 0, wx.ALL, 5)
 
-        # 逆ジョイントブロック -------------------------------
-        self.advance_reverse_joint_sizer = wx.StaticBoxSizer(
-            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("逆ジョイント")), orient=wx.VERTICAL
+        # 縦逆ジョイントブロック -------------------------------
+        self.advance_vertical_reverse_joint_sizer = wx.StaticBoxSizer(
+            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("縦逆ジョイント")), orient=wx.VERTICAL
         )
 
-        self.advance_reverse_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.advance_vertical_reverse_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.advance_reverse_joint_valid_check = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("有効"))
-        self.advance_reverse_joint_valid_check.SetToolTip(logger.transtext("逆ジョイントを有効にするか否か"))
-        self.advance_reverse_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_reverse_joint)
-        self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_valid_check, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_valid_check = wx.CheckBox(
+            self.advance_window, wx.ID_ANY, logger.transtext("有効")
+        )
+        self.advance_vertical_reverse_joint_valid_check.SetToolTip(logger.transtext("縦逆ジョイントを有効にするか否か"))
+        self.advance_vertical_reverse_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_vertical_reverse_joint)
+        self.advance_vertical_reverse_joint_head_sizer.Add(
+            self.advance_vertical_reverse_joint_valid_check, 0, wx.ALL, 5
+        )
 
         # 係数
-        self.advance_reverse_joint_coefficient_txt = wx.StaticText(
+        self.advance_vertical_reverse_joint_coefficient_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("制限係数"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.advance_reverse_joint_coefficient_txt.SetToolTip(
+        self.advance_vertical_reverse_joint_coefficient_txt.SetToolTip(
             logger.transtext("末端ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
         )
-        self.advance_reverse_joint_coefficient_txt.Wrap(-1)
-        self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_coefficient_txt, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_coefficient_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_head_sizer.Add(
+            self.advance_vertical_reverse_joint_coefficient_txt, 0, wx.ALL, 5
+        )
 
-        self.advance_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(
+        self.advance_vertical_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1
         )
-        self.advance_reverse_joint_coefficient_spin.Bind(
+        self.advance_vertical_reverse_joint_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_head_sizer.Add(self.advance_reverse_joint_coefficient_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_head_sizer.Add(
+            self.advance_vertical_reverse_joint_coefficient_spin, 0, wx.ALL, 5
+        )
 
-        self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_head_sizer, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_sizer.Add(self.advance_vertical_reverse_joint_head_sizer, 0, wx.ALL, 5)
 
-        self.advance_reverse_joint_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
+        self.advance_vertical_reverse_joint_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
         # 移動X(最小)
-        self.reverse_joint_mov_x_min_txt = wx.StaticText(
+        self.vertical_reverse_joint_mov_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端逆ジョイントの移動X(最小)"))
-        self.reverse_joint_mov_x_min_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動X(最小)"))
+        self.vertical_reverse_joint_mov_x_min_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_x_min_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_mov_x_min_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
         )
-        self.reverse_joint_mov_x_min_spin.Bind(
+        self.vertical_reverse_joint_mov_x_min_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_min_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_x_min_spin, 0, wx.ALL, 5)
 
         # 移動Y(最小)
-        self.reverse_joint_mov_y_min_txt = wx.StaticText(
+        self.vertical_reverse_joint_mov_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端逆ジョイントの移動Y(最小)"))
-        self.reverse_joint_mov_y_min_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Y(最小)"))
+        self.vertical_reverse_joint_mov_y_min_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_y_min_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_mov_y_min_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
         )
-        self.reverse_joint_mov_y_min_spin.Bind(
+        self.vertical_reverse_joint_mov_y_min_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_min_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_y_min_spin, 0, wx.ALL, 5)
 
         # 移動Z(最小)
-        self.reverse_joint_mov_z_min_txt = wx.StaticText(
+        self.vertical_reverse_joint_mov_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端逆ジョイントの移動Z(最小)"))
-        self.reverse_joint_mov_z_min_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Z(最小)"))
+        self.vertical_reverse_joint_mov_z_min_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_z_min_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_mov_z_min_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
         )
-        self.reverse_joint_mov_z_min_spin.Bind(
+        self.vertical_reverse_joint_mov_z_min_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_min_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_z_min_spin, 0, wx.ALL, 5)
 
         # 移動X(最大)
-        self.reverse_joint_mov_x_max_txt = wx.StaticText(
+        self.vertical_reverse_joint_mov_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端逆ジョイントの移動X(最大)"))
-        self.reverse_joint_mov_x_max_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動X(最大)"))
+        self.vertical_reverse_joint_mov_x_max_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_x_max_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_mov_x_max_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_mov_x_max_spin.Bind(
+        self.vertical_reverse_joint_mov_x_max_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_x_max_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_x_max_spin, 0, wx.ALL, 5)
 
         # 移動Y(最大)
-        self.reverse_joint_mov_y_max_txt = wx.StaticText(
+        self.vertical_reverse_joint_mov_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端逆ジョイントの移動Y(最大)"))
-        self.reverse_joint_mov_y_max_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Y(最大)"))
+        self.vertical_reverse_joint_mov_y_max_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_y_max_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_mov_y_max_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_mov_y_max_spin.Bind(
+        self.vertical_reverse_joint_mov_y_max_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_y_max_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_y_max_spin, 0, wx.ALL, 5)
 
         # 移動Z(最大)
-        self.reverse_joint_mov_z_max_txt = wx.StaticText(
+        self.vertical_reverse_joint_mov_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端逆ジョイントの移動Z(最大)"))
-        self.reverse_joint_mov_z_max_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Z(最大)"))
+        self.vertical_reverse_joint_mov_z_max_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_mov_z_max_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_mov_z_max_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_mov_z_max_spin.Bind(
+        self.vertical_reverse_joint_mov_z_max_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_mov_z_max_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_z_max_spin, 0, wx.ALL, 5)
 
         # 回転X(最小)
-        self.reverse_joint_rot_x_min_txt = wx.StaticText(
+        self.vertical_reverse_joint_rot_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_rot_x_min_txt.SetToolTip(logger.transtext("末端逆ジョイントの回転X(最小)"))
-        self.reverse_joint_rot_x_min_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_min_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_rot_x_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの回転X(最小)"))
+        self.vertical_reverse_joint_rot_x_min_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_x_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_x_min_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_rot_x_min_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
         )
-        self.reverse_joint_rot_x_min_spin.Bind(
+        self.vertical_reverse_joint_rot_x_min_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_min_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_x_min_spin, 0, wx.ALL, 5)
 
         # 回転Y(最小)
-        self.reverse_joint_rot_y_min_txt = wx.StaticText(
+        self.vertical_reverse_joint_rot_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_rot_y_min_txt.SetToolTip(logger.transtext("末端逆ジョイントの回転Y(最小)"))
-        self.reverse_joint_rot_y_min_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_min_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_rot_y_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの回転Y(最小)"))
+        self.vertical_reverse_joint_rot_y_min_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_y_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_y_min_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_rot_y_min_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
         )
-        self.reverse_joint_rot_y_min_spin.Bind(
+        self.vertical_reverse_joint_rot_y_min_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_min_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_y_min_spin, 0, wx.ALL, 5)
 
         # 回転Z(最小)
-        self.reverse_joint_rot_z_min_txt = wx.StaticText(
+        self.vertical_reverse_joint_rot_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_rot_z_min_txt.SetToolTip(logger.transtext("末端逆ジョイントの回転Z(最小)"))
-        self.reverse_joint_rot_z_min_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_min_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_rot_z_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの回転Z(最小)"))
+        self.vertical_reverse_joint_rot_z_min_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_z_min_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_z_min_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_rot_z_min_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
         )
-        self.reverse_joint_rot_z_min_spin.Bind(
+        self.vertical_reverse_joint_rot_z_min_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_min_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_z_min_spin, 0, wx.ALL, 5)
 
         # 回転X(最大)
-        self.reverse_joint_rot_x_max_txt = wx.StaticText(
+        self.vertical_reverse_joint_rot_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_rot_x_max_txt.SetToolTip(logger.transtext("末端逆ジョイントの回転X(最大)"))
-        self.reverse_joint_rot_x_max_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_max_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_rot_x_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの回転X(最大)"))
+        self.vertical_reverse_joint_rot_x_max_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_x_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_x_max_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_rot_x_max_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_rot_x_max_spin.Bind(
+        self.vertical_reverse_joint_rot_x_max_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_x_max_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_x_max_spin, 0, wx.ALL, 5)
 
         # 回転Y(最大)
-        self.reverse_joint_rot_y_max_txt = wx.StaticText(
+        self.vertical_reverse_joint_rot_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_rot_y_max_txt.SetToolTip(logger.transtext("末端逆ジョイントの回転Y(最大)"))
-        self.reverse_joint_rot_y_max_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_max_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_rot_y_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの回転Y(最大)"))
+        self.vertical_reverse_joint_rot_y_max_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_y_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_y_max_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_rot_y_max_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_rot_y_max_spin.Bind(
+        self.vertical_reverse_joint_rot_y_max_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_y_max_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_y_max_spin, 0, wx.ALL, 5)
 
         # 回転Z(最大)
-        self.reverse_joint_rot_z_max_txt = wx.StaticText(
+        self.vertical_reverse_joint_rot_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_rot_z_max_txt.SetToolTip(logger.transtext("末端逆ジョイントの回転Z(最大)"))
-        self.reverse_joint_rot_z_max_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_max_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_rot_z_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの回転Z(最大)"))
+        self.vertical_reverse_joint_rot_z_max_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_z_max_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_rot_z_max_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_rot_z_max_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_rot_z_max_spin.Bind(
+        self.vertical_reverse_joint_rot_z_max_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_rot_z_max_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_rot_z_max_spin, 0, wx.ALL, 5)
 
         # ばね(移動X)
-        self.reverse_joint_spring_mov_x_txt = wx.StaticText(
+        self.vertical_reverse_joint_spring_mov_x_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ばね(移動X)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_spring_mov_x_txt.SetToolTip(logger.transtext("末端逆ジョイントのばね(移動X)"))
-        self.reverse_joint_spring_mov_x_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_x_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_spring_mov_x_txt.SetToolTip(logger.transtext("末端縦逆ジョイントのばね(移動X)"))
+        self.vertical_reverse_joint_spring_mov_x_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_mov_x_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_spring_mov_x_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_spring_mov_x_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_spring_mov_x_spin.Bind(
+        self.vertical_reverse_joint_spring_mov_x_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_x_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_mov_x_spin, 0, wx.ALL, 5)
 
         # ばね(移動Y)
-        self.reverse_joint_spring_mov_y_txt = wx.StaticText(
+        self.vertical_reverse_joint_spring_mov_y_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ばね(移動Y)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_spring_mov_y_txt.SetToolTip(logger.transtext("末端逆ジョイントのばね(移動Y)"))
-        self.reverse_joint_spring_mov_y_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_y_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_spring_mov_y_txt.SetToolTip(logger.transtext("末端縦逆ジョイントのばね(移動Y)"))
+        self.vertical_reverse_joint_spring_mov_y_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_mov_y_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_spring_mov_y_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_spring_mov_y_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_spring_mov_y_spin.Bind(
+        self.vertical_reverse_joint_spring_mov_y_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_y_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_mov_y_spin, 0, wx.ALL, 5)
 
         # ばね(移動Z)
-        self.reverse_joint_spring_mov_z_txt = wx.StaticText(
+        self.vertical_reverse_joint_spring_mov_z_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ばね(移動Z)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_spring_mov_z_txt.SetToolTip(logger.transtext("末端逆ジョイントのばね(移動Z)"))
-        self.reverse_joint_spring_mov_z_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_z_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_spring_mov_z_txt.SetToolTip(logger.transtext("末端縦逆ジョイントのばね(移動Z)"))
+        self.vertical_reverse_joint_spring_mov_z_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_mov_z_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_spring_mov_z_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_spring_mov_z_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_spring_mov_z_spin.Bind(
+        self.vertical_reverse_joint_spring_mov_z_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_mov_z_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_mov_z_spin, 0, wx.ALL, 5)
 
         # ばね(回転X)
-        self.reverse_joint_spring_rot_x_txt = wx.StaticText(
+        self.vertical_reverse_joint_spring_rot_x_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ばね(回転X)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_spring_rot_x_txt.SetToolTip(logger.transtext("末端逆ジョイントのばね(回転X)"))
-        self.reverse_joint_spring_rot_x_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_x_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_spring_rot_x_txt.SetToolTip(logger.transtext("末端縦逆ジョイントのばね(回転X)"))
+        self.vertical_reverse_joint_spring_rot_x_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_rot_x_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_spring_rot_x_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_spring_rot_x_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_spring_rot_x_spin.Bind(
+        self.vertical_reverse_joint_spring_rot_x_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_x_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_rot_x_spin, 0, wx.ALL, 5)
 
         # ばね(回転Y)
-        self.reverse_joint_spring_rot_y_txt = wx.StaticText(
+        self.vertical_reverse_joint_spring_rot_y_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ばね(回転Y)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_spring_rot_y_txt.SetToolTip(logger.transtext("末端逆ジョイントのばね(回転Y)"))
-        self.reverse_joint_spring_rot_y_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_y_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_spring_rot_y_txt.SetToolTip(logger.transtext("末端縦逆ジョイントのばね(回転Y)"))
+        self.vertical_reverse_joint_spring_rot_y_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_rot_y_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_spring_rot_y_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_spring_rot_y_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_spring_rot_y_spin.Bind(
+        self.vertical_reverse_joint_spring_rot_y_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_y_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_rot_y_spin, 0, wx.ALL, 5)
 
         # ばね(回転Z)
-        self.reverse_joint_spring_rot_z_txt = wx.StaticText(
+        self.vertical_reverse_joint_spring_rot_z_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ばね(回転Z)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.reverse_joint_spring_rot_z_txt.SetToolTip(logger.transtext("末端逆ジョイントのばね(回転Z)"))
-        self.reverse_joint_spring_rot_z_txt.Wrap(-1)
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_z_txt, 0, wx.ALL, 5)
+        self.vertical_reverse_joint_spring_rot_z_txt.SetToolTip(logger.transtext("末端縦逆ジョイントのばね(回転Z)"))
+        self.vertical_reverse_joint_spring_rot_z_txt.Wrap(-1)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_rot_z_txt, 0, wx.ALL, 5)
 
-        self.reverse_joint_spring_rot_z_spin = wx.SpinCtrlDouble(
+        self.vertical_reverse_joint_spring_rot_z_spin = wx.SpinCtrlDouble(
             self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
         )
-        self.reverse_joint_spring_rot_z_spin.Bind(
+        self.vertical_reverse_joint_spring_rot_z_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
         )
-        self.advance_reverse_joint_grid_sizer.Add(self.reverse_joint_spring_rot_z_spin, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_spring_rot_z_spin, 0, wx.ALL, 5)
 
-        self.advance_reverse_joint_sizer.Add(self.advance_reverse_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
-        self.advance_param_sizer.Add(self.advance_reverse_joint_sizer, 0, wx.ALL, 5)
+        self.advance_vertical_reverse_joint_sizer.Add(
+            self.advance_vertical_reverse_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5
+        )
+        self.advance_param_sizer.Add(self.advance_vertical_reverse_joint_sizer, 0, wx.ALL, 5)
+
+        # 横逆ジョイントブロック -------------------------------
+        self.advance_horizonal_reverse_joint_sizer = wx.StaticBoxSizer(
+            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("横逆ジョイント")), orient=wx.VERTICAL
+        )
+
+        self.advance_horizonal_reverse_joint_head_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.advance_horizonal_reverse_joint_valid_check = wx.CheckBox(
+            self.advance_window, wx.ID_ANY, logger.transtext("有効")
+        )
+        self.advance_horizonal_reverse_joint_valid_check.SetToolTip(logger.transtext("横逆ジョイントを有効にするか否か"))
+        self.advance_horizonal_reverse_joint_valid_check.Bind(wx.EVT_CHECKBOX, self.on_horizonal_reverse_joint)
+        self.advance_horizonal_reverse_joint_head_sizer.Add(
+            self.advance_horizonal_reverse_joint_valid_check, 0, wx.ALL, 5
+        )
+
+        # 係数
+        self.advance_horizonal_reverse_joint_coefficient_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("制限係数"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.advance_horizonal_reverse_joint_coefficient_txt.SetToolTip(
+            logger.transtext("末端ジョイントが末端ジョイントよりどれくらい制限を強くするか。1の場合、全ての段の制限が均一になります。")
+        )
+        self.advance_horizonal_reverse_joint_coefficient_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_head_sizer.Add(
+            self.advance_horizonal_reverse_joint_coefficient_txt, 0, wx.ALL, 5
+        )
+
+        self.advance_horizonal_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1
+        )
+        self.advance_horizonal_reverse_joint_coefficient_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_head_sizer.Add(
+            self.advance_horizonal_reverse_joint_coefficient_spin, 0, wx.ALL, 5
+        )
+
+        self.advance_horizonal_reverse_joint_sizer.Add(self.advance_horizonal_reverse_joint_head_sizer, 0, wx.ALL, 5)
+
+        self.advance_horizonal_reverse_joint_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
+
+        # 移動X(最小)
+        self.horizonal_reverse_joint_mov_x_min_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端横逆ジョイントの移動X(最小)"))
+        self.horizonal_reverse_joint_mov_x_min_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_mov_x_min_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_mov_x_min_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_x_min_spin, 0, wx.ALL, 5)
+
+        # 移動Y(最小)
+        self.horizonal_reverse_joint_mov_y_min_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端横逆ジョイントの移動Y(最小)"))
+        self.horizonal_reverse_joint_mov_y_min_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_mov_y_min_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_mov_y_min_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_y_min_spin, 0, wx.ALL, 5)
+
+        # 移動Z(最小)
+        self.horizonal_reverse_joint_mov_z_min_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端横逆ジョイントの移動Z(最小)"))
+        self.horizonal_reverse_joint_mov_z_min_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_mov_z_min_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_mov_z_min_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_z_min_spin, 0, wx.ALL, 5)
+
+        # 移動X(最大)
+        self.horizonal_reverse_joint_mov_x_max_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端横逆ジョイントの移動X(最大)"))
+        self.horizonal_reverse_joint_mov_x_max_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_mov_x_max_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_mov_x_max_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_x_max_spin, 0, wx.ALL, 5)
+
+        # 移動Y(最大)
+        self.horizonal_reverse_joint_mov_y_max_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端横逆ジョイントの移動Y(最大)"))
+        self.horizonal_reverse_joint_mov_y_max_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_mov_y_max_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_mov_y_max_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_y_max_spin, 0, wx.ALL, 5)
+
+        # 移動Z(最大)
+        self.horizonal_reverse_joint_mov_z_max_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端横逆ジョイントの移動Z(最大)"))
+        self.horizonal_reverse_joint_mov_z_max_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_mov_z_max_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_mov_z_max_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_z_max_spin, 0, wx.ALL, 5)
+
+        # 回転X(最小)
+        self.horizonal_reverse_joint_rot_x_min_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("回転X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_rot_x_min_txt.SetToolTip(logger.transtext("末端横逆ジョイントの回転X(最小)"))
+        self.horizonal_reverse_joint_rot_x_min_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_x_min_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_rot_x_min_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_rot_x_min_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_x_min_spin, 0, wx.ALL, 5)
+
+        # 回転Y(最小)
+        self.horizonal_reverse_joint_rot_y_min_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("回転Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_rot_y_min_txt.SetToolTip(logger.transtext("末端横逆ジョイントの回転Y(最小)"))
+        self.horizonal_reverse_joint_rot_y_min_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_y_min_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_rot_y_min_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_rot_y_min_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_y_min_spin, 0, wx.ALL, 5)
+
+        # 回転Z(最小)
+        self.horizonal_reverse_joint_rot_z_min_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("回転Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_rot_z_min_txt.SetToolTip(logger.transtext("末端横逆ジョイントの回転Z(最小)"))
+        self.horizonal_reverse_joint_rot_z_min_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_z_min_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_rot_z_min_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1000, max=1, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_rot_z_min_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_z_min_spin, 0, wx.ALL, 5)
+
+        # 回転X(最大)
+        self.horizonal_reverse_joint_rot_x_max_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("回転X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_rot_x_max_txt.SetToolTip(logger.transtext("末端横逆ジョイントの回転X(最大)"))
+        self.horizonal_reverse_joint_rot_x_max_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_x_max_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_rot_x_max_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_rot_x_max_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_x_max_spin, 0, wx.ALL, 5)
+
+        # 回転Y(最大)
+        self.horizonal_reverse_joint_rot_y_max_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("回転Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_rot_y_max_txt.SetToolTip(logger.transtext("末端横逆ジョイントの回転Y(最大)"))
+        self.horizonal_reverse_joint_rot_y_max_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_y_max_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_rot_y_max_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_rot_y_max_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_y_max_spin, 0, wx.ALL, 5)
+
+        # 回転Z(最大)
+        self.horizonal_reverse_joint_rot_z_max_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("回転Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_rot_z_max_txt.SetToolTip(logger.transtext("末端横逆ジョイントの回転Z(最大)"))
+        self.horizonal_reverse_joint_rot_z_max_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_z_max_txt, 0, wx.ALL, 5)
+
+        self.horizonal_reverse_joint_rot_z_max_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=-1, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_rot_z_max_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_rot_z_max_spin, 0, wx.ALL, 5)
+
+        # ばね(移動X)
+        self.horizonal_reverse_joint_spring_mov_x_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ばね(移動X)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_spring_mov_x_txt.SetToolTip(logger.transtext("末端横逆ジョイントのばね(移動X)"))
+        self.horizonal_reverse_joint_spring_mov_x_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_mov_x_txt, 0, wx.ALL, 5
+        )
+
+        self.horizonal_reverse_joint_spring_mov_x_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_spring_mov_x_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_mov_x_spin, 0, wx.ALL, 5
+        )
+
+        # ばね(移動Y)
+        self.horizonal_reverse_joint_spring_mov_y_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ばね(移動Y)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_spring_mov_y_txt.SetToolTip(logger.transtext("末端横逆ジョイントのばね(移動Y)"))
+        self.horizonal_reverse_joint_spring_mov_y_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_mov_y_txt, 0, wx.ALL, 5
+        )
+
+        self.horizonal_reverse_joint_spring_mov_y_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_spring_mov_y_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_mov_y_spin, 0, wx.ALL, 5
+        )
+
+        # ばね(移動Z)
+        self.horizonal_reverse_joint_spring_mov_z_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ばね(移動Z)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_spring_mov_z_txt.SetToolTip(logger.transtext("末端横逆ジョイントのばね(移動Z)"))
+        self.horizonal_reverse_joint_spring_mov_z_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_mov_z_txt, 0, wx.ALL, 5
+        )
+
+        self.horizonal_reverse_joint_spring_mov_z_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_spring_mov_z_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_mov_z_spin, 0, wx.ALL, 5
+        )
+
+        # ばね(回転X)
+        self.horizonal_reverse_joint_spring_rot_x_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ばね(回転X)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_spring_rot_x_txt.SetToolTip(logger.transtext("末端横逆ジョイントのばね(回転X)"))
+        self.horizonal_reverse_joint_spring_rot_x_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_rot_x_txt, 0, wx.ALL, 5
+        )
+
+        self.horizonal_reverse_joint_spring_rot_x_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_spring_rot_x_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_rot_x_spin, 0, wx.ALL, 5
+        )
+
+        # ばね(回転Y)
+        self.horizonal_reverse_joint_spring_rot_y_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ばね(回転Y)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_spring_rot_y_txt.SetToolTip(logger.transtext("末端横逆ジョイントのばね(回転Y)"))
+        self.horizonal_reverse_joint_spring_rot_y_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_rot_y_txt, 0, wx.ALL, 5
+        )
+
+        self.horizonal_reverse_joint_spring_rot_y_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_spring_rot_y_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_rot_y_spin, 0, wx.ALL, 5
+        )
+
+        # ばね(回転Z)
+        self.horizonal_reverse_joint_spring_rot_z_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("ばね(回転Z)"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.horizonal_reverse_joint_spring_rot_z_txt.SetToolTip(logger.transtext("末端横逆ジョイントのばね(回転Z)"))
+        self.horizonal_reverse_joint_spring_rot_z_txt.Wrap(-1)
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_rot_z_txt, 0, wx.ALL, 5
+        )
+
+        self.horizonal_reverse_joint_spring_rot_z_spin = wx.SpinCtrlDouble(
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="0", min=0, max=1000, initial=0, inc=0.1
+        )
+        self.horizonal_reverse_joint_spring_rot_z_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
+        )
+        self.advance_horizonal_reverse_joint_grid_sizer.Add(
+            self.horizonal_reverse_joint_spring_rot_z_spin, 0, wx.ALL, 5
+        )
+
+        self.advance_horizonal_reverse_joint_sizer.Add(
+            self.advance_horizonal_reverse_joint_grid_sizer, 1, wx.ALL | wx.EXPAND, 5
+        )
+        self.advance_param_sizer.Add(self.advance_horizonal_reverse_joint_sizer, 0, wx.ALL, 5)
 
         # 詳細オプションブロック -------------------------------
         self.advance_option_grid_sizer = wx.StaticBoxSizer(
@@ -2808,9 +3177,9 @@ class PhysicsParam:
                 )
             params["diagonal_joint_coefficient"] = self.advance_diagonal_joint_coefficient_spin.GetValue()
 
-            params["reverse_joint"] = None
-            if self.advance_reverse_joint_valid_check.GetValue():
-                params["reverse_joint"] = Joint(
+            params["vertical_reverse_joint"] = None
+            if self.advance_vertical_reverse_joint_valid_check.GetValue():
+                params["vertical_reverse_joint"] = Joint(
                     "",
                     "",
                     -1,
@@ -2819,37 +3188,84 @@ class PhysicsParam:
                     MVector3D(),
                     MVector3D(),
                     MVector3D(
-                        self.reverse_joint_mov_x_min_spin.GetValue(),
-                        self.reverse_joint_mov_y_min_spin.GetValue(),
-                        self.reverse_joint_mov_z_min_spin.GetValue(),
+                        self.vertical_reverse_joint_mov_x_min_spin.GetValue(),
+                        self.vertical_reverse_joint_mov_y_min_spin.GetValue(),
+                        self.vertical_reverse_joint_mov_z_min_spin.GetValue(),
                     ),
                     MVector3D(
-                        self.reverse_joint_mov_x_max_spin.GetValue(),
-                        self.reverse_joint_mov_y_max_spin.GetValue(),
-                        self.reverse_joint_mov_z_max_spin.GetValue(),
+                        self.vertical_reverse_joint_mov_x_max_spin.GetValue(),
+                        self.vertical_reverse_joint_mov_y_max_spin.GetValue(),
+                        self.vertical_reverse_joint_mov_z_max_spin.GetValue(),
                     ),
                     MVector3D(
-                        self.reverse_joint_rot_x_min_spin.GetValue(),
-                        self.reverse_joint_rot_y_min_spin.GetValue(),
-                        self.reverse_joint_rot_z_min_spin.GetValue(),
+                        self.vertical_reverse_joint_rot_x_min_spin.GetValue(),
+                        self.vertical_reverse_joint_rot_y_min_spin.GetValue(),
+                        self.vertical_reverse_joint_rot_z_min_spin.GetValue(),
                     ),
                     MVector3D(
-                        self.reverse_joint_rot_x_max_spin.GetValue(),
-                        self.reverse_joint_rot_y_max_spin.GetValue(),
-                        self.reverse_joint_rot_z_max_spin.GetValue(),
+                        self.vertical_reverse_joint_rot_x_max_spin.GetValue(),
+                        self.vertical_reverse_joint_rot_y_max_spin.GetValue(),
+                        self.vertical_reverse_joint_rot_z_max_spin.GetValue(),
                     ),
                     MVector3D(
-                        self.reverse_joint_spring_mov_x_spin.GetValue(),
-                        self.reverse_joint_spring_mov_y_spin.GetValue(),
-                        self.reverse_joint_spring_mov_z_spin.GetValue(),
+                        self.vertical_reverse_joint_spring_mov_x_spin.GetValue(),
+                        self.vertical_reverse_joint_spring_mov_y_spin.GetValue(),
+                        self.vertical_reverse_joint_spring_mov_z_spin.GetValue(),
                     ),
                     MVector3D(
-                        self.reverse_joint_spring_rot_x_spin.GetValue(),
-                        self.reverse_joint_spring_rot_y_spin.GetValue(),
-                        self.reverse_joint_spring_rot_z_spin.GetValue(),
+                        self.vertical_reverse_joint_spring_rot_x_spin.GetValue(),
+                        self.vertical_reverse_joint_spring_rot_y_spin.GetValue(),
+                        self.vertical_reverse_joint_spring_rot_z_spin.GetValue(),
                     ),
                 )
-            params["reverse_joint_coefficient"] = self.advance_reverse_joint_coefficient_spin.GetValue()
+            params[
+                "vertical_reverse_joint_coefficient"
+            ] = self.advance_vertical_reverse_joint_coefficient_spin.GetValue()
+
+            params["horizonal_reverse_joint"] = None
+            if self.advance_horizonal_reverse_joint_valid_check.GetValue():
+                params["horizonal_reverse_joint"] = Joint(
+                    "",
+                    "",
+                    -1,
+                    -1,
+                    -1,
+                    MVector3D(),
+                    MVector3D(),
+                    MVector3D(
+                        self.horizonal_reverse_joint_mov_x_min_spin.GetValue(),
+                        self.horizonal_reverse_joint_mov_y_min_spin.GetValue(),
+                        self.horizonal_reverse_joint_mov_z_min_spin.GetValue(),
+                    ),
+                    MVector3D(
+                        self.horizonal_reverse_joint_mov_x_max_spin.GetValue(),
+                        self.horizonal_reverse_joint_mov_y_max_spin.GetValue(),
+                        self.horizonal_reverse_joint_mov_z_max_spin.GetValue(),
+                    ),
+                    MVector3D(
+                        self.horizonal_reverse_joint_rot_x_min_spin.GetValue(),
+                        self.horizonal_reverse_joint_rot_y_min_spin.GetValue(),
+                        self.horizonal_reverse_joint_rot_z_min_spin.GetValue(),
+                    ),
+                    MVector3D(
+                        self.horizonal_reverse_joint_rot_x_max_spin.GetValue(),
+                        self.horizonal_reverse_joint_rot_y_max_spin.GetValue(),
+                        self.horizonal_reverse_joint_rot_z_max_spin.GetValue(),
+                    ),
+                    MVector3D(
+                        self.horizonal_reverse_joint_spring_mov_x_spin.GetValue(),
+                        self.horizonal_reverse_joint_spring_mov_y_spin.GetValue(),
+                        self.horizonal_reverse_joint_spring_mov_z_spin.GetValue(),
+                    ),
+                    MVector3D(
+                        self.horizonal_reverse_joint_spring_rot_x_spin.GetValue(),
+                        self.horizonal_reverse_joint_spring_rot_y_spin.GetValue(),
+                        self.horizonal_reverse_joint_spring_rot_z_spin.GetValue(),
+                    ),
+                )
+            params[
+                "horizonal_reverse_joint_coefficient"
+            ] = self.advance_horizonal_reverse_joint_coefficient_spin.GetValue()
         else:
             if is_show_error:
                 empty_param_list = []
@@ -3008,28 +3424,55 @@ class PhysicsParam:
         self.advance_diagonal_joint_coefficient_spin.SetValue(params["diagonal_joint_coefficient"])
         self.on_diagonal_joint(wx.EVT_CHECKBOX)
 
-        # 逆ジョイント -----------
-        self.advance_reverse_joint_valid_check.SetValue(params["reverse_joint_valid"])
-        self.reverse_joint_mov_x_min_spin.SetValue(params["reverse_joint_mov_x_min"])
-        self.reverse_joint_mov_y_min_spin.SetValue(params["reverse_joint_mov_y_min"])
-        self.reverse_joint_mov_z_min_spin.SetValue(params["reverse_joint_mov_z_min"])
-        self.reverse_joint_mov_x_max_spin.SetValue(params["reverse_joint_mov_x_max"])
-        self.reverse_joint_mov_y_max_spin.SetValue(params["reverse_joint_mov_y_max"])
-        self.reverse_joint_mov_z_max_spin.SetValue(params["reverse_joint_mov_z_max"])
-        self.reverse_joint_rot_x_min_spin.SetValue(params["reverse_joint_rot_x_min"])
-        self.reverse_joint_rot_y_min_spin.SetValue(params["reverse_joint_rot_y_min"])
-        self.reverse_joint_rot_z_min_spin.SetValue(params["reverse_joint_rot_z_min"])
-        self.reverse_joint_rot_x_max_spin.SetValue(params["reverse_joint_rot_x_max"])
-        self.reverse_joint_rot_y_max_spin.SetValue(params["reverse_joint_rot_y_max"])
-        self.reverse_joint_rot_z_max_spin.SetValue(params["reverse_joint_rot_z_max"])
-        self.reverse_joint_spring_mov_x_spin.SetValue(params["reverse_joint_spring_mov_x"])
-        self.reverse_joint_spring_mov_y_spin.SetValue(params["reverse_joint_spring_mov_y"])
-        self.reverse_joint_spring_mov_z_spin.SetValue(params["reverse_joint_spring_mov_z"])
-        self.reverse_joint_spring_rot_x_spin.SetValue(params["reverse_joint_spring_rot_x"])
-        self.reverse_joint_spring_rot_y_spin.SetValue(params["reverse_joint_spring_rot_y"])
-        self.reverse_joint_spring_rot_z_spin.SetValue(params["reverse_joint_spring_rot_z"])
-        self.advance_reverse_joint_coefficient_spin.SetValue(params["reverse_joint_coefficient"])
-        self.on_reverse_joint(wx.EVT_CHECKBOX)
+        # 縦逆ジョイント -----------
+        self.advance_vertical_reverse_joint_valid_check.SetValue(params.get("vertical_reverse_joint_valid", 0))
+        self.vertical_reverse_joint_mov_x_min_spin.SetValue(params.get("vertical_reverse_joint_mov_x_min", 0))
+        self.vertical_reverse_joint_mov_y_min_spin.SetValue(params.get("vertical_reverse_joint_mov_y_min", 0))
+        self.vertical_reverse_joint_mov_z_min_spin.SetValue(params.get("vertical_reverse_joint_mov_z_min", 0))
+        self.vertical_reverse_joint_mov_x_max_spin.SetValue(params.get("vertical_reverse_joint_mov_x_max", 0))
+        self.vertical_reverse_joint_mov_y_max_spin.SetValue(params.get("vertical_reverse_joint_mov_y_max", 0))
+        self.vertical_reverse_joint_mov_z_max_spin.SetValue(params.get("vertical_reverse_joint_mov_z_max", 0))
+        self.vertical_reverse_joint_rot_x_min_spin.SetValue(params.get("vertical_reverse_joint_rot_x_min", 0))
+        self.vertical_reverse_joint_rot_y_min_spin.SetValue(params.get("vertical_reverse_joint_rot_y_min", 0))
+        self.vertical_reverse_joint_rot_z_min_spin.SetValue(params.get("vertical_reverse_joint_rot_z_min", 0))
+        self.vertical_reverse_joint_rot_x_max_spin.SetValue(params.get("vertical_reverse_joint_rot_x_max", 0))
+        self.vertical_reverse_joint_rot_y_max_spin.SetValue(params.get("vertical_reverse_joint_rot_y_max", 0))
+        self.vertical_reverse_joint_rot_z_max_spin.SetValue(params.get("vertical_reverse_joint_rot_z_max", 0))
+        self.vertical_reverse_joint_spring_mov_x_spin.SetValue(params.get("vertical_reverse_joint_spring_mov_x", 0))
+        self.vertical_reverse_joint_spring_mov_y_spin.SetValue(params.get("vertical_reverse_joint_spring_mov_y", 0))
+        self.vertical_reverse_joint_spring_mov_z_spin.SetValue(params.get("vertical_reverse_joint_spring_mov_z", 0))
+        self.vertical_reverse_joint_spring_rot_x_spin.SetValue(params.get("vertical_reverse_joint_spring_rot_x", 0))
+        self.vertical_reverse_joint_spring_rot_y_spin.SetValue(params.get("vertical_reverse_joint_spring_rot_y", 0))
+        self.vertical_reverse_joint_spring_rot_z_spin.SetValue(params.get("vertical_reverse_joint_spring_rot_z", 0))
+        self.advance_vertical_reverse_joint_coefficient_spin.SetValue(
+            params.get("vertical_reverse_joint_coefficient", 0)
+        )
+        self.on_vertical_reverse_joint(wx.EVT_CHECKBOX)
+
+        # 横逆ジョイント -----------
+        self.advance_horizonal_reverse_joint_valid_check.SetValue(params.get("horizonal_reverse_joint_valid", 0))
+        self.horizonal_reverse_joint_mov_x_min_spin.SetValue(params.get("horizonal_reverse_joint_mov_x_min", 0))
+        self.horizonal_reverse_joint_mov_y_min_spin.SetValue(params.get("horizonal_reverse_joint_mov_y_min", 0))
+        self.horizonal_reverse_joint_mov_z_min_spin.SetValue(params.get("horizonal_reverse_joint_mov_z_min", 0))
+        self.horizonal_reverse_joint_mov_x_max_spin.SetValue(params.get("horizonal_reverse_joint_mov_x_max", 0))
+        self.horizonal_reverse_joint_mov_y_max_spin.SetValue(params.get("horizonal_reverse_joint_mov_y_max", 0))
+        self.horizonal_reverse_joint_mov_z_max_spin.SetValue(params.get("horizonal_reverse_joint_mov_z_max", 0))
+        self.horizonal_reverse_joint_rot_x_min_spin.SetValue(params.get("horizonal_reverse_joint_rot_x_min", 0))
+        self.horizonal_reverse_joint_rot_y_min_spin.SetValue(params.get("horizonal_reverse_joint_rot_y_min", 0))
+        self.horizonal_reverse_joint_rot_z_min_spin.SetValue(params.get("horizonal_reverse_joint_rot_z_min", 0))
+        self.horizonal_reverse_joint_rot_x_max_spin.SetValue(params.get("horizonal_reverse_joint_rot_x_max", 0))
+        self.horizonal_reverse_joint_rot_y_max_spin.SetValue(params.get("horizonal_reverse_joint_rot_y_max", 0))
+        self.horizonal_reverse_joint_rot_z_max_spin.SetValue(params.get("horizonal_reverse_joint_rot_z_max", 0))
+        self.horizonal_reverse_joint_spring_mov_x_spin.SetValue(params.get("horizonal_reverse_joint_spring_mov_x", 0))
+        self.horizonal_reverse_joint_spring_mov_y_spin.SetValue(params.get("horizonal_reverse_joint_spring_mov_y", 0))
+        self.horizonal_reverse_joint_spring_mov_z_spin.SetValue(params.get("horizonal_reverse_joint_spring_mov_z", 0))
+        self.horizonal_reverse_joint_spring_rot_x_spin.SetValue(params.get("horizonal_reverse_joint_spring_rot_x", 0))
+        self.horizonal_reverse_joint_spring_rot_y_spin.SetValue(params.get("horizonal_reverse_joint_spring_rot_y", 0))
+        self.horizonal_reverse_joint_spring_rot_z_spin.SetValue(params.get("horizonal_reverse_joint_spring_rot_z", 0))
+        self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(
+            params.get("horizonal_reverse_joint_coefficient", 0)
+        )
+        self.on_horizonal_reverse_joint(wx.EVT_CHECKBOX)
 
     def on_param_export(self, event: wx.Event):
         params = self.get_param_export_data()
@@ -3165,27 +3608,27 @@ class PhysicsParam:
         params["diagonal_joint_spring_rot_z"] = self.diagonal_joint_spring_rot_z_spin.GetValue()
         params["diagonal_joint_coefficient"] = self.advance_diagonal_joint_coefficient_spin.GetValue()
 
-        # 逆ジョイント -----------
-        params["reverse_joint_valid"] = self.advance_reverse_joint_valid_check.GetValue()
-        params["reverse_joint_mov_x_min"] = self.reverse_joint_mov_x_min_spin.GetValue()
-        params["reverse_joint_mov_y_min"] = self.reverse_joint_mov_y_min_spin.GetValue()
-        params["reverse_joint_mov_z_min"] = self.reverse_joint_mov_z_min_spin.GetValue()
-        params["reverse_joint_mov_x_max"] = self.reverse_joint_mov_x_max_spin.GetValue()
-        params["reverse_joint_mov_y_max"] = self.reverse_joint_mov_y_max_spin.GetValue()
-        params["reverse_joint_mov_z_max"] = self.reverse_joint_mov_z_max_spin.GetValue()
-        params["reverse_joint_rot_x_min"] = self.reverse_joint_rot_x_min_spin.GetValue()
-        params["reverse_joint_rot_y_min"] = self.reverse_joint_rot_y_min_spin.GetValue()
-        params["reverse_joint_rot_z_min"] = self.reverse_joint_rot_z_min_spin.GetValue()
-        params["reverse_joint_rot_x_max"] = self.reverse_joint_rot_x_max_spin.GetValue()
-        params["reverse_joint_rot_y_max"] = self.reverse_joint_rot_y_max_spin.GetValue()
-        params["reverse_joint_rot_z_max"] = self.reverse_joint_rot_z_max_spin.GetValue()
-        params["reverse_joint_spring_mov_x"] = self.reverse_joint_spring_mov_x_spin.GetValue()
-        params["reverse_joint_spring_mov_y"] = self.reverse_joint_spring_mov_y_spin.GetValue()
-        params["reverse_joint_spring_mov_z"] = self.reverse_joint_spring_mov_z_spin.GetValue()
-        params["reverse_joint_spring_rot_x"] = self.reverse_joint_spring_rot_x_spin.GetValue()
-        params["reverse_joint_spring_rot_y"] = self.reverse_joint_spring_rot_y_spin.GetValue()
-        params["reverse_joint_spring_rot_z"] = self.reverse_joint_spring_rot_z_spin.GetValue()
-        params["reverse_joint_coefficient"] = self.advance_reverse_joint_coefficient_spin.GetValue()
+        # 縦逆ジョイント -----------
+        params["vertical_reverse_joint_valid"] = self.advance_vertical_reverse_joint_valid_check.GetValue()
+        params["vertical_reverse_joint_mov_x_min"] = self.vertical_reverse_joint_mov_x_min_spin.GetValue()
+        params["vertical_reverse_joint_mov_y_min"] = self.vertical_reverse_joint_mov_y_min_spin.GetValue()
+        params["vertical_reverse_joint_mov_z_min"] = self.vertical_reverse_joint_mov_z_min_spin.GetValue()
+        params["vertical_reverse_joint_mov_x_max"] = self.vertical_reverse_joint_mov_x_max_spin.GetValue()
+        params["vertical_reverse_joint_mov_y_max"] = self.vertical_reverse_joint_mov_y_max_spin.GetValue()
+        params["vertical_reverse_joint_mov_z_max"] = self.vertical_reverse_joint_mov_z_max_spin.GetValue()
+        params["vertical_reverse_joint_rot_x_min"] = self.vertical_reverse_joint_rot_x_min_spin.GetValue()
+        params["vertical_reverse_joint_rot_y_min"] = self.vertical_reverse_joint_rot_y_min_spin.GetValue()
+        params["vertical_reverse_joint_rot_z_min"] = self.vertical_reverse_joint_rot_z_min_spin.GetValue()
+        params["vertical_reverse_joint_rot_x_max"] = self.vertical_reverse_joint_rot_x_max_spin.GetValue()
+        params["vertical_reverse_joint_rot_y_max"] = self.vertical_reverse_joint_rot_y_max_spin.GetValue()
+        params["vertical_reverse_joint_rot_z_max"] = self.vertical_reverse_joint_rot_z_max_spin.GetValue()
+        params["vertical_reverse_joint_spring_mov_x"] = self.vertical_reverse_joint_spring_mov_x_spin.GetValue()
+        params["vertical_reverse_joint_spring_mov_y"] = self.vertical_reverse_joint_spring_mov_y_spin.GetValue()
+        params["vertical_reverse_joint_spring_mov_z"] = self.vertical_reverse_joint_spring_mov_z_spin.GetValue()
+        params["vertical_reverse_joint_spring_rot_x"] = self.vertical_reverse_joint_spring_rot_x_spin.GetValue()
+        params["vertical_reverse_joint_spring_rot_y"] = self.vertical_reverse_joint_spring_rot_y_spin.GetValue()
+        params["vertical_reverse_joint_spring_rot_z"] = self.vertical_reverse_joint_spring_rot_z_spin.GetValue()
+        params["vertical_reverse_joint_coefficient"] = self.advance_vertical_reverse_joint_coefficient_spin.GetValue()
 
         return params
 
@@ -3345,27 +3788,77 @@ class PhysicsParam:
         self.diagonal_joint_spring_rot_y_spin.Enable(self.advance_diagonal_joint_valid_check.GetValue())
         self.diagonal_joint_spring_rot_z_spin.Enable(self.advance_diagonal_joint_valid_check.GetValue())
 
-    def on_reverse_joint(self, event: wx.Event):
+    def on_vertical_reverse_joint(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        self.advance_reverse_joint_coefficient_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_mov_x_min_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_mov_x_max_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_mov_y_min_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_mov_y_max_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_mov_z_min_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_mov_z_max_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_rot_x_min_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_rot_x_max_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_rot_y_min_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_rot_y_max_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_rot_z_min_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_rot_z_max_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_spring_mov_x_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_spring_mov_y_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_spring_mov_z_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_spring_rot_x_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_spring_rot_y_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
-        self.reverse_joint_spring_rot_z_spin.Enable(self.advance_reverse_joint_valid_check.GetValue())
+        self.advance_vertical_reverse_joint_coefficient_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+        self.vertical_reverse_joint_mov_x_min_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_mov_x_max_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_mov_y_min_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_mov_y_max_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_mov_z_min_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_mov_z_max_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_rot_x_min_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_rot_x_max_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_rot_y_min_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_rot_y_max_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_rot_z_min_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_rot_z_max_spin.Enable(self.advance_vertical_reverse_joint_valid_check.GetValue())
+        self.vertical_reverse_joint_spring_mov_x_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+        self.vertical_reverse_joint_spring_mov_y_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+        self.vertical_reverse_joint_spring_mov_z_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+        self.vertical_reverse_joint_spring_rot_x_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+        self.vertical_reverse_joint_spring_rot_y_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+        self.vertical_reverse_joint_spring_rot_z_spin.Enable(
+            self.advance_vertical_reverse_joint_valid_check.GetValue()
+        )
+
+    def on_horizonal_reverse_joint(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
+        self.advance_horizonal_reverse_joint_coefficient_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
+        self.horizonal_reverse_joint_mov_x_min_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_mov_x_max_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_mov_y_min_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_mov_y_max_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_mov_z_min_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_mov_z_max_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_rot_x_min_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_rot_x_max_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_rot_y_min_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_rot_y_max_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_rot_z_min_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_rot_z_max_spin.Enable(self.advance_horizonal_reverse_joint_valid_check.GetValue())
+        self.horizonal_reverse_joint_spring_mov_x_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
+        self.horizonal_reverse_joint_spring_mov_y_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
+        self.horizonal_reverse_joint_spring_mov_z_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
+        self.horizonal_reverse_joint_spring_rot_x_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
+        self.horizonal_reverse_joint_spring_rot_y_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
+        self.horizonal_reverse_joint_spring_rot_z_spin.Enable(
+            self.advance_horizonal_reverse_joint_valid_check.GetValue()
+        )
 
     def set_material_name(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
@@ -3555,7 +4048,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(シルク)"):
             self.simple_mass_slider.SetValue(0.8)
@@ -3565,7 +4058,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ベルベッド)"):
             self.simple_mass_slider.SetValue(3.0)
@@ -3575,7 +4068,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(レザー)"):
             self.simple_mass_slider.SetValue(3.2)
@@ -3585,7 +4078,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_reverse_joint_valid_check.SetValue(1)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(デニム)"):
             self.simple_mass_slider.SetValue(2.9)
@@ -3595,7 +4088,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_reverse_joint_valid_check.SetValue(1)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("単一揺れ物"):
             self.simple_mass_slider.SetValue(2.3)
@@ -3605,7 +4098,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
             self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
             self.simple_mass_slider.SetValue(1.5)
@@ -3615,7 +4108,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
             self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
             self.simple_mass_slider.SetValue(1.5)
@@ -3625,7 +4118,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
             self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
             self.simple_mass_slider.SetValue(0.8)
@@ -3635,7 +4128,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(0)
             self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
@@ -3647,7 +4140,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
             self.advance_rigidbody_balancer_ctrl.SetValue(0)
 
@@ -3659,7 +4152,7 @@ class PhysicsParam:
             self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_reverse_joint_valid_check.SetValue(0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
 
             self.advance_rigidbody_balancer_ctrl.SetValue(0)
 
@@ -3667,7 +4160,8 @@ class PhysicsParam:
         self.set_air_resistance(event)
         self.set_shape_maintenance(event)
         self.on_diagonal_joint(event)
-        self.on_reverse_joint(event)
+        self.on_vertical_reverse_joint(event)
+        self.on_horizonal_reverse_joint(event)
 
     def set_air_resistance(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
@@ -3802,6 +4296,7 @@ class PhysicsParam:
                 base_joint_val *= 1.2
                 base_spring_val *= 1.2
 
+            # 縦ジョイント
             self.advance_vertical_joint_coefficient_spin.SetValue(base_joint_val * 20)
 
             vertical_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 2))
@@ -3818,6 +4313,7 @@ class PhysicsParam:
             self.vertical_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.vertical_joint_spring_rot_z_spin.SetValue(spring_rot)
 
+            # 横ジョイント
             horizonal_joint_mov = 1 - base_joint_val * 3
             self.horizonal_joint_mov_x_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_x_max_spin.SetValue(horizonal_joint_mov)
@@ -3838,6 +4334,7 @@ class PhysicsParam:
             self.horizonal_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.horizonal_joint_spring_rot_z_spin.SetValue(spring_rot)
 
+            # 斜めジョイント
             self.advance_diagonal_joint_coefficient_spin.SetValue(base_joint_val * 10)
 
             diagonal_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 0.75))
@@ -3854,21 +4351,40 @@ class PhysicsParam:
             self.diagonal_joint_spring_rot_y_spin.SetValue(spring_rot)
             self.diagonal_joint_spring_rot_z_spin.SetValue(spring_rot)
 
-            self.advance_reverse_joint_coefficient_spin.SetValue(base_joint_val * 10)
+            # 縦逆ジョイント
+            self.advance_vertical_reverse_joint_coefficient_spin.SetValue(
+                self.advance_vertical_joint_coefficient_spin.GetValue()
+            )
 
-            reverse_joint_rot = max(0, min(180, 180 - base_joint_val * 180 * 0.5))
-            reverse_joint_y_rot = max(0, min(89, 89 - base_joint_val * 89 * 0.5))
-            self.reverse_joint_rot_x_min_spin.SetValue(-reverse_joint_rot)
-            self.reverse_joint_rot_x_max_spin.SetValue(reverse_joint_rot)
-            self.reverse_joint_rot_y_min_spin.SetValue(-reverse_joint_y_rot)
-            self.reverse_joint_rot_y_max_spin.SetValue(reverse_joint_y_rot)
-            self.reverse_joint_rot_z_min_spin.SetValue(-reverse_joint_rot)
-            self.reverse_joint_rot_z_max_spin.SetValue(reverse_joint_rot)
+            self.vertical_reverse_joint_rot_x_min_spin.SetValue(self.vertical_joint_rot_x_min_spin.GetValue())
+            self.vertical_reverse_joint_rot_x_max_spin.SetValue(self.vertical_joint_rot_x_max_spin.GetValue())
+            self.vertical_reverse_joint_rot_y_min_spin.SetValue(self.vertical_joint_rot_y_min_spin.GetValue())
+            self.vertical_reverse_joint_rot_y_max_spin.SetValue(self.vertical_joint_rot_y_max_spin.GetValue())
+            self.vertical_reverse_joint_rot_z_min_spin.SetValue(self.vertical_joint_rot_z_min_spin.GetValue())
+            self.vertical_reverse_joint_rot_z_max_spin.SetValue(self.vertical_joint_rot_z_max_spin.GetValue())
 
-            spring_rot = max(0, min(180, base_spring_val * 3))
-            self.reverse_joint_spring_rot_x_spin.SetValue(spring_rot)
-            self.reverse_joint_spring_rot_y_spin.SetValue(spring_rot)
-            self.reverse_joint_spring_rot_z_spin.SetValue(spring_rot)
+            self.vertical_reverse_joint_spring_rot_x_spin.SetValue(self.vertical_joint_spring_rot_x_spin.GetValue())
+            self.vertical_reverse_joint_spring_rot_y_spin.SetValue(self.vertical_joint_spring_rot_y_spin.GetValue())
+            self.vertical_reverse_joint_spring_rot_z_spin.SetValue(self.vertical_joint_spring_rot_z_spin.GetValue())
+
+            # 横逆ジョイント
+            self.horizonal_reverse_joint_mov_x_min_spin.SetValue(self.horizonal_joint_mov_x_min_spin.GetValue())
+            self.horizonal_reverse_joint_mov_x_max_spin.SetValue(self.horizonal_joint_mov_x_max_spin.GetValue())
+
+            self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(
+                self.advance_horizonal_joint_coefficient_spin.GetValue()
+            )
+
+            self.horizonal_reverse_joint_rot_x_min_spin.SetValue(self.horizonal_joint_rot_x_min_spin.GetValue())
+            self.horizonal_reverse_joint_rot_x_max_spin.SetValue(self.horizonal_joint_rot_x_max_spin.GetValue())
+            self.horizonal_reverse_joint_rot_y_min_spin.SetValue(self.horizonal_joint_rot_y_min_spin.GetValue())
+            self.horizonal_reverse_joint_rot_y_max_spin.SetValue(self.horizonal_joint_rot_y_max_spin.GetValue())
+            self.horizonal_reverse_joint_rot_z_min_spin.SetValue(self.horizonal_joint_rot_z_min_spin.GetValue())
+            self.horizonal_reverse_joint_rot_z_max_spin.SetValue(self.horizonal_joint_rot_z_max_spin.GetValue())
+
+            self.horizonal_reverse_joint_spring_rot_x_spin.SetValue(self.horizonal_joint_spring_rot_x_spin.GetValue())
+            self.horizonal_reverse_joint_spring_rot_y_spin.SetValue(self.horizonal_joint_spring_rot_y_spin.GetValue())
+            self.horizonal_reverse_joint_spring_rot_z_spin.SetValue(self.horizonal_joint_spring_rot_z_spin.GetValue())
 
             if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.6:
                 # 一定以上の維持感であれば斜めも張る
@@ -3879,10 +4395,11 @@ class PhysicsParam:
 
             if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.8:
                 # 一定以上の維持感であれば逆も張る
-                self.advance_reverse_joint_valid_check.SetValue(1)
+                self.advance_vertical_reverse_joint_valid_check.SetValue(1)
+                self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
 
             self.on_diagonal_joint(event)
-            self.on_reverse_joint(event)
+            self.on_vertical_reverse_joint(event)
 
     def on_clear(self, event: wx.Event):
         self.simple_material_ctrl.SetStringSelection("")
@@ -3909,17 +4426,19 @@ class PhysicsParam:
         self.set_air_resistance(event)
         self.set_shape_maintenance(event)
         self.on_diagonal_joint(event)
-        self.on_reverse_joint(event)
+        self.on_vertical_reverse_joint(event)
 
         self.advance_vertical_joint_valid_check.SetValue(1)
         self.advance_horizonal_joint_valid_check.SetValue(1)
         self.advance_diagonal_joint_valid_check.SetValue(0)
-        self.advance_reverse_joint_valid_check.SetValue(0)
+        self.advance_vertical_reverse_joint_valid_check.SetValue(0)
+        self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
         self.advance_vertical_joint_coefficient_spin.SetValue(2.8)
         self.advance_horizonal_joint_coefficient_spin.SetValue(4.2)
         self.advance_diagonal_joint_coefficient_spin.SetValue(1)
-        self.advance_reverse_joint_coefficient_spin.SetValue(1)
+        self.advance_vertical_reverse_joint_coefficient_spin.SetValue(1)
+        self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(1)
 
     def create_weighted_bone_names(self):
         self.weighted_bone_names = {}
@@ -3967,7 +4486,7 @@ class PhysicsParam:
             is_regist = True
             for bname, blinks in bone_links.items():
                 if bname != bone_name and bone_name in blinks.all().keys():
-                    # 他のボーンリストに含まれている場合、登録対象外
+                    # 他のボーンリストに含まている場合、登録対象外
                     is_regist = False
                     break
             if is_regist:

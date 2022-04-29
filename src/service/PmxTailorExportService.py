@@ -953,28 +953,52 @@ class PmxTailorExportService:
                 param_option["diagonal_joint"], vv_keys, param_option["diagonal_joint_coefficient"]
             )
 
-            # 逆ジョイント情報
+            # 縦逆ジョイント情報
             (
-                reverse_limit_min_mov_xs,
-                reverse_limit_min_mov_ys,
-                reverse_limit_min_mov_zs,
-                reverse_limit_max_mov_xs,
-                reverse_limit_max_mov_ys,
-                reverse_limit_max_mov_zs,
-                reverse_limit_min_rot_xs,
-                reverse_limit_min_rot_ys,
-                reverse_limit_min_rot_zs,
-                reverse_limit_max_rot_xs,
-                reverse_limit_max_rot_ys,
-                reverse_limit_max_rot_zs,
-                reverse_spring_constant_mov_xs,
-                reverse_spring_constant_mov_ys,
-                reverse_spring_constant_mov_zs,
-                reverse_spring_constant_rot_xs,
-                reverse_spring_constant_rot_ys,
-                reverse_spring_constant_rot_zs,
+                vertical_reverse_limit_min_mov_xs,
+                vertical_reverse_limit_min_mov_ys,
+                vertical_reverse_limit_min_mov_zs,
+                vertical_reverse_limit_max_mov_xs,
+                vertical_reverse_limit_max_mov_ys,
+                vertical_reverse_limit_max_mov_zs,
+                vertical_reverse_limit_min_rot_xs,
+                vertical_reverse_limit_min_rot_ys,
+                vertical_reverse_limit_min_rot_zs,
+                vertical_reverse_limit_max_rot_xs,
+                vertical_reverse_limit_max_rot_ys,
+                vertical_reverse_limit_max_rot_zs,
+                vertical_reverse_spring_constant_mov_xs,
+                vertical_reverse_spring_constant_mov_ys,
+                vertical_reverse_spring_constant_mov_zs,
+                vertical_reverse_spring_constant_rot_xs,
+                vertical_reverse_spring_constant_rot_ys,
+                vertical_reverse_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["reverse_joint"], vv_keys, param_option["reverse_joint_coefficient"]
+                param_option["vertical_reverse_joint"], vv_keys, param_option["vertical_reverse_joint_coefficient"]
+            )
+
+            # 横逆ジョイント情報
+            (
+                horizonal_reverse_limit_min_mov_xs,
+                horizonal_reverse_limit_min_mov_ys,
+                horizonal_reverse_limit_min_mov_zs,
+                horizonal_reverse_limit_max_mov_xs,
+                horizonal_reverse_limit_max_mov_ys,
+                horizonal_reverse_limit_max_mov_zs,
+                horizonal_reverse_limit_min_rot_xs,
+                horizonal_reverse_limit_min_rot_ys,
+                horizonal_reverse_limit_min_rot_zs,
+                horizonal_reverse_limit_max_rot_xs,
+                horizonal_reverse_limit_max_rot_ys,
+                horizonal_reverse_limit_max_rot_zs,
+                horizonal_reverse_spring_constant_mov_xs,
+                horizonal_reverse_spring_constant_mov_ys,
+                horizonal_reverse_spring_constant_mov_zs,
+                horizonal_reverse_spring_constant_rot_xs,
+                horizonal_reverse_spring_constant_rot_ys,
+                horizonal_reverse_spring_constant_rot_zs,
+            ) = self.create_joint_param(
+                param_option["horizonal_reverse_joint"], vv_keys, param_option["horizonal_reverse_joint_coefficient"]
             )
 
             for v_yidx, v_xidx in zip(np.where(regist_bones)[0], np.where(regist_bones)[1]):
@@ -1105,8 +1129,8 @@ class PmxTailorExportService:
                         )
                         created_joints[joint_key] = joint
 
-                        if param_option["reverse_joint"]:
-                            # 逆ジョイント
+                        if param_option["vertical_reverse_joint"]:
+                            # 縦逆ジョイント
                             if v_yidx == 0:
                                 a_rigidbody = vv.map_rigidbodies[base_map_idx]
                                 b_rigidbody = root_rigidbody
@@ -1134,24 +1158,24 @@ class PmxTailorExportService:
                                 b_rigidbody,
                                 joint_pos,
                                 joint_qq,
-                                reverse_limit_min_mov_xs,
-                                reverse_limit_min_mov_ys,
-                                reverse_limit_min_mov_zs,
-                                reverse_limit_max_mov_xs,
-                                reverse_limit_max_mov_ys,
-                                reverse_limit_max_mov_zs,
-                                reverse_limit_min_rot_xs,
-                                reverse_limit_min_rot_ys,
-                                reverse_limit_min_rot_zs,
-                                reverse_limit_max_rot_xs,
-                                reverse_limit_max_rot_ys,
-                                reverse_limit_max_rot_zs,
-                                reverse_spring_constant_mov_xs,
-                                reverse_spring_constant_mov_ys,
-                                reverse_spring_constant_mov_zs,
-                                reverse_spring_constant_rot_xs,
-                                reverse_spring_constant_rot_ys,
-                                reverse_spring_constant_rot_zs,
+                                vertical_reverse_limit_min_mov_xs,
+                                vertical_reverse_limit_min_mov_ys,
+                                vertical_reverse_limit_min_mov_zs,
+                                vertical_reverse_limit_max_mov_xs,
+                                vertical_reverse_limit_max_mov_ys,
+                                vertical_reverse_limit_max_mov_zs,
+                                vertical_reverse_limit_min_rot_xs,
+                                vertical_reverse_limit_min_rot_ys,
+                                vertical_reverse_limit_min_rot_zs,
+                                vertical_reverse_limit_max_rot_xs,
+                                vertical_reverse_limit_max_rot_ys,
+                                vertical_reverse_limit_max_rot_zs,
+                                vertical_reverse_spring_constant_mov_xs,
+                                vertical_reverse_spring_constant_mov_ys,
+                                vertical_reverse_spring_constant_mov_zs,
+                                vertical_reverse_spring_constant_rot_xs,
+                                vertical_reverse_spring_constant_rot_ys,
+                                vertical_reverse_spring_constant_rot_zs,
                             )
                             created_joints[joint_key] = joint
 
@@ -1356,8 +1380,8 @@ class PmxTailorExportService:
                         )
                         created_joints[joint_key] = joint
 
-                        if param_option["reverse_joint"]:
-                            # 逆ジョイント
+                        if param_option["horizonal_reverse_joint"]:
+                            # 横逆ジョイント
                             a_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
                             b_rigidbody = now_prev_vv.map_rigidbodies.get(prev_map_idx, None)
 
@@ -1371,24 +1395,25 @@ class PmxTailorExportService:
                                 b_rigidbody,
                                 joint_pos,
                                 joint_qq,
-                                reverse_limit_min_mov_xs,
-                                reverse_limit_min_mov_ys,
-                                reverse_limit_min_mov_zs,
-                                reverse_limit_max_mov_xs,
-                                reverse_limit_max_mov_ys,
-                                reverse_limit_max_mov_zs,
-                                reverse_limit_min_rot_xs,
-                                reverse_limit_min_rot_ys,
-                                reverse_limit_min_rot_zs,
-                                reverse_limit_max_rot_xs,
-                                reverse_limit_max_rot_ys,
-                                reverse_limit_max_rot_zs,
-                                reverse_spring_constant_mov_xs,
-                                reverse_spring_constant_mov_ys,
-                                reverse_spring_constant_mov_zs,
-                                reverse_spring_constant_rot_xs,
-                                reverse_spring_constant_rot_ys,
-                                reverse_spring_constant_rot_zs,
+                                horizonal_reverse_limit_min_mov_xs,
+                                horizonal_reverse_limit_min_mov_ys,
+                                horizonal_reverse_limit_min_mov_zs,
+                                horizonal_reverse_limit_max_mov_xs,
+                                horizonal_reverse_limit_max_mov_ys,
+                                horizonal_reverse_limit_max_mov_zs,
+                                horizonal_reverse_limit_min_rot_xs,
+                                horizonal_reverse_limit_min_rot_ys,
+                                horizonal_reverse_limit_min_rot_zs,
+                                horizonal_reverse_limit_max_rot_xs,
+                                horizonal_reverse_limit_max_rot_ys,
+                                horizonal_reverse_limit_max_rot_zs,
+                                horizonal_reverse_spring_constant_mov_xs,
+                                horizonal_reverse_spring_constant_mov_ys,
+                                horizonal_reverse_spring_constant_mov_zs,
+                                horizonal_reverse_spring_constant_rot_xs,
+                                horizonal_reverse_spring_constant_rot_ys,
+                                horizonal_reverse_spring_constant_rot_zs,
+                                ratio,
                             )
                             created_joints[joint_key] = joint
 
