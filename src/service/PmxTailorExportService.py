@@ -1996,28 +1996,32 @@ class PmxTailorExportService:
                     continue
                 top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
 
-        root_rigidbody = self.get_rigidbody(model, root_bone.name)
-        if not root_rigidbody:
-            # 中心剛体を接触なしボーン追従剛体で生成
-            root_rigidbody = RigidBody(
-                root_bone.name,
-                root_bone.english_name,
-                root_bone.index,
-                param_rigidbody.collision_group,
-                0,
-                0,
-                MVector3D(0.5, 0.5, 0.5),
-                MVector3D(np.mean(top_bone_positions, axis=0)),
-                MVector3D(),
-                1,
-                0.5,
-                0.5,
-                0,
-                0,
-                0,
-            )
-            root_rigidbody.index = len(model.rigidbodies)
-            model.rigidbodies[root_rigidbody.name] = root_rigidbody
+        if param_option["parent_type"] == logger.transtext("中心"):
+            root_rigidbody = self.get_rigidbody(model, root_bone.name)
+            if not root_rigidbody:
+                # 中心剛体を接触なしボーン追従剛体で生成
+                root_rigidbody = RigidBody(
+                    root_bone.name,
+                    root_bone.english_name,
+                    root_bone.index,
+                    param_rigidbody.collision_group,
+                    0,
+                    0,
+                    MVector3D(0.5, 0.5, 0.5),
+                    MVector3D(np.mean(top_bone_positions, axis=0)),
+                    MVector3D(),
+                    1,
+                    0.5,
+                    0.5,
+                    0,
+                    0,
+                    0,
+                )
+                root_rigidbody.index = len(model.rigidbodies)
+                model.rigidbodies[root_rigidbody.name] = root_rigidbody
+        else:
+            # 中心剛体を作らない場合、ルートは親剛体
+            root_rigidbody = parent_bone_rigidbody
 
         for base_map_idx, regist_bones in all_regist_bones.items():
             logger.info("--【No.%s】剛体生成", base_map_idx + 1)
@@ -2159,10 +2163,7 @@ class PmxTailorExportService:
                     target_bone = now_now_bone if v_yidx < max_v_yidx else now_below_bone
 
                 if not (target_bone.index in model.vertices):
-                    logger.warning(
-                        "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
-                        vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
-                    )
+                    # ウェイトを持ってないボーンは登録対象外（有り得るので警告なし）
                     continue
 
                 # 剛体の厚みINDEX
@@ -4146,16 +4147,12 @@ class PmxTailorExportService:
                         # ボーン位置を保持
                         nearest_pos = bone.position.copy()
                         nearest_v_key = bone.position.to_key(threshold)
-                        # 登録は対象外
-                        regist_bones[grid_row, 0] = False
                     else:
                         # ウェイトを持つボーンの場合
 
                         # ウェイト頂点の中心を保持
                         nearest_pos = MVector3D(np.mean(weighted_vertex_positions[bone.index], axis=0))
                         nearest_v_key = nearest_pos.to_key(threshold)
-                        # ウェイト頂点の中心頂点に紐付くボーンとして登録
-                        regist_bones[grid_row, 0] = True
 
                     if nearest_v_key not in virtual_vertices:
                         virtual_vertices[nearest_v_key] = VirtualVertex(nearest_v_key)
@@ -4163,6 +4160,7 @@ class PmxTailorExportService:
                     virtual_vertices[nearest_v_key].positions.append(nearest_pos.data())
                     virtual_vertices[nearest_v_key].map_bones[grid_col] = bone
                     vertex_map[grid_row, 0] = nearest_v_key
+                    regist_bones[grid_row, 0] = True
 
                     logger.info("-- 仮想ボーン: %s: 終了", bone.name)
 
@@ -4252,6 +4250,7 @@ class PmxTailorExportService:
         )
         # 面を形成する頂点同士の距離から閾値生成
         threshold = np.min(v_pair_distances[v_pair_distances > 0]) * 0.8
+        median_threshold = np.median(v_pair_distances[v_pair_distances > 0])
 
         logger.info("%s: 材質頂点の閾値算出: %s", material_name, round(threshold, 5))
 
@@ -4537,7 +4536,7 @@ class PmxTailorExportService:
         horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
 
         # 変曲点を求める
-        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_poses)) >= threshold * 1.2)[0]
+        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_poses)) >= median_threshold)[0]
 
         if len(target_idx_pose_f_prime_diff) < 2:
             # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす
