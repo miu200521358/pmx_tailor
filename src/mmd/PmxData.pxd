@@ -97,6 +97,9 @@ cdef class RigidBody:
     cdef public bint is_arm_upper
     cdef public bint is_small
     cdef public MQuaternion shape_qq
+    cdef public MVector3D x_direction
+    cdef public MVector3D y_direction
+    cdef public MVector3D z_direction
     cdef public int SHAPE_SPHERE
     cdef public int SHAPE_BOX
     cdef public int SHAPE_CAPSULE

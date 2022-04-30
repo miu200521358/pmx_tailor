@@ -505,6 +505,9 @@ cdef class RigidBody:
         self.is_arm_upper = False
         self.is_small = False
         self.shape_qq = MQuaternion()
+        self.x_direction = MVector3D()
+        self.y_direction = MVector3D()
+        self.z_direction = MVector3D()
 
         self.SHAPE_SPHERE = 0
         self.SHAPE_BOX = 1
