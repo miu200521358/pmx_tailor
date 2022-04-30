@@ -1081,17 +1081,12 @@ class PmxTailorExportService:
                         a_rigidbody = root_rigidbody
                         b_rigidbody = vv.map_rigidbodies[base_map_idx]
 
-                        if param_option["exist_physics_clear"] == logger.transtext("再利用") or param_option[
-                            "joint_pos_type"
-                        ] == logger.transtext("ボーン間"):
-                            joint_pos = vv.map_bones[base_map_idx].position
-                        else:
-                            joint_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
+                        joint_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                     else:
                         a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = vv.map_rigidbodies.get(base_map_idx, None)
 
-                        if param_option["exist_physics_clear"] == logger.transtext("再利用") or param_option[
+                        if param_option["exist_physics_clear"] != logger.transtext("再利用") and param_option[
                             "joint_pos_type"
                         ] == logger.transtext("ボーン間"):
                             # 剛体が重なる箇所の交点
@@ -2399,30 +2394,30 @@ class PmxTailorExportService:
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
-                # # 自身の中間
-                # mean_position = MVector3D(
-                #     np.mean(
-                #         [
-                #             now_now_bone.position.data(),
-                #             now_below_bone.position.data(),
-                #         ],
-                #         axis=0,
-                #     )
-                # )
-
                 # ボーン進行方向(x)
                 x_direction_pos = (now_now_bone.position - now_below_bone.position).normalized()
                 # ボーン進行方向に対しての横軸(y)
                 if (
-                    next_above_bone
+                    (prev_map_idx != next_map_idx or prev_xidx != next_xidx)
+                    and next_above_bone
                     and next_above_bone != now_now_bone
                     and prev_above_bone
                     and prev_above_bone != now_now_bone
                 ):
                     y_direction_pos = (next_above_bone.position - prev_above_bone.position).normalized()
-                elif next_above_bone and next_above_bone != now_now_bone and now_now_bone:
+                elif (
+                    (base_map_idx != next_map_idx or v_xidx != next_xidx)
+                    and next_above_bone
+                    and now_now_bone
+                    and next_above_bone != now_now_bone
+                ):
                     y_direction_pos = (next_above_bone.position - now_now_bone.position).normalized()
-                elif prev_above_bone and prev_above_bone != now_now_bone and now_now_bone:
+                elif (
+                    (base_map_idx != prev_map_idx or v_xidx != prev_xidx)
+                    and prev_above_bone
+                    and now_now_bone
+                    and prev_above_bone != now_now_bone
+                ):
                     y_direction_pos = (now_now_bone.position - prev_above_bone.position).normalized()
                 else:
                     y_direction_pos = MVector3D(1, 0, 0)
@@ -2515,79 +2510,25 @@ class PmxTailorExportService:
                 vv.map_rigidbodies[base_map_idx].shape_qq = shape_qq
 
                 # 別途保持しておく
-                if (v_yidx, vv.map_rigidbodies[base_map_idx].name) not in created_rigidbodies:
+                if vv.map_rigidbodies[base_map_idx].name not in created_rigidbodies:
                     if base_map_idx not in created_rigidbody_vvs:
                         created_rigidbody_vvs[base_map_idx] = {}
                     if v_xidx not in created_rigidbody_vvs[base_map_idx]:
                         created_rigidbody_vvs[base_map_idx][v_xidx] = {}
                     created_rigidbody_vvs[base_map_idx][v_xidx][v_yidx] = vv
-                    created_rigidbodies[(v_yidx, vv.map_rigidbodies[base_map_idx].name)] = vv.map_rigidbodies[
-                        base_map_idx
-                    ]
-                    # created_rigidbody_masses[vv.map_rigidbodies[base_map_idx].name] = mass
-                    # created_rigidbody_linear_dampings[vv.map_rigidbodies[base_map_idx].name] = linear_damping
-                    # created_rigidbody_angular_dampings[vv.map_rigidbodies[base_map_idx].name] = angular_damping
-                    # created_rigidbody_volumes[vv.map_rigidbodies[base_map_idx].name] = (
-                    #     shape_size.x() * shape_size.y() * shape_size.z()
-                    # )
+                    created_rigidbodies[vv.map_rigidbodies[base_map_idx].name] = vv.map_rigidbodies[base_map_idx]
                 else:
                     # 既に保持済みの剛体である場合、前のを参照する
-                    vv.map_rigidbodies[base_map_idx] = created_rigidbodies[
-                        (v_yidx, vv.map_rigidbodies[base_map_idx].name)
-                    ]
+                    vv.map_rigidbodies[base_map_idx] = created_rigidbodies[vv.map_rigidbodies[base_map_idx].name]
 
                 if len(created_rigidbodies) > 0 and len(created_rigidbodies) // 50 > prev_rigidbody_cnt:
                     logger.info("-- -- 【No.%s】剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
                     prev_rigidbody_cnt = len(created_rigidbodies) // 50
 
-        # min_mass = 0
-        # min_linear_damping = 0
-        # min_angular_damping = 0
-        # min_volume = 0
-
-        # max_mass = 0
-        # max_linear_damping = 0
-        # max_angular_damping = 0
-        # max_volume = 0
-
-        # if len(created_rigidbody_masses.values()) > 0:
-        #     min_mass = np.min(list(created_rigidbody_masses.values()))
-        #     min_linear_damping = np.min(list(created_rigidbody_linear_dampings.values()))
-        #     min_angular_damping = np.min(list(created_rigidbody_angular_dampings.values()))
-        #     min_volume = np.min(list(created_rigidbody_volumes.values()))
-
-        #     max_mass = np.max(list(created_rigidbody_masses.values()))
-        #     max_linear_damping = np.max(list(created_rigidbody_linear_dampings.values()))
-        #     max_angular_damping = np.max(list(created_rigidbody_angular_dampings.values()))
-        #     max_volume = np.max(list(created_rigidbody_volumes.values()))
-
-        for (v_yidx, rigidbody_name) in sorted(created_rigidbodies.keys()):
+        for rigidbody_name in sorted(created_rigidbodies.keys()):
             # 剛体を登録
-            rigidbody = created_rigidbodies[(v_yidx, rigidbody_name)]
+            rigidbody = created_rigidbodies[rigidbody_name]
             rigidbody.index = len(model.rigidbodies)
-            # y_ratio = (v_yidx + 1) / len(v_yidxs)
-            # volume_ratio = (
-            #     (created_rigidbody_volumes[rigidbody_name] - min_volume) / (max_volume - min_volume)
-            #     if min_volume != max_volume
-            #     else 1
-            # )
-
-            # # 質量と減衰は最大を決めて再割り当て
-            # rigidbody.param.linear_damping = calc_ratio(
-            #     rigidbody.param.linear_damping,
-            #     min_linear_damping,
-            #     max_linear_damping,
-            #     param_rigidbody.param.linear_damping,
-            #     min(max_linear_damping, 0.9999),
-            # )
-
-            # rigidbody.param.angular_damping = calc_ratio(
-            #     rigidbody.param.angular_damping,
-            #     min_angular_damping,
-            #     max_angular_damping,
-            #     param_rigidbody.param.angular_damping,
-            #     min(max_angular_damping, 0.9999),
-            # )
 
             if rigidbody.name in model.rigidbodies:
                 logger.warning("同じ剛体名が既に登録されているため、末尾に乱数を追加します。 既存剛体名: %s", rigidbody.name)
