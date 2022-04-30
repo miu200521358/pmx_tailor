@@ -4681,7 +4681,7 @@ class PmxTailorExportService:
         horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
 
         # 変曲点を求める
-        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_poses)) >= median_threshold)[0]
+        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_poses)) >= median_threshold / 2)[0]
 
         if len(target_idx_pose_f_prime_diff) < 2:
             # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす
