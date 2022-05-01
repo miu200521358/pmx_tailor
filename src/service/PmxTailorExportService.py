@@ -819,7 +819,7 @@ class PmxTailorExportService:
                 )
 
                 # 残ウェイト
-                self.create_remaining_weight(
+                weighted_vidxs = self.create_remaining_weight(
                     model, param_option, material_name, virtual_vertices, remaining_vertices, threshold
                 )
 
@@ -827,7 +827,9 @@ class PmxTailorExportService:
                 self.create_grad_weight(model, param_option, material_name, virtual_vertices, threshold)
 
                 # 裏ウェイト
-                self.create_back_weight(model, param_option, material_name, virtual_vertices, back_vertices, threshold)
+                self.create_back_weight(
+                    model, param_option, material_name, virtual_vertices, back_vertices, weighted_vidxs, threshold
+                )
 
             root_rigidbody, parent_bone_rigidbody = self.create_rigidbody(
                 model,
@@ -2776,6 +2778,7 @@ class PmxTailorExportService:
         material_name: str,
         virtual_vertices: dict,
         back_vertices: list,
+        weighted_vidxs: list,
         threshold: float,
     ):
         if param_option["back_material_name"]:
@@ -2797,7 +2800,7 @@ class PmxTailorExportService:
         prev_weight_cnt = 0
 
         front_vertices = {}
-        for vidx in model.material_vertices[material_name]:
+        for vidx in weighted_vidxs:
             v = model.vertex_dict[vidx]
             front_vertices[v.index] = v.position.data()
 
@@ -2812,6 +2815,8 @@ class PmxTailorExportService:
             # 直近頂点INDEXのウェイトを転写
             copy_front_vertex_idx = list(front_vertices.keys())[np.argmin(bv_distances)]
             bv.deform = copy.deepcopy(model.vertex_dict[copy_front_vertex_idx].deform)
+
+            logger.debug(f"裏頂点: back [{bv.index}], front [{copy_front_vertex_idx}]")
 
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
@@ -2834,6 +2839,9 @@ class PmxTailorExportService:
         vertex_cnt = 0
         prev_vertex_cnt = 0
 
+        # ウェイト塗り終わった実頂点リスト
+        weighted_vidxs = []
+
         # 塗り終わった頂点リスト
         weighted_vkeys = list(set(list(virtual_vertices.keys())) - set(list(remaining_vertices.keys())))
 
@@ -2841,6 +2849,7 @@ class PmxTailorExportService:
         for vkey in weighted_vkeys:
             vv = virtual_vertices[vkey]
             weighted_poses[vkey] = vv.position().data()
+            weighted_vidxs.extend(vv.vidxs())
 
         # 裾材質を追加
         if param_option["edge_material_name"] or param_option["edge_extend_material_names"]:
@@ -2988,6 +2997,7 @@ class PmxTailorExportService:
                     )
 
                 for rv in vv.real_vertices:
+                    weighted_vidxs.append(rv.index)
                     rv.deform = vv.deform
 
             vertex_cnt += 1
@@ -2997,6 +3007,8 @@ class PmxTailorExportService:
                 prev_vertex_cnt = vertex_cnt // 100
 
         logger.info("-- 残ウェイト: %s個目:終了", vertex_cnt)
+
+        return weighted_vidxs
 
     def create_weight(
         self,
@@ -4712,22 +4724,25 @@ class PmxTailorExportService:
         # 変曲点を求める
         target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_dots)) >= dot_threshold)[0]
 
-        if len(target_idx_pose_f_prime_diff) < 2:
-            # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす
+        logger.debug(f"target_idx_pose_f_prime_diff: [{np.round(target_idx_pose_f_prime_diff, decimals=3)}]")
+
+        if len(target_idx_pose_f_prime_diff) not in [3, 4]:
+            # 変曲点が一枚物（四角でない）場合、エッジが均一に水平に繋がってるとみなす
             horizonal_top_edge_keys = all_top_edge_keys
         else:
-            target_idx_pose_indices = [0] + (target_idx_pose_f_prime_diff + 1).tolist() + [len(all_top_edge_poses)]
+            target_idx_pose_indices = [
+                0,
+                target_idx_pose_f_prime_diff[1],
+                target_idx_pose_f_prime_diff[2] + 1,
+                len(all_top_edge_poses),
+            ]
 
             # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
-            for ssi, esi in zip(target_idx_pose_indices[::2], target_idx_pose_indices[1::2]):
+            for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
                 target_all_top_edge_keys = (
-                    all_top_edge_keys[ssi:esi] if 0 <= ssi < esi else all_top_edge_keys[ssi:] + all_top_edge_keys[:esi]
+                    all_top_edge_keys[ssi : (esi + 2)] if 0 == ssi else all_top_edge_keys[(ssi + 1) : (esi + 1)]
                 )
-                slice_all_top_edge_poses = (
-                    all_top_edge_poses[(ssi + 1) : esi]
-                    if 0 <= ssi < esi
-                    else all_top_edge_poses[(ssi + 1) :] + all_top_edge_poses[:esi]
-                )
+                slice_all_top_edge_poses = all_top_edge_poses[ssi : (esi + 1)]
 
                 if len(slice_all_top_edge_poses) < 2:
                     # diffが取れないくらい小さいのは無視
@@ -4865,33 +4880,45 @@ class PmxTailorExportService:
             for ti, bottom_key in enumerate(bottom_edge_keys):
                 bottom_target_pos = virtual_vertices[bottom_key].position()
 
-                # # 中心から見た処理対象仮想頂点の位置
-                # bottom_local_pos = (bottom_target_pos - bottom_edge_mean_pos) * base_reverse_axis
-                # # 上部の理想位置をざっくり比率から求めておく
-                # top_ideal_pos = top_edge_mean_pos + (
-                #     bottom_local_pos
-                #     * (
-                #         np.array([top_x_radius, top_y_radius, top_z_radius])
-                #         / np.array([bottom_x_radius, bottom_y_radius, bottom_z_radius])
-                #     )
-                # )
-
-                # 下部の角度に類似した上部角度を選ぶ
-                bottom_degree0, bottom_degree1 = self.calc_arc_degree(
-                    bottom_edge_start_pos,
-                    bottom_edge_mean_pos,
-                    bottom_target_pos,
-                    base_vertical_axis,
-                    base_reverse_axis,
-                )
-
-                degree_diffs0 = np.abs(np.array(list(top_degrees.keys())) - bottom_degree0)
-                degree_diffs1 = np.abs(np.array(list(top_degrees.keys())) - bottom_degree1)
-
-                if np.min(degree_diffs0) < np.min(degree_diffs1):
-                    top_target_pos = np.array(list(top_degrees.values()))[np.argmin(degree_diffs0)]
+                if param_option["route_estimate_type"] == logger.transtext("縮尺"):
+                    # 中心から見た処理対象仮想頂点の位置
+                    bottom_local_pos = (bottom_target_pos - bottom_edge_mean_pos) * base_reverse_axis
+                    # 上部の理想位置をざっくり比率から求めておく
+                    top_ideal_pos = top_edge_mean_pos + (
+                        bottom_local_pos
+                        * (
+                            np.array([top_x_radius, top_y_radius, top_z_radius])
+                            / np.array([bottom_x_radius, bottom_y_radius, bottom_z_radius])
+                        )
+                    )
+                    top_distances = np.linalg.norm((np.array(top_edge_poses) - top_ideal_pos.data()), ord=2, axis=1)
+                    top_target_pos = MVector3D(np.array(top_edge_poses)[np.argmin(top_distances)])
+                    logger.debug(
+                        f"◆上部縮尺推定: top_vidxs: [{virtual_vertices[top_target_pos.to_key(threshold)].vidxs()}, bottom_vidxs: [{virtual_vertices[bottom_key].vidxs()}], top_ideal_pos: [{top_ideal_pos.to_log()}], top_target_pos: [{top_target_pos.to_log()}]"
+                    )
                 else:
-                    top_target_pos = np.array(list(top_degrees.values()))[np.argmin(degree_diffs1)]
+                    # 下部の角度に類似した上部角度を選ぶ
+                    bottom_degree0, bottom_degree1 = self.calc_arc_degree(
+                        bottom_edge_start_pos,
+                        bottom_edge_mean_pos,
+                        bottom_target_pos,
+                        base_vertical_axis,
+                        base_reverse_axis,
+                    )
+
+                    degree_diffs0 = np.abs(np.array(list(top_degrees.keys())) - bottom_degree0)
+                    degree_diffs1 = np.abs(np.array(list(top_degrees.keys())) - bottom_degree1)
+
+                    if np.min(degree_diffs0) < np.min(degree_diffs1):
+                        top_target_pos = np.array(list(top_degrees.values()))[np.argmin(degree_diffs0)]
+                        top_degree = np.array(list(top_degrees.keys()))[np.argmin(degree_diffs0)]
+                    else:
+                        top_target_pos = np.array(list(top_degrees.values()))[np.argmin(degree_diffs1)]
+                        top_degree = np.array(list(top_degrees.keys()))[np.argmin(degree_diffs1)]
+
+                    logger.debug(
+                        f"◆上部角度推定: top_vidxs: [{virtual_vertices[top_target_pos.to_key(threshold)].vidxs()}], bottom_vidxs: [{virtual_vertices[bottom_key].vidxs()}], bottom_degree: [{round(bottom_degree0, 3)}], nearest_top_degree: [{round(top_degree, 3)}], top_pos: [{top_target_pos.to_log()}]"
+                    )
 
                 vkeys, vscores = self.create_vertex_line_map(
                     bottom_key,
@@ -5290,7 +5317,7 @@ class PmxTailorExportService:
         # ボーン進行方向(x)
         top_x_pos = (top_pos - bottom_pos).normalized()
         # ボーン進行方向に対しての縦軸(y)
-        top_y_pos = bottom_vv.normal().normalized()
+        top_y_pos = MVector3D(1, 0, 0)
         # ボーン進行方向に対しての横軸(z)
         top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
         top_qq = MQuaternion.fromDirection(top_z_pos, top_y_pos)

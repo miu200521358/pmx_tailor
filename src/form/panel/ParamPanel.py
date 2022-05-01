@@ -2920,6 +2920,25 @@ class PhysicsParam:
         self.route_search_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_option_grid_sizer.Add(self.route_search_type_ctrl, 0, wx.ALL, 5)
 
+        # 根元頂点推定手法
+        self.route_estimate_type_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("根元頂点推定"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.route_estimate_type_txt.SetToolTip(
+            logger.transtext("根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定")
+        )
+        self.route_estimate_type_txt.Wrap(-1)
+        self.advance_option_grid_sizer.Add(self.route_estimate_type_txt, 0, wx.ALL, 5)
+
+        self.route_estimate_type_ctrl = wx.Choice(
+            self.advance_window,
+            id=wx.ID_ANY,
+            choices=[logger.transtext("角度"), logger.transtext("縮尺")],
+        )
+        self.route_estimate_type_ctrl.SetToolTip(self.route_estimate_type_txt.GetToolTipText())
+        self.route_estimate_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_option_grid_sizer.Add(self.route_estimate_type_ctrl, 0, wx.ALL, 5)
+
         # 物理親
         physics_parent_tooltip = logger.transtext("物理的に親となる物理設定番号。物理親を設定すると設定した物理の上端が物理親の下端に紐付けられます。")
         self.physics_parent_txt = wx.StaticText(
@@ -3073,9 +3092,11 @@ class PhysicsParam:
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
                 "vertices_grad_csv": self.vertices_grad_csv_file_ctrl.path(),
                 "physics_parent": self.physics_parent_spin.GetValue(),
-                "parent_type": self.parent_type_ctrl.GetStringSelection(),
+                "physics_type": self.physics_type_ctrl.GetStringSelection(),
+                "density_type": self.density_type_ctrl.GetStringSelection(),
                 "joint_pos_type": self.joint_pos_type_ctrl.GetStringSelection(),
                 "route_search_type": self.route_search_type_ctrl.GetStringSelection(),
+                "route_estimate_type": self.route_estimate_type_ctrl.GetStringSelection(),
                 "params": self.get_param_export_data(),
             }
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
@@ -3115,6 +3136,7 @@ class PhysicsParam:
             params["parent_type"] = self.parent_type_ctrl.GetStringSelection()
             params["joint_pos_type"] = self.joint_pos_type_ctrl.GetStringSelection()
             params["route_search_type"] = self.route_search_type_ctrl.GetStringSelection()
+            params["route_estimate_type"] = self.route_estimate_type_ctrl.GetStringSelection()
 
             # 自身を非衝突対象
             no_collision_group = 0
@@ -3442,10 +3464,6 @@ class PhysicsParam:
         self.vertical_bone_density_spin.SetValue(params["vertical_bone_density"])
         self.horizonal_bone_density_spin.SetValue(params["horizonal_bone_density"])
         self.horizonal_bone_offset_spin.SetValue(params.get("horizonal_bone_offset", 0))
-        self.physics_type_ctrl.SetStringSelection(params["physics_type"])
-        self.density_type_ctrl.SetStringSelection(params.get("density_type", logger.transtext("頂点")))
-        self.joint_pos_type_ctrl.SetStringSelection(params.get("joint_pos_type", logger.transtext("ボーン間")))
-        self.route_search_type_ctrl.SetStringSelection(params.get("route_search_type", logger.transtext("根元頂点優先")))
 
         # 剛体 ---------------
         self.advance_rigidbody_shape_type_ctrl.SetSelection(params["rigidbody_shape_type"])
@@ -3630,11 +3648,6 @@ class PhysicsParam:
         params["vertical_bone_density"] = int(self.vertical_bone_density_spin.GetValue())
         params["horizonal_bone_density"] = int(self.horizonal_bone_density_spin.GetValue())
         params["horizonal_bone_offset"] = int(self.horizonal_bone_offset_spin.GetValue())
-        params["bone_thinning_out"] = False
-        params["physics_type"] = self.physics_type_ctrl.GetStringSelection()
-        params["density_type"] = self.density_type_ctrl.GetStringSelection()
-        params["joint_pos_type"] = self.joint_pos_type_ctrl.GetStringSelection()
-        params["route_search_type"] = self.route_search_type_ctrl.GetStringSelection()
 
         # 剛体 ---------------
         params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
@@ -4043,6 +4056,24 @@ class PhysicsParam:
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
             if not self.vertices_grad_csv_file_ctrl.path():
                 self.vertices_grad_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_grad_csv", ""))
+
+            # 詳細画面
+            if self.physics_type_ctrl.GetStringSelection() == logger.transtext("布"):
+                self.physics_type_ctrl.SetStringSelection(abb_setting.get("physics_type", logger.transtext("布")))
+            if self.density_type_ctrl.GetStringSelection() == logger.transtext("頂点"):
+                self.density_type_ctrl.SetStringSelection(abb_setting.get("density_type", logger.transtext("頂点")))
+            if self.joint_pos_type_ctrl.GetStringSelection() == logger.transtext("ボーン間"):
+                self.joint_pos_type_ctrl.SetStringSelection(
+                    abb_setting.get("joint_pos_type", logger.transtext("ボーン間"))
+                )
+            if self.route_search_type_ctrl.GetStringSelection() == logger.transtext("根元頂点優先"):
+                self.route_search_type_ctrl.SetStringSelection(
+                    abb_setting.get("route_search_type", logger.transtext("根元頂点優先"))
+                )
+            if self.route_estimate_type_ctrl.GetStringSelection() == logger.transtext("角度"):
+                self.route_estimate_type_ctrl.SetStringSelection(
+                    abb_setting.get("route_estimate_type", logger.transtext("角度"))
+                )
             if not self.physics_parent_spin.GetValue():
                 self.physics_parent_spin.SetValue(int(abb_setting.get("physics_parent", 0)))
 
@@ -4155,6 +4186,7 @@ class PhysicsParam:
         self.rigidbody_end_thicks_spin.SetValue(0.2)
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
         self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
+        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
 
         if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))
@@ -4595,6 +4627,7 @@ class PhysicsParam:
         self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
         self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
+        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
 
         self.set_material_name(event)
         # self.set_fineness(event)
