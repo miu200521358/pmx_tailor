@@ -4401,9 +4401,8 @@ class PmxTailorExportService:
         )
         # 面を形成する頂点同士の距離から閾値生成
         threshold = np.min(v_pair_distances[v_pair_distances > 0]) * 0.8
-        mean_threshold = np.mean(v_pair_distances[v_pair_distances > 0])
 
-        logger.info("%s: 材質頂点の閾値算出: %s (%s)", material_name, round(threshold, 5), round(mean_threshold, 5))
+        logger.info("%s: 材質頂点の閾値算出: %s", material_name, round(threshold, 5))
 
         logger.info("%s: 仮想頂点リストの生成", material_name)
 
@@ -4589,10 +4588,23 @@ class PmxTailorExportService:
 
         mean_poses = []
         target_idx_poses = []
+        target_diff_dots = []
         for n, edge_lines in enumerate(all_edge_lines):
             target_idx_poses.append([])
-            for now_edge_key in edge_lines:
+            target_diff_dots.append([])
+
+            for prev_edge_key, now_edge_key, next_edge_key in zip(
+                edge_lines, edge_lines[1:] + edge_lines[:1], edge_lines[2:] + edge_lines[:2]
+            ):
+                prev_edge_pos = virtual_vertices[prev_edge_key].position()
                 now_edge_pos = virtual_vertices[now_edge_key].position()
+                next_edge_pos = virtual_vertices[next_edge_key].position()
+
+                target_diff_dots[-1].append(
+                    MVector3D.dotProduct(
+                        (next_edge_pos - now_edge_pos).normalized(), (now_edge_pos - prev_edge_pos).normalized()
+                    )
+                )
 
                 if material_direction == 0:
                     # 水平の場合
@@ -4607,6 +4619,7 @@ class PmxTailorExportService:
         # topは全部並列
         all_top_edge_keys = []
         all_top_edge_poses = []
+        all_top_edge_dots = []
         # bottomはエッジが分かれてたら分ける
         all_bottom_edge_keys = []
 
@@ -4614,11 +4627,14 @@ class PmxTailorExportService:
 
         if len(all_edge_lines) == 2:
             # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
-            for n, (edge_lines, target_poses) in enumerate(zip(all_edge_lines, target_idx_poses)):
+            for n, (edge_lines, target_poses, target_dots) in enumerate(
+                zip(all_edge_lines, target_idx_poses, target_diff_dots)
+            ):
                 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
                     if np.median(target_poses) >= target_mean:
                         all_top_edge_keys = edge_lines
                         all_top_edge_poses = target_poses
+                        all_top_edge_dots = target_dots
                     if np.median(target_poses) <= target_mean:
                         all_bottom_edge_keys.append(edge_lines)
                 else:
@@ -4627,14 +4643,18 @@ class PmxTailorExportService:
                     if np.median(target_poses) <= target_mean:
                         all_top_edge_keys = edge_lines
                         all_top_edge_poses = target_poses
+                        all_top_edge_dots = target_dots
         else:
             # エッジが2つではない場合、半分で分ける(下右は大きい方、上左は小さい方)
-            for n, (edge_lines, target_poses) in enumerate(zip(all_edge_lines, target_idx_poses)):
+            for n, (edge_lines, target_poses, target_dots) in enumerate(
+                zip(all_edge_lines, target_idx_poses, target_diff_dots)
+            ):
                 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
                     if np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)].shape[0] > 0:
                         for idx in np.where(np.array(target_poses) > target_mean)[0]:
                             all_top_edge_keys.append(edge_lines[idx])
                             all_top_edge_poses.append(target_poses[idx])
+                            all_top_edge_dots.append(target_dots[idx])
                     if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
                         target_idxs = np.where(np.array(target_poses) < target_mean)[0]
                         if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
@@ -4650,6 +4670,7 @@ class PmxTailorExportService:
                         for idx in np.where(np.array(target_poses) < target_mean)[0]:
                             all_top_edge_keys.append(edge_lines[idx])
                             all_top_edge_poses.append(target_poses[idx])
+                            all_top_edge_dots.append(target_dots[idx])
                     if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
                         target_idxs = np.where(np.array(target_poses) > target_mean)[0]
                         if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
@@ -4681,8 +4702,15 @@ class PmxTailorExportService:
         # 移動量の最大の1/2を閾値とする
         horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
 
+        # 内積差の最大の1/2を閾値とする
+        dot_threshold = np.max(np.abs(np.diff(all_top_edge_dots))) / 2
+
+        logger.debug(
+            f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
+        )
+
         # 変曲点を求める
-        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_poses)) >= mean_threshold / 2)[0]
+        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_dots)) >= dot_threshold)[0]
 
         if len(target_idx_pose_f_prime_diff) < 2:
             # 変曲点がほぼない場合、エッジが均一に水平に繋がってるとみなす
@@ -4691,7 +4719,7 @@ class PmxTailorExportService:
             target_idx_pose_indices = [0] + (target_idx_pose_f_prime_diff + 1).tolist() + [len(all_top_edge_poses)]
 
             # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
-            for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
+            for ssi, esi in zip(target_idx_pose_indices[::2], target_idx_pose_indices[1::2]):
                 target_all_top_edge_keys = (
                     all_top_edge_keys[ssi:esi] if 0 <= ssi < esi else all_top_edge_keys[ssi:] + all_top_edge_keys[:esi]
                 )
@@ -5336,23 +5364,28 @@ class PmxTailorExportService:
                 )
                 continue
 
-            prev_dot = (
-                MVector3D.dotProduct(
-                    (virtual_vertices[vkeys[0]].position() - virtual_vertices[vkeys[1]].position()).normalized(),
-                    (to_pos - virtual_vertices[vkeys[0]].position()).normalized(),
+            if param_option["route_search_type"] == logger.transtext("前頂点優先"):
+                # 前頂点との内積差を考慮する場合
+                prev_dot = (
+                    MVector3D.dotProduct(
+                        (virtual_vertices[vkeys[0]].position() - virtual_vertices[vkeys[1]].position()).normalized(),
+                        (to_pos - virtual_vertices[vkeys[0]].position()).normalized(),
+                    )
+                    if len(vkeys) > 1
+                    else 1
                 )
-                if len(vkeys) > 1
-                else 1
-            )
 
-            # if prev_dot < 0.5:
-            #     # ズレた方向には行かせない
-            #     scores.append(0)
-            #     prev_dots.append(0)
-            #     logger.debug(
-            #         f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, 前ズレ方向"
-            #     )
-            #     continue
+                if prev_dot < 0.5:
+                    # ズレた方向には行かせない
+                    scores.append(0)
+                    prev_dots.append(0)
+                    logger.debug(
+                        f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, 前ズレ方向"
+                    )
+                    continue
+            else:
+                # 根元頂点の向きのみ参照する場合
+                prev_dot = 1
 
             score = (yaw_score * 20) + pitch_score + (roll_score * 2)
 
