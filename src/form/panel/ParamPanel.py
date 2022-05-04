@@ -299,7 +299,7 @@ class ParamPanel(BasePanel):
                     material_key = f"{param['material_name']}:{param['abb_name']}:{param['vertices_csv']}"
                     if material_key in param_material_names:
                         logger.error(
-                            "同じ材質に対して複数の物理設定が割り当てられています\n" + "既存物理再利用などで異なる箇所に物理を割り当てたい場合、略称が違っているか確認してください。",
+                            "同じ材質・同じ略称に対して複数の物理設定が割り当てられています\n異なる箇所に物理を割り当てたい場合、略称を変えているか確認してください。",
                             decoration=MLogger.DECORATION_BOX,
                         )
                         return []
@@ -605,139 +605,9 @@ class PhysicsParam:
         self.simple_extend_back_btn_ctrl.SetToolTip(logger.transtext("追加で裏材質を指定したい場合に選択してください。"))
         self.simple_extend_back_btn_ctrl.Bind(wx.EVT_BUTTON, self.on_click_extend_back)
         self.simple_back_material_sizer.Add(self.simple_extend_back_btn_ctrl, 0, wx.ALL, 5)
-
         self.simple_param_sizer.Add(self.simple_back_material_sizer, 0, wx.ALL | wx.EXPAND, 0)
 
-        # 頂点CSVファイルコントロール
-        self.vertices_csv_file_ctrl = HistoryFilePickerCtrl(
-            self.main_frame,
-            self.simple_window,
-            logger.transtext("物理対象頂点CSV"),
-            logger.transtext("物理対象頂点CSVファイルを開く"),
-            ("csv"),
-            wx.FLP_DEFAULT_STYLE,
-            logger.transtext(
-                "材質の中で物理を割り当てたい頂点を絞り込みたい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
-            ),
-            file_model_spacer=0,
-            title_parts_ctrl=None,
-            title_parts2_ctrl=None,
-            file_histories_key="vertices_csv",
-            is_change_output=False,
-            is_aster=False,
-            is_save=False,
-            set_no=0,
-        )
-        self.vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
-        self.simple_param_sizer.Add(self.vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
-
-        # 物理グラデCSVファイルコントロール
-        self.vertices_grad_csv_file_ctrl = HistoryFilePickerCtrl(
-            self.main_frame,
-            self.simple_window,
-            logger.transtext("物理グラデーション対象頂点CSV"),
-            logger.transtext("物理グラデーション対象頂点CSVファイルを開く"),
-            ("csv"),
-            wx.FLP_DEFAULT_STYLE,
-            logger.transtext(
-                "物理対象頂点CSVを指定しており、かつ物理そのものは設定しないがウェイトを物理ボーンで塗り直したい頂点がある場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
-            ),
-            file_model_spacer=0,
-            title_parts_ctrl=None,
-            title_parts2_ctrl=None,
-            file_histories_key="vertices_grad_csv",
-            is_change_output=False,
-            is_aster=False,
-            is_save=False,
-            set_no=0,
-        )
-        self.vertices_grad_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
-        self.simple_param_sizer.Add(self.vertices_grad_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
-
         self.simple_grid_sizer = wx.FlexGridSizer(0, 5, 0, 0)
-
-        # # 材質頂点密集度
-        # self.simple_threshold_txt = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("密集度"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_threshold_txt.SetToolTip(
-        #     logger.transtext("材質の密集の度合い。\n値を大きくすると、ある程度ばらけた頂点もひとつの頂点として扱います。\n値を小さくすると、細かいメッシュも別頂点として処理できます。")
-        # )
-        # self.simple_threshold_txt.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_threshold_txt, 0, wx.ALL, 5)
-
-        # self.simple_threshold_label = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("（0.1）"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_threshold_label.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_threshold_label, 0, wx.ALL, 5)
-
-        # self.simple_threshold_min_label = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("0.005"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_threshold_min_label.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_threshold_min_label, 0, wx.ALL, 5)
-
-        # self.simple_threshold_slider = FloatSliderCtrl(
-        #     self.simple_window,
-        #     wx.ID_ANY,
-        #     0.1,
-        #     0.005,
-        #     0.3,
-        #     0.001,
-        #     self.simple_threshold_label,
-        #     wx.DefaultPosition,
-        #     (350, 30),
-        #     wx.SL_HORIZONTAL,
-        # )
-        # self.simple_grid_sizer.Add(self.simple_threshold_slider, 1, wx.ALL | wx.EXPAND, 5)
-
-        # self.simple_threshold_max_label = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("0.3"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_threshold_max_label.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_threshold_max_label, 0, wx.ALL, 5)
-
-        # # 物理の細かさスライダー
-        # self.simple_fineness_txt = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("細かさ"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_fineness_txt.SetToolTip(logger.transtext("材質の物理の細かさ。ボーン・剛体・ジョイントの細かさ等に影響します。"))
-        # self.simple_fineness_txt.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_fineness_txt, 0, wx.ALL, 5)
-
-        # self.simple_fineness_label = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("（3.4）"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_fineness_label.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_fineness_label, 0, wx.ALL, 5)
-
-        # self.simple_fineness_min_label = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("小"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_fineness_min_label.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_fineness_min_label, 0, wx.ALL, 5)
-
-        # self.simple_fineness_slider = FloatSliderCtrl(
-        #     self.simple_window,
-        #     wx.ID_ANY,
-        #     3.4,
-        #     1,
-        #     10,
-        #     0.1,
-        #     self.simple_fineness_label,
-        #     wx.DefaultPosition,
-        #     (350, 30),
-        #     wx.SL_HORIZONTAL,
-        # )
-        # self.simple_fineness_slider.Bind(wx.EVT_SCROLL_CHANGED, self.set_fineness)
-        # self.simple_grid_sizer.Add(self.simple_fineness_slider, 1, wx.ALL | wx.EXPAND, 5)
-
-        # self.simple_fineness_max_label = wx.StaticText(
-        #     self.simple_window, wx.ID_ANY, logger.transtext("大"), wx.DefaultPosition, wx.DefaultSize, 0
-        # )
-        # self.simple_fineness_max_label.Wrap(-1)
-        # self.simple_grid_sizer.Add(self.simple_fineness_max_label, 0, wx.ALL, 5)
 
         # 剛体の質量スライダー
         self.simple_mass_txt = wx.StaticText(
@@ -865,6 +735,76 @@ class PhysicsParam:
         self.simple_grid_sizer.Add(self.simple_shape_maintenance_max_label, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
+
+        # 頂点CSVファイルコントロール
+        self.vertices_csv_file_ctrl = HistoryFilePickerCtrl(
+            self.main_frame,
+            self.simple_window,
+            logger.transtext("物理対象頂点CSV"),
+            logger.transtext("物理対象頂点CSVファイルを開く"),
+            ("csv"),
+            wx.FLP_DEFAULT_STYLE,
+            logger.transtext(
+                "材質の中で物理を割り当てたい頂点を絞り込みたい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+            ),
+            file_model_spacer=0,
+            title_parts_ctrl=None,
+            title_parts2_ctrl=None,
+            file_histories_key="vertices_csv",
+            is_change_output=False,
+            is_aster=False,
+            is_save=False,
+            set_no=0,
+        )
+        self.vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
+
+        # 物理グラデCSVファイルコントロール
+        self.vertices_grad_csv_file_ctrl = HistoryFilePickerCtrl(
+            self.main_frame,
+            self.simple_window,
+            logger.transtext("物理グラデーション対象頂点CSV"),
+            logger.transtext("物理グラデーション対象頂点CSVファイルを開く"),
+            ("csv"),
+            wx.FLP_DEFAULT_STYLE,
+            logger.transtext(
+                "物理対象頂点CSVを指定しており、かつ物理そのものは設定しないがウェイトを物理ボーンで塗り直したい頂点がある場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+            ),
+            file_model_spacer=0,
+            title_parts_ctrl=None,
+            title_parts2_ctrl=None,
+            file_histories_key="vertices_grad_csv",
+            is_change_output=False,
+            is_aster=False,
+            is_save=False,
+            set_no=0,
+        )
+        self.vertices_grad_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.vertices_grad_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
+
+        # 根元頂点CSVファイルコントロール
+        self.top_vertices_csv_file_ctrl = HistoryFilePickerCtrl(
+            self.main_frame,
+            self.simple_window,
+            logger.transtext("根元頂点CSV"),
+            logger.transtext("根元頂点CSVファイルを開く"),
+            ("csv"),
+            wx.FLP_DEFAULT_STYLE,
+            logger.transtext(
+                "（自動判定で根元がうまく抽出できなかったなどで）根元頂点を指定したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+            ),
+            file_model_spacer=0,
+            title_parts_ctrl=None,
+            title_parts2_ctrl=None,
+            file_histories_key="top_vertices_csv",
+            is_change_output=False,
+            is_aster=False,
+            is_save=False,
+            set_no=0,
+        )
+        self.top_vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.top_vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
+
         self.simple_sizer.Add(self.simple_param_sizer, 1, wx.ALL | wx.EXPAND, 5)
 
         # 詳細版 ------------------
@@ -3069,8 +3009,13 @@ class PhysicsParam:
                 logger.error("物理グラデーション対象頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
                 return params, False
 
+            if self.top_vertices_csv_file_ctrl.path() and not os.path.exists(self.top_vertices_csv_file_ctrl.path()):
+                logger.error("根元頂点CSVファイルが存在しません", decoration=MLogger.DECORATION_BOX)
+                return params, False
+
             self.vertices_csv_file_ctrl.save()
             self.vertices_grad_csv_file_ctrl.save()
+            self.top_vertices_csv_file_ctrl.save()
 
             if self.simple_abb_ctrl.GetValue() not in self.main_frame.file_hitories["abb_setting"]:
                 self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {}
@@ -3091,6 +3036,7 @@ class PhysicsParam:
                 ),
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
                 "vertices_grad_csv": self.vertices_grad_csv_file_ctrl.path(),
+                "top_vertices_csv": self.top_vertices_csv_file_ctrl.path(),
                 "physics_parent": self.physics_parent_spin.GetValue(),
                 "physics_type": self.physics_type_ctrl.GetStringSelection(),
                 "density_type": self.density_type_ctrl.GetStringSelection(),
@@ -3118,6 +3064,7 @@ class PhysicsParam:
             params["special_shape"] = self.simple_special_shape_ctrl.GetStringSelection()
             params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
             params["vertices_grad_csv"] = self.vertices_grad_csv_file_ctrl.path()
+            params["top_vertices_csv"] = self.top_vertices_csv_file_ctrl.path()
             # params["threshold"] = self.simple_threshold_slider.GetValue()
             # params["fineness"] = self.simple_fineness_slider.GetValue()
             params["mass"] = self.simple_mass_slider.GetValue()
@@ -4056,6 +4003,8 @@ class PhysicsParam:
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
             if not self.vertices_grad_csv_file_ctrl.path():
                 self.vertices_grad_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_grad_csv", ""))
+            if not self.top_vertices_csv_file_ctrl.path():
+                self.top_vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("top_vertices_csv", ""))
 
             # 詳細画面
             if self.physics_type_ctrl.GetStringSelection() == logger.transtext("布"):

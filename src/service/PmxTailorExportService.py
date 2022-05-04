@@ -4390,6 +4390,9 @@ class PmxTailorExportService:
             logger.warning("対象範囲となる頂点が取得できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
             return None, None, None, None, None
 
+        material_mean_pos = MVector3D(np.mean(list(vertex_positions.values()), axis=0))
+        logger.info("%s: 材質頂点の中心点算出: %s", material_name, material_mean_pos.to_log())
+
         # 各頂点の位置との差分から距離を測る
         v_distances = np.linalg.norm(
             (np.array(list(vertex_positions.values())) - parent_bone.position.data()), ord=2, axis=1
@@ -4412,7 +4415,7 @@ class PmxTailorExportService:
             np.array(pair1_vertex_positions) - np.array(pair2_vertex_positions), ord=2, axis=1
         )
         # 面を形成する頂点同士の距離から閾値生成
-        threshold = np.min(v_pair_distances[v_pair_distances > 0]) * 0.8
+        threshold = np.min(v_pair_distances[v_pair_distances > 0]) / 2
 
         logger.info("%s: 材質頂点の閾値算出: %s", material_name, round(threshold, 5))
 
@@ -4432,57 +4435,74 @@ class PmxTailorExportService:
                 # 3つ揃ってない場合、スルー
                 continue
 
-            for v0_idx, v1_idx, v2_idx in zip(
-                model.indices[index_idx],
-                model.indices[index_idx][1:] + [model.indices[index_idx][0]],
-                [model.indices[index_idx][2]] + model.indices[index_idx][:-1],
-            ):
-                v0 = model.vertex_dict[v0_idx]
-                v1 = model.vertex_dict[v1_idx]
-                v2 = model.vertex_dict[v2_idx]
+            v0_idx = model.indices[index_idx][0]
+            v1_idx = model.indices[index_idx][1]
+            v2_idx = model.indices[index_idx][2]
 
-                v0_key = v0.position.to_key(threshold)
-                v1_key = v1.position.to_key(threshold)
-                v2_key = v2.position.to_key(threshold)
+            v0 = model.vertex_dict[v0_idx]
+            v1 = model.vertex_dict[v1_idx]
+            v2 = model.vertex_dict[v2_idx]
 
-                # 一旦ルートボーンにウェイトを一括置換
-                v0.deform = Bdef1(parent_bone.index)
+            v0_key = v0.position.to_key(threshold)
+            v1_key = v1.position.to_key(threshold)
+            v2_key = v2.position.to_key(threshold)
 
-                # 面垂線
-                vv1 = v1.position - v0.position
-                vv2 = v2.position - v1.position
-                surface_vector = MVector3D.crossProduct(vv1, vv2)
-                surface_normal = surface_vector.normalized()
+            # 一旦ルートボーンにウェイトを一括置換
+            v0.deform = Bdef1(parent_bone.index)
 
-                # 面の中心
-                mean_pos = MVector3D(np.mean([v0.position.data(), v1.position.data(), v2.position.data()], axis=0))
-                # 面垂線と軸ベクトルとの内積
-                direction_dot = MVector3D.dotProduct(surface_normal, parent_direction)
+            # 面垂線
+            vv1 = v1.position - v0.position
+            vv2 = v2.position - v1.position
+            surface_vector = MVector3D.crossProduct(vv1, vv2)
+            surface_normal = surface_vector.normalized()
 
-                if np.isclose(material_direction, 0):
-                    # 水平の場合、軸の向きだけ考える
-                    intersect = surface_normal.data()[target_idx]
-                    intersect_vec = base_vertical_axis
-                else:
-                    # 面垂線と親ボーンとの交点
-                    intersect_vec, intersect_tt, intersect_uu, intersect_len = calc_intersect(
-                        mean_pos,
-                        mean_pos + surface_normal * 1000,
-                        parent_bone.position + -parent_direction * 1000,
-                        parent_bone.position + parent_direction * 1000,
-                    )
-                    logger.debug(
-                        f"tt[{round(intersect_tt, 5)}], uu[{round(intersect_uu, 5)}], len[{round(intersect_len, 5)}], iv[{intersect_vec.to_log()}]"
-                    )
-                    # どちらかが範囲内なら表。両方とも範囲外なら裏
-                    intersect = 0 <= intersect_tt <= 1 or 0 <= intersect_uu <= 1
+            # 面の中心
+            mean_pos = MVector3D(np.mean([v0.position.data(), v1.position.data(), v2.position.data()], axis=0))
+            # 面垂線と軸ベクトルとの内積
+            direction_dot = MVector3D.dotProduct(surface_normal, parent_direction)
 
-                # 面法線と同じ向き場合かつ面垂線の向きが軸ベクトルに近くない場合、辺キー生成（表面のみを対象とする）
-                # プリーツは厚みがないとみなす
-                if (intersect > 0 and direction_dot < 0.5) or param_option["special_shape"] == logger.transtext(
-                    "全て表面"
-                ):
-                    lkey = (min(v0_key, v1_key), max(v0_key, v1_key))
+            if np.isclose(material_direction, 0):
+                # 水平の場合、軸の向きだけ考える
+                intersect = surface_normal.data()[target_idx]
+            else:
+                # ボーンから頂点0への向き（評価軸を殺して垂直にする）を親の面法線とする
+                material_normal = (mean_pos - parent_bone.position) * base_reverse_axis
+
+                # 頂点0を面法線方向に伸ばした垂線を線分とみなす
+                mean_line_segment = mean_pos + surface_normal
+                surface_line_segment = mean_pos + surface_normal * 1000
+
+                v0_dot = MVector3D.dotProduct(material_normal, mean_line_segment)
+                surface_dot = MVector3D.dotProduct(material_normal, surface_line_segment)
+
+                logger.debug(
+                    f"material_normal[{material_normal.to_log()}], mean_line_segment[{mean_line_segment.to_log()}], surface_line_segment[{surface_line_segment.to_log()}], v0_dot[{round(v0_dot, 3)}], surface_dot[{round(surface_dot, 3)}]"
+                )
+                # (v1・n) * (v2・n) <= 0ならば線分は平面と衝突を起こしている
+                intersect = v0_dot * surface_dot
+
+                # # 面垂線と親ボーンとの交点
+                # intersect_vec, intersect_tt, intersect_uu, intersect_len = calc_intersect(
+                #     mean_pos,
+                #     mean_pos + surface_normal * 1000,
+                #     parent_bone.position + -parent_direction * 1000,
+                #     parent_bone.position + parent_direction * 1000,
+                # )
+                # logger.debug(
+                #     f"tt[{round(intersect_tt, 5)}], uu[{round(intersect_uu, 5)}], len[{round(intersect_len, 5)}], iv[{intersect_vec.to_log()}]"
+                # )
+                # # どちらかが範囲内なら表。両方とも範囲外なら裏
+                # intersect = 0 <= intersect_tt <= 1 or 0 <= intersect_uu <= 1
+
+            # 面法線と同じ向き場合かつ面垂線の向きが軸ベクトルに近くない場合、辺キー生成（表面のみを対象とする）
+            # プリーツは厚みがないとみなす
+            if (intersect > 0 and direction_dot < 0.5) or param_option["special_shape"] == logger.transtext("全て表面"):
+                for vv0_key, vv1_key, vv2_key, vv0 in [
+                    (v0_key, v1_key, v2_key, v0),
+                    (v1_key, v2_key, v0_key, v1),
+                    (v2_key, v0_key, v1_key, v2),
+                ]:
+                    lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
                     if index_idx not in edge_pair_lkeys[lkey]:
@@ -4493,23 +4513,25 @@ class PmxTailorExportService:
                     index_surface_normals[lkey].append(surface_normal)
 
                     # 仮想頂点登録（該当頂点対象）
-                    if v0_key not in virtual_vertices:
-                        virtual_vertices[v0_key] = VirtualVertex(v0_key)
-                    virtual_vertices[v0_key].append([v0], [v1_key, v2_key], [index_idx])
+                    if vv0_key not in virtual_vertices:
+                        virtual_vertices[vv0_key] = VirtualVertex(vv0_key)
+                    virtual_vertices[vv0_key].append([vv0], [vv1_key, vv2_key], [index_idx])
 
                     # 残頂点リストにまずは登録
                     if v0_key not in remaining_vertices:
-                        remaining_vertices[v0_key] = virtual_vertices[v0_key]
+                        remaining_vertices[vv0_key] = virtual_vertices[vv0_key]
 
-                    logger.debug(
-                        f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
-                    )
-                else:
-                    # 裏面に登録
-                    back_vertices.append(v0_idx)
-                    logger.debug(
-                        f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
-                    )
+                logger.debug(
+                    f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], v1[{v1.index}:{v1_key}], v2[{v2.index}:{v2_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
+                )
+            else:
+                # 裏面に登録
+                back_vertices.append(v0_idx)
+                back_vertices.append(v1_idx)
+                back_vertices.append(v2_idx)
+                logger.debug(
+                    f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], v1[{v1.index}:{v1_key}], v2[{v2.index}:{v2_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
+                )
 
             n += 1
 
@@ -4635,148 +4657,183 @@ class PmxTailorExportService:
         # bottomはエッジが分かれてたら分ける
         all_bottom_edge_keys = []
 
-        target_mean = np.mean(mean_poses)
-
-        if len(all_edge_lines) == 2:
-            # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
-            for n, (edge_lines, target_poses, target_dots) in enumerate(
-                zip(all_edge_lines, target_idx_poses, target_diff_dots)
-            ):
-                if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
-                    if np.median(target_poses) >= target_mean:
-                        all_top_edge_keys = edge_lines
-                        all_top_edge_poses = target_poses
-                        all_top_edge_dots = target_dots
-                    if np.median(target_poses) <= target_mean:
-                        all_bottom_edge_keys.append(edge_lines)
-                else:
-                    if np.median(target_poses) >= target_mean:
-                        all_bottom_edge_keys.append(edge_lines)
-                    if np.median(target_poses) <= target_mean:
-                        all_top_edge_keys = edge_lines
-                        all_top_edge_poses = target_poses
-                        all_top_edge_dots = target_dots
-        else:
-            # エッジが2つではない場合、半分で分ける(下右は大きい方、上左は小さい方)
-            for n, (edge_lines, target_poses, target_dots) in enumerate(
-                zip(all_edge_lines, target_idx_poses, target_diff_dots)
-            ):
-                if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
-                    if np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)].shape[0] > 0:
-                        for idx in np.where(np.array(target_poses) > target_mean)[0]:
-                            all_top_edge_keys.append(edge_lines[idx])
-                            all_top_edge_poses.append(target_poses[idx])
-                            all_top_edge_dots.append(target_dots[idx])
-                    if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
-                        target_idxs = np.where(np.array(target_poses) < target_mean)[0]
-                        if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
-                            idxs = [0] + [t[0] for t in np.where(np.diff(target_idxs) > 1)] + [len(target_idxs) - 1]
-                        else:
-                            idxs = [0, len(target_idxs) - 1]
-                        for sidx, eidx in zip(idxs, idxs[1:]):
-                            all_bottom_edge_keys.append([])
-                            for idx in range(sidx, eidx + 1):
-                                all_bottom_edge_keys[-1].append(edge_lines[target_idxs[idx]])
-                else:
-                    if len(np.where(np.array(target_poses) < target_mean)) > 0:
-                        for idx in np.where(np.array(target_poses) < target_mean)[0]:
-                            all_top_edge_keys.append(edge_lines[idx])
-                            all_top_edge_poses.append(target_poses[idx])
-                            all_top_edge_dots.append(target_dots[idx])
-                    if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
-                        target_idxs = np.where(np.array(target_poses) > target_mean)[0]
-                        if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
-                            idxs = [0] + [t[0] for t in np.where(np.diff(target_idxs) > 1)] + [len(target_idxs) - 1]
-                        else:
-                            idxs = [0, len(target_idxs) - 1]
-                        for sidx, eidx in zip(idxs, idxs[1:]):
-                            all_bottom_edge_keys.append([])
-                            for idx in range(sidx, eidx + 1):
-                                all_bottom_edge_keys[-1].append(edge_lines[target_idxs[idx]])
-
-        if not all_top_edge_keys:
-            logger.warning(
-                "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
-                decoration=MLogger.DECORATION_BOX,
-            )
-            return None, None, None, None, None
-
-        if not all_bottom_edge_keys:
-            logger.warning(
-                "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
-                decoration=MLogger.DECORATION_BOX,
-            )
-            return None, None, None, None, None
-
         horizonal_top_edge_keys = []
-        vertical_top_edge_keys = []
 
-        # 移動量の最大の1/2を閾値とする
-        horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
+        # 根元頂点CSVが指定されている場合、対象頂点リスト生成
+        if param_option["top_vertices_csv"]:
+            top_target_vertices = []
+            try:
+                with open(param_option["top_vertices_csv"], encoding="cp932", mode="r") as f:
+                    reader = csv.reader(f)
+                    next(reader)  # ヘッダーを読み飛ばす
+                    for row in reader:
+                        if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
+                            top_target_vertices.append(int(row[1]))
+            except Exception:
+                logger.warning("根元頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                return None, None, None, None, None
 
-        # 内積差の最大の1/2を閾値とする
-        dot_threshold = np.max(np.abs(np.diff(all_top_edge_dots))) / 2
+            # 根元頂点キーリスト生成
+            for vidx in top_target_vertices:
+                v = model.vertex_dict[vidx]
+                horizonal_top_edge_keys.append(v.position.to_key(threshold))
 
-        logger.debug(
-            f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
-        )
-
-        # 変曲点を求める
-        target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_dots)) >= dot_threshold)[0]
-
-        logger.debug(f"target_idx_pose_f_prime_diff: [{np.round(target_idx_pose_f_prime_diff, decimals=3)}]")
-
-        if len(target_idx_pose_f_prime_diff) not in [3, 4]:
-            # 変曲点が一枚物（四角でない）場合、エッジが均一に水平に繋がってるとみなす
-            horizonal_top_edge_keys = all_top_edge_keys
+            if len(all_edge_lines) == 2:
+                # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
+                for edge_lines in all_edge_lines:
+                    if horizonal_top_edge_keys[0] in edge_lines:
+                        # 根元キーが含まれている場合、スルー
+                        continue
+                    else:
+                        # 根元キーがふくまれていない場合、末端扱い
+                        all_bottom_edge_keys.append(edge_lines)
+            else:
+                for edge_lines in all_edge_lines:
+                    all_bottom_edge_keys.append([])
+                    for edge_key in edge_lines:
+                        if edge_key not in horizonal_top_edge_keys:
+                            all_bottom_edge_keys[-1].append(edge_key)
         else:
-            target_idx_pose_indices = [
-                0,
-                target_idx_pose_f_prime_diff[1],
-                target_idx_pose_f_prime_diff[2] + 1,
-                len(all_top_edge_poses),
-            ]
+            target_mean = np.mean(mean_poses)
 
-            # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
-            for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
-                target_all_top_edge_keys = (
-                    all_top_edge_keys[ssi : (esi + 2)] if 0 == ssi else all_top_edge_keys[(ssi + 1) : (esi + 1)]
+            if len(all_edge_lines) == 2:
+                # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
+                for n, (edge_lines, target_poses, target_dots) in enumerate(
+                    zip(all_edge_lines, target_idx_poses, target_diff_dots)
+                ):
+                    if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
+                        if np.median(target_poses) >= target_mean:
+                            all_top_edge_keys = edge_lines
+                            all_top_edge_poses = target_poses
+                            all_top_edge_dots = target_dots
+                        if np.median(target_poses) <= target_mean:
+                            all_bottom_edge_keys.append(edge_lines)
+                    else:
+                        if np.median(target_poses) >= target_mean:
+                            all_bottom_edge_keys.append(edge_lines)
+                        if np.median(target_poses) <= target_mean:
+                            all_top_edge_keys = edge_lines
+                            all_top_edge_poses = target_poses
+                            all_top_edge_dots = target_dots
+            else:
+                # エッジが2つではない場合、半分で分ける(下右は大きい方、上左は小さい方)
+                for n, (edge_lines, target_poses, target_dots) in enumerate(
+                    zip(all_edge_lines, target_idx_poses, target_diff_dots)
+                ):
+                    if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
+                        if np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)].shape[0] > 0:
+                            for idx in np.where(np.array(target_poses) > target_mean)[0]:
+                                all_top_edge_keys.append(edge_lines[idx])
+                                all_top_edge_poses.append(target_poses[idx])
+                                all_top_edge_dots.append(target_dots[idx])
+                        if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
+                            target_idxs = np.where(np.array(target_poses) < target_mean)[0]
+                            if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
+                                idxs = (
+                                    [0] + [t[0] for t in np.where(np.diff(target_idxs) > 1)] + [len(target_idxs) - 1]
+                                )
+                            else:
+                                idxs = [0, len(target_idxs) - 1]
+                            for sidx, eidx in zip(idxs, idxs[1:]):
+                                all_bottom_edge_keys.append([])
+                                for idx in range(sidx, eidx + 1):
+                                    all_bottom_edge_keys[-1].append(edge_lines[target_idxs[idx]])
+                    else:
+                        if len(np.where(np.array(target_poses) < target_mean)) > 0:
+                            for idx in np.where(np.array(target_poses) < target_mean)[0]:
+                                all_top_edge_keys.append(edge_lines[idx])
+                                all_top_edge_poses.append(target_poses[idx])
+                                all_top_edge_dots.append(target_dots[idx])
+                        if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
+                            target_idxs = np.where(np.array(target_poses) > target_mean)[0]
+                            if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
+                                idxs = (
+                                    [0] + [t[0] for t in np.where(np.diff(target_idxs) > 1)] + [len(target_idxs) - 1]
+                                )
+                            else:
+                                idxs = [0, len(target_idxs) - 1]
+                            for sidx, eidx in zip(idxs, idxs[1:]):
+                                all_bottom_edge_keys.append([])
+                                for idx in range(sidx, eidx + 1):
+                                    all_bottom_edge_keys[-1].append(edge_lines[target_idxs[idx]])
+
+            if not all_bottom_edge_keys:
+                logger.warning(
+                    "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                    decoration=MLogger.DECORATION_BOX,
                 )
-                slice_all_top_edge_poses = all_top_edge_poses[ssi : (esi + 1)]
+                return None, None, None, None, None
 
-                if len(slice_all_top_edge_poses) < 2:
-                    # diffが取れないくらい小さいのは無視
-                    logger.debug(
-                        f"SKIP ssi[{ssi}], esi[{esi}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
-                    )
-                    continue
+            if not all_top_edge_keys:
+                logger.warning(
+                    "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                    decoration=MLogger.DECORATION_BOX,
+                )
+                return None, None, None, None, None
 
-                sliced_diff = np.mean(np.abs(np.diff(slice_all_top_edge_poses)))
+            vertical_top_edge_keys = []
 
-                if sliced_diff <= horizonal_threshold:
-                    # 同一方向の傾きに変化が小さければ、水平方向
-                    horizonal_top_edge_keys.extend(target_all_top_edge_keys)
+            # 移動量の最大の1/2を閾値とする
+            horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
 
-                    logger.debug(
-                        f"HOR ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
-                    )
-                else:
-                    # 同一方向の傾きに変化があれば、垂直方向
-                    vertical_top_edge_keys.extend(target_all_top_edge_keys)
+            # 内積差の最大の1/2を閾値とする
+            dot_threshold = np.mean(np.abs(np.diff(all_top_edge_dots)))
 
-                    logger.debug(
-                        f"VER ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
-                    )
-
-        logger.debug(f"horizonal[{horizonal_top_edge_keys}]")
-        logger.debug(f"vertical[{vertical_top_edge_keys}]")
-
-        if not horizonal_top_edge_keys:
-            logger.warning(
-                "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
-                decoration=MLogger.DECORATION_BOX,
+            logger.debug(
+                f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
             )
-            return None, None, None, None, None
+
+            # 変曲点を求める
+            target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_dots)) >= dot_threshold)[0]
+
+            logger.debug(f"target_idx_pose_f_prime_diff: [{np.round(target_idx_pose_f_prime_diff, decimals=3)}]")
+
+            if len(target_idx_pose_f_prime_diff) < 3 or np.isclose(horizonal_threshold, 0, rtol=1e-02, atol=1e-04):
+                # 変曲点が一枚物（四角でない）場合、ほぼ均一である場合、エッジが均一に水平に繋がってるとみなす
+                horizonal_top_edge_keys = all_top_edge_keys
+            else:
+                target_idx_pose_indices = [0] + target_idx_pose_f_prime_diff[1::2].tolist() + [len(all_top_edge_poses)]
+
+                # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
+                for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
+                    target_all_top_edge_keys = (
+                        all_top_edge_keys[ssi : (esi + 2)] if 0 == ssi else all_top_edge_keys[(ssi + 1) : (esi + 1)]
+                    )
+                    slice_all_top_edge_poses = all_top_edge_poses[ssi : (esi + 1)]
+
+                    if len(slice_all_top_edge_poses) < 2:
+                        # diffが取れないくらい小さいのは無視
+                        logger.debug(
+                            f"SKIP ssi[{ssi}], esi[{esi}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+                        )
+                        continue
+
+                    sliced_diff = np.mean(np.abs(np.diff(slice_all_top_edge_poses)))
+
+                    if sliced_diff <= horizonal_threshold:
+                        # 同一方向の傾きに変化が小さければ、水平方向
+                        horizonal_top_edge_keys.extend(target_all_top_edge_keys)
+
+                        logger.debug(
+                            f"HOR ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+                        )
+                    else:
+                        # 同一方向の傾きに変化があれば、垂直方向
+                        vertical_top_edge_keys.extend(target_all_top_edge_keys)
+
+                        logger.debug(
+                            f"VER ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+                        )
+
+            logger.debug(f"horizonal[{horizonal_top_edge_keys}]")
+            logger.debug(f"vertical[{vertical_top_edge_keys}]")
+
+            if not horizonal_top_edge_keys:
+                logger.warning(
+                    "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                    decoration=MLogger.DECORATION_BOX,
+                )
+                return None, None, None, None, None
 
         logger.info(
             "-- %s: 上部エッジ %s",
@@ -5382,7 +5439,7 @@ class PmxTailorExportService:
             vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
             roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
 
-            if yaw_score < 0.5:
+            if direction_dot < 1 and yaw_score < 0.5:
                 # ズレた方向には行かせない
                 scores.append(0)
                 prev_dots.append(0)

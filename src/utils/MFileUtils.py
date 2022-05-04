@@ -31,6 +31,7 @@ def read_history(mydir_path):
         "org_vroid": [],
         "vertices_csv": [],
         "vertices_grad_csv": [],
+        "top_vertices_csv": [],
         "abb_setting": {},
         "max": 50,
     }
