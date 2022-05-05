@@ -4465,10 +4465,10 @@ class PmxTailorExportService:
                 # 水平の場合、軸の向きだけ考える
                 intersect = surface_normal.data()[target_idx]
             else:
-                # ボーンから頂点0への向き（評価軸を殺して垂直にする）を親の面法線とする
+                # ボーンから面中心への向き（評価軸を殺して垂直にする）を親の面法線とする
                 material_normal = (mean_pos - parent_bone.position) * base_reverse_axis
 
-                # 頂点0を面法線方向に伸ばした垂線を線分とみなす
+                # 面中心を面法線方向に伸ばした垂線を線分とみなす
                 mean_line_segment = mean_pos + surface_normal
                 surface_line_segment = mean_pos + surface_normal * 1000
 
