@@ -791,7 +791,8 @@ class PmxTailorExportService:
                     logger.warning("有効な頂点マップが生成できなかった為、処理を終了します", decoration=MLogger.DECORATION_BOX)
                     return False, None, None
 
-                vertex_map_orders = [k for k in np.argsort(-np.array(map_cnt)) if map_cnt[k] > np.max(map_cnt) * 0.5]
+                # ボーンはどのマップにも作成する
+                vertex_map_orders = [k for k in np.argsort(-np.array(map_cnt))]
 
                 (
                     root_bone,
@@ -2995,6 +2996,9 @@ class PmxTailorExportService:
         for base_map_idx, vertex_map in enumerate(vertex_maps):
             logger.info("--【No.%s】ウェイト分布判定", base_map_idx + 1)
 
+            if base_map_idx not in all_regist_bones:
+                continue
+
             regist_bones = all_regist_bones[base_map_idx]
 
             # ウェイト分布
@@ -3483,7 +3487,11 @@ class PmxTailorExportService:
                         prev_vertex_cnt = vertex_cnt // 1000
 
                 v_xidx += 1
-                if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and not np.isnan(vertex_map[v_yidx, 0]).any():
+                if (
+                    not np.isnan(vertex_map[v_yidx, v_xidx]).any()
+                    and not np.isnan(vertex_map[v_yidx, 0]).any()
+                    and vertex_map.shape[1] > 2
+                ):
                     # 輪を描いたのも入れとく(ウェイト対象取得の時に範囲指定入るからここでは強制)
                     if (
                         tuple(vertex_map[v_yidx, 0])
@@ -3604,34 +3612,14 @@ class PmxTailorExportService:
                 for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
                     vertex_map.shape[0] - 1
                 ]:
-                    for v_xidx in range(0, vertex_map.shape[1], param_option["horizonal_bone_density"]):
+                    for v_xidx in list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"])) + [
+                        vertex_map.shape[1] - 1
+                    ]:
                         if (
                             not np.isnan(vertex_map[v_yidx, v_xidx]).any()
                             or not all_bone_connected[base_map_idx][v_yidx, v_xidx]
                         ):
                             regist_bones[v_yidx, v_xidx] = True
-                    if not all_bone_connected[base_map_idx][v_yidx, (v_xidx + 1) :].all():
-                        # 区間終わった後にどこか繋がってない場合、最後に追加する
-                        # 有効な最後のINDEX
-                        for max_v_xidx in reversed(np.unique(np.where(~np.isnan(vertex_map[v_yidx, :]))[0])):
-                            if v_xidx == max_v_xidx:
-                                # 登録済みまで到達したら終了
-                                break
-                            if virtual_vertices[tuple(vertex_map[v_yidx, max_v_xidx])].vidxs():
-                                # 仮想頂点は対象外
-                                regist_bones[v_yidx, max_v_xidx] = True
-                                break
-
-            for v_xidx in range(vertex_map.shape[1]):
-                if not len(np.where(regist_bones[:, v_xidx])[0]):
-                    # 同一列でひとつも登録されてない場合、処理対象外
-                    continue
-                # 同一列でどこか登録対象である場合を必ず登録対象とする
-                min_v_yidx = np.min(np.where(~np.isnan(vertex_map[:, v_xidx]))[0])
-                max_v_yidx = np.max(np.where(~np.isnan(vertex_map[:, v_xidx]))[0])
-                regist_bones[:min_v_yidx, v_xidx] = False
-                regist_bones[max_v_yidx, v_xidx] = True
-                regist_bones[(max_v_yidx + 1) :, v_xidx] = False
 
             for v_yidx in range(vertex_map.shape[0]):
                 for v_xidx in range(vertex_map.shape[1]):
@@ -4287,8 +4275,6 @@ class PmxTailorExportService:
         # 一旦全体の位置を把握
         n = 0
         vertex_positions = {}
-        pair1_vertex_positions = []
-        pair2_vertex_positions = []
         for index_idx in model.material_indices[material_name]:
             for v0_idx, v1_idx in zip(
                 model.indices[index_idx],
@@ -4297,8 +4283,6 @@ class PmxTailorExportService:
                 if v0_idx not in target_vertices or v1_idx not in target_vertices:
                     continue
                 vertex_positions[v0_idx] = model.vertex_dict[v0_idx].position.data()
-                pair1_vertex_positions.append(model.vertex_dict[v0_idx].position.data())
-                pair2_vertex_positions.append(model.vertex_dict[v1_idx].position.data())
 
             n += 1
             if n > 0 and n % 1000 == 0:
@@ -4328,12 +4312,14 @@ class PmxTailorExportService:
         )[0]
         logger.info("%s: 材質頂点の傾き算出: %s", material_name, round(material_direction, 5))
 
-        # 頂点同士の距離
-        v_pair_distances = np.linalg.norm(
-            np.array(pair1_vertex_positions) - np.array(pair2_vertex_positions), ord=2, axis=1
+        # 頂点間の距離
+        # https://blog.shikoan.com/distance-without-for-loop/
+        all_vertex_diffs = np.expand_dims(np.array(list(vertex_positions.values())), axis=1) - np.expand_dims(
+            np.array(list(vertex_positions.values())), axis=0
         )
-        # 面を形成する頂点同士の距離から閾値生成
-        threshold = np.min(v_pair_distances[v_pair_distances > 0]) / 2
+        all_vertex_distances = np.sqrt(np.sum(all_vertex_diffs**2, axis=-1))
+        # 頂点同士の距離から閾値生成
+        threshold = np.min(all_vertex_distances[all_vertex_distances > 0]) * 0.8
 
         logger.info("%s: 材質頂点の閾値算出: %s", material_name, round(threshold, 5))
 
@@ -4609,9 +4595,8 @@ class PmxTailorExportService:
             sign = 1 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")] else -1
 
             # 処理対象頂点の距離の中央値
-            mean_distance = np.mean(
-                np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
-            )
+            mean_distances = np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
+            mean_distance = np.mean(mean_distances)
 
             for n, (edge_lines, edge_poses, target_dots) in enumerate(
                 zip(all_edge_lines, all_edge_poses, target_diff_dots)
@@ -4641,13 +4626,13 @@ class PmxTailorExportService:
                     # bottom はスリットの可能性があるので、中央値でさらに区分けする
                     distance_idxs = np.where(edge_distances * sign > mean_distance * sign)[0]
                     if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
-                        idxs = [0] + [t[0] for t in np.where(np.diff(distance_idxs) > 1)] + [len(distance_idxs) - 1]
+                        idxs = [0] + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)] + [len(distance_idxs) - 1]
                     else:
                         idxs = [0, len(distance_idxs) - 1]
 
-                    for sidx, eidx in zip(idxs, idxs[1:]):
+                    for i, (sidx, eidx) in enumerate(zip(idxs, idxs[1:])):
                         all_bottom_edge_keys.append([])
-                        for idx in range(sidx, eidx + 1):
+                        for idx in range(sidx + (0 if i == 0 else 1), eidx + 1):
                             all_bottom_edge_keys[-1].append(edge_lines[distance_idxs[idx]])
 
             if not all_bottom_edge_keys:
@@ -5027,12 +5012,10 @@ class PmxTailorExportService:
             if not tmp_vertex_map.any():
                 continue
 
-            target_regists = [True for _ in range(tmp_vertex_map.shape[1])]
-
             logger.info("%s: 頂点マップ[%s]: マップ生成", material_name, f"{(bi + 1):03d}")
 
             # XYの最大と最小の抽出
-            xu = np.unique([i for i in range(tmp_vertex_map.shape[1]) if target_regists[i]])
+            xu = np.unique([i for i in range(tmp_vertex_map.shape[1])])
 
             # 存在しない頂点INDEXで二次元配列初期化
             vertex_map = np.full((tmp_vertex_map.shape[0], len(xu), 3), (np.nan, np.nan, np.nan))
@@ -5042,16 +5025,6 @@ class PmxTailorExportService:
             prev_xx = 0
             xx = 0
             for x in range(tmp_vertex_map.shape[1]):
-                if not target_regists[x]:
-                    # 登録対象外の場合、接続仮想頂点リストにだけは追加する
-                    for y, vkey in enumerate(tmp_vertex_map[:, x]):
-                        if np.isnan(vkey).any() or np.isnan(vertex_map[y, prev_xx]).any():
-                            continue
-                        prev_vv = virtual_vertices[tuple(vertex_map[y, prev_xx])]
-                        vv = virtual_vertices[tuple(vkey)]
-                        prev_vv.connected_vvs.extend(vv.connected_vvs)
-                    continue
-
                 for y, vkey in enumerate(tmp_vertex_map[:, x]):
                     if np.isnan(vkey).any():
                         continue
@@ -5068,28 +5041,10 @@ class PmxTailorExportService:
                     vertex_display_map[y, xx] = ":".join([str(v) for v in vv.vidxs()])
                     registed_vertices.append(vkey)
 
-                    if xx > 0 and not target_regists[x - 1]:
-                        # 前のキーが対象外だった場合、前のキーに今のキーの接続情報を追加しておく
-                        if not np.isnan(vertex_map[y, xx - 1]).any():
-                            prev_vv = virtual_vertices[tuple(vertex_map[y, xx - 1])]
-                            prev_vv.connected_vvs.append(vkey)
-                            vv.connected_vvs.append(prev_vv.key)
-
                     prev_xx = xx
 
                 xx += 1
                 logger.debug("-------")
-
-            # 最後のキーの接続情報を有効な最初に追加しておく
-            if not target_regists[0]:
-                # 最初のキーが対象外だった場合、最後のキーの接続情報を最初に追加しておく
-                for y, vkey in enumerate(vertex_map[:, -1]):
-                    if not np.isnan(vertex_map[y, 0]).any() and not np.isnan(vkey).any():
-                        vkey = tuple(vkey)
-                        prev_vv = virtual_vertices[tuple(vertex_map[y, 0])]
-                        prev_vv.connected_vvs.append(vkey)
-                        vv = virtual_vertices[vkey]
-                        vv.connected_vvs.append(prev_vv.key)
 
             if vertex_map.any():
                 target_vertex_maps = []
