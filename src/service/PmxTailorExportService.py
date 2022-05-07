@@ -820,7 +820,14 @@ class PmxTailorExportService:
 
                 # 残ウェイト
                 weighted_vidxs = self.create_remaining_weight(
-                    model, param_option, material_name, virtual_vertices, remaining_vertices, threshold
+                    model,
+                    param_option,
+                    material_name,
+                    virtual_vertices,
+                    vertex_maps,
+                    all_regist_bones,
+                    remaining_vertices,
+                    threshold,
                 )
 
                 # グラデウェイト
@@ -2831,6 +2838,8 @@ class PmxTailorExportService:
         param_option: dict,
         material_name: str,
         virtual_vertices: dict,
+        vertex_maps: dict,
+        all_regist_bones: dict,
         remaining_vertices: dict,
         threshold: float,
     ):
@@ -2851,6 +2860,27 @@ class PmxTailorExportService:
             weighted_poses[vkey] = vv.position().data()
             weighted_vidxs.extend(vv.vidxs())
 
+        # 登録済みのボーンの位置リスト
+        bone_poses = {}
+        for base_map_idx, vertex_map in enumerate(vertex_maps):
+            for v_yidx in range(vertex_map.shape[0]):
+                for v_xidx in range(vertex_map.shape[1]):
+                    if np.isnan(vertex_map[v_yidx, v_xidx]).any():
+                        continue
+
+                    v_key = tuple(vertex_map[v_yidx, v_xidx])
+                    vv = virtual_vertices[v_key]
+
+                    bones = [b for b in vv.map_bones.values() if b]
+                    if bones:
+                        # ボーンが登録されている場合、ボーン位置を保持
+                        bone_poses[bones[0].index] = bones[0].position.data()
+                        continue
+
+                    # ボーンが登録されてない箇所かつまだウェイトが塗られてないのは残頂点に入れる
+                    if v_key not in remaining_vertices and not vv.deform:
+                        remaining_vertices[v_key] = vv
+
         # 裾材質を追加
         if param_option["edge_material_name"] or param_option["edge_extend_material_names"]:
             for mname in [param_option["edge_material_name"]] + param_option["edge_extend_material_names"]:
@@ -2869,136 +2899,69 @@ class PmxTailorExportService:
             if not vv.vidxs():
                 continue
 
-            # ウェイト済み頂点のうち、最も近いのを抽出
-            weighted_diff_distances = np.linalg.norm(
-                np.array(list(weighted_poses.values())) - vv.position().data(), ord=2, axis=1
+            # ボーンの近いのを選択
+            bone_diff_distances = np.linalg.norm(
+                np.array(list(bone_poses.values())) - vv.position().data(), ord=2, axis=1
             )
-            nearest_vkey = list(weighted_poses.keys())[np.argmin(weighted_diff_distances)]
-            nearest_vv = virtual_vertices[nearest_vkey]
-            nearest_deform = nearest_vv.deform
-            # nearest_vv.connected_vvs.extend(vv.vidxs())
 
-            if type(nearest_deform) is Bdef1:
-                logger.debug(
-                    f"remaining1 nearest_vv: {nearest_vv.vidxs()}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
+            # 近いの4つ抽出
+            nearest_bone_indices = np.array(list(bone_poses.keys()))[np.argsort(bone_diff_distances)[:4]]
+            nearest_distances = np.sort(bone_diff_distances)[:4]
+
+            weight_bone1 = model.bones[model.bone_indexes[nearest_bone_indices[0]]]
+            weight_bone2 = model.bones[model.bone_indexes[nearest_bone_indices[1]]]
+            weight_bone3 = model.bones[model.bone_indexes[nearest_bone_indices[2]]]
+            weight_bone4 = model.bones[model.bone_indexes[nearest_bone_indices[3]]]
+
+            bone1_distance = nearest_distances[0]
+            bone2_distance = nearest_distances[1] if nearest_distances[1] > 0.1 else 0
+            bone3_distance = nearest_distances[2] if nearest_distances[2] > 0.1 else 0
+            bone4_distance = nearest_distances[3] if nearest_distances[3] > 0.1 else 0
+            all_distance = bone1_distance + bone2_distance + bone3_distance + bone4_distance
+
+            weight_names = np.array([weight_bone1.name, weight_bone2.name, weight_bone3.name, weight_bone4.name])
+            if all_distance != 0:
+                total_weights = np.array(
+                    [
+                        bone1_distance / all_distance,
+                        bone2_distance / all_distance,
+                        bone3_distance / all_distance,
+                        bone4_distance / all_distance,
+                    ]
+                )
+            else:
+                total_weights = np.array([1, bone2_distance, bone3_distance, bone4_distance])
+                logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", vv.vidxs())
+            weights = total_weights / total_weights.sum(axis=0, keepdims=1)
+            weight_idxs = np.argsort(weights)
+
+            logger.debug(
+                f"remaining4 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
+            )
+
+            if np.count_nonzero(weights) == 1:
+                vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+            elif np.count_nonzero(weights) == 2:
+                vv.deform = Bdef2(
+                    model.bones[weight_names[weight_idxs[-1]]].index,
+                    model.bones[weight_names[weight_idxs[-2]]].index,
+                    weights[weight_idxs[-1]],
+                )
+            else:
+                vv.deform = Bdef4(
+                    model.bones[weight_names[weight_idxs[-1]]].index,
+                    model.bones[weight_names[weight_idxs[-2]]].index,
+                    model.bones[weight_names[weight_idxs[-3]]].index,
+                    model.bones[weight_names[weight_idxs[-4]]].index,
+                    weights[weight_idxs[-1]],
+                    weights[weight_idxs[-2]],
+                    weights[weight_idxs[-3]],
+                    weights[weight_idxs[-4]],
                 )
 
-                for rv in vv.real_vertices:
-                    rv.deform = Bdef1(nearest_deform.index0)
-
-            elif type(nearest_deform) is Bdef2:
-                weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
-                weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
-
-                bone1_distance = vv.position().distanceToPoint(weight_bone1.position)
-                bone2_distance = (
-                    vv.position().distanceToPoint(weight_bone2.position) if nearest_deform.weight0 < 1 else 0
-                )
-
-                weight_names = np.array([weight_bone1.name, weight_bone2.name])
-                if bone1_distance + bone2_distance != 0:
-                    total_weights = np.array(
-                        [
-                            bone1_distance / (bone1_distance + bone2_distance),
-                            bone2_distance / (bone1_distance + bone2_distance),
-                        ]
-                    )
-                else:
-                    total_weights = np.array([1, 0])
-                    logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", vv.vidxs())
-                weights = total_weights / total_weights.sum(axis=0, keepdims=1)
-                weight_idxs = np.argsort(weights)
-
-                logger.debug(
-                    f"remaining2 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
-                )
-
-                if np.count_nonzero(weights) == 1:
-                    vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
-                elif np.count_nonzero(weights) == 2:
-                    vv.deform = Bdef2(
-                        model.bones[weight_names[weight_idxs[-1]]].index,
-                        model.bones[weight_names[weight_idxs[-2]]].index,
-                        weights[weight_idxs[-1]],
-                    )
-                else:
-                    vv.deform = Bdef4(
-                        model.bones[weight_names[weight_idxs[-1]]].index,
-                        model.bones[weight_names[weight_idxs[-2]]].index,
-                        model.bones[weight_names[weight_idxs[-3]]].index,
-                        model.bones[weight_names[weight_idxs[-4]]].index,
-                        weights[weight_idxs[-1]],
-                        weights[weight_idxs[-2]],
-                        weights[weight_idxs[-3]],
-                        weights[weight_idxs[-4]],
-                    )
-
-                for rv in vv.real_vertices:
-                    rv.deform = vv.deform
-
-            elif type(nearest_deform) is Bdef4:
-                weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
-                weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
-                weight_bone3 = model.bones[model.bone_indexes[nearest_deform.index2]]
-                weight_bone4 = model.bones[model.bone_indexes[nearest_deform.index3]]
-
-                bone1_distance = (
-                    vv.position().distanceToPoint(weight_bone1.position) if nearest_deform.weight0 > 0 else 0
-                )
-                bone2_distance = (
-                    vv.position().distanceToPoint(weight_bone2.position) if nearest_deform.weight1 > 0 else 0
-                )
-                bone3_distance = (
-                    vv.position().distanceToPoint(weight_bone3.position) if nearest_deform.weight2 > 0 else 0
-                )
-                bone4_distance = (
-                    vv.position().distanceToPoint(weight_bone4.position) if nearest_deform.weight3 > 0 else 0
-                )
-                all_distance = bone1_distance + bone2_distance + bone3_distance + bone4_distance
-
-                weight_names = np.array([weight_bone1.name, weight_bone2.name, weight_bone3.name, weight_bone4.name])
-                if all_distance != 0:
-                    total_weights = np.array(
-                        [
-                            bone1_distance / all_distance,
-                            bone2_distance / all_distance,
-                            bone3_distance / all_distance,
-                            bone4_distance / all_distance,
-                        ]
-                    )
-                else:
-                    total_weights = np.array([1, bone2_distance, bone3_distance, bone4_distance])
-                    logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", vv.vidxs())
-                weights = total_weights / total_weights.sum(axis=0, keepdims=1)
-                weight_idxs = np.argsort(weights)
-
-                logger.debug(
-                    f"remaining4 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
-                )
-
-                if np.count_nonzero(weights) == 1:
-                    vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
-                elif np.count_nonzero(weights) == 2:
-                    vv.deform = Bdef2(
-                        model.bones[weight_names[weight_idxs[-1]]].index,
-                        model.bones[weight_names[weight_idxs[-2]]].index,
-                        weights[weight_idxs[-1]],
-                    )
-                else:
-                    vv.deform = Bdef4(
-                        model.bones[weight_names[weight_idxs[-1]]].index,
-                        model.bones[weight_names[weight_idxs[-2]]].index,
-                        model.bones[weight_names[weight_idxs[-3]]].index,
-                        model.bones[weight_names[weight_idxs[-4]]].index,
-                        weights[weight_idxs[-1]],
-                        weights[weight_idxs[-2]],
-                        weights[weight_idxs[-3]],
-                        weights[weight_idxs[-4]],
-                    )
-
-                for rv in vv.real_vertices:
-                    weighted_vidxs.append(rv.index)
-                    rv.deform = vv.deform
+            for rv in vv.real_vertices:
+                weighted_vidxs.append(rv.index)
+                rv.deform = vv.deform
 
             vertex_cnt += 1
 
@@ -3016,7 +2979,7 @@ class PmxTailorExportService:
         param_option: dict,
         material_name: str,
         virtual_vertices: dict,
-        vertex_maps: dict,
+        vertex_maps: list,
         all_regist_bones: dict,
         all_bone_vertical_distances: dict,
         all_bone_horizonal_distances: dict,
@@ -3029,19 +2992,17 @@ class PmxTailorExportService:
         # 親ボーン
         parent_bone = model.bones[param_option["parent_bone_name"]]
 
-        for base_map_idx, regist_bones in all_regist_bones.items():
+        for base_map_idx, vertex_map in enumerate(vertex_maps):
             logger.info("--【No.%s】ウェイト分布判定", base_map_idx + 1)
 
-            vertex_map = vertex_maps[base_map_idx]
+            regist_bones = all_regist_bones[base_map_idx]
 
             # ウェイト分布
             prev_weight_cnt = 0
             weight_cnt = 0
 
-            for v_xidx in range(regist_bones.shape[1]):
-                target_v_xidx = v_xidx
-
-                for v_yidx in range(regist_bones.shape[0]):
+            for v_xidx in range(vertex_map.shape[1]):
+                for v_yidx in range(vertex_map.shape[0]):
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any():
                         continue
 
@@ -3062,7 +3023,7 @@ class PmxTailorExportService:
                         max_v_yidx,
                         max_v_xidx,
                     ) = self.get_block_vidxs(
-                        v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
+                        v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx, is_weight=True
                     )
 
                     if regist_bones[v_yidx, v_xidx]:
@@ -3117,6 +3078,8 @@ class PmxTailorExportService:
                                     model.vertices[weight_bone_idx] = []
                                 model.vertices[weight_bone_idx].append(rv)
 
+                        logger.debug(f"BDEF1 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
+
                         # 登録対象の場合、残対象から削除
                         if vkey in remaining_vertices:
                             del remaining_vertices[vkey]
@@ -3161,11 +3124,16 @@ class PmxTailorExportService:
                             .index
                         )
 
-                        vv.deform = Bdef2(
-                            weight_bone_idx_0,
-                            weight_bone_idx_1,
-                            1 - prev_weight,
-                        )
+                        if np.isclose(prev_weight, 0):
+                            vv.deform = Bdef1(weight_bone_idx_0)
+                        elif np.isclose(prev_weight, 1):
+                            vv.deform = Bdef1(weight_bone_idx_1)
+                        else:
+                            vv.deform = Bdef2(
+                                weight_bone_idx_0,
+                                weight_bone_idx_1,
+                                1 - prev_weight,
+                            )
 
                         for rv in vv.real_vertices:
                             rv.deform = vv.deform
@@ -3178,36 +3146,14 @@ class PmxTailorExportService:
                                 model.vertices[weight_bone_idx_1] = []
                             model.vertices[weight_bone_idx_1].append(rv)
 
+                        logger.debug(f"BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
+
                         # 登録対象の場合、残対象から削除
                         if vkey in remaining_vertices:
                             del remaining_vertices[vkey]
 
                     elif np.where(regist_bones[:, v_xidx])[0].shape[0] > 1:
                         # 同じX位置にボーンがある場合、縦のBDEF2登録対象
-                        # if (
-                        #     below_yidx == max_v_yidx
-                        #     and not np.isnan(vertex_map[above_yidx, v_xidx]).any()
-                        #     and virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])].map_bones.get(
-                        #         base_map_idx, None
-                        #     )
-                        # ):
-                        #     weight_bone_idx_0 = (
-                        #         virtual_vertices[tuple(vertex_map[above_yidx, v_xidx])].map_bones[base_map_idx].index
-                        #     )
-
-                        #     vv.deform = Bdef1(weight_bone_idx_0)
-
-                        #     # 末端がある場合、上のボーンでBDEF1
-                        #     for rv in vv.real_vertices:
-                        #         rv.deform = vv.deform
-
-                        #         # 逆登録
-                        #         model.vertices[weight_bone_idx_0].append(rv)
-
-                        #     # 登録対象の場合、残対象から削除
-                        #     if vkey in remaining_vertices:
-                        #         del remaining_vertices[vkey]
-                        # else:
                         if (
                             not all_bone_vertical_distances[base_map_idx].any()
                             or np.isnan(vertex_map[above_yidx, v_xidx]).any()
@@ -3241,11 +3187,16 @@ class PmxTailorExportService:
                             virtual_vertices[tuple(vertex_map[below_yidx, v_xidx])].map_bones[base_map_idx].index
                         )
 
-                        vv.deform = Bdef2(
-                            weight_bone_idx_0,
-                            weight_bone_idx_1,
-                            1 - above_weight,
-                        )
+                        if np.isclose(above_weight, 0):
+                            vv.deform = Bdef1(weight_bone_idx_0)
+                        elif np.isclose(above_weight, 1):
+                            vv.deform = Bdef1(weight_bone_idx_1)
+                        else:
+                            vv.deform = Bdef2(
+                                weight_bone_idx_0,
+                                weight_bone_idx_1,
+                                1 - above_weight,
+                            )
 
                         for rv in vv.real_vertices:
                             rv.deform = vv.deform
@@ -3257,6 +3208,8 @@ class PmxTailorExportService:
                             if weight_bone_idx_1 not in model.vertices:
                                 model.vertices[weight_bone_idx_1] = []
                             model.vertices[weight_bone_idx_1].append(rv)
+
+                        logger.debug(f"BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                         # 登録対象の場合、残対象から削除
                         if vkey in remaining_vertices:
@@ -3351,49 +3304,6 @@ class PmxTailorExportService:
                             )
                         )
 
-                        # if False:
-                        #     prev_above_weight += prev_below_weight
-                        #     next_above_weight += next_below_weight
-
-                        #     # ほぼ0のものは0に置換（円周用）
-                        #     total_weights = np.array([prev_above_weight, next_above_weight])
-                        #     total_weights[np.isclose(total_weights, 0, equal_nan=True)] = 0
-
-                        #     if np.count_nonzero(total_weights):
-                        #         deform_weights = total_weights / total_weights.sum(axis=0, keepdims=1)
-
-                        #         weight_bone_idx_0 = (
-                        #             virtual_vertices[tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])]
-                        #             .map_bones[prev_map_idx]
-                        #             .index
-                        #         )
-                        #         weight_bone_idx_1 = (
-                        #             virtual_vertices[tuple(vertex_maps[next_map_idx][above_yidx, target_next_xidx])]
-                        #             .map_bones[next_map_idx]
-                        #             .index
-                        #         )
-
-                        #         vv.deform = Bdef2(
-                        #             weight_bone_idx_0,
-                        #             weight_bone_idx_1,
-                        #             deform_weights[0],
-                        #         )
-
-                        #         for rv in vv.real_vertices:
-                        #             rv.deform = vv.deform
-
-                        #             # 逆登録
-                        #             if weight_bone_idx_0 not in model.vertices:
-                        #                 model.vertices[weight_bone_idx_0] = []
-                        #             model.vertices[weight_bone_idx_0].append(rv)
-                        #             if weight_bone_idx_1 not in model.vertices:
-                        #                 model.vertices[weight_bone_idx_1] = []
-                        #             model.vertices[weight_bone_idx_1].append(rv)
-
-                        #         # 登録対象の場合、残対象から削除
-                        #         if vkey in remaining_vertices:
-                        #             del remaining_vertices[vkey]
-                        # else:
                         # ほぼ0のものは0に置換（円周用）
                         total_weights = np.array(
                             [prev_above_weight, next_above_weight, prev_below_weight, next_below_weight]
@@ -3451,6 +3361,8 @@ class PmxTailorExportService:
                                 if weight_bone_idx_3 not in model.vertices:
                                     model.vertices[weight_bone_idx_3] = []
                                 model.vertices[weight_bone_idx_3].append(rv)
+
+                            logger.debug(f"BDEF4 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                             # 登録対象の場合、残対象から削除
                             if vkey in remaining_vertices:
@@ -3701,8 +3613,14 @@ class PmxTailorExportService:
                     if not all_bone_connected[base_map_idx][v_yidx, (v_xidx + 1) :].all():
                         # 区間終わった後にどこか繋がってない場合、最後に追加する
                         # 有効な最後のINDEX
-                        max_v_xidx = np.max(np.where(~np.isnan(vertex_map[v_yidx, :]))[0])
-                        regist_bones[v_yidx, max_v_xidx] = True
+                        for max_v_xidx in reversed(np.unique(np.where(~np.isnan(vertex_map[v_yidx, :]))[0])):
+                            if v_xidx == max_v_xidx:
+                                # 登録済みまで到達したら終了
+                                break
+                            if virtual_vertices[tuple(vertex_map[v_yidx, max_v_xidx])].vidxs():
+                                # 仮想頂点は対象外
+                                regist_bones[v_yidx, max_v_xidx] = True
+                                break
 
             for v_xidx in range(vertex_map.shape[1]):
                 if not len(np.where(regist_bones[:, v_xidx])[0]):
@@ -4620,11 +4538,11 @@ class PmxTailorExportService:
 
         logger.info("%s: エッジの抽出", material_name)
 
-        mean_poses = []
-        target_idx_poses = []
+        all_mean_poses = []
+        all_edge_poses = []
         target_diff_dots = []
         for n, edge_lines in enumerate(all_edge_lines):
-            target_idx_poses.append([])
+            all_edge_poses.append([])
             target_diff_dots.append([])
 
             for prev_edge_key, now_edge_key, next_edge_key in zip(
@@ -4640,17 +4558,11 @@ class PmxTailorExportService:
                     )
                 )
 
-                if material_direction == 0:
-                    # 水平の場合
-                    # キーの主に動く方向の位置。Z固定
-                    target_idx_poses[-1].append(now_edge_pos.data()[2])
-                    mean_poses.append(now_edge_pos.data()[2])
-                else:
-                    # キーの主に動く方向の位置。スリットとかは位置が変動する
-                    target_idx_poses[-1].append(now_edge_pos.data()[target_idx])
-                    mean_poses.append(now_edge_pos.data()[target_idx])
+                all_edge_poses[-1].append(now_edge_pos.data())
+                all_mean_poses.append(now_edge_pos.data())
 
         # topは全部並列
+        all_top_edge_distances = []
         all_top_edge_keys = []
         all_top_edge_poses = []
         all_top_edge_dots = []
@@ -4694,68 +4606,49 @@ class PmxTailorExportService:
                         if edge_key not in horizonal_top_edge_keys:
                             all_bottom_edge_keys[-1].append(edge_key)
         else:
-            target_mean = np.mean(mean_poses)
+            sign = 1 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")] else -1
 
-            if len(all_edge_lines) == 2:
-                # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
-                for n, (edge_lines, target_poses, target_dots) in enumerate(
-                    zip(all_edge_lines, target_idx_poses, target_diff_dots)
+            # 処理対象頂点の距離の中央値
+            mean_distance = np.mean(
+                np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
+            )
+
+            for n, (edge_lines, edge_poses, target_dots) in enumerate(
+                zip(all_edge_lines, all_edge_poses, target_diff_dots)
+            ):
+                edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
+                edge_mean_distance = np.mean(edge_distances)
+                if len(all_edge_lines) == 2 and edge_mean_distance * sign < mean_distance * sign:
+                    # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
+                    all_top_edge_keys = edge_lines
+                    all_top_edge_poses = edge_poses
+                    all_top_edge_dots = target_dots
+                    all_top_edge_distances = edge_distances
+
+                if (
+                    len(all_edge_lines) != 2
+                    and np.array(edge_lines)[edge_distances * sign < mean_distance * sign].shape[0] > 0
                 ):
-                    if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
-                        if np.median(target_poses) >= target_mean:
-                            all_top_edge_keys = edge_lines
-                            all_top_edge_poses = target_poses
-                            all_top_edge_dots = target_dots
-                        if np.median(target_poses) <= target_mean:
-                            all_bottom_edge_keys.append(edge_lines)
+                    # 距離が全体の距離より近い場合、上部とみなす
+                    for idx in np.where(edge_distances * sign < mean_distance * sign)[0]:
+                        all_top_edge_keys.append(edge_lines[idx])
+                        all_top_edge_poses.append(edge_poses[idx])
+                        all_top_edge_dots.append(target_dots[idx])
+                        all_top_edge_distances.append(edge_distances[idx])
+
+                if np.array(edge_lines)[edge_distances * sign > mean_distance * sign].shape[0] > 0:
+                    # 距離が全体の距離より遠い場合、下部とみなす
+                    # bottom はスリットの可能性があるので、中央値でさらに区分けする
+                    distance_idxs = np.where(edge_distances * sign > mean_distance * sign)[0]
+                    if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
+                        idxs = [0] + [t[0] for t in np.where(np.diff(distance_idxs) > 1)] + [len(distance_idxs) - 1]
                     else:
-                        if np.median(target_poses) >= target_mean:
-                            all_bottom_edge_keys.append(edge_lines)
-                        if np.median(target_poses) <= target_mean:
-                            all_top_edge_keys = edge_lines
-                            all_top_edge_poses = target_poses
-                            all_top_edge_dots = target_dots
-            else:
-                # エッジが2つではない場合、半分で分ける(下右は大きい方、上左は小さい方)
-                for n, (edge_lines, target_poses, target_dots) in enumerate(
-                    zip(all_edge_lines, target_idx_poses, target_diff_dots)
-                ):
-                    if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")]:
-                        if np.array(edge_lines)[np.where(np.array(target_poses) > target_mean)].shape[0] > 0:
-                            for idx in np.where(np.array(target_poses) > target_mean)[0]:
-                                all_top_edge_keys.append(edge_lines[idx])
-                                all_top_edge_poses.append(target_poses[idx])
-                                all_top_edge_dots.append(target_dots[idx])
-                        if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
-                            target_idxs = np.where(np.array(target_poses) < target_mean)[0]
-                            if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
-                                idxs = (
-                                    [0] + [t[0] for t in np.where(np.diff(target_idxs) > 1)] + [len(target_idxs) - 1]
-                                )
-                            else:
-                                idxs = [0, len(target_idxs) - 1]
-                            for sidx, eidx in zip(idxs, idxs[1:]):
-                                all_bottom_edge_keys.append([])
-                                for idx in range(sidx, eidx + 1):
-                                    all_bottom_edge_keys[-1].append(edge_lines[target_idxs[idx]])
-                    else:
-                        if len(np.where(np.array(target_poses) < target_mean)) > 0:
-                            for idx in np.where(np.array(target_poses) < target_mean)[0]:
-                                all_top_edge_keys.append(edge_lines[idx])
-                                all_top_edge_poses.append(target_poses[idx])
-                                all_top_edge_dots.append(target_dots[idx])
-                        if np.array(edge_lines)[np.where(np.array(target_poses) < target_mean)].shape[0] > 0:
-                            target_idxs = np.where(np.array(target_poses) > target_mean)[0]
-                            if np.where(np.diff(target_idxs) > 1)[0].shape[0] > 0:
-                                idxs = (
-                                    [0] + [t[0] for t in np.where(np.diff(target_idxs) > 1)] + [len(target_idxs) - 1]
-                                )
-                            else:
-                                idxs = [0, len(target_idxs) - 1]
-                            for sidx, eidx in zip(idxs, idxs[1:]):
-                                all_bottom_edge_keys.append([])
-                                for idx in range(sidx, eidx + 1):
-                                    all_bottom_edge_keys[-1].append(edge_lines[target_idxs[idx]])
+                        idxs = [0, len(distance_idxs) - 1]
+
+                    for sidx, eidx in zip(idxs, idxs[1:]):
+                        all_bottom_edge_keys.append([])
+                        for idx in range(sidx, eidx + 1):
+                            all_bottom_edge_keys[-1].append(edge_lines[distance_idxs[idx]])
 
             if not all_bottom_edge_keys:
                 logger.warning(
@@ -4773,11 +4666,21 @@ class PmxTailorExportService:
 
             vertical_top_edge_keys = []
 
-            # 移動量の最大の1/2を閾値とする
-            horizonal_threshold = np.max(np.abs(np.diff(all_top_edge_poses))) / 2
+            # 主に移動する軸（水平：Z、上下：Y、左右：X）
+            move_idx = (
+                2
+                if material_direction == 0
+                else 1
+                if param_option["direction"] in [logger.transtext("下"), logger.transtext("上")]
+                else 0
+            )
+            top_move_values = np.array(all_top_edge_poses)[:, move_idx]
 
-            # 内積差の最大の1/2を閾値とする
-            dot_threshold = np.mean(np.abs(np.diff(all_top_edge_dots)))
+            # の最大の1/2を閾値とする
+            horizonal_threshold = np.max(np.abs(np.diff(top_move_values))) / 2
+
+            # 内積差の最大の1/2を閾値とする(ただし、最下限を設ける)
+            dot_threshold = max(0.2, np.max(np.abs(np.diff(all_top_edge_dots))) / 2)
 
             logger.debug(
                 f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
@@ -4792,23 +4695,25 @@ class PmxTailorExportService:
                 # 変曲点が一枚物（四角でない）場合、ほぼ均一である場合、エッジが均一に水平に繋がってるとみなす
                 horizonal_top_edge_keys = all_top_edge_keys
             else:
-                target_idx_pose_indices = [0] + target_idx_pose_f_prime_diff[1::2].tolist() + [len(all_top_edge_poses)]
+                target_idx_pose_indices = (
+                    [0] + (target_idx_pose_f_prime_diff[::2] + 1).tolist() + [len(top_move_values)]
+                )
 
                 # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
                 for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
                     target_all_top_edge_keys = (
                         all_top_edge_keys[ssi : (esi + 2)] if 0 == ssi else all_top_edge_keys[(ssi + 1) : (esi + 1)]
                     )
-                    slice_all_top_edge_poses = all_top_edge_poses[ssi : (esi + 1)]
+                    slice_top_move_values = top_move_values[ssi : (esi + 1)]
 
-                    if len(slice_all_top_edge_poses) < 2:
+                    if len(slice_top_move_values) < 2:
                         # diffが取れないくらい小さいのは無視
                         logger.debug(
                             f"SKIP ssi[{ssi}], esi[{esi}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
                         )
                         continue
 
-                    sliced_diff = np.mean(np.abs(np.diff(slice_all_top_edge_poses)))
+                    sliced_diff = np.mean(np.abs(np.diff(slice_top_move_values)))
 
                     if sliced_diff <= horizonal_threshold:
                         # 同一方向の傾きに変化が小さければ、水平方向
@@ -5614,6 +5519,7 @@ class PmxTailorExportService:
         all_regist_bones: dict,
         all_bone_connected: dict,
         base_map_idx: int,
+        is_weight=False,
     ):
         regist_bones = all_regist_bones[base_map_idx]
 
@@ -5753,15 +5659,37 @@ class PmxTailorExportService:
 
         above_yidx = 0
         if v_yidx > 0:
-            above_yidx = np.max(np.where(regist_bones[:v_yidx, v_xidx])) if regist_bones[:v_yidx, v_xidx].any() else 0
+            if is_weight:
+                # ウェイトの場合は近所のも参照
+                above_yidx = (
+                    np.max(np.where(regist_bones[:v_yidx, v_xidx]))
+                    if regist_bones[:v_yidx, v_xidx].any()
+                    else np.max(np.where(regist_bones[:v_yidx, :v_xidx])[0])
+                    if np.where(regist_bones[:v_yidx, :v_xidx])[0].any()
+                    else 0
+                )
+            else:
+                above_yidx = (
+                    np.max(np.where(regist_bones[:v_yidx, v_xidx])) if regist_bones[:v_yidx, v_xidx].any() else 0
+                )
 
         below_yidx = regist_bones.shape[0] - 1
         if v_yidx < regist_bones.shape[0] - 1:
-            below_yidx = (
-                np.min(np.where(regist_bones[(v_yidx + 1) :, v_xidx])) + (v_yidx + 1)
-                if regist_bones[(v_yidx + 1) :, v_xidx].any()
-                else v_yidx
-            )
+            if is_weight:
+                # ウェイトの場合は近所のも参照
+                below_yidx = (
+                    np.min(np.where(regist_bones[(v_yidx + 1) :, v_xidx])) + (v_yidx + 1)
+                    if regist_bones[(v_yidx + 1) :, v_xidx].any()
+                    else np.min(np.where(regist_bones[(v_yidx + 1) :, :v_xidx])[0]) + (v_yidx + 1)
+                    if np.where(regist_bones[(v_yidx + 1) :, :v_xidx])[0].any()
+                    else regist_bones.shape[0] - 1
+                )
+            else:
+                below_yidx = (
+                    np.min(np.where(regist_bones[(v_yidx + 1) :, v_xidx])) + (v_yidx + 1)
+                    if regist_bones[(v_yidx + 1) :, v_xidx].any()
+                    else v_yidx
+                )
 
         return (
             prev_map_idx,
