@@ -2378,7 +2378,7 @@ class PmxTailorExportService:
 
                 if rigidbody_shape_type == 0:
                     # 球剛体の場合
-                    ball_size = np.mean([x_size, y_size]) * 0.5
+                    ball_size = max(0.25, np.mean([x_size, y_size]) * 0.5)
                     shape_size = MVector3D(ball_size, ball_size, ball_size)
 
                 elif rigidbody_shape_type == 1:
@@ -2392,7 +2392,7 @@ class PmxTailorExportService:
                             if prev_connected or next_connected
                             else 1
                         ),
-                        y_size * (0.5 if v_yidx < max_v_yidx else 0.7),
+                        max(0.25, y_size * (0.5 if v_yidx < max_v_yidx else 0.7)),
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
@@ -2400,7 +2400,7 @@ class PmxTailorExportService:
                     # カプセル剛体の場合
                     shape_size = MVector3D(
                         x_size * 0.45,
-                        y_size * 0.85,
+                        max(0.25, y_size * 0.85),
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
@@ -3749,9 +3749,8 @@ class PmxTailorExportService:
                     for v_xidx in list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"])) + [
                         vertex_map.shape[1] - 1
                     ]:
-                        if (
-                            not np.isnan(vertex_map[v_yidx, v_xidx]).any()
-                            or not all_bone_connected[base_map_idx][v_yidx, v_xidx]
+                        if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and (
+                            v_xidx < vertex_map.shape[1] - 1 or not all_bone_connected[base_map_idx][v_yidx, v_xidx]
                         ):
                             regist_bones[v_yidx, v_xidx] = True
 
@@ -4655,6 +4654,10 @@ class PmxTailorExportService:
                     [f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines],
                 )
                 all_edge_lines.append(edge_lines)
+        
+        if len(all_edge_lines) == 1 and not param_option["top_vertices_csv"]:
+            logger.warning("エッジが一本かつ根元頂点CSVが指定されていません。\nマントやコートの裾などの一枚物の場合、根元頂点CSVを指定してください。", decoration=MLogger.DECORATION_BOX)
+            return None, None, None, None, None
 
         logger.info("%s: エッジの抽出", material_name)
 
@@ -4686,10 +4689,14 @@ class PmxTailorExportService:
         all_top_edge_keys = []
         all_top_edge_poses = []
         all_top_edge_dots = []
-        # bottomはエッジが分かれてたら分ける
-        all_bottom_edge_keys = []
 
         horizonal_top_edge_keys = []
+
+        sign = 1 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")] else -1
+
+        # 処理対象頂点の距離の中央値
+        mean_distances = np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
+        mean_distance = np.mean(mean_distances)
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
@@ -4710,28 +4717,7 @@ class PmxTailorExportService:
                 v = model.vertex_dict[vidx]
                 horizonal_top_edge_keys.append(v.position.to_key(threshold))
 
-            if len(all_edge_lines) == 2:
-                # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
-                for edge_lines in all_edge_lines:
-                    if horizonal_top_edge_keys[0] in edge_lines:
-                        # 根元キーが含まれている場合、スルー
-                        continue
-                    else:
-                        # 根元キーがふくまれていない場合、末端扱い
-                        all_bottom_edge_keys.append(edge_lines)
-            else:
-                for edge_lines in all_edge_lines:
-                    all_bottom_edge_keys.append([])
-                    for edge_key in edge_lines:
-                        if edge_key not in horizonal_top_edge_keys:
-                            all_bottom_edge_keys[-1].append(edge_key)
         else:
-            sign = 1 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")] else -1
-
-            # 処理対象頂点の距離の中央値
-            mean_distances = np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
-            mean_distance = np.mean(mean_distances)
-
             for n, (edge_lines, edge_poses, target_dots) in enumerate(
                 zip(all_edge_lines, all_edge_poses, target_diff_dots)
             ):
@@ -4754,31 +4740,6 @@ class PmxTailorExportService:
                         all_top_edge_poses.append(edge_poses[idx])
                         all_top_edge_dots.append(target_dots[idx])
                         all_top_edge_distances.append(edge_distances[idx])
-
-                if np.array(edge_lines)[edge_distances * sign > mean_distance * sign].shape[0] > 0:
-                    # 距離が全体の距離より遠い場合、下部とみなす
-                    # bottom はスリットの可能性があるので、中央値でさらに区分けする
-                    distance_idxs = np.where(edge_distances * sign > mean_distance * sign)[0]
-                    if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
-                        idxs = (
-                            [0]
-                            + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)]
-                            + [len(distance_idxs) - 1]
-                        )
-                    else:
-                        idxs = [0, len(distance_idxs) - 1]
-
-                    for i, (sidx, eidx) in enumerate(zip(idxs, idxs[1:])):
-                        all_bottom_edge_keys.append([])
-                        for idx in range(sidx + (0 if i == 0 else 1), eidx + 1):
-                            all_bottom_edge_keys[-1].append(edge_lines[distance_idxs[idx]])
-
-            if not all_bottom_edge_keys:
-                logger.warning(
-                    "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
-                    decoration=MLogger.DECORATION_BOX,
-                )
-                return None, None, None, None, None
 
             if not all_top_edge_keys:
                 logger.warning(
@@ -4868,6 +4829,38 @@ class PmxTailorExportService:
             material_name,
             [(ek, virtual_vertices[ek].vidxs()) for ek in horizonal_top_edge_keys],
         )
+
+        # bottomはエッジが分かれてたら分ける
+        all_bottom_edge_keys = []
+
+        for n, (edge_lines, edge_poses, target_dots) in enumerate(
+            zip(all_edge_lines, all_edge_poses, target_diff_dots)
+        ):
+            edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
+            edge_mean_distance = np.mean(edge_distances)
+
+            if np.array(edge_lines)[edge_distances * sign > mean_distance * sign].shape[0] > 0:
+                # 距離が全体の距離より遠い場合、下部とみなす
+                # bottom はスリットの可能性があるので、中央値でさらに区分けする
+                distance_idxs = np.where(edge_distances * sign > mean_distance * sign)[0]
+                if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
+                    idxs = (
+                        [0] + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)] + [len(distance_idxs) - 1]
+                    )
+                else:
+                    idxs = [0, len(distance_idxs) - 1]
+
+                for i, (sidx, eidx) in enumerate(zip(idxs, idxs[1:])):
+                    all_bottom_edge_keys.append([])
+                    for idx in range(sidx + (0 if i == 0 else 1), eidx + 1):
+                        all_bottom_edge_keys[-1].append(edge_lines[distance_idxs[idx]])
+
+        if not all_bottom_edge_keys:
+            logger.warning(
+                "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                decoration=MLogger.DECORATION_BOX,
+            )
+            return None, None, None, None, None
 
         for ei, eks in enumerate(all_bottom_edge_keys):
             logger.info(

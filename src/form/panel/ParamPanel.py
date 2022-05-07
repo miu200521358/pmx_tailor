@@ -759,29 +759,6 @@ class PhysicsParam:
         self.vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
         self.simple_param_sizer.Add(self.vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
 
-        # 物理グラデCSVファイルコントロール
-        self.vertices_grad_csv_file_ctrl = HistoryFilePickerCtrl(
-            self.main_frame,
-            self.simple_window,
-            logger.transtext("物理グラデーション対象頂点CSV"),
-            logger.transtext("物理グラデーション対象頂点CSVファイルを開く"),
-            ("csv"),
-            wx.FLP_DEFAULT_STYLE,
-            logger.transtext(
-                "物理対象頂点CSVを指定しており、かつ物理そのものは設定しないがウェイトを物理ボーンで塗り直したい頂点がある場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
-            ),
-            file_model_spacer=0,
-            title_parts_ctrl=None,
-            title_parts2_ctrl=None,
-            file_histories_key="vertices_grad_csv",
-            is_change_output=False,
-            is_aster=False,
-            is_save=False,
-            set_no=0,
-        )
-        self.vertices_grad_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
-        self.simple_param_sizer.Add(self.vertices_grad_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
-
         # 根元頂点CSVファイルコントロール
         self.top_vertices_csv_file_ctrl = HistoryFilePickerCtrl(
             self.main_frame,
@@ -804,6 +781,29 @@ class PhysicsParam:
         )
         self.top_vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
         self.simple_param_sizer.Add(self.top_vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
+
+        # 物理グラデCSVファイルコントロール
+        self.vertices_grad_csv_file_ctrl = HistoryFilePickerCtrl(
+            self.main_frame,
+            self.simple_window,
+            logger.transtext("物理グラデーション対象頂点CSV"),
+            logger.transtext("物理グラデーション対象頂点CSVファイルを開く"),
+            ("csv"),
+            wx.FLP_DEFAULT_STYLE,
+            logger.transtext(
+                "物理対象頂点CSVを指定しており、かつ物理そのものは設定しないがウェイトを物理ボーンで塗り直したい頂点がある場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+            ),
+            file_model_spacer=0,
+            title_parts_ctrl=None,
+            title_parts2_ctrl=None,
+            file_histories_key="vertices_grad_csv",
+            is_change_output=False,
+            is_aster=False,
+            is_save=False,
+            set_no=0,
+        )
+        self.vertices_grad_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.vertices_grad_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
 
         self.simple_sizer.Add(self.simple_param_sizer, 1, wx.ALL | wx.EXPAND, 5)
 
