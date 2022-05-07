@@ -2810,8 +2810,9 @@ class PmxTailorExportService:
         weight_cnt = 0
         prev_weight_cnt = 0
 
+        # 塗り終わった頂点と処理対象材質頂点の論理和頂点リストを対象とする
         front_vertices = {}
-        for vidx in weighted_vidxs:
+        for vidx in list(set(weighted_vidxs) | (set(model.material_vertices[material_name]) - set(back_vertices))):
             v = model.vertex_dict[vidx]
             front_vertices[v.index] = v.position.data()
 
@@ -4654,9 +4655,17 @@ class PmxTailorExportService:
                     [f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines],
                 )
                 all_edge_lines.append(edge_lines)
-        
+
+        if not all_edge_lines:
+            logger.warning(
+                "エッジが検出できなかったため、処理を中断します。\n裏面のある材質で「すべて表面」を選択してないか、確認してください。", decoration=MLogger.DECORATION_BOX
+            )
+            return None, None, None, None, None
+
         if len(all_edge_lines) == 1 and not param_option["top_vertices_csv"]:
-            logger.warning("エッジが一本かつ根元頂点CSVが指定されていません。\nマントやコートの裾などの一枚物の場合、根元頂点CSVを指定してください。", decoration=MLogger.DECORATION_BOX)
+            logger.warning(
+                "エッジが一本かつ根元頂点CSVが指定されていません。\nマントやコートの裾などの一枚物の場合、根元頂点CSVを指定してください。", decoration=MLogger.DECORATION_BOX
+            )
             return None, None, None, None, None
 
         logger.info("%s: エッジの抽出", material_name)
@@ -4715,8 +4724,14 @@ class PmxTailorExportService:
             # 根元頂点キーリスト生成
             for vidx in top_target_vertices:
                 v = model.vertex_dict[vidx]
-                horizonal_top_edge_keys.append(v.position.to_key(threshold))
 
+                # 仮想頂点登録（該当頂点対象）
+                vkey = v.position.to_key(threshold)
+                if vkey not in virtual_vertices:
+                    virtual_vertices[vkey] = VirtualVertex(vkey)
+                virtual_vertices[vkey].append([v], [], [])
+
+                horizonal_top_edge_keys.append(vkey)
         else:
             for n, (edge_lines, edge_poses, target_dots) in enumerate(
                 zip(all_edge_lines, all_edge_poses, target_diff_dots)
