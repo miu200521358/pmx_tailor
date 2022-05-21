@@ -605,7 +605,7 @@ class PmxTailorExportService:
             logger.warning(
                 "存在しない物理親が指定されているため、処理を終了します 対象物理設定: %s, 物理親INDEX: %s",
                 abb_name,
-                physics_parent_idx,
+                (physics_parent_idx + 1),
                 decoration=MLogger.DECORATION_BOX,
             )
             return False
@@ -618,10 +618,11 @@ class PmxTailorExportService:
 
         logger.info("-- 【%s:%s】親物理末端ボーン位置取得", material_name, abb_name)
 
-        # 親物理の最後のボーン位置一覧を取得
+        # 親物理のボーン位置一覧を取得（特に上限は設けない）
         parent_bottom_bone_poses = {}
         for midx, vertex_map in enumerate(parent_vertex_maps):
-            for vkey in vertex_map[-1, :]:
+            for v_yidx, v_xidx in zip(np.where(vertex_map)[0], np.where(vertex_map)[1]):
+                vkey = tuple(vertex_map[v_yidx, v_xidx])
                 if np.isnan(vkey).any() or tuple(vkey) not in parent_virtual_vertices:
                     continue
 
@@ -678,12 +679,32 @@ class PmxTailorExportService:
                     (np.array(list(parent_bottom_bone_poses.values())) - bone.position.data()), ord=2, axis=1
                 )
 
-                # 最も近い親ボーンINDEX
-                nearest_parent_bone_vkey = list(parent_bottom_bone_poses.keys())[np.argmin(parent_distances)]
+                nearest_parent_bone = None
+                nearest_parent_rigidbody = None
+                for distance_idx in np.argsort(parent_distances):
+                    # 最も近い親ボーンINDEX
+                    nearest_parent_bone_vkey = list(parent_bottom_bone_poses.keys())[distance_idx]
 
-                nearest_parent_vv = parent_virtual_vertices[nearest_parent_bone_vkey]
-                nearest_parent_bone = [b for b in nearest_parent_vv.map_bones.values() if b][0]
-                nearest_parent_rigidbody = [r for r in nearest_parent_vv.map_rigidbodies.values() if r][0]
+                    nearest_parent_vv = parent_virtual_vertices[nearest_parent_bone_vkey]
+                    if not (
+                        [b for b in nearest_parent_vv.map_bones.values() if b]
+                        and [r for r in nearest_parent_vv.map_rigidbodies.values() if r]
+                    ):
+                        # ボーンか剛体がない場合、スルー
+                        continue
+
+                    nearest_parent_bone = [b for b in nearest_parent_vv.map_bones.values() if b][0]
+                    nearest_parent_rigidbody = [r for r in nearest_parent_vv.map_rigidbodies.values() if r][0]
+                    break
+
+                if not (nearest_parent_bone and nearest_parent_rigidbody):
+                    logger.warning(
+                        "物理親に相当するボーンもしくは剛体が検出できなかったため、処理を終了します 対象物理設定: %s, 物理親INDEX: %s",
+                        abb_name,
+                        (physics_parent_idx + 1),
+                        decoration=MLogger.DECORATION_BOX,
+                    )
+                    return False
 
                 # 処理対象ボーンの親ボーンに最近親ボーンを設定
                 bone.parent_index = nearest_parent_bone.index
@@ -766,7 +787,7 @@ class PmxTailorExportService:
         else:
             if param_option["exist_physics_clear"] == logger.transtext("再利用"):
                 virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone = self.create_bone_map(
-                    model, param_option, material_name, target_vertices
+                    model, param_option, material_name, target_vertices, is_root_bone=False
                 )
             else:
                 vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold = self.create_vertex_map(
@@ -2185,7 +2206,7 @@ class PmxTailorExportService:
                     continue
                 top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
 
-        if param_option["parent_type"] == logger.transtext("中心"):
+        if param_option["exist_physics_clear"] != logger.transtext("再利用") and param_option["parent_type"] == logger.transtext("中心"):
             root_rigidbody = self.get_rigidbody(model, root_bone.name)
             if not root_rigidbody:
                 # 中心剛体を接触なしボーン追従剛体で生成
@@ -4279,7 +4300,7 @@ class PmxTailorExportService:
                         virtual_vertices[nearest_v_key] = VirtualVertex(nearest_v_key)
 
                     virtual_vertices[nearest_v_key].positions.append(nearest_pos.data())
-                    virtual_vertices[nearest_v_key].map_bones[grid_col] = bone
+                    virtual_vertices[nearest_v_key].map_bones[0] = bone
                     vertex_map[grid_row, grid_col] = nearest_v_key
 
                     logger.info("-- 仮想ボーン: %s: 終了", bone.name)
@@ -4295,8 +4316,8 @@ class PmxTailorExportService:
                         vv1 = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])]
                         vv2 = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx + 1])]
 
-                        vv1_bone_index = vv1.map_bones[0].index
-                        vv2_bone_index = vv2.map_bones[0].index
+                        vv1_bone_index = vv1.map_bones[0].index if 0 in vv1.map_bones else -1
+                        vv2_bone_index = vv2.map_bones[0].index if 0 in vv2.map_bones else -1
 
                         key = (min(vv1_bone_index, vv2_bone_index), max(vv1_bone_index, vv2_bone_index))
                         if key in weighted_bone_pairs:
@@ -4309,8 +4330,8 @@ class PmxTailorExportService:
                     vv1 = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])]
                     vv2 = virtual_vertices[tuple(vertex_map[v_yidx, 0])]
 
-                    vv1_bone_index = vv1.map_bones[0].index
-                    vv2_bone_index = vv2.map_bones[0].index
+                    vv1_bone_index = vv1.map_bones[0].index if 0 in vv1.map_bones else -1
+                    vv2_bone_index = vv2.map_bones[0].index if 0 in vv2.map_bones else -1
 
                     key = (min(vv1_bone_index, vv2_bone_index), max(vv1_bone_index, vv2_bone_index))
                     if key in weighted_bone_pairs:

@@ -133,6 +133,14 @@ class ParamPanel(BasePanel):
             if choiceDialog.ShowModal() == wx.ID_CANCEL:
                 return  # the user changed their mind
 
+            if not choiceDialog.GetSelections():
+                dialog = wx.MessageDialog(
+                    self.frame, logger.transtext("設定のチェックボックスが1件も選択されなかった為、登録処理をスキップします。"), style=wx.OK
+                )
+                dialog.ShowModal()
+                dialog.Destroy()
+                return
+
             ng_setting_names = []
             last_pidx = -1
             for cidx in choiceDialog.GetSelections():
@@ -4137,6 +4145,12 @@ class PhysicsParam:
         self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
 
+        self.advance_vertical_joint_valid_check.SetValue(1)
+        self.advance_horizonal_joint_valid_check.SetValue(0)
+        self.advance_diagonal_joint_valid_check.SetValue(0)
+        self.advance_vertical_reverse_joint_valid_check.SetValue(0)
+        self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
+
         if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
@@ -4162,40 +4176,28 @@ class PhysicsParam:
             self.simple_air_resistance_slider.SetValue(1.7)
             self.simple_shape_maintenance_slider.SetValue(2.2)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
-            self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(シルク)"):
             self.simple_mass_slider.SetValue(0.8)
             self.simple_air_resistance_slider.SetValue(1.2)
             self.simple_shape_maintenance_slider.SetValue(1.7)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
-            self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ベルベッド)"):
             self.simple_mass_slider.SetValue(3.0)
             self.simple_air_resistance_slider.SetValue(1.4)
             self.simple_shape_maintenance_slider.SetValue(1.9)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(レザー)"):
             self.simple_mass_slider.SetValue(3.2)
             self.simple_air_resistance_slider.SetValue(2.2)
             self.simple_shape_maintenance_slider.SetValue(3.8)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
             self.advance_vertical_reverse_joint_valid_check.SetValue(1)
@@ -4206,7 +4208,6 @@ class PhysicsParam:
             self.simple_air_resistance_slider.SetValue(3.3)
             self.simple_shape_maintenance_slider.SetValue(2.3)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
             self.advance_vertical_reverse_joint_valid_check.SetValue(1)
@@ -4217,44 +4218,20 @@ class PhysicsParam:
             self.simple_air_resistance_slider.SetValue(2.5)
             self.simple_shape_maintenance_slider.SetValue(2.8)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
-            self.advance_horizonal_joint_valid_check.SetValue(0)
-            self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
-
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
-            self.simple_mass_slider.SetValue(1.5)
-            self.simple_air_resistance_slider.SetValue(3.7)
-            self.simple_shape_maintenance_slider.SetValue(4.3)
-
-            self.advance_vertical_joint_valid_check.SetValue(1)
-            self.advance_horizonal_joint_valid_check.SetValue(0)
-            self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
+            self.simple_mass_slider.SetValue(1.8)
+            self.simple_air_resistance_slider.SetValue(2.7)
+            self.simple_shape_maintenance_slider.SetValue(3.6)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
-            self.simple_mass_slider.SetValue(1.8)
-            self.simple_air_resistance_slider.SetValue(2.8)
-            self.simple_shape_maintenance_slider.SetValue(3.2)
-
-            self.advance_vertical_joint_valid_check.SetValue(1)
-            self.advance_horizonal_joint_valid_check.SetValue(0)
-            self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
+            self.simple_mass_slider.SetValue(2.3)
+            self.simple_air_resistance_slider.SetValue(1.8)
+            self.simple_shape_maintenance_slider.SetValue(2.5)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
-            self.simple_mass_slider.SetValue(0.8)
+            self.simple_mass_slider.SetValue(1)
             self.simple_air_resistance_slider.SetValue(2.7)
-            self.simple_shape_maintenance_slider.SetValue(3.0)
-
-            self.advance_vertical_joint_valid_check.SetValue(1)
-            self.advance_horizonal_joint_valid_check.SetValue(0)
-            self.advance_diagonal_joint_valid_check.SetValue(0)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
+            self.simple_shape_maintenance_slider.SetValue(3.8)
 
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
@@ -4263,26 +4240,22 @@ class PhysicsParam:
             self.simple_air_resistance_slider.SetValue(4.3)
             self.simple_shape_maintenance_slider.SetValue(3.7)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
             self.simple_mass_slider.SetValue(6.2)
             self.simple_air_resistance_slider.SetValue(3.3)
             self.simple_shape_maintenance_slider.SetValue(3.0)
 
-            self.advance_vertical_joint_valid_check.SetValue(1)
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(0)
-            self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
         self.set_mass(event)
         self.set_air_resistance(event)
         self.set_shape_maintenance(event)
+        self.on_vertical_joint(event)
+        self.on_horizonal_joint(event)
         self.on_diagonal_joint(event)
         self.on_vertical_reverse_joint(event)
         self.on_horizonal_reverse_joint(event)
@@ -4460,13 +4433,6 @@ class PhysicsParam:
             horizonal_spring_rot = max(0, min(180, base_horizonal_ratio * 180))
             horizonal_spring_y_rot = max(0, min(89, base_horizonal_ratio * 89))
 
-            if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
-                # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を大きくしておく
-                horizonal_joint_rot /= 1.2
-                horizonal_joint_y_rot /= 1.2
-                horizonal_spring_rot *= 1.2
-                horizonal_spring_y_rot *= 1.2
-
             self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot)
             self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot)
             self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_y_rot)
@@ -4487,13 +4453,6 @@ class PhysicsParam:
 
             diagonal_spring_rot = max(0, min(180, base_diagonal_ratio * 180))
             diagonal_spring_y_rot = max(0, min(89, base_diagonal_ratio * 89))
-
-            if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
-                # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を大きくしておく
-                diagonal_joint_rot /= 1.2
-                diagonal_joint_y_rot /= 1.2
-                diagonal_spring_rot *= 1.2
-                diagonal_spring_y_rot *= 1.2
 
             self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
             self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
@@ -4548,7 +4507,11 @@ class PhysicsParam:
                     self.advance_diagonal_joint_valid_check.SetValue(1)
             # 一度張ったらチェックは自動で外さない
 
-            if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.8:
+            if (
+                self.physics_type_ctrl.GetStringSelection() == logger.transtext("布")
+                and self.simple_shape_maintenance_slider.GetValue()
+                > self.simple_shape_maintenance_slider.GetMax() * 0.8
+            ):
                 # 一定以上の維持感であれば逆も張る
                 self.advance_vertical_reverse_joint_valid_check.SetValue(1)
                 self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
