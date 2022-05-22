@@ -1136,7 +1136,7 @@ class PhysicsParam:
         self.advance_vertical_joint_head_sizer.Add(self.advance_vertical_joint_coefficient_txt, 0, wx.ALL, 5)
 
         self.advance_vertical_joint_coefficient_spin = wx.SpinCtrlDouble(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.8", min=1, max=10, initial=1, inc=0.1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="2.8", min=1, max=50, initial=1, inc=0.1
         )
         self.advance_vertical_joint_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
@@ -1461,7 +1461,7 @@ class PhysicsParam:
         self.advance_horizonal_joint_head_sizer.Add(self.advance_horizonal_joint_coefficient_txt, 0, wx.ALL, 5)
 
         self.advance_horizonal_joint_coefficient_spin = wx.SpinCtrlDouble(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="4.2", min=1, max=10, initial=4.2, inc=0.1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="4.2", min=1, max=50, initial=4.2, inc=0.1
         )
         self.advance_horizonal_joint_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
@@ -1792,7 +1792,7 @@ class PhysicsParam:
         self.advance_diagonal_joint_head_sizer.Add(self.advance_diagonal_joint_coefficient_txt, 0, wx.ALL, 5)
 
         self.advance_diagonal_joint_coefficient_spin = wx.SpinCtrlDouble(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=50, initial=1, inc=0.1
         )
         self.advance_diagonal_joint_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
@@ -2123,7 +2123,7 @@ class PhysicsParam:
         )
 
         self.advance_vertical_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=50, initial=1, inc=0.1
         )
         self.advance_vertical_reverse_joint_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
@@ -2458,7 +2458,7 @@ class PhysicsParam:
         )
 
         self.advance_horizonal_reverse_joint_coefficient_spin = wx.SpinCtrlDouble(
-            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=10, initial=1, inc=0.1
+            self.advance_window, id=wx.ID_ANY, size=wx.Size(90, -1), value="1", min=1, max=50, initial=1, inc=0.1
         )
         self.advance_horizonal_reverse_joint_coefficient_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.main_frame.on_wheel_spin_ctrl(event, 0.1)
@@ -4093,6 +4093,12 @@ class PhysicsParam:
                     self.bone_grid.GetTable().SetValue(r, event.GetCol(), bone_names[bi])
 
             self.bone_grid.ForceRefresh()
+        else:
+            # 空欄が設定された場合、下も全部空欄
+            for r in range(event.GetRow() + 1, self.bone_grid.GetNumberRows()):
+                self.bone_grid.GetTable().SetValue(r, event.GetCol(), "")
+
+            self.bone_grid.ForceRefresh()
 
     def get_bone_grid(self):
         bone_grid = {}
@@ -4217,16 +4223,19 @@ class PhysicsParam:
             self.simple_mass_slider.SetValue(2.3)
             self.simple_air_resistance_slider.SetValue(2.5)
             self.simple_shape_maintenance_slider.SetValue(2.8)
+            self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
             self.simple_mass_slider.SetValue(1.8)
             self.simple_air_resistance_slider.SetValue(2.7)
             self.simple_shape_maintenance_slider.SetValue(3.6)
+            self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
             self.simple_mass_slider.SetValue(2.3)
             self.simple_air_resistance_slider.SetValue(1.8)
             self.simple_shape_maintenance_slider.SetValue(2.5)
+            self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
             self.simple_mass_slider.SetValue(1)
@@ -4234,6 +4243,7 @@ class PhysicsParam:
             self.simple_shape_maintenance_slider.SetValue(3.8)
 
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
+            self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(小)"):
             self.simple_mass_slider.SetValue(5.4)
