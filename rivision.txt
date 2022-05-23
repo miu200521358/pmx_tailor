@@ -556,6 +556,23 @@ PmxTailor_2.00.00_β46 (2022/05/23) miumiu
 ・ジョイント位置をボーン位置に設置
 ※末端の変形がちょっと汚い（剛体が安定しない？）ので、要調整
 
+https://fire.st/RyVCbUn
+PmxTailor_2.00.00_β47 (2022/05/23) miumiu
+・剛体の向き、ジョイントの向きを調整
+
+https://fire.st/iu8ztzt
+PmxTailor_2.00.00_β48 (2022/05/23) miumiu
+・末端剛体の大きさを上のと合わせる
+
+https://fire.st/egX38j8
+PmxTailor_2.00.00_β49 (2022/05/23) miumiu
+・減衰の効き方を逆に
+
+
+
+
+
+
 
 
 よし、VRoid Studioで揺れ物設定できない袖やコートの裾なんかも、PmxTailorで物理設定できるようになりました。
@@ -566,7 +583,8 @@ https://com.nicovideo.jp/community/co5387214
 
 
 
-
+減衰の効きが逆（先端ほど値が大きくなる）
+0.999 - 
 
 
 
