@@ -1032,26 +1032,6 @@ class PmxTailorExportService:
                 param_option["horizonal_reverse_joint"], vv_keys, param_option["horizonal_reverse_joint_coefficient"]
             )
 
-            # 末端ジョイント情報
-            end_limit_min_mov_xs = np.zeros(len(horizonal_limit_min_mov_xs))
-            end_limit_min_mov_ys = np.zeros(len(horizonal_limit_min_mov_ys))
-            end_limit_min_mov_zs = np.zeros(len(horizonal_limit_min_mov_zs))
-            end_limit_min_rot_xs = np.full(len(horizonal_limit_min_rot_xs), 1)
-            end_limit_min_rot_ys = np.full(len(horizonal_limit_min_rot_ys), 1)
-            end_limit_min_rot_zs = np.full(len(horizonal_limit_min_rot_zs), 1)
-            end_limit_max_mov_xs = np.zeros(len(horizonal_limit_max_mov_xs))
-            end_limit_max_mov_ys = np.zeros(len(horizonal_limit_max_mov_ys))
-            end_limit_max_mov_zs = np.zeros(len(horizonal_limit_max_mov_zs))
-            end_limit_max_rot_xs = np.zeros(len(horizonal_limit_max_rot_xs))
-            end_limit_max_rot_ys = np.zeros(len(horizonal_limit_max_rot_ys))
-            end_limit_max_rot_zs = np.zeros(len(horizonal_limit_max_rot_zs))
-            end_spring_constant_mov_xs = np.zeros(len(horizonal_spring_constant_mov_xs))
-            end_spring_constant_mov_ys = np.zeros(len(horizonal_spring_constant_mov_ys))
-            end_spring_constant_mov_zs = np.zeros(len(horizonal_spring_constant_mov_zs))
-            end_spring_constant_rot_xs = np.zeros(len(horizonal_spring_constant_rot_xs))
-            end_spring_constant_rot_ys = np.zeros(len(horizonal_spring_constant_rot_ys))
-            end_spring_constant_rot_zs = np.zeros(len(horizonal_spring_constant_rot_zs))
-
             for v_yidx, v_xidx in zip(np.where(vertex_map)[0], np.where(vertex_map)[1]):
                 if np.isnan(vertex_map[v_yidx, v_xidx]).any():
                     continue
@@ -1107,28 +1087,28 @@ class PmxTailorExportService:
 
                 now_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[above_yidx, v_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 now_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[v_yidx, v_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 now_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[below_yidx, v_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
 
                 next_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[above_yidx, next_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 next_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[v_yidx, next_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 next_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[below_yidx, next_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
 
                 if param_option["vertical_joint"]:
@@ -1156,7 +1136,28 @@ class PmxTailorExportService:
                     else:
                         a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                         b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
-                        joint_pos = b_bone.position
+                        if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                            # 剛体が重なる箇所の交点
+                            above_mat = MMatrix4x4()
+                            above_point = MVector3D()
+                            if a_rigidbody:
+                                above_mat.setToIdentity()
+                                above_mat.translate(a_rigidbody.shape_position)
+                                above_mat.rotate(a_rigidbody.shape_qq)
+                                above_point = above_mat * MVector3D(0, -a_rigidbody.shape_size.y(), 0)
+
+                            now_mat = MMatrix4x4()
+                            now_mat.setToIdentity()
+                            now_mat.translate(b_rigidbody.shape_position)
+                            now_mat.rotate(b_rigidbody.shape_qq)
+                            now_point = now_mat * MVector3D(0, b_rigidbody.shape_size.y(), 0)
+
+                            if v_yidx == 0:
+                                joint_pos = now_point
+                            else:
+                                joint_pos = (above_point + now_point) / 2
+                        else:
+                            joint_pos = b_bone.position
 
                         if v_yidx == 0:
                             joint_qq = b_rigidbody.shape_qq
@@ -1201,46 +1202,6 @@ class PmxTailorExportService:
                         )
                         created_joints[joint_key] = joint
 
-                        # if v_yidx == registed_max_v_yidx and not param_option["vertical_reverse_joint"]:
-                        #     a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
-                        #     b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
-
-                        #     if (
-                        #         a_rigidbody
-                        #         and a_rigidbody.index >= 0
-                        #         and b_rigidbody
-                        #         and b_rigidbody.index >= 0
-                        #         and a_rigidbody.index != b_rigidbody.index
-                        #     ):
-                        #         joint_key, joint = self.build_joint(
-                        #             "↑",
-                        #             1,
-                        #             bone_y_idx,
-                        #             a_rigidbody,
-                        #             b_rigidbody,
-                        #             joint_pos,
-                        #             reverse_joint_qq,
-                        #             end_limit_min_mov_xs,
-                        #             end_limit_min_mov_ys,
-                        #             end_limit_min_mov_zs,
-                        #             end_limit_max_mov_xs,
-                        #             end_limit_max_mov_ys,
-                        #             end_limit_max_mov_zs,
-                        #             end_limit_min_rot_xs,
-                        #             end_limit_min_rot_ys,
-                        #             end_limit_min_rot_zs,
-                        #             end_limit_max_rot_xs,
-                        #             end_limit_max_rot_ys,
-                        #             end_limit_max_rot_zs,
-                        #             end_spring_constant_mov_xs,
-                        #             end_spring_constant_mov_ys,
-                        #             end_spring_constant_mov_zs,
-                        #             end_spring_constant_rot_xs,
-                        #             end_spring_constant_rot_ys,
-                        #             end_spring_constant_rot_zs,
-                        #         )
-                        #         created_joints[joint_key] = joint
-
                         if param_option["vertical_reverse_joint"]:
                             # 縦逆ジョイント
                             a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
@@ -1248,7 +1209,28 @@ class PmxTailorExportService:
 
                             a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                             b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
-                            joint_pos = b_bone.position
+                            if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                                # 剛体が重なる箇所の交点
+                                above_mat = MMatrix4x4()
+                                above_point = MVector3D()
+                                if a_rigidbody:
+                                    above_mat.setToIdentity()
+                                    above_mat.translate(a_rigidbody.shape_position)
+                                    above_mat.rotate(a_rigidbody.shape_qq)
+                                    above_point = above_mat * MVector3D(0, a_rigidbody.shape_size.y(), 0)
+
+                                now_mat = MMatrix4x4()
+                                now_mat.setToIdentity()
+                                now_mat.translate(b_rigidbody.shape_position)
+                                now_mat.rotate(b_rigidbody.shape_qq)
+                                now_point = now_mat * MVector3D(0, -b_rigidbody.shape_size.y(), 0)
+
+                                if v_yidx == 0:
+                                    joint_pos = above_point
+                                else:
+                                    joint_pos = (above_point + now_point) / 2
+                            else:
+                                joint_pos = b_bone.position
 
                             # ボーン進行方向(x)
                             x_direction_pos = (b_bone.position - a_bone.position).normalized()
@@ -1405,7 +1387,25 @@ class PmxTailorExportService:
                     else:
                         a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                         b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
-                        joint_pos = b_bone.position
+                        if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                            # 剛体が重なる箇所の交点
+                            above_mat = MMatrix4x4()
+                            above_point = MVector3D()
+                            if a_rigidbody:
+                                above_mat.setToIdentity()
+                                above_mat.translate(a_rigidbody.shape_position)
+                                above_mat.rotate(a_rigidbody.shape_qq)
+                                above_point = above_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+
+                            now_mat = MMatrix4x4()
+                            now_mat.setToIdentity()
+                            now_mat.translate(b_rigidbody.shape_position)
+                            now_mat.rotate(b_rigidbody.shape_qq)
+                            now_point = now_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+
+                            joint_pos = (above_point + now_point) / 2
+                        else:
+                            joint_pos = b_bone.position
 
                         # ボーン進行方向(x)
                         x_direction_pos = (b_bone.position - a_bone.position).normalized()
@@ -1501,7 +1501,10 @@ class PmxTailorExportService:
                         )
                         created_joints[joint_key] = joint
 
-                        if v_yidx == registed_max_v_yidx:
+                        if (
+                            param_option["joint_pos_type"] == logger.transtext("ボーン位置")
+                            and v_yidx == registed_max_v_yidx
+                        ):
                             # 末端横ジョイント
                             a_pos = (
                                 model.bones[
@@ -1569,53 +1572,6 @@ class PmxTailorExportService:
                             )
                             created_joints[joint_key] = joint
 
-                            # if not param_option["horizonal_reverse_joint"]:
-                            #     # 末端横ジョイント
-                            #     a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
-                            #     b_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
-                            #     a_bone = model.bones[
-                            #         model.bone_indexes[
-                            #             model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index
-                            #         ]
-                            #     ]
-                            #     b_bone = model.bones[
-                            #         model.bone_indexes[
-                            #             model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index
-                            #         ]
-                            #     ]
-                            #     joint_pos = b_bone.position
-
-                            #     joint_key, joint = self.build_joint(
-                            #         "←",
-                            #         5,
-                            #         bone_y_idx,
-                            #         a_rigidbody,
-                            #         b_rigidbody,
-                            #         joint_pos,
-                            #         reverse_joint_qq,
-                            #         end_limit_min_mov_xs,
-                            #         end_limit_min_mov_ys,
-                            #         end_limit_min_mov_zs,
-                            #         end_limit_max_mov_xs,
-                            #         end_limit_max_mov_ys,
-                            #         end_limit_max_mov_zs,
-                            #         end_limit_min_rot_xs,
-                            #         end_limit_min_rot_ys,
-                            #         end_limit_min_rot_zs,
-                            #         end_limit_max_rot_xs,
-                            #         end_limit_max_rot_ys,
-                            #         end_limit_max_rot_zs,
-                            #         end_spring_constant_mov_xs,
-                            #         end_spring_constant_mov_ys,
-                            #         end_spring_constant_mov_zs,
-                            #         end_spring_constant_rot_xs,
-                            #         end_spring_constant_rot_ys,
-                            #         end_spring_constant_rot_zs,
-                            #         ratio,
-                            #         override_joint_name=f"←|{a_bone.name}|{b_bone.name}",
-                            #     )
-                            #     created_joints[joint_key] = joint
-
                         if param_option["horizonal_reverse_joint"]:
                             # 横逆ジョイント
                             a_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
@@ -1623,7 +1579,25 @@ class PmxTailorExportService:
 
                             a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                             b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
-                            joint_pos = b_bone.position
+                            if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                                # 剛体が重なる箇所の交点
+                                above_mat = MMatrix4x4()
+                                above_point = MVector3D()
+                                if a_rigidbody:
+                                    above_mat.setToIdentity()
+                                    above_mat.translate(a_rigidbody.shape_position)
+                                    above_mat.rotate(a_rigidbody.shape_qq)
+                                    above_point = above_mat * MVector3D(-a_rigidbody.shape_size.x(), 0, 0)
+
+                                now_mat = MMatrix4x4()
+                                now_mat.setToIdentity()
+                                now_mat.translate(b_rigidbody.shape_position)
+                                now_mat.rotate(b_rigidbody.shape_qq)
+                                now_point = now_mat * MVector3D(b_rigidbody.shape_size.x(), 0, 0)
+
+                                joint_pos = (above_point + now_point) / 2
+                            else:
+                                joint_pos = b_bone.position
 
                             # ボーン進行方向(x)
                             x_direction_pos = (b_bone.position - a_bone.position).normalized()
@@ -1666,7 +1640,10 @@ class PmxTailorExportService:
                             )
                             created_joints[joint_key] = joint
 
-                            if v_yidx == registed_max_v_yidx:
+                            if (
+                                param_option["joint_pos_type"] == logger.transtext("ボーン位置")
+                                and v_yidx == registed_max_v_yidx
+                            ):
                                 # 末端横逆ジョイント
                                 a_bone = model.bones[
                                     model.bone_indexes[
@@ -1748,7 +1725,25 @@ class PmxTailorExportService:
                     else:
                         a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                         b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
-                        joint_pos = b_bone.position
+                        if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                            # 剛体が重なる箇所の交点
+                            above_mat = MMatrix4x4()
+                            above_point = MVector3D()
+                            if a_rigidbody:
+                                above_mat.setToIdentity()
+                                above_mat.translate(a_rigidbody.shape_position)
+                                above_mat.rotate(a_rigidbody.shape_qq)
+                                above_point = above_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+
+                            now_mat = MMatrix4x4()
+                            now_mat.setToIdentity()
+                            now_mat.translate(b_rigidbody.shape_position)
+                            now_mat.rotate(b_rigidbody.shape_qq)
+                            now_point = now_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+
+                            joint_pos = (above_point + now_point) / 2
+                        else:
+                            joint_pos = b_bone.position
 
                         # ボーン進行方向(x)
                         x_direction_pos = (b_bone.position - a_bone.position).normalized()
@@ -1814,7 +1809,25 @@ class PmxTailorExportService:
                     else:
                         a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                         b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
-                        joint_pos = b_bone.position
+                        if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                            # 剛体が重なる箇所の交点
+                            above_mat = MMatrix4x4()
+                            above_point = MVector3D()
+                            if a_rigidbody:
+                                above_mat.setToIdentity()
+                                above_mat.translate(a_rigidbody.shape_position)
+                                above_mat.rotate(a_rigidbody.shape_qq)
+                                above_point = above_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+
+                            now_mat = MMatrix4x4()
+                            now_mat.setToIdentity()
+                            now_mat.translate(b_rigidbody.shape_position)
+                            now_mat.rotate(b_rigidbody.shape_qq)
+                            now_point = now_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+
+                            joint_pos = (above_point + now_point) / 2
+                        else:
+                            joint_pos = b_bone.position
 
                         # ボーン進行方向(x)
                         x_direction_pos = (b_bone.position - a_bone.position).normalized()
@@ -2385,9 +2398,15 @@ class PmxTailorExportService:
 
             # 縦段INDEX
             v_yidxs = list(range(regist_bones.shape[0]))
-            rigidbody_masses = np.linspace(
-                param_rigidbody.param.mass * coefficient, param_rigidbody.param.mass, len(v_yidxs)
-            )
+            if param_option["physics_type"] in [logger.transtext("髪")]:
+                # 髪は形状維持のため末端ほど質量を軽くする
+                rigidbody_masses = np.linspace(
+                    param_rigidbody.param.mass * coefficient, param_rigidbody.param.mass, len(v_yidxs)
+                )
+            else:
+                rigidbody_masses = np.linspace(
+                    param_rigidbody.param.mass, param_rigidbody.param.mass * coefficient * 2, len(v_yidxs)
+                )
             linear_dampings = np.linspace(
                 param_rigidbody.param.linear_damping,
                 min(0.999, param_rigidbody.param.linear_damping * coefficient),
@@ -2441,44 +2460,45 @@ class PmxTailorExportService:
                     continue
 
                 nan_vertex_maps = np.full((max_v_yidx + 1, max_v_xidx + 1, 3), (np.nan, np.nan, np.nan))
+                below_yidx = below_yidx if below_yidx > v_yidx else max_v_yidx
 
                 prev_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(prev_map_idx, nan_vertex_maps)[above_yidx, prev_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 prev_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(prev_map_idx, nan_vertex_maps)[v_yidx, prev_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 prev_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(prev_map_idx, nan_vertex_maps)[below_yidx, prev_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
 
                 now_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[above_yidx, v_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 now_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[v_yidx, v_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 now_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[below_yidx, v_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
 
                 next_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[above_yidx, next_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 next_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[v_yidx, next_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
                 next_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[below_yidx, next_xidx]),
-                    VirtualVertex(""),
+                    None,
                 )
 
                 if not (now_now_vv and now_below_vv):
@@ -2546,7 +2566,7 @@ class PmxTailorExportService:
                     x_size = np.median(all_vertex_distances)
 
                 if v_yidx == registed_max_v_yidx:
-                    # 末端は上との長さ半分にしておく
+                    # 末端は上との長さにしておく
                     y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
                 else:
                     # 根元は下のボーンとの距離
@@ -2583,28 +2603,46 @@ class PmxTailorExportService:
                     # 最後を超えている場合、最初に戻す
                     ceil_mean_xidx = 0
 
-                # 中間位置
-                shape_position = MVector3D(
-                    np.mean(
-                        [
-                            virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx])]
-                            .position()
-                            .data(),
-                            virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx])]
-                            .position()
-                            .data(),
-                            virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx])]
-                            .position()
-                            .data(),
-                            virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx])]
-                            .position()
-                            .data(),
-                        ],
-                        axis=0,
-                    )
-                )
+                if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                    # ジョイントがボーン間にある場合、剛体はボーン位置
+                    shape_position = now_now_bone.position
+                else:
+                    if param_option["exist_physics_clear"] in [logger.transtext("そのまま"), logger.transtext("上書き")]:
+                        # そのまま・上書きはメッシュの中間位置で位置を取り直す
+                        shape_position = MVector3D(
+                            np.mean(
+                                [
+                                    virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx])]
+                                    .position()
+                                    .data(),
+                                    virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx])]
+                                    .position()
+                                    .data(),
+                                    virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx])]
+                                    .position()
+                                    .data(),
+                                    virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx])]
+                                    .position()
+                                    .data(),
+                                ],
+                                axis=0,
+                            )
+                        )
+                    else:
+                        # 再利用はボーンの位置だけで判定
+                        shape_positions = []
+                        shape_positions.append(now_now_bone.position)
+                        if now_above_bone and now_now_bone == now_below_bone:
+                            shape_positions.append(now_above_bone.position.data())
+                        else:
+                            shape_positions.append(now_below_bone.position.data())
+                        if next_now_bone:
+                            shape_positions.append(next_now_bone.position.data())
+                        if next_below_bone:
+                            shape_positions.append(next_below_bone.position.data())
+                        shape_position = MVector3D(np.mean(shape_positions, axis=0))
 
-                if v_yidx == max_v_yidx:
+                if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
                     # 末端は軸方向がひとつ上の向きとする
                     x_direction_from_pos = now_now_bone.position
                     x_direction_to_pos = y_direction_from_pos = now_above_bone.position
@@ -2619,7 +2657,7 @@ class PmxTailorExportService:
                 # ボーン進行方向に対しての横軸(y)
                 y_direction_pos = (y_direction_to_pos - y_direction_from_pos).normalized()
                 # ボーン進行方向に対しての縦軸(z)
-                z_direction_pos = MVector3D.crossProduct(y_direction_pos, x_direction_pos)
+                z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
                 shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                 shape_euler = shape_qq.toEulerAngles()
                 shape_rotation_radians = MVector3D(
@@ -4435,8 +4473,7 @@ class PmxTailorExportService:
 
             # 布は横の繋がりをチェックする
             for v_yidx in range(vertex_map.shape[0]):
-                v_xidx = -1
-                for v_xidx in range(0, vertex_map.shape[1]):
+                for v_xidx in range(0, vertex_map.shape[1] - 1):
                     if (
                         not np.isnan(vertex_map[v_yidx, v_xidx]).any()
                         and not np.isnan(vertex_map[v_yidx, v_xidx + 1]).any()

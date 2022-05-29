@@ -174,6 +174,11 @@ class ParamPanel(BasePanel):
                         )
                         self.physics_list[-1].simple_primitive_ctrl.SetStringSelection(vroid2pmx_setting["primitive"])
 
+                        # ラベル設定(テキストボックスイベントではないので、個別設定)
+                        label_text = f"{self.physics_list[-1].simple_material_ctrl.GetStringSelection()}:{self.physics_list[-1].simple_abb_ctrl.GetValue()}"
+                        self.physics_list[-1].advance_material_ctrl.SetLabelText(label_text)
+                        self.physics_list[-1].bone_material_ctrl.SetLabelText(label_text)
+
                         self.physics_list[-1].set_simple_primitive(event)
                         self.physics_list[-1].initialize_bone_param(event)
 
@@ -905,9 +910,9 @@ class PhysicsParam:
         self.advance_bone_sizer.Add(self.advance_bone_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_bone_sizer, 0, wx.ALL, 5)
 
-        # 末端剛体ブロック -------------------------------
+        # 根元剛体ブロック -------------------------------
         self.advance_rigidbody_sizer = wx.StaticBoxSizer(
-            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("末端剛体")), orient=wx.VERTICAL
+            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("根元剛体")), orient=wx.VERTICAL
         )
         self.advance_rigidbody_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
@@ -915,7 +920,7 @@ class PhysicsParam:
         self.rigidbody_mass_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("質量"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.rigidbody_mass_txt.SetToolTip(logger.transtext("末端剛体の質量"))
+        self.rigidbody_mass_txt.SetToolTip(logger.transtext("根元剛体の質量"))
         self.rigidbody_mass_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_mass_txt, 0, wx.ALL, 5)
 
@@ -936,7 +941,7 @@ class PhysicsParam:
         self.rigidbody_linear_damping_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動減衰"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.rigidbody_linear_damping_txt.SetToolTip(logger.transtext("末端剛体の移動減衰"))
+        self.rigidbody_linear_damping_txt.SetToolTip(logger.transtext("根元剛体の移動減衰"))
         self.rigidbody_linear_damping_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_linear_damping_txt, 0, wx.ALL, 5)
 
@@ -959,7 +964,7 @@ class PhysicsParam:
         self.rigidbody_angular_damping_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("回転減衰"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.rigidbody_angular_damping_txt.SetToolTip(logger.transtext("末端剛体の回転減衰"))
+        self.rigidbody_angular_damping_txt.SetToolTip(logger.transtext("根元剛体の回転減衰"))
         self.rigidbody_angular_damping_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_angular_damping_txt, 0, wx.ALL, 5)
 
@@ -982,7 +987,7 @@ class PhysicsParam:
         self.rigidbody_restitution_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("反発力"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.rigidbody_restitution_txt.SetToolTip(logger.transtext("末端剛体の反発力"))
+        self.rigidbody_restitution_txt.SetToolTip(logger.transtext("根元剛体の反発力"))
         self.rigidbody_restitution_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_restitution_txt, 0, wx.ALL, 5)
 
@@ -998,7 +1003,7 @@ class PhysicsParam:
         self.rigidbody_friction_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("摩擦力"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.rigidbody_friction_txt.SetToolTip(logger.transtext("末端剛体の摩擦力"))
+        self.rigidbody_friction_txt.SetToolTip(logger.transtext("根元剛体の摩擦力"))
         self.rigidbody_friction_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_friction_txt, 0, wx.ALL, 5)
 
@@ -1021,7 +1026,7 @@ class PhysicsParam:
         self.rigidbody_coefficient_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("係数"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.rigidbody_coefficient_txt.SetToolTip(logger.transtext("末端剛体から上の剛体にかけての加算係数"))
+        self.rigidbody_coefficient_txt.SetToolTip(logger.transtext("根元剛体から下の剛体にかけての加算係数"))
         self.rigidbody_coefficient_txt.Wrap(-1)
         self.advance_rigidbody_grid_sizer.Add(self.rigidbody_coefficient_txt, 0, wx.ALL, 5)
 
@@ -4227,14 +4232,16 @@ class PhysicsParam:
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
             self.simple_mass_slider.SetValue(1.8)
-            self.simple_air_resistance_slider.SetValue(2.7)
-            self.simple_shape_maintenance_slider.SetValue(3.6)
+            # 前髪は制限角度を0にする
+            self.simple_air_resistance_slider.SetValue(3.6)
+            self.simple_shape_maintenance_slider.SetValue(4.2)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(1)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
             self.simple_mass_slider.SetValue(2.3)
-            self.simple_air_resistance_slider.SetValue(1.8)
-            self.simple_shape_maintenance_slider.SetValue(2.5)
+            self.simple_air_resistance_slider.SetValue(2.3)
+            self.simple_shape_maintenance_slider.SetValue(3.5)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
@@ -4405,8 +4412,12 @@ class PhysicsParam:
             base_vertical_ratio = air_resistance_ratio * shape_maintenance_ratio
             self.advance_vertical_joint_coefficient_spin.SetValue(base_vertical_ratio * 20)
 
-            vertical_joint_rot = max(0, min(180, (180 - base_vertical_ratio * 180 * 2)))
-            vertical_joint_y_rot = max(0, min(89, (89 - base_vertical_ratio * 89 * 2)))
+            vertical_joint_rot = max(0, min(180, (180 - base_vertical_ratio * 180)))
+            vertical_joint_y_rot = max(0, min(89, (89 - base_vertical_ratio * 89)))
+
+            # 制限角度が0の場合、ちょっとだけ動かす
+            vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
+            vertical_joint_y_rot = 2 if not vertical_joint_y_rot else vertical_joint_y_rot
 
             vertical_spring_rot = max(0, min(180, base_vertical_ratio * 180))
             vertical_spring_y_rot = max(0, min(89, base_vertical_ratio * 89))
@@ -4437,8 +4448,12 @@ class PhysicsParam:
 
             self.advance_horizonal_joint_coefficient_spin.SetValue(base_horizonal_ratio * 20)
 
-            horizonal_joint_rot = max(0, min(180, (180 - base_horizonal_ratio * 180 * 2)))
-            horizonal_joint_y_rot = max(0, min(89, (89 - base_horizonal_ratio * 89 * 2)))
+            horizonal_joint_rot = max(0, min(180, (180 - base_horizonal_ratio * 180)))
+            horizonal_joint_y_rot = max(0, min(89, (89 - base_horizonal_ratio * 89)))
+
+            # 制限角度が0の場合、ちょっとだけ動かす
+            horizonal_joint_rot = 2 if not horizonal_joint_rot else horizonal_joint_rot
+            horizonal_joint_y_rot = 2 if not horizonal_joint_y_rot else horizonal_joint_y_rot
 
             horizonal_spring_rot = max(0, min(180, base_horizonal_ratio * 180))
             horizonal_spring_y_rot = max(0, min(89, base_horizonal_ratio * 89))
@@ -4458,8 +4473,12 @@ class PhysicsParam:
             base_diagonal_ratio = air_resistance_ratio * mass_ratio
             self.advance_diagonal_joint_coefficient_spin.SetValue(base_diagonal_ratio * 20)
 
-            diagonal_joint_rot = max(0, min(180, (180 - base_diagonal_ratio * 180 * 2)))
-            diagonal_joint_y_rot = max(0, min(89, (89 - base_diagonal_ratio * 89 * 2)))
+            diagonal_joint_rot = max(0, min(180, (180 - base_diagonal_ratio * 180)))
+            diagonal_joint_y_rot = max(0, min(89, (89 - base_diagonal_ratio * 89)))
+
+            # 制限角度が0の場合、ちょっとだけ動かす
+            diagonal_joint_rot = 2 if not diagonal_joint_rot else diagonal_joint_rot
+            diagonal_joint_y_rot = 2 if not diagonal_joint_y_rot else diagonal_joint_y_rot
 
             diagonal_spring_rot = max(0, min(180, base_diagonal_ratio * 180))
             diagonal_spring_y_rot = max(0, min(89, base_diagonal_ratio * 89))
