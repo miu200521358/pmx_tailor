@@ -1087,28 +1087,28 @@ class PmxTailorExportService:
 
                 now_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[above_yidx, v_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 now_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[v_yidx, v_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 now_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[below_yidx, v_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
 
                 next_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[above_yidx, next_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 next_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[v_yidx, next_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 next_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[below_yidx, next_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
 
                 if param_option["vertical_joint"]:
@@ -1123,6 +1123,7 @@ class PmxTailorExportService:
                     if not (a_rigidbody and a_rigidbody.index >= 0):
                         if not (
                             regist_bones[below_yidx, v_xidx]
+                            and a_rigidbody
                             and b_rigidbody
                             and b_rigidbody.index >= 0
                             and a_rigidbody.index != b_rigidbody.index
@@ -2462,43 +2463,30 @@ class PmxTailorExportService:
                 nan_vertex_maps = np.full((max_v_yidx + 1, max_v_xidx + 1, 3), (np.nan, np.nan, np.nan))
                 below_yidx = below_yidx if below_yidx > v_yidx else max_v_yidx
 
-                prev_above_vv = virtual_vertices.get(
-                    tuple(vertex_maps.get(prev_map_idx, nan_vertex_maps)[above_yidx, prev_xidx]),
-                    None,
-                )
-                prev_now_vv = virtual_vertices.get(
-                    tuple(vertex_maps.get(prev_map_idx, nan_vertex_maps)[v_yidx, prev_xidx]),
-                    None,
-                )
-                prev_below_vv = virtual_vertices.get(
-                    tuple(vertex_maps.get(prev_map_idx, nan_vertex_maps)[below_yidx, prev_xidx]),
-                    None,
-                )
-
                 now_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[above_yidx, v_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 now_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[v_yidx, v_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 now_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(base_map_idx, nan_vertex_maps)[below_yidx, v_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
 
                 next_above_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[above_yidx, next_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 next_now_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[v_yidx, next_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
                 next_below_vv = virtual_vertices.get(
                     tuple(vertex_maps.get(next_map_idx, nan_vertex_maps)[below_yidx, next_xidx]),
-                    None,
+                    VirtualVertex(""),
                 )
 
                 if not (now_now_vv and now_below_vv):
@@ -2507,10 +2495,6 @@ class PmxTailorExportService:
                         vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
                     )
                     continue
-
-                prev_above_bone = prev_above_vv.map_bones.get(prev_map_idx, None)
-                prev_now_bone = prev_now_vv.map_bones.get(prev_map_idx, None)
-                prev_below_bone = prev_below_vv.map_bones.get(prev_map_idx, None)
 
                 now_above_bone = now_above_vv.map_bones.get(base_map_idx, None)
                 now_now_bone = now_now_vv.map_bones.get(base_map_idx, None)
@@ -2609,22 +2593,35 @@ class PmxTailorExportService:
                 else:
                     if param_option["exist_physics_clear"] in [logger.transtext("そのまま"), logger.transtext("上書き")]:
                         # そのまま・上書きはメッシュの中間位置で位置を取り直す
+                        shape_positions = []
+                        if tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx]) in virtual_vertices:
+                            shape_positions.append(
+                                virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx])]
+                                .position()
+                                .data()
+                            )
+                        if tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx]) in virtual_vertices:
+                            shape_positions.append(
+                                virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx])]
+                                .position()
+                                .data()
+                            )
+                        if tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx]) in virtual_vertices:
+                            shape_positions.append(
+                                virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx])]
+                                .position()
+                                .data()
+                            )
+                        if tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx]) in virtual_vertices:
+                            shape_positions.append(
+                                virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx])]
+                                .position()
+                                .data()
+                            )
+
                         shape_position = MVector3D(
                             np.mean(
-                                [
-                                    virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx])]
-                                    .position()
-                                    .data(),
-                                    virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx])]
-                                    .position()
-                                    .data(),
-                                    virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx])]
-                                    .position()
-                                    .data(),
-                                    virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx])]
-                                    .position()
-                                    .data(),
-                                ],
+                                shape_positions,
                                 axis=0,
                             )
                         )
@@ -2646,11 +2643,17 @@ class PmxTailorExportService:
                     # 末端は軸方向がひとつ上の向きとする
                     x_direction_from_pos = now_now_bone.position
                     x_direction_to_pos = y_direction_from_pos = now_above_bone.position
-                    y_direction_to_pos = virtual_vertices[tuple(vertex_map[above_yidx, ceil_mean_xidx])].position()
+                    if tuple(vertex_map[above_yidx, ceil_mean_xidx]) in virtual_vertices:
+                        y_direction_to_pos = virtual_vertices[tuple(vertex_map[above_yidx, ceil_mean_xidx])].position()
+                    else:
+                        y_direction_to_pos = y_direction_from_pos + MVector3D(1, 0, 0)
                 else:
                     x_direction_from_pos = now_below_bone.position
                     x_direction_to_pos = y_direction_from_pos = now_now_bone.position
-                    y_direction_to_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                    if tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices:
+                        y_direction_to_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                    else:
+                        y_direction_to_pos = y_direction_from_pos + MVector3D(1, 0, 0)
 
                 # ボーン進行方向(x)
                 x_direction_pos = (x_direction_to_pos - x_direction_from_pos).normalized()

@@ -125,9 +125,9 @@ class ParamPanel(BasePanel):
         with wx.MultiChoiceDialog(
             self.frame,
             logger.transtext("インポートしたい設定を選んで、OKボタンをクリックしてください。複数選択OKです。\n件数が多い場合、読み込み完了まで少し時間がかかります。"),
-            caption="Vroid2Pmx設定インポート選択",
+            caption=logger.transtext("Vroid2Pmx設定インポート選択"),
             choices=file_names,
-            style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE,
+            style=wx.CAPTION | wx.CLOSE_BOX | wx.SYSTEM_MENU | wx.OK | wx.CANCEL | wx.CENTRE | wx.RESIZE_BORDER,
         ) as choiceDialog:
 
             if choiceDialog.ShowModal() == wx.ID_CANCEL:
@@ -4233,9 +4233,8 @@ class PhysicsParam:
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
             self.simple_mass_slider.SetValue(1.8)
             # 前髪は制限角度を0にする
-            self.simple_air_resistance_slider.SetValue(3.6)
-            self.simple_shape_maintenance_slider.SetValue(4.2)
-            self.advance_vertical_reverse_joint_valid_check.SetValue(1)
+            self.simple_air_resistance_slider.SetValue(5)
+            self.simple_shape_maintenance_slider.SetValue(5)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
