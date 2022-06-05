@@ -323,8 +323,8 @@ class MLogger:
                             # ない場合、追加(オリジナル言語の場合、そのまま。違う場合は空欄)
                             msgs[msg] = msg if self.target_lang == lang else ""
 
-                        with open(messages_path, "w", encoding="utf-8") as wf:
-                            json.dump(msgs, wf, ensure_ascii=False)
+                    with open(messages_path, "w", encoding="utf-8") as wf:
+                        json.dump(msgs, wf, ensure_ascii=False)
                 except Exception:
                     print("*** Message Update ERROR ***\n%s", traceback.format_exc())
 

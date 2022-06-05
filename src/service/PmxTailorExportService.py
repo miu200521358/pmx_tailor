@@ -853,7 +853,9 @@ class PmxTailorExportService:
                 )
 
                 # グラデウェイト
-                self.create_grad_weight(model, param_option, material_name, virtual_vertices, threshold)
+                self.create_grad_weight(
+                    model, param_option, material_name, virtual_vertices, weighted_vidxs, threshold, base_vertical_axis
+                )
 
                 # 裏ウェイト
                 self.create_back_weight(
@@ -2898,7 +2900,9 @@ class PmxTailorExportService:
         param_option: dict,
         material_name: str,
         virtual_vertices: dict,
+        weighted_vidxs: list,
         threshold: float,
+        base_vertical_axis: MVector3D,
     ):
 
         # 物理グラデーション対象頂点CSVが指定されている場合、対象頂点リスト生成
@@ -2919,7 +2923,8 @@ class PmxTailorExportService:
                         vidx = int(row[1])
                         v = model.vertex_dict[vidx]
                         v_key = v.position.to_key(threshold)
-                        if v_key not in target_vertices:
+                        if v_key not in target_vertices and v.index not in weighted_vidxs:
+                            # まだ登録されてない、かつ既に塗り終わった頂点ではない場合、対象
                             target_vertices[v_key] = VirtualVertex(v_key)
                             target_vertices[v_key].append([v], [], [])
         except Exception:
@@ -2929,14 +2934,11 @@ class PmxTailorExportService:
         # 親ボーン
         parent_bone = model.bones[param_option["parent_bone_name"]]
 
-        # 物理設定対象ボーン
-        physics_bones = {}
-        # 親ボーンも対象とする
-        physics_bones[parent_bone.index] = parent_bone.position.data()
-        for vv in virtual_vertices.values():
-            bones = [b for b in vv.map_bones.values() if b]
-            for bone in bones:
-                physics_bones[bone.index] = bone.position.data()
+        # 塗り終わった頂点のリスト
+        weighted_vertices = {}
+        for vidx in weighted_vidxs:
+            v = model.vertex_dict[vidx]
+            weighted_vertices[v.index] = v.position.data()
 
         weight_cnt = 0
         prev_weight_cnt = 0
@@ -2944,34 +2946,86 @@ class PmxTailorExportService:
         for vkey, vv in target_vertices.items():
             if not vv.vidxs():
                 continue
-            # 物理設定対象ボーンと親ボーンとの中間の距離
-            # （頂点そのものだと親ボーンとの距離が大きすぎてグラデが綺麗にならない）
-            physics_bone_distances = (
-                np.linalg.norm(
-                    np.array(list(physics_bones.values()))
-                    - np.mean([parent_bone.position.data(), vv.position().data()], axis=0),
-                    ord=2,
-                    axis=1,
-                )
-                ** 2
-            )
-            # 近いの4つを選ぶ
-            deform_bone_indices = np.array(list(physics_bones.keys()))[np.argsort(physics_bone_distances)[:4]]
-            # ウェイトは近い方が値が大きい
-            deform_distances = np.sort(physics_bone_distances)[:4]
-            deform_weights = 1 / deform_distances
-            deform_normalized_weights = deform_weights / deform_weights.sum(axis=0, keepdims=1)
 
-            vv.deform = Bdef4(
-                deform_bone_indices[0],
-                deform_bone_indices[1],
-                deform_bone_indices[2],
-                deform_bone_indices[3],
-                deform_normalized_weights[0],
-                deform_normalized_weights[1],
-                deform_normalized_weights[2],
-                deform_normalized_weights[3],
+            # 各頂点の位置との差分から距離を測る
+            vv_distances = np.linalg.norm(
+                (np.array(list(weighted_vertices.values())) - vv.position().data()), ord=2, axis=1
             )
+
+            # 直近頂点INDEXのウェイトを転写
+            copy_weighted_vertex_idx = list(weighted_vertices.keys())[np.argmin(vv_distances)]
+            copy_weighted_vertex = model.vertex_dict[copy_weighted_vertex_idx]
+
+            # 親ボーンの評価軸位置
+            parent_axis_pos = parent_bone.position.data()[np.where(np.abs(base_vertical_axis.data()))][0]
+            # 直近頂点の評価軸位置
+            nearest_vertex_axis_pos = copy_weighted_vertex.position.data()[
+                np.where(np.abs(base_vertical_axis.data()))
+            ][0]
+            # 処理対象頂点の評価軸位置
+            target_axis_pos = vv.position().data()[np.where(np.abs(base_vertical_axis.data()))][0]
+
+            if not nearest_vertex_axis_pos <= target_axis_pos <= parent_axis_pos:
+                # 処理対象頂点が範囲外の場合、スルー
+                continue
+
+            # 処理対象頂点の直近頂点ボーンウェイト比率
+            target_ratio = abs(target_axis_pos - nearest_vertex_axis_pos) / abs(
+                parent_axis_pos - nearest_vertex_axis_pos
+            )
+
+            # ウェイト比率からウェイト量を調整
+            vertex_weights = np.array(copy_weighted_vertex.deform.get_weights()) * (1 - target_ratio)
+
+            # 残りは親ボーンに割り当てる
+            parent_weight = 1 - np.sum(vertex_weights)
+
+            # 全体のウェイト
+            total_weights = {parent_bone.index: parent_weight}
+            for idx, w in zip(copy_weighted_vertex.deform.get_idx_list(), vertex_weights):
+                total_weights[idx] = w
+
+            # ウェイト上位4件まで
+            weight_idxs = np.argsort(list(total_weights.values()))[-4:]
+            weight_bone_idxs = np.array(list(total_weights.keys()))[weight_idxs]
+            weights = np.array(list(total_weights.values()))[weight_idxs]
+            # ウェイト正規化
+            weights = weights / weights.sum(axis=0, keepdims=1)
+
+            logger.debug(
+                f"グラデ元頂点: target [{vv.vidxs()}], weighted [{copy_weighted_vertex_idx}], weight_idx[{weight_bone_idxs}], weight[{np.round(weights, decimals=3)}]"
+            )
+
+            if np.count_nonzero(weights) == 1:
+                vv.deform = Bdef1(weight_bone_idxs[weight_idxs[-1]])
+            elif np.count_nonzero(weights) == 2:
+                vv.deform = Bdef2(
+                    weight_bone_idxs[weight_idxs[-1]],
+                    weight_bone_idxs[weight_idxs[-2]],
+                    weights[weight_idxs[-1]],
+                )
+            elif np.count_nonzero(weights) == 3:
+                vv.deform = Bdef4(
+                    weight_bone_idxs[weight_idxs[-1]],
+                    weight_bone_idxs[weight_idxs[-2]],
+                    weight_bone_idxs[weight_idxs[-3]],
+                    0,
+                    weights[weight_idxs[-1]],
+                    weights[weight_idxs[-2]],
+                    weights[weight_idxs[-3]],
+                    0,
+                )
+            else:
+                vv.deform = Bdef4(
+                    weight_bone_idxs[weight_idxs[-1]],
+                    weight_bone_idxs[weight_idxs[-2]],
+                    weight_bone_idxs[weight_idxs[-3]],
+                    weight_bone_idxs[weight_idxs[-4]],
+                    weights[weight_idxs[-1]],
+                    weights[weight_idxs[-2]],
+                    weights[weight_idxs[-3]],
+                    weights[weight_idxs[-4]],
+                )
 
             for rv in vv.real_vertices:
                 rv.deform = vv.deform
@@ -3235,70 +3289,6 @@ class PmxTailorExportService:
                 for rv in vv.real_vertices:
                     weighted_vidxs.append(rv.index)
                     rv.deform = vv.deform
-
-            # # ボーンの近いのを選択
-            # bone_diff_distances = np.linalg.norm(
-            #     np.array(list(bone_poses.values())) - vv.position().data(), ord=2, axis=1
-            # )
-
-            # # 近いの4つ抽出
-            # nearest_bone_indices = np.array(list(bone_poses.keys()))[np.argsort(bone_diff_distances)[:4]]
-            # nearest_distances = np.sort(bone_diff_distances)[:4]
-
-            # weight_bone1 = model.bones[model.bone_indexes[nearest_bone_indices[0]]]
-            # weight_bone2 = model.bones[model.bone_indexes[nearest_bone_indices[1]]]
-            # weight_bone3 = model.bones[model.bone_indexes[nearest_bone_indices[2]]]
-            # weight_bone4 = model.bones[model.bone_indexes[nearest_bone_indices[3]]]
-
-            # bone1_distance = nearest_distances[0]
-            # bone2_distance = nearest_distances[1] if nearest_distances[1] > 0.1 else 0
-            # bone3_distance = nearest_distances[2] if nearest_distances[2] > 0.1 else 0
-            # bone4_distance = nearest_distances[3] if nearest_distances[3] > 0.1 else 0
-            # all_distance = bone1_distance + bone2_distance + bone3_distance + bone4_distance
-
-            # weight_names = np.array([weight_bone1.name, weight_bone2.name, weight_bone3.name, weight_bone4.name])
-            # if all_distance != 0:
-            #     total_weights = np.array(
-            #         [
-            #             bone1_distance / all_distance,
-            #             bone2_distance / all_distance,
-            #             bone3_distance / all_distance,
-            #             bone4_distance / all_distance,
-            #         ]
-            #     )
-            # else:
-            #     total_weights = np.array([1, bone2_distance, bone3_distance, bone4_distance])
-            #     logger.warning("残ウェイト計算で意図せぬ値が入ったため、BDEF1を設定します。: 対象頂点[%s]", vv.vidxs())
-            # weights = total_weights / total_weights.sum(axis=0, keepdims=1)
-            # weight_idxs = np.argsort(weights)
-
-            # logger.debug(
-            #     f"remaining4 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
-            # )
-
-            # if np.count_nonzero(weights) == 1:
-            #     vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
-            # elif np.count_nonzero(weights) == 2:
-            #     vv.deform = Bdef2(
-            #         model.bones[weight_names[weight_idxs[-1]]].index,
-            #         model.bones[weight_names[weight_idxs[-2]]].index,
-            #         weights[weight_idxs[-1]],
-            #     )
-            # else:
-            #     vv.deform = Bdef4(
-            #         model.bones[weight_names[weight_idxs[-1]]].index,
-            #         model.bones[weight_names[weight_idxs[-2]]].index,
-            #         model.bones[weight_names[weight_idxs[-3]]].index,
-            #         model.bones[weight_names[weight_idxs[-4]]].index,
-            #         weights[weight_idxs[-1]],
-            #         weights[weight_idxs[-2]],
-            #         weights[weight_idxs[-3]],
-            #         weights[weight_idxs[-4]],
-            #     )
-
-            # for rv in vv.real_vertices:
-            #     weighted_vidxs.append(rv.index)
-            #     rv.deform = vv.deform
 
             vertex_cnt += 1
 

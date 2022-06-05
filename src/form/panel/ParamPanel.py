@@ -3033,6 +3033,7 @@ class PhysicsParam:
             if self.simple_abb_ctrl.GetValue() not in self.main_frame.file_hitories["abb_setting"]:
                 self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {}
             self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()] = {
+                "material_name": self.simple_material_ctrl.GetStringSelection(),
                 "parent_bone_name": self.simple_parent_bone_ctrl.GetStringSelection(),
                 "group": self.simple_group_ctrl.GetStringSelection(),
                 "direction": self.simple_direction_ctrl.GetStringSelection(),
@@ -3986,6 +3987,8 @@ class PhysicsParam:
         # 既存の設定があったら再設定
         if self.simple_abb_ctrl.GetValue() in self.main_frame.file_hitories["abb_setting"]:
             abb_setting = self.main_frame.file_hitories["abb_setting"][self.simple_abb_ctrl.GetValue()]
+            if not self.simple_material_ctrl.GetStringSelection():
+                self.simple_material_ctrl.SetStringSelection(abb_setting["material_name"])
             if not self.simple_parent_bone_ctrl.GetStringSelection():
                 self.simple_parent_bone_ctrl.SetStringSelection(abb_setting["parent_bone_name"])
             if not self.simple_group_ctrl.GetStringSelection():
@@ -4411,15 +4414,15 @@ class PhysicsParam:
             base_vertical_ratio = air_resistance_ratio * shape_maintenance_ratio
             self.advance_vertical_joint_coefficient_spin.SetValue(base_vertical_ratio * 20)
 
-            vertical_joint_rot = max(0, min(180, (180 - base_vertical_ratio * 180 * 1.5)))
-            vertical_joint_y_rot = max(0, min(89, (89 - base_vertical_ratio * 89 * 1.5)))
+            vertical_joint_rot = max(0, min(180, (180 - base_vertical_ratio * 180 * 2)))
+            vertical_joint_y_rot = max(0, min(89, (89 - base_vertical_ratio * 89 * 2)))
 
             # 制限角度が0の場合、ちょっとだけ動かす
             vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
             vertical_joint_y_rot = 2 if not vertical_joint_y_rot else vertical_joint_y_rot
 
-            vertical_spring_rot = max(0, min(180, base_vertical_ratio * 180 * 1.5))
-            vertical_spring_y_rot = max(0, min(89, base_vertical_ratio * 89 * 1.5))
+            vertical_spring_rot = max(0, min(180, base_vertical_ratio * 180 * 2))
+            vertical_spring_y_rot = max(0, min(89, base_vertical_ratio * 89 * 2))
 
             if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
                 # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を大きくしておく
@@ -4447,15 +4450,15 @@ class PhysicsParam:
 
             self.advance_horizonal_joint_coefficient_spin.SetValue(base_horizonal_ratio * 20)
 
-            horizonal_joint_rot = max(0, min(180, (180 - base_horizonal_ratio * 180 * 1.5)))
-            horizonal_joint_y_rot = max(0, min(89, (89 - base_horizonal_ratio * 89 * 1.5)))
+            horizonal_joint_rot = max(0, min(180, (180 - base_horizonal_ratio * 180 * 2)))
+            horizonal_joint_y_rot = max(0, min(89, (89 - base_horizonal_ratio * 89 * 2)))
 
             # 制限角度が0の場合、ちょっとだけ動かす
             horizonal_joint_rot = 2 if not horizonal_joint_rot else horizonal_joint_rot
             horizonal_joint_y_rot = 2 if not horizonal_joint_y_rot else horizonal_joint_y_rot
 
-            horizonal_spring_rot = max(0, min(180, base_horizonal_ratio * 180 * 1.5))
-            horizonal_spring_y_rot = max(0, min(89, base_horizonal_ratio * 89 * 1.5))
+            horizonal_spring_rot = max(0, min(180, base_horizonal_ratio * 180 * 2))
+            horizonal_spring_y_rot = max(0, min(89, base_horizonal_ratio * 89 * 2))
 
             self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot)
             self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot)
@@ -4472,15 +4475,15 @@ class PhysicsParam:
             base_diagonal_ratio = air_resistance_ratio * mass_ratio
             self.advance_diagonal_joint_coefficient_spin.SetValue(base_diagonal_ratio * 20)
 
-            diagonal_joint_rot = max(0, min(180, (180 - base_diagonal_ratio * 180 * 1.5)))
-            diagonal_joint_y_rot = max(0, min(89, (89 - base_diagonal_ratio * 89 * 1.5)))
+            diagonal_joint_rot = max(0, min(180, (180 - base_diagonal_ratio * 180 * 2)))
+            diagonal_joint_y_rot = max(0, min(89, (89 - base_diagonal_ratio * 89 * 2)))
 
             # 制限角度が0の場合、ちょっとだけ動かす
             diagonal_joint_rot = 2 if not diagonal_joint_rot else diagonal_joint_rot
             diagonal_joint_y_rot = 2 if not diagonal_joint_y_rot else diagonal_joint_y_rot
 
-            diagonal_spring_rot = max(0, min(180, base_diagonal_ratio * 180 * 1.5))
-            diagonal_spring_y_rot = max(0, min(89, base_diagonal_ratio * 89 * 1.5))
+            diagonal_spring_rot = max(0, min(180, base_diagonal_ratio * 180 * 2))
+            diagonal_spring_y_rot = max(0, min(89, base_diagonal_ratio * 89 * 2))
 
             self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
             self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
