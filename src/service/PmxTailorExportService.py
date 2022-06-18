@@ -2542,13 +2542,15 @@ class PmxTailorExportService:
                     if next_below_bone:
                         x_sizes.append(now_below_bone.position.distanceToPoint(next_below_bone.position))
                     x_size = np.max(x_sizes)
-                elif prev_connected:
-                    x_sizes = []
-                    if prev_now_bone:
-                        x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
-                    if prev_below_bone:
-                        x_sizes.append(now_below_bone.position.distanceToPoint(prev_below_bone.position))
-                    x_size = np.max(x_sizes)
+                elif prev_connected and v_xidx > 0:
+                    if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                        if prev_now_bone:
+                            x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
+                        if prev_below_bone:
+                            x_sizes.append(now_below_bone.position.distanceToPoint(prev_below_bone.position))
+                        x_size = np.max(x_sizes)
+                    else:
+                        x_size = 0.2
                 else:
                     v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[now_now_bone.index]]
 

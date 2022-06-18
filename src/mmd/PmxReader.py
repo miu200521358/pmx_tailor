@@ -391,8 +391,11 @@ class PmxReader:
                     else:
                         # 既に同じボーン名がある場合、処理がおかしくなるので乱数追加
                         logger.warning(
-                            "ボーン名が重複しているため、後のボーンを無視します。\nモデル: %s\n重複ボーン名: %s(%s - %s)"
-                            % (pmx.name, bone.name, pmx.bones[bone.name].index, bone_idx),
+                            "ボーン名が重複しているため、後のボーンを無視します。\nモデル: %s\n重複ボーン名: %s(%s - %s)",
+                            pmx.name,
+                            bone.name,
+                            pmx.bones[bone.name].index,
+                            bone_idx,
                             decoration=MLogger.DECORATION_BOX,
                         )  # noqa
                         # 乱数追加してボーンリストにだけ追加
@@ -998,8 +1001,11 @@ class PmxReader:
                     else:
                         # 既に同じモーフ名がある場合、処理がおかしくなるので乱数追加
                         logger.warning(
-                            "モーフ名が重複しているため、後のモーフを無視します。\nモデル: %s\n重複モーフ名: %s(%s - %s)"
-                            % (pmx.name, morph.name, pmx.org_morphs[morph.name].index, morph_idx),
+                            "モーフ名が重複しているため、後のモーフを無視します。\nモデル: %s\n重複モーフ名: %s(%s - %s)",
+                            pmx.name,
+                            morph.name,
+                            pmx.org_morphs[morph.name].index,
+                            morph_idx,
                             decoration=MLogger.DECORATION_BOX,
                         )  # noqa
                         # 乱数追加してモーフリストにだけ追加
@@ -1091,8 +1097,11 @@ class PmxReader:
                     else:
                         # 既に同じ剛体名がある場合、処理がおかしくなるので乱数追加
                         logger.warning(
-                            "剛体名が重複しているため、後の剛体を無視します。\nモデル: %s\n重複剛体名: %s(%s - %s)"
-                            % (pmx.name, rigidbody.name, pmx.rigidbodies[rigidbody.name].index, rigidbody_idx),
+                            "剛体名が重複しているため、後の剛体を無視します。\nモデル: %s\n重複剛体名: %s(%s - %s)",
+                            pmx.name,
+                            rigidbody.name,
+                            pmx.rigidbodies[rigidbody.name].index,
+                            rigidbody_idx,
                             decoration=MLogger.DECORATION_BOX,
                         )  # noqa
                         # 乱数追加して剛体リストにだけ追加
@@ -1129,8 +1138,11 @@ class PmxReader:
                     else:
                         # 既に同じジョイント名がある場合、処理がおかしくなるので乱数追加
                         logger.warning(
-                            "ジョイント名が重複しているため、後のジョイントを無視します。\nモデル: %s\n重複ジョイント名: %s(%s - %s)"
-                            % (pmx.name, joint.name, pmx.joints[joint.name].index, joint_idx),
+                            "ジョイント名が重複しているため、後のジョイントを無視します。\nモデル: %s\n重複ジョイント名: %s(%s - %s)",
+                            pmx.name,
+                            joint.name,
+                            pmx.joints[joint.name].index,
+                            joint_idx,
                             decoration=MLogger.DECORATION_BOX,
                         )  # noqa
                         # 乱数追加してジョイントリストにだけ追加
