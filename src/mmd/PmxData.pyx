@@ -1041,6 +1041,7 @@ cdef class Capsule(OBB):
 class Joint:
     def __init__(self, name, english_name, joint_type, rigidbody_index_a, rigidbody_index_b, position, rotation, \
                  translation_limit_min, translation_limit_max, rotation_limit_min, rotation_limit_max, spring_constant_translation, spring_constant_rotation):
+        self.index = -1
         self.name = name
         self.english_name = english_name
         self.joint_type = joint_type

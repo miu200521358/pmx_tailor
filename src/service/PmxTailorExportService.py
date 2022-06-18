@@ -2599,7 +2599,7 @@ class PmxTailorExportService:
                 if v_xidx == registed_max_v_xidx and next_connected:
                     # 円周を描いている場合、最初（最後の次）からの中間にしておく
                     mean_x_idx = v_xidx + (max_v_xidx + 1 - v_xidx) / 2
-                elif prev_connected:
+                elif prev_connected and v_xidx > 0:
                     mean_x_idx = v_xidx + (prev_xidx - v_xidx) / 2
                 else:
                     mean_x_idx = v_xidx + (next_xidx - v_xidx) / 2
@@ -3081,9 +3081,9 @@ class PmxTailorExportService:
 
             # 直近頂点INDEXのウェイトを転写
             copy_front_vertex_idx = list(front_vertices.keys())[np.argmin(bv_distances)]
-            bv.deform = copy.deepcopy(model.vertex_dict[copy_front_vertex_idx].deform)
 
-            logger.debug(f"裏頂点: back [{bv.index}], front [{copy_front_vertex_idx}]")
+            logger.debug(f"裏頂点: back [{bv.index}], front [{copy_front_vertex_idx}], 距離 [{np.min(bv_distances)}]")
+            bv.deform = copy.deepcopy(model.vertex_dict[copy_front_vertex_idx].deform)
 
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
@@ -4713,7 +4713,10 @@ class PmxTailorExportService:
                 intersect = surface_normal.data()[target_idx]
             else:
                 # ボーンから面中心への向き（評価軸を殺して垂直にする）を親の面法線とする
-                material_normal = (mean_pos - parent_bone.position) * base_reverse_axis
+                if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
+                    material_normal = (mean_pos - parent_bone.position) * base_reverse_axis
+                else:
+                    material_normal = MVector3D.crossProduct(mean_pos, mean_pos + base_vertical_axis)
 
                 # 面中心を面法線方向に伸ばした垂線を線分とみなす
                 mean_line_segment = mean_pos + surface_normal
@@ -4910,10 +4913,13 @@ class PmxTailorExportService:
 
         horizonal_top_edge_keys = []
 
-        sign = 1 if param_option["direction"] in [logger.transtext("下"), logger.transtext("右")] else -1
-
         # 処理対象頂点の距離の中央値
-        mean_distances = np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
+        if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
+            mean_distances = np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
+        else:
+            mean_distances = np.linalg.norm(
+                (np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+            )
         mean_distance = np.mean(mean_distances)
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
@@ -4945,21 +4951,25 @@ class PmxTailorExportService:
             for n, (edge_lines, edge_poses, target_dots) in enumerate(
                 zip(all_edge_lines, all_edge_poses, target_diff_dots)
             ):
-                edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
+                if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
+                    edge_distances = np.linalg.norm(
+                        (np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1
+                    )
+                else:
+                    edge_distances = np.linalg.norm(
+                        (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+                    )
                 edge_mean_distance = np.mean(edge_distances)
-                if len(all_edge_lines) == 2 and edge_mean_distance * sign < mean_distance * sign:
+                if len(all_edge_lines) == 2 and edge_mean_distance < mean_distance:
                     # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
                     all_top_edge_keys = edge_lines
                     all_top_edge_poses = edge_poses
                     all_top_edge_dots = target_dots
                     all_top_edge_distances = edge_distances
 
-                if (
-                    len(all_edge_lines) != 2
-                    and np.array(edge_lines)[edge_distances * sign < mean_distance * sign].shape[0] > 0
-                ):
+                if len(all_edge_lines) != 2 and np.array(edge_lines)[edge_distances < mean_distance].shape[0] > 0:
                     # 距離が全体の距離より近い場合、上部とみなす
-                    for idx in np.where(edge_distances * sign < mean_distance * sign)[0]:
+                    for idx in np.where(edge_distances < mean_distance)[0]:
                         all_top_edge_keys.append(edge_lines[idx])
                         all_top_edge_poses.append(edge_poses[idx])
                         all_top_edge_dots.append(target_dots[idx])
@@ -5060,13 +5070,21 @@ class PmxTailorExportService:
         for n, (edge_lines, edge_poses, target_dots) in enumerate(
             zip(all_edge_lines, all_edge_poses, target_diff_dots)
         ):
-            edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
+            if edge_lines == horizonal_top_edge_keys:
+                continue
+
+            if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
+                edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
+            else:
+                edge_distances = np.linalg.norm(
+                    (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+                )
             edge_mean_distance = np.mean(edge_distances)
 
-            if np.array(edge_lines)[edge_distances * sign > mean_distance * sign].shape[0] > 0:
+            if np.array(edge_lines)[edge_distances > mean_distance].shape[0] > 0:
                 # 距離が全体の距離より遠い場合、下部とみなす
                 # bottom はスリットの可能性があるので、中央値でさらに区分けする
-                distance_idxs = np.where(edge_distances * sign > mean_distance * sign)[0]
+                distance_idxs = np.where(edge_distances > mean_distance)[0]
                 if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
                     idxs = (
                         [0] + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)] + [len(distance_idxs) - 1]

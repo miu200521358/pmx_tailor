@@ -474,7 +474,7 @@ class PhysicsParam:
         self.simple_direction_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("下"), logger.transtext("上"), logger.transtext("右"), logger.transtext("左")],
+            choices=[logger.transtext("下"), logger.transtext("右"), logger.transtext("左")],
         )
         self.simple_direction_ctrl.SetToolTip(self.simple_direction_txt.GetToolTipText())
         self.simple_direction_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -3042,11 +3042,11 @@ class PhysicsParam:
                 "special_shape": self.simple_special_shape_ctrl.GetStringSelection(),
                 "back_material_name": self.simple_back_material_ctrl.GetStringSelection(),
                 "back_extend_material_names": ",".join(
-                    [str(cidx) for cidx in self.simple_extend_back_choice_ctrl.GetSelections()]
+                    self.frame.material_list[cidx + 1] for cidx in self.simple_extend_back_choice_ctrl.GetSelections()
                 ),
                 "edge_material_name": self.simple_edge_material_ctrl.GetStringSelection(),
                 "edge_extend_material_names": ",".join(
-                    [str(cidx) for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()]
+                    self.frame.material_list[cidx + 1] for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()
                 ),
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
                 "vertices_grad_csv": self.vertices_grad_csv_file_ctrl.path(),
@@ -4005,16 +4005,24 @@ class PhysicsParam:
                 )
             if not self.simple_back_material_ctrl.GetStringSelection():
                 self.simple_back_material_ctrl.SetStringSelection(abb_setting.get("back_material_name", ""))
-            if not self.simple_extend_back_choice_ctrl.GetSelections():
-                for cidx in abb_setting.get("back_extend_material_names", "").split(","):
-                    if cidx:
-                        self.simple_edge_material_ctrl.SetSelection(int(cidx))
+            if not self.simple_extend_back_choice_ctrl.GetSelections() and abb_setting.get(
+                "back_extend_material_names", ""
+            ):
+                selected_idxs = []
+                for n, material_name in enumerate(self.frame.material_list):
+                    if material_name and material_name in abb_setting.get("back_extend_material_names", "").split(","):
+                        selected_idxs.append(n - 1)
+                self.simple_extend_back_choice_ctrl.SetSelections(selected_idxs)
             if not self.simple_edge_material_ctrl.GetStringSelection():
                 self.simple_edge_material_ctrl.SetStringSelection(abb_setting.get("edge_material_name", ""))
-            if not self.simple_extend_edge_choice_ctrl.GetSelections():
-                for cidx in abb_setting.get("edge_extend_material_names", "").split(","):
-                    if cidx:
-                        self.simple_extend_edge_choice_ctrl.SetSelection(int(cidx))
+            if not self.simple_extend_edge_choice_ctrl.GetSelections() and abb_setting.get(
+                "edge_extend_material_names", ""
+            ):
+                selected_idxs = []
+                for n, material_name in enumerate(self.frame.material_list):
+                    if material_name and material_name in abb_setting.get("edge_extend_material_names", "").split(","):
+                        selected_idxs.append(n - 1)
+                self.simple_extend_edge_choice_ctrl.SetSelections(selected_idxs)
             if not self.vertices_csv_file_ctrl.path():
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
             if not self.vertices_grad_csv_file_ctrl.path():
