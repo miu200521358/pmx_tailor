@@ -4153,7 +4153,7 @@ class PhysicsParam:
         if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸"):
             self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() / 30)
         else:
-            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() * 5)
+            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() * 2)
         self.rigidbody_coefficient_spin.SetValue(self.simple_mass_slider.GetValue() / 1.5)
         self.set_air_resistance(event)
 
