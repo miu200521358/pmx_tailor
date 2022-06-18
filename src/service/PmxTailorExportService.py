@@ -2596,11 +2596,12 @@ class PmxTailorExportService:
                         rigidbody_limit_thicks[rigidbody_y_idx],
                     )
 
-                if v_xidx == registed_max_v_xidx and next_connected:
+                if v_xidx == registed_max_v_xidx:
                     # 円周を描いている場合、最初（最後の次）からの中間にしておく
-                    mean_x_idx = v_xidx + (max_v_xidx + 1 - v_xidx) / 2
-                elif prev_connected and v_xidx > 0:
-                    mean_x_idx = v_xidx + (prev_xidx - v_xidx) / 2
+                    if next_connected:
+                        mean_x_idx = v_xidx + (max_v_xidx + 1 - v_xidx) / 2
+                    else:
+                        mean_x_idx = v_xidx
                 else:
                     mean_x_idx = v_xidx + (next_xidx - v_xidx) / 2
                 mean_y_idx = v_yidx + (below_yidx - v_yidx) / 2
