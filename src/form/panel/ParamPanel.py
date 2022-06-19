@@ -1083,10 +1083,10 @@ class PhysicsParam:
             self.advance_window,
             id=wx.ID_ANY,
             size=wx.Size(90, -1),
-            value="0.2",
+            value="0.1",
             min=0.01,
             max=10,
-            initial=0.2,
+            initial=0.1,
             inc=0.01,
         )
         self.rigidbody_root_thicks_spin.Bind(
