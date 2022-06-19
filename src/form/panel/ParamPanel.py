@@ -896,9 +896,7 @@ class PhysicsParam:
         self.advance_bone_grid_sizer.Add(self.density_type_txt, 0, wx.ALL, 5)
 
         self.density_type_ctrl = wx.Choice(
-            self.advance_window,
-            id=wx.ID_ANY,
-            choices=[logger.transtext("頂点"), logger.transtext("距離"), logger.transtext("距離間引き")],
+            self.advance_window, id=wx.ID_ANY, choices=[logger.transtext("頂点"), logger.transtext("距離")]
         )
         self.density_type_ctrl.SetToolTip(self.density_type_txt.GetToolTipText())
         self.density_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)

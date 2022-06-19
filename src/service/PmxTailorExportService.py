@@ -3943,58 +3943,6 @@ class PmxTailorExportService:
                 for v_yidx, y_regist in enumerate(y_regists):
                     for v_xidx, x_regist in enumerate(x_regists):
                         regist_bones[v_yidx, v_xidx] = y_regist and x_regist
-            elif param_option["density_type"] == logger.transtext("距離間引き"):
-                median_vertical_distance = np.median(
-                    all_bone_vertical_distances[base_map_idx][:, int(vertex_map.shape[1] / 2)]
-                )
-                median_horizonal_distance = np.median(
-                    all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), :]
-                )
-
-                logger.debug(
-                    f"median_horizonal_distance: {round(median_horizonal_distance, 4)}, median_vertical_distance: {round(median_vertical_distance, 4)}"
-                )
-
-                # 間隔が距離タイプの場合、均等になるように間を空ける
-                y_regists = np.zeros(vertex_map.shape[0], dtype=np.int)
-                prev_y_regist = 0
-                for v_yidx in range(vertex_map.shape[0]):
-                    if (
-                        np.sum(
-                            all_bone_vertical_distances[base_map_idx][
-                                (prev_y_regist + 1) : (v_yidx + 1), int(vertex_map.shape[1] / 2)
-                            ]
-                        )
-                        > median_vertical_distance * param_option["vertical_bone_density"]
-                    ):
-                        # 前の登録ボーンから一定距離離れたら登録対象
-                        y_regists[v_yidx] = True
-                        prev_y_regist = v_yidx
-                # 最初と最後は必ず登録する
-                y_regists[0] = y_regists[-1] = True
-
-                for v_yidx in range(vertex_map.shape[0]):
-                    prev_x_regist = 0
-
-                    for v_xidx in range(vertex_map.shape[1]):
-                        if np.isnan(vertex_map[v_yidx, v_xidx]).any() or not y_regists[v_yidx]:
-                            # 登録対象ではない場合、Falseのまま
-                            continue
-
-                        if v_xidx in [0, vertex_map.shape[1] - 1]:
-                            # 最初と最後は必ず登録
-                            regist_bones[v_yidx, v_xidx] = True
-                            continue
-
-                        if (
-                            np.sum(
-                                all_bone_horizonal_distances[base_map_idx][v_yidx, (prev_x_regist + 1) : (v_xidx + 1)]
-                            )
-                            > median_horizonal_distance * param_option["horizonal_bone_density"]
-                        ):
-                            # 前の登録ボーンから一定距離離れたら登録対象
-                            regist_bones[v_yidx, v_xidx] = True
-                            prev_x_regist = v_xidx
 
             else:
                 # 間隔が頂点タイプの場合、規則的に間を空ける(Yは末端は非表示になるので、もう一つ上も登録対象)
@@ -4025,36 +3973,47 @@ class PmxTailorExportService:
 
                     # 親は既にモデルに登録済みのものを選ぶ
                     parent_bone = None
-                    if v_yidx > 0:
-                        # 0番目以降は既に登録済みの上のボーンを採用する
+                    for parent_v_yidx in range(v_yidx - 1, -1, -1):
+                        target_vkey = vertex_map[parent_v_yidx, v_xidx]
+                        if np.isnan(target_vkey).any():
+                            continue
 
-                        # 親候補のX位置一覧
-                        parent_xidxs = (
-                            list(range(v_xidx, -1, -1))
-                            if v_xidx > 0
-                            else list(range(v_xidx + 1, vertex_map.shape[1]))
-                        )
-
-                        for parent_v_yidx in range(v_yidx - 1, -1, -1):
-                            for parent_v_xidx in parent_xidxs:
-                                target_vkey = vertex_map[parent_v_yidx, parent_v_xidx]
-                                if np.isnan(target_vkey).any():
-                                    continue
-
-                                parent_bone = virtual_vertices[tuple(target_vkey)].map_bones.get(
-                                    base_map_idx, None
-                                )
-                                if parent_bone and (
-                                    parent_bone.name in model.bones or parent_bone.name in tmp_all_bones
-                                ):
-                                    # 登録されていたら終了
-                                    break
-                            if parent_bone:
-                                break
+                        parent_bone = virtual_vertices[tuple(target_vkey)].map_bones.get(base_map_idx, None)
+                        if parent_bone and (parent_bone.name in model.bones or parent_bone.name in tmp_all_bones):
+                            # 登録されていたら終了
+                            break
 
                     if not parent_bone:
-                        # 最後まで登録されている親ボーンが見つからなければ、ルート
-                        parent_bone = root_bone
+                        if v_yidx > 0:
+                            # 0番目以降は既に登録済みの上のボーンを採用する
+
+                            # 親候補のX位置一覧
+                            parent_xidxs = (
+                                list(range(v_xidx - 1, -1, -1))
+                                if v_xidx > 0
+                                else list(range(v_xidx + 1, vertex_map.shape[1]))
+                            )
+
+                            for parent_v_xidx in parent_xidxs:
+                                for parent_v_yidx in range(v_yidx - 1, -1, -1):
+                                    target_vkey = vertex_map[parent_v_yidx, parent_v_xidx]
+                                    if np.isnan(target_vkey).any():
+                                        continue
+
+                                    parent_bone = virtual_vertices[tuple(target_vkey)].map_bones.get(
+                                        base_map_idx, None
+                                    )
+                                    if parent_bone and (
+                                        parent_bone.name in model.bones or parent_bone.name in tmp_all_bones
+                                    ):
+                                        # 登録されていたら終了
+                                        break
+                                if parent_bone:
+                                    break
+
+                        if not parent_bone:
+                            # 最後まで登録されている親ボーンが見つからなければ、ルート
+                            parent_bone = root_bone
 
                     if not vv.map_bones.get(base_map_idx, None):
                         # ボーン仮登録
