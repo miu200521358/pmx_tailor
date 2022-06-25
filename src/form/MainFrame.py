@@ -9,13 +9,13 @@ from form.panel.FilePanel import FilePanel
 from form.panel.ParamPanel import ParamPanel
 from form.panel.ParamAdvancePanel import ParamAdvancePanel
 from form.panel.ParamBonePanel import ParamBonePanel
-from utils import MFormUtils, MFileUtils # noqa
-from utils.MLogger import MLogger # noqa
+from utils import MFormUtils, MFileUtils  # noqa
+from utils.MLogger import MLogger  # noqa
 from form.worker.ExportWorkerThread import ExportWorkerThread
 from form.worker.LoadWorkerThread import LoadWorkerThread
 
 if os.name == "nt":
-    import winsound     # Windows版のみインポート
+    import winsound  # Windows版のみインポート
 
 logger = MLogger(__name__)
 
@@ -26,8 +26,9 @@ logger = MLogger(__name__)
 
 
 class MainFrame(wx.Frame):
-
-    def __init__(self, parent, mydir_path: str, version_name: str, logging_level: int, is_saving: bool, is_out_log: bool):
+    def __init__(
+        self, parent, mydir_path: str, version_name: str, logging_level: int, is_saving: bool, is_out_log: bool
+    ):
         self.version_name = version_name
         self.logging_level = logging_level
         self.is_out_log = is_out_log
@@ -35,11 +36,11 @@ class MainFrame(wx.Frame):
         self.mydir_path = mydir_path
         self.elapsed_time = 0
         self.popuped_finger_warning = False
-        
+
         self.worker = None
         self.load_worker = None
 
-        self.my_program = 'PmxTailor'
+        self.my_program = "PmxTailor"
 
         frame_size = wx.Size(600, 700)
         if logger.target_lang == "en_US":
@@ -47,9 +48,16 @@ class MainFrame(wx.Frame):
         elif logger.target_lang == "zh_CN":
             frame_size = wx.Size(700, 700)
 
-        frame_title = logger.transtext(f'{self.my_program} ローカル版') + f' {self.version_name}'
-        wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=frame_title, \
-                          pos=wx.DefaultPosition, size=frame_size, style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
+        frame_title = logger.transtext(f"{self.my_program} ローカル版") + f" {self.version_name}"
+        wx.Frame.__init__(
+            self,
+            parent,
+            id=wx.ID_ANY,
+            title=frame_title,
+            pos=wx.DefaultPosition,
+            size=frame_size,
+            style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL,
+        )
 
         # ファイル履歴読み込み
         self.file_hitories = MFileUtils.read_history(self.mydir_path)
@@ -88,7 +96,7 @@ class MainFrame(wx.Frame):
         # パラ調整タブ
         self.simple_param_panel_ctrl = ParamPanel(self, self.note_ctrl, 1)
         self.note_ctrl.AddPage(self.simple_param_panel_ctrl, logger.transtext("パラ調整"), False)
-        
+
         # パラ調整(詳細)タブ
         self.advance_param_panel_ctrl = ParamAdvancePanel(self, self.note_ctrl, 2)
         self.note_ctrl.AddPage(self.advance_param_panel_ctrl, logger.transtext("パラ調整(詳細)"), False)
@@ -96,7 +104,7 @@ class MainFrame(wx.Frame):
         # パラ調整(ボーン)タブ
         self.bone_param_panel_ctrl = ParamBonePanel(self, self.note_ctrl, 3)
         self.note_ctrl.AddPage(self.bone_param_panel_ctrl, logger.transtext("パラ調整(ボーン)"), False)
-        
+
         # ---------------------------------------------
 
         # タブ押下時の処理
@@ -117,7 +125,7 @@ class MainFrame(wx.Frame):
         self.Layout()
 
         self.Centre(wx.BOTH)
-    
+
     def on_idle(self, event: wx.Event):
         pass
 
@@ -137,7 +145,7 @@ class MainFrame(wx.Frame):
             self.note_ctrl.SetSelection(self.file_panel_ctrl.tab_idx)
             self.file_panel_ctrl.fix_tab()
 
-            logger.info(logger.transtext("パラ調整タブ表示準備開始\nファイル読み込み処理を実行します。少しお待ちください...."), decoration=MLogger.DECORATION_BOX)
+            logger.info("パラ調整タブ表示準備開始\nファイル読み込み処理を実行します。少しお待ちください....", decoration=MLogger.DECORATION_BOX)
 
             # 読み込み処理実行
             self.load(event, is_param=True)
@@ -151,7 +159,7 @@ class MainFrame(wx.Frame):
             self.note_ctrl.SetSelection(self.file_panel_ctrl.tab_idx)
             self.file_panel_ctrl.fix_tab()
 
-            logger.info(logger.transtext("パラ調整(詳細)タブ表示準備開始\nファイル読み込み処理を実行します。少しお待ちください...."), decoration=MLogger.DECORATION_BOX)
+            logger.info("パラ調整(詳細)タブ表示準備開始\nファイル読み込み処理を実行します。少しお待ちください....", decoration=MLogger.DECORATION_BOX)
 
             # 読み込み処理実行
             self.load(event, is_param_advance=True)
@@ -165,7 +173,7 @@ class MainFrame(wx.Frame):
             self.note_ctrl.SetSelection(self.file_panel_ctrl.tab_idx)
             self.file_panel_ctrl.fix_tab()
 
-            logger.info(logger.transtext("パラ調整(ボーン)タブ表示準備開始\nファイル読み込み処理を実行します。少しお待ちください...."), decoration=MLogger.DECORATION_BOX)
+            logger.info("パラ調整(ボーン)タブ表示準備開始\nファイル読み込み処理を実行します。少しお待ちください....", decoration=MLogger.DECORATION_BOX)
 
             # 読み込み処理実行
             self.load(event, is_param_bone=True)
@@ -197,14 +205,14 @@ class MainFrame(wx.Frame):
                 worked_time = "{0:02d}m{1:02d}s".format(int(td_m), int(td_s))
 
         return worked_time
-    
+
     # ファイルセットの入力可否チェック
     def is_valid(self):
         result = True
         result = self.file_panel_ctrl.org_model_file_ctrl.is_valid() and result
 
         return result
-    
+
     # 読み込み
     def load(self, event, is_exec=False, is_param=False, is_param_advance=False, is_param_bone=False):
         # フォーム無効化
@@ -224,9 +232,14 @@ class MainFrame(wx.Frame):
                 if is_param_bone:
                     tab_name = logger.transtext("パラ調整(ボーン)")
                 # 読み込み出来なかったらエラー
-                logger.error("「ファイル」タブで対象モデルファイルパスが指定されていないため、「%s」タブが開けません。" \
-                             + "\n既に指定済みの場合、現在読み込み中の可能性があります。" \
-                             + "\n「■読み込み成功」のログが出てから、「%s」タブを開いてください。", tab_name, tab_name, decoration=MLogger.DECORATION_BOX)
+                logger.error(
+                    "「ファイル」タブで対象モデルファイルパスが指定されていないため、「%s」タブが開けません。"
+                    + "\n既に指定済みの場合、現在読み込み中の可能性があります。"
+                    + "\n「■読み込み成功」のログが出てから、「%s」タブを開いてください。",
+                    tab_name,
+                    tab_name,
+                    decoration=MLogger.DECORATION_BOX,
+                )
 
             # タブ移動可
             self.release_tab()
@@ -237,14 +250,16 @@ class MainFrame(wx.Frame):
 
         # 読み込み開始
         if self.load_worker:
-            logger.error(logger.transtext("まだ処理が実行中です。終了してから再度実行してください。"), decoration=MLogger.DECORATION_BOX)
+            logger.error("まだ処理が実行中です。終了してから再度実行してください。", decoration=MLogger.DECORATION_BOX)
         else:
             # 停止ボタンに切り替え
             self.file_panel_ctrl.export_btn_ctrl.SetLabel(logger.transtext("読み込み処理停止"))
             self.file_panel_ctrl.export_btn_ctrl.Enable()
 
             # 別スレッドで実行
-            self.load_worker = LoadWorkerThread(self, LoadThreadEvent, is_exec, is_param, is_param_advance, is_param_bone)
+            self.load_worker = LoadWorkerThread(
+                self, LoadThreadEvent, is_exec, is_param, is_param_advance, is_param_bone
+            )
             self.load_worker.start()
 
         return result
@@ -255,7 +270,7 @@ class MainFrame(wx.Frame):
     # 読み込み完了処理
     def on_load_result(self, event: wx.Event):
         self.elapsed_time = event.elapsed_time
-        
+
         # タブ移動可
         self.release_tab()
         # フォーム有効化
@@ -279,8 +294,8 @@ class MainFrame(wx.Frame):
 
             event.Skip()
             return False
-        
-        logger.info(logger.transtext("ファイルデータ読み込みが完了しました"), decoration=MLogger.DECORATION_BOX, title="OK")
+
+        logger.info("ファイルデータ読み込みが完了しました", decoration=MLogger.DECORATION_BOX, title="OK")
 
         if event.is_exec:
             if not self.is_loaded_valid():
@@ -302,7 +317,7 @@ class MainFrame(wx.Frame):
             self.file_panel_ctrl.fix_tab()
 
             if self.worker:
-                logger.error(logger.transtext("まだ処理が実行中です。終了してから再度実行してください。"), decoration=MLogger.DECORATION_BOX)
+                logger.error("まだ処理が実行中です。終了してから再度実行してください。", decoration=MLogger.DECORATION_BOX)
             else:
                 # 停止ボタンに切り替え
                 self.file_panel_ctrl.export_btn_ctrl.SetLabel(self.file_panel_ctrl.txt_stop)
@@ -332,7 +347,7 @@ class MainFrame(wx.Frame):
             self.sound_finish()
 
             logger.info("\n処理時間: %s", self.show_worked_time())
-        
+
             event.Skip()
             return True
 

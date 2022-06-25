@@ -331,13 +331,14 @@ class MLogger:
         return trans_msg
 
     @classmethod
-    def initialize(cls, level=logging.INFO, is_file=False, mode=MODE_READONLY):
+    def initialize(cls, level=logging.INFO, is_file=False, target_lang=None, mode=MODE_READONLY):
         # logging.basicConfig(level=level)
         logging.basicConfig(level=level, format=cls.DEFAULT_FORMAT)
         cls.total_level = level
         cls.is_file = is_file
         cls.mode = mode
         cls.outout_datetime = "{0:%Y%m%d_%H%M%S}".format(datetime.now())
+        cls.lang = target_lang
 
         if mode == MLogger.MODE_UPDATE:
             # 更新版の場合、必要なディレクトリ・ファイルを全部作成する
@@ -352,7 +353,7 @@ class MLogger:
                         print("*** Message Dump ERROR ***\n%s", traceback.format_exc())
 
         # 実行環境に応じたローカル言語
-        lang = locale.getdefaultlocale()[0]
+        lang = target_lang if target_lang else locale.getdefaultlocale()[0]
         if lang not in cls.langs:
             # 実行環境言語に対応した言語が出力対象外である場合、第一言語を出力する
             cls.target_lang = cls.langs[0]

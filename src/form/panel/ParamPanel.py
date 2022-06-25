@@ -4178,12 +4178,16 @@ class PhysicsParam:
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
             self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
-        elif logger.transtext("胸") in self.simple_primitive_ctrl.GetStringSelection():
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext(
+            "胸(小)"
+        ) or self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
             self.physics_type_ctrl.SetStringSelection(logger.transtext("胸"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("球"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
             self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
-        elif logger.transtext("髪") in self.simple_primitive_ctrl.GetStringSelection():
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext(
+            "髪(ショート)"
+        ) or self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
             self.physics_type_ctrl.SetStringSelection(logger.transtext("髪"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
