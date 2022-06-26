@@ -773,7 +773,11 @@ class PmxTailorExportService:
         ]:
             # 胸の場合、N式おっぱい構造ボーンとウェイトを設定する
             virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone = self.create_bone_map(
-                model, param_option, material_name, target_vertices, is_root_bone=False
+                model,
+                param_option,
+                material_name,
+                target_vertices,
+                is_root_bone=(param_option["parent_type"] == logger.transtext("中心")),
             )
 
             self.create_bust_physics(
@@ -787,7 +791,11 @@ class PmxTailorExportService:
         else:
             if param_option["exist_physics_clear"] == logger.transtext("再利用"):
                 virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone = self.create_bone_map(
-                    model, param_option, material_name, target_vertices, is_root_bone=False
+                    model,
+                    param_option,
+                    material_name,
+                    target_vertices,
+                    is_root_bone=(param_option["parent_type"] == logger.transtext("中心")),
                 )
             else:
                 vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold = self.create_vertex_map(
@@ -2352,9 +2360,7 @@ class PmxTailorExportService:
                     continue
                 top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
 
-        if param_option["exist_physics_clear"] != logger.transtext("再利用") and param_option[
-            "parent_type"
-        ] == logger.transtext("中心"):
+        if param_option["parent_type"] == logger.transtext("中心"):
             root_rigidbody = self.get_rigidbody(model, root_bone.name)
             if not root_rigidbody:
                 # 中心剛体を接触なしボーン追従剛体で生成
@@ -2566,7 +2572,7 @@ class PmxTailorExportService:
                     all_vertex_distances = np.sqrt(np.sum(all_vertex_diffs**2, axis=-1))
                     x_size = np.median(all_vertex_distances)
 
-                if v_yidx == registed_max_v_yidx:
+                if v_yidx > 0 and v_yidx == registed_max_v_yidx:
                     # 末端は上との長さにしておく
                     y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
                 else:
