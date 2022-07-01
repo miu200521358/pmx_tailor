@@ -1072,7 +1072,7 @@ class PmxTailorExportService:
                     parent_bone_rigidbody.shape_size.x(),
                 )
 
-                bone_y_idx = np.where(np.array(vv_keys) == v_yidx)[0][0]
+                bone_y_idx = np.where(np.array(vv_keys) == v_yidx)[0][0] + 1
 
                 (
                     prev_map_idx,
@@ -1421,10 +1421,7 @@ class PmxTailorExportService:
                         # ボーン進行方向(x)
                         x_direction_pos = (b_bone.position - a_bone.position).normalized()
                         # ボーン進行方向に対しての縦軸(z)
-                        if v_yidx == 0:
-                            z_direction_pos = b_rigidbody.z_direction.normalized()
-                        else:
-                            z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
+                        z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
                         joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
 
                         ratio = 1
@@ -1544,12 +1541,7 @@ class PmxTailorExportService:
                             # ボーン進行方向(x)
                             x_direction_pos = (b_pos - a_pos).normalized()
                             # ボーン進行方向に対しての縦軸(z)
-                            if v_yidx == 0:
-                                z_direction_pos = b_rigidbody.z_direction.normalized()
-                            else:
-                                z_direction_pos = (
-                                    (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
-                                ).normalized()
+                            z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
 
                             joint_key, joint = self.build_joint(
@@ -1613,12 +1605,7 @@ class PmxTailorExportService:
                             # ボーン進行方向(x)
                             x_direction_pos = (b_bone.position - a_bone.position).normalized()
                             # ボーン進行方向に対しての縦軸(z)
-                            if v_yidx == 0:
-                                z_direction_pos = b_rigidbody.z_direction.normalized()
-                            else:
-                                z_direction_pos = (
-                                    (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
-                                ).normalized()
+                            z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
 
                             joint_key, joint = self.build_joint(
@@ -1671,12 +1658,9 @@ class PmxTailorExportService:
                                 # ボーン進行方向(x)
                                 x_direction_pos = (b_bone.position - a_bone.position).normalized()
                                 # ボーン進行方向に対しての縦軸(z)
-                                if v_yidx == 0:
-                                    z_direction_pos = b_rigidbody.z_direction.normalized()
-                                else:
-                                    z_direction_pos = (
-                                        (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
-                                    ).normalized()
+                                z_direction_pos = (
+                                    (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
+                                ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
 
                                 joint_key, joint = self.build_joint(
@@ -2394,28 +2378,17 @@ class PmxTailorExportService:
 
             # 厚みの判定
 
-            # 上下はY軸比較, 左右はX軸比較
-            target_idx = 1 if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")] else 0
-            target_direction = 1 if param_option["direction"] in [logger.transtext("上"), logger.transtext("右")] else -1
-
-            # キーは比較対象＋向きで昇順
-            vv_keys = sorted(np.unique(vertex_map[np.where(regist_bones)][:, target_idx]) * target_direction)
-            # 厚みは比較キーの数分だけ作る
-            rigidbody_limit_thicks = np.linspace(
-                param_option["rigidbody_root_thicks"], param_option["rigidbody_end_thicks"], len(vv_keys)
-            )
-
             # 縦段INDEX
             v_yidxs = list(range(regist_bones.shape[0]))
-            if param_option["physics_type"] in [logger.transtext("髪")]:
-                # 髪は形状維持のため末端ほど質量を軽くする
-                rigidbody_masses = np.linspace(
-                    param_rigidbody.param.mass * coefficient, param_rigidbody.param.mass, len(v_yidxs)
-                )
-            else:
-                rigidbody_masses = np.linspace(
-                    param_rigidbody.param.mass, param_rigidbody.param.mass * coefficient * 2, len(v_yidxs)
-                )
+            rigidbody_masses = np.linspace(
+                param_rigidbody.param.mass, param_rigidbody.param.mass / coefficient, len(v_yidxs)
+            )
+
+            # 厚みは比較キーの数分だけ作る
+            rigidbody_limit_thicks = np.linspace(
+                param_option["rigidbody_root_thicks"], param_option["rigidbody_end_thicks"], len(v_yidxs)
+            )
+
             linear_dampings = np.linspace(
                 param_rigidbody.param.linear_damping,
                 min(0.999, param_rigidbody.param.linear_damping * coefficient),
@@ -2536,11 +2509,6 @@ class PmxTailorExportService:
                     # ウェイトを持ってないボーンは登録対象外（有り得るので警告なし）
                     continue
 
-                # 剛体の厚みINDEX
-                rigidbody_y_idx = np.where(vv_keys == rigidbody_bone_key[target_idx] * target_direction)[0]
-                if not rigidbody_y_idx:
-                    rigidbody_y_idx = 0
-
                 if next_connected:
                     x_sizes = []
                     if next_now_bone:
@@ -2572,7 +2540,7 @@ class PmxTailorExportService:
                     all_vertex_distances = np.sqrt(np.sum(all_vertex_diffs**2, axis=-1))
                     x_size = np.median(all_vertex_distances)
 
-                if v_yidx > 0 and v_yidx == registed_max_v_yidx:
+                if v_yidx > 0 and v_yidx == registed_max_v_yidx and now_above_bone:
                     # 末端は上との長さにしておく
                     y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
                 else:
@@ -2581,27 +2549,40 @@ class PmxTailorExportService:
 
                 if rigidbody_shape_type == 0:
                     # 球剛体の場合
-                    ball_size = np.mean([x_size, y_size]) * 0.5
+                    ball_size = np.mean([x_size, y_size]) * rigidbody_limit_thicks[v_yidx]
                     shape_size = MVector3D(ball_size, ball_size, ball_size)
+                    shape_volume = 4 / 3 * math.pi * shape_size.x()
 
                 elif rigidbody_shape_type == 1:
                     # 箱剛体の場合
                     shape_size = MVector3D(
                         x_size * (0.5 if next_connected or prev_connected else 1),
                         max(0.25, y_size) * 0.5,
-                        rigidbody_limit_thicks[rigidbody_y_idx],
+                        rigidbody_limit_thicks[v_yidx],
                     )
-
-                    # if param_option["physics_type"] == logger.transtext("布") and v_yidx == registed_max_v_yidx:
-                    #     # 布で末端の場合、幅を小さくする
-                    #     shape_size.setX(shape_size.x() * 0.3)
-
+                    shape_volume = shape_size.x() * shape_size.y() * shape_size.z()
                 else:
                     # カプセル剛体の場合
                     shape_size = MVector3D(
-                        x_size * 0.5,
-                        max(0.25, y_size) * 0.5,
-                        rigidbody_limit_thicks[rigidbody_y_idx],
+                        x_size * rigidbody_limit_thicks[v_yidx],
+                        max(0.25, y_size) * 0.8,
+                        rigidbody_limit_thicks[v_yidx],
+                    )
+                    shape_volume = (shape_size.x() * shape_size.x() * math.pi * shape_size.y()) + (
+                        4 / 3 * math.pi * shape_size.x()
+                    )
+
+                logger.debug(
+                    "name: %s, size: %s, volume: %s",
+                    vv.map_bones[base_map_idx].name,
+                    shape_size.to_log(),
+                    shape_volume,
+                )
+                if shape_volume < 0.005:
+                    logger.warning(
+                        "剛体体積が小さいため、物理が溶ける可能性があります 剛体名: %s, 剛体体積: %s",
+                        vv.map_bones[base_map_idx].name,
+                        round(shape_volume, 5),
                     )
 
                 if v_xidx == registed_max_v_xidx:

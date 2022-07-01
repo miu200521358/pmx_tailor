@@ -163,6 +163,15 @@ class ParamPanel(BasePanel):
                         self.physics_list[-1].simple_back_material_ctrl.SetStringSelection(
                             vroid2pmx_setting.get("back_material_name", "")
                         )
+                        if vroid2pmx_setting.get("back_extend_material_names", []):
+                            selected_idxs = []
+                            for n, material_name in enumerate(self.material_list):
+                                if material_name and material_name in vroid2pmx_setting.get(
+                                    "back_extend_material_names", []
+                                ):
+                                    selected_idxs.append(n - 1)
+                            self.physics_list[-1].simple_extend_back_choice_ctrl.SetSelections(selected_idxs)
+
                         self.physics_list[-1].simple_parent_bone_ctrl.SetStringSelection(
                             vroid2pmx_setting["parent_bone_name"]
                         )
@@ -180,6 +189,22 @@ class ParamPanel(BasePanel):
                         self.physics_list[-1].bone_material_ctrl.SetLabelText(label_text)
 
                         self.physics_list[-1].set_simple_primitive(event)
+
+                        if "耳" in vroid2pmx_setting["abb_name"]:
+                            self.physics_list[-1].simple_air_resistance_slider.SetValue(5)
+                            self.physics_list[-1].simple_shape_maintenance_slider.SetValue(5)
+                            self.physics_list[-1].set_mass(event)
+                        elif (
+                            "CS" in vroid2pmx_setting["abb_name"]
+                            or "SK" in vroid2pmx_setting["abb_name"]
+                            or "CT" in vroid2pmx_setting["abb_name"]
+                        ):
+                            self.physics_list[-1].advance_horizonal_joint_restruct_check.SetValue(0)
+                            self.physics_list[-1].simple_mass_slider.SetValue(4.6)
+                            self.physics_list[-1].simple_air_resistance_slider.SetValue(3.6)
+                            self.physics_list[-1].simple_shape_maintenance_slider.SetValue(4)
+
+                        self.physics_list[-1].set_mass(event)
                         self.physics_list[-1].initialize_bone_param(event)
 
                         for c, target_bone_cols in enumerate(vroid2pmx_setting["target_bones"]):
@@ -194,8 +219,22 @@ class ParamPanel(BasePanel):
                             # ケモ耳は中心ボーンを作る
                             self.physics_list[-1].parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
 
-                        if "Skrt" in vroid2pmx_setting["abb_name"] or "Coat" in vroid2pmx_setting["abb_name"]:
-                            # スカートはボーン位置
+                        # 剛体の厚みを設定する
+                        self.physics_list[-1].rigidbody_root_thicks_spin.SetValue(
+                            vroid2pmx_setting.get("rigidbody_root_thick", 0.5)
+                        )
+                        self.physics_list[-1].rigidbody_end_thicks_spin.SetValue(
+                            vroid2pmx_setting.get("rigidbody_end_thick", 0.5)
+                        )
+
+                        if (
+                            "CS" in vroid2pmx_setting["abb_name"]
+                            or "SK" in vroid2pmx_setting["abb_name"]
+                            or "CT" in vroid2pmx_setting["abb_name"]
+                        ):
+                            self.physics_list[-1].advance_horizonal_joint_restruct_check.SetValue(0)
+                            # self.physics_list[-1].horizonal_joint_mov_y_min_spin.SetValue(-3)
+                            # self.physics_list[-1].horizonal_joint_mov_y_max_spin.SetValue(3)
                             self.physics_list[-1].joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
                 except Exception:
@@ -4152,8 +4191,17 @@ class PhysicsParam:
         if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸"):
             self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() / 30)
         else:
-            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() * 2)
-        self.rigidbody_coefficient_spin.SetValue(self.simple_mass_slider.GetValue() / 1.5)
+            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
+
+        if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
+            self.rigidbody_coefficient_spin.SetValue(20 / self.simple_mass_slider.GetValue())
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
+            self.rigidbody_coefficient_spin.SetValue(10 / self.simple_mass_slider.GetValue())
+        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
+            self.rigidbody_coefficient_spin.SetValue(10 / self.simple_mass_slider.GetValue())
+        else:
+            self.rigidbody_coefficient_spin.SetValue(5 / self.simple_mass_slider.GetValue())
+
         self.set_air_resistance(event)
 
     def set_simple_primitive(self, event: wx.Event):
@@ -4184,13 +4232,14 @@ class PhysicsParam:
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("球"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
             self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext(
-            "髪(ショート)"
-        ) or self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
+        elif logger.transtext("髪") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("髪"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
-            self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
+            if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
+                self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
+            else:
+                self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
         else:
             self.physics_type_ctrl.SetStringSelection(logger.transtext("布"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("箱"))
@@ -4245,23 +4294,30 @@ class PhysicsParam:
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
-            self.simple_mass_slider.SetValue(1.8)
-            # 前髪は制限角度を0にする
-            self.simple_air_resistance_slider.SetValue(5)
-            self.simple_shape_maintenance_slider.SetValue(5)
+            self.simple_mass_slider.SetValue(0.8)
+            self.simple_air_resistance_slider.SetValue(3.2)
+            self.simple_shape_maintenance_slider.SetValue(4.2)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
+            self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
+
+            self.advance_vertical_reverse_joint_coefficient_spin.SetValue(1.0)
+            self.advance_vertical_reverse_joint_valid_check.SetValue(1)
+
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
-            self.simple_mass_slider.SetValue(2.3)
+            self.simple_mass_slider.SetValue(1.2)
             self.simple_air_resistance_slider.SetValue(2.3)
             self.simple_shape_maintenance_slider.SetValue(3.5)
+
+            self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
-            self.simple_mass_slider.SetValue(1)
+            self.simple_mass_slider.SetValue(0.8)
             self.simple_air_resistance_slider.SetValue(2.7)
             self.simple_shape_maintenance_slider.SetValue(3.8)
 
+            self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
@@ -4282,8 +4338,6 @@ class PhysicsParam:
             self.advance_diagonal_joint_valid_check.SetValue(1)
 
         self.set_mass(event)
-        self.set_air_resistance(event)
-        self.set_shape_maintenance(event)
         self.on_vertical_joint(event)
         self.on_horizonal_joint(event)
         self.on_diagonal_joint(event)
@@ -4423,10 +4477,11 @@ class PhysicsParam:
 
             # 縦ジョイント
             base_vertical_ratio = air_resistance_ratio * shape_maintenance_ratio
-            self.advance_vertical_joint_coefficient_spin.SetValue(base_vertical_ratio * 20)
+            if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
+                self.advance_vertical_joint_coefficient_spin.SetValue(base_vertical_ratio * 10)
 
-            vertical_joint_rot = max(0, min(180, (180 - base_vertical_ratio * 180 * 2)))
-            vertical_joint_y_rot = max(0, min(89, (89 - base_vertical_ratio * 89 * 2)))
+            vertical_joint_rot = max(0, min(180, (180 - base_vertical_ratio * 180 * 1.5)))
+            vertical_joint_y_rot = max(0, min(89, (89 - base_vertical_ratio * 89 * 1.5)))
 
             # 制限角度が0の場合、ちょっとだけ動かす
             vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
@@ -4436,11 +4491,11 @@ class PhysicsParam:
             vertical_spring_y_rot = max(0, min(89, base_vertical_ratio * 89 * 2))
 
             if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
-                # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を大きくしておく
+                # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を小さめにしておく
                 vertical_joint_rot /= 1.2
                 vertical_joint_y_rot /= 1.2
-                vertical_spring_rot *= 1.2
-                vertical_spring_y_rot *= 1.2
+                vertical_spring_rot /= 3
+                vertical_spring_y_rot /= 3
 
             self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
             self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
@@ -4459,7 +4514,8 @@ class PhysicsParam:
             self.horizonal_joint_mov_x_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_x_max_spin.SetValue(horizonal_joint_mov)
 
-            self.advance_horizonal_joint_coefficient_spin.SetValue(base_horizonal_ratio * 20)
+            if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
+                self.advance_horizonal_joint_coefficient_spin.SetValue(base_horizonal_ratio * 20)
 
             horizonal_joint_rot = max(0, min(180, (180 - base_horizonal_ratio * 180 * 2)))
             horizonal_joint_y_rot = max(0, min(89, (89 - base_horizonal_ratio * 89 * 2)))
@@ -4484,7 +4540,8 @@ class PhysicsParam:
 
             # 斜めジョイント
             base_diagonal_ratio = air_resistance_ratio * mass_ratio
-            self.advance_diagonal_joint_coefficient_spin.SetValue(base_diagonal_ratio * 20)
+            if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
+                self.advance_diagonal_joint_coefficient_spin.SetValue(base_diagonal_ratio * 10)
 
             diagonal_joint_rot = max(0, min(180, (180 - base_diagonal_ratio * 180 * 2)))
             diagonal_joint_y_rot = max(0, min(89, (89 - base_diagonal_ratio * 89 * 2)))
@@ -4566,8 +4623,6 @@ class PhysicsParam:
         self.simple_back_material_ctrl.SetStringSelection("")
         self.simple_edge_material_ctrl.SetStringSelection("")
         self.simple_primitive_ctrl.SetStringSelection("")
-        # self.simple_threshold_slider.SetValue(0.05)
-        # self.simple_fineness_slider.SetValue(3.4)
         self.simple_mass_slider.SetValue(1.5)
         self.simple_air_resistance_slider.SetValue(1.8)
         self.simple_shape_maintenance_slider.SetValue(1.5)
