@@ -30,7 +30,7 @@ def read_history(mydir_path):
         "org_pmx": [],
         "org_vroid": [],
         "vertices_csv": [],
-        "vertices_grad_csv": [],
+        "vertices_back_csv": [],
         "top_vertices_csv": [],
         "abb_setting": {},
         "max": 50,

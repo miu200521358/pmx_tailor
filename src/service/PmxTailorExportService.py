@@ -13,6 +13,7 @@ import bezier
 import csv
 import random
 import string
+from glob import glob
 from collections import Counter
 
 from module.MOptions import MExportOptions
@@ -862,7 +863,14 @@ class PmxTailorExportService:
 
                 # グラデウェイト
                 self.create_grad_weight(
-                    model, param_option, material_name, virtual_vertices, weighted_vidxs, threshold, base_vertical_axis
+                    model,
+                    param_option,
+                    material_name,
+                    virtual_vertices,
+                    target_vertices,
+                    weighted_vidxs,
+                    threshold,
+                    base_vertical_axis,
                 )
 
                 # 裏ウェイト
@@ -2890,13 +2898,14 @@ class PmxTailorExportService:
         param_option: dict,
         material_name: str,
         virtual_vertices: dict,
+        target_map_vertices: list,
         weighted_vidxs: list,
         threshold: float,
         base_vertical_axis: MVector3D,
     ):
 
-        # 物理グラデーション対象頂点CSVが指定されている場合、対象頂点リスト生成
-        if not param_option["vertices_grad_csv"]:
+        # 裏面対象頂点CSVが指定されていない場合、スルー
+        if not param_option["vertices_csv"]:
             return
 
         logger.info(
@@ -2904,21 +2913,16 @@ class PmxTailorExportService:
         )
 
         target_vertices = {}
-        try:
-            with open(param_option["vertices_grad_csv"], encoding="cp932", mode="r") as f:
-                reader = csv.reader(f)
-                next(reader)  # ヘッダーを読み飛ばす
-                for row in reader:
-                    if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
-                        vidx = int(row[1])
-                        v = model.vertex_dict[vidx]
-                        v_key = v.position.to_key(threshold)
-                        if v_key not in target_vertices and v.index not in weighted_vidxs:
-                            # まだ登録されてない、かつ既に塗り終わった頂点ではない場合、対象
-                            target_vertices[v_key] = VirtualVertex(v_key)
-                            target_vertices[v_key].append([v], [], [])
-        except Exception:
-            logger.warning("物理グラデーション対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
+        for vidx in target_map_vertices:
+            v = model.vertex_dict[vidx]
+            v_key = v.position.to_key(threshold)
+            if v_key not in target_vertices and v.index not in weighted_vidxs:
+                # まだ登録されてない、かつ既に塗り終わった頂点ではない場合、対象
+                target_vertices[v_key] = VirtualVertex(v_key)
+                target_vertices[v_key].append([v], [], [])
+
+        if not target_vertices:
+            logger.info("裏面対象頂点が見つからなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
             return
 
         # 親ボーン
@@ -2981,6 +2985,8 @@ class PmxTailorExportService:
             weights = np.array(list(total_weights.values()))[weight_idxs]
             # ウェイト正規化
             weights = weights / weights.sum(axis=0, keepdims=1)
+            # INDEX取り直し（ウェイトが5件以上あった場合用）
+            weight_idxs = np.argsort(-weights)
 
             logger.debug(
                 f"グラデ元頂点: target [{vv.vidxs()}], weighted [{copy_weighted_vertex_idx}], weight_idx[{weight_bone_idxs}], weight[{np.round(weights, decimals=3)}]"
@@ -3043,6 +3049,20 @@ class PmxTailorExportService:
         if param_option["back_extend_material_names"]:
             for mname in param_option["back_extend_material_names"]:
                 back_vertices += list(model.material_vertices[mname])
+
+        if param_option["vertices_back_csv"]:
+            try:
+                csv_back_vertices = []
+                for vertices_back_csv_path in glob(param_option["vertices_back_csv"]):
+                    with open(vertices_back_csv_path, encoding="cp932", mode="r") as f:
+                        reader = csv.reader(f)
+                        next(reader)  # ヘッダーを読み飛ばす
+                        for row in reader:
+                            if len(row) > 1 and int(row[1]):
+                                csv_back_vertices.append(int(row[1]))
+                back_vertices += csv_back_vertices
+            except Exception:
+                logger.warning("裏面対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
 
         if not back_vertices:
             return
@@ -3773,7 +3793,7 @@ class PmxTailorExportService:
             vertex_cnt = 0
 
             bone_horizonal_distances = np.zeros((vertex_map.shape[0], vertex_map.shape[1]))
-            bone_vertical_distances = np.zeros((vertex_map.shape[0] - 1, vertex_map.shape[1] - 1))
+            bone_vertical_distances = np.zeros((vertex_map.shape[0], vertex_map.shape[1]))
             bone_connected = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
 
             # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
@@ -5382,10 +5402,11 @@ class PmxTailorExportService:
                     active_yidxs.append(v_yidx)
 
             # 根元の1つは必ず残して仮想頂点を作る
-            remove_yidxs = (
-                np.array(remove_yidxs)[np.where(np.array(remove_yidxs) < min(active_yidxs))[0]].tolist()
-                + np.array(remove_yidxs)[np.where(np.array(remove_yidxs) > max(active_yidxs) + 1)[0]].tolist()
-            )
+            if active_yidxs:
+                remove_yidxs = (
+                    np.array(remove_yidxs)[np.where(np.array(remove_yidxs) < min(active_yidxs))[0]].tolist()
+                    + np.array(remove_yidxs)[np.where(np.array(remove_yidxs) > max(active_yidxs) + 1)[0]].tolist()
+                )
 
             tmp_vertex_map = np.delete(tmp_vertex_map, remove_yidxs, axis=0)
 

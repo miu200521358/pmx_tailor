@@ -46,6 +46,6 @@ if __name__ == "__main__":
                             print(f"「{k}」 -> 「{v}」")
 
                 with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(messages, f, ensure_ascii=False)
+                    json.dump(messages, f, ensure_ascii=False, indent=4)
         except Exception as e:
             print("*** Message Translate ERROR ***\n%s", traceback.format_exc())

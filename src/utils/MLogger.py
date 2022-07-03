@@ -324,7 +324,7 @@ class MLogger:
                             msgs[msg] = msg if self.target_lang == lang else ""
 
                     with open(messages_path, "w", encoding="utf-8") as wf:
-                        json.dump(msgs, wf, ensure_ascii=False)
+                        json.dump(msgs, wf, ensure_ascii=False, indent=4)
                 except Exception:
                     print("*** Message Update ERROR ***\n%s", traceback.format_exc())
 
@@ -348,7 +348,7 @@ class MLogger:
                 if not os.path.exists(messages_path):
                     try:
                         with open(messages_path, "w", encoding="utf-8") as f:
-                            json.dump({}, f, ensure_ascii=False)
+                            json.dump({}, f, ensure_ascii=False, indent=4)
                     except Exception:
                         print("*** Message Dump ERROR ***\n%s", traceback.format_exc())
 
