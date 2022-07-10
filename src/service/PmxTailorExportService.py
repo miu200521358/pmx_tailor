@@ -2526,6 +2526,7 @@ class PmxTailorExportService:
                     x_size = np.max(x_sizes)
                 elif prev_connected and v_xidx > 0:
                     if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
+                        x_sizes = []
                         if prev_now_bone:
                             x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
                         if prev_below_bone:
@@ -2552,7 +2553,7 @@ class PmxTailorExportService:
                     # 末端は上との長さにしておく
                     y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
                 else:
-                    # 根元は下のボーンとの距離
+                    # その他は下のボーンとの距離
                     y_size = now_now_bone.position.distanceToPoint(now_below_bone.position)
 
                 if rigidbody_shape_type == 0:
@@ -2565,7 +2566,7 @@ class PmxTailorExportService:
                     # 箱剛体の場合
                     shape_size = MVector3D(
                         x_size * (0.5 if next_connected or prev_connected else 1),
-                        max(0.25, y_size) * 0.5,
+                        max(0.25, y_size) * (0.5 if v_yidx > 0 else 0.25),
                         rigidbody_limit_thicks[v_yidx],
                     )
                     shape_volume = shape_size.x() * shape_size.y() * shape_size.z()
@@ -2696,6 +2697,14 @@ class PmxTailorExportService:
                 shape_rotation_radians = MVector3D(
                     math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
                 )
+
+                if v_yidx == 0 and param_option["joint_pos_type"] == logger.transtext("ボーン間") and rigidbody_shape_type == 1:
+                    # ボーン間の箱剛体の根元は剛体位置を中間に来るよう調整
+                    mat = MMatrix4x4()
+                    mat.setToIdentity()
+                    mat.translate(shape_position)
+                    mat.rotate(shape_qq)
+                    shape_position = mat * MVector3D(0, -shape_size.y(), 0)
 
                 # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                 mode = 2 if 0 == v_yidx else 1

@@ -1127,10 +1127,10 @@ class PhysicsParam:
             self.advance_window,
             id=wx.ID_ANY,
             size=wx.Size(90, -1),
-            value="0.05",
+            value="0.07",
             min=0.01,
             max=10,
-            initial=0.05,
+            initial=0.07,
             inc=0.01,
         )
         self.rigidbody_root_thicks_spin.Bind(
@@ -3464,7 +3464,7 @@ class PhysicsParam:
 
     def set_param_import_data(self, params: dict):
         # 簡易版オプションデータ -------------
-        # self.simple_threshold_slider.SetValue(params.get("threshold", 0.05))
+        # self.simple_threshold_slider.SetValue(params.get("threshold", 0.07))
         # self.simple_fineness_slider.SetValue(params.get("fineness", 3.4))
         self.simple_mass_slider.SetValue(params.get("mass", 0.5))
         self.simple_air_resistance_slider.SetValue(params.get("air_resistance", 1.8))
@@ -4217,7 +4217,7 @@ class PhysicsParam:
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_rigidbody_balancer_ctrl.SetValue(0)
         self.advance_horizonal_joint_restruct_check.SetValue(1)
-        self.rigidbody_root_thicks_spin.SetValue(0.05)
+        self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
         self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))

@@ -591,5 +591,7 @@
     "これまで指定された裏面対象頂点CSVを再指定できます。": "You can respecify the backside target vertex CSV that was previously specified.",
     "斜め（＼）ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s": "Since the information required to generate the diagonal (\\) joint could not be obtained, it will be passed through. Processing target: %s",
     "縦ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s": "Since the information required to generate the vertical joint could not be obtained, it will be passed through. Processing target: %s",
-    "材質ではなく特定の頂点だけ裏面対象としてウェイトを塗り直したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nファイル名を「*.csv」にすることで、フォルダ内の全CSVファイルを対象とすることができます。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。": "If you want to repaint the weights only for specific vertices instead of the material, specify the vertex CSV file saved so that the vertex list can be selected in PmxEditor.\nBy setting the file name to \"* .csv\", all CSV files in the folder can be targeted.\nYou can specify by D & D, specify from the open button, and select from the history."
+    "材質ではなく特定の頂点だけ裏面対象としてウェイトを塗り直したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nファイル名を「*.csv」にすることで、フォルダ内の全CSVファイルを対象とすることができます。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。": "If you want to repaint the weights only for specific vertices instead of the material, specify the vertex CSV file saved so that the vertex list can be selected in PmxEditor.\nBy setting the file name to \"* .csv\", all CSV files in the folder can be targeted.\nYou can specify by D & D, specify from the open button, and select from the history.",
+    "-- メッシュ確認: %s個目:終了": "--Mesh confirmation: %sth: End",
+    "-- -- 【No.%s】剛体: %s個目:終了": "---- [No. %s] Rigid body: %sth: End"
 }
