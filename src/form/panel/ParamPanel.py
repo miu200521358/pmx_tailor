@@ -2903,7 +2903,7 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("ルート探索"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.route_search_type_txt.SetToolTip(
-            logger.transtext("末端頂点から根元頂点を走査する際の手法\n根元頂点優先: 推定根元頂点への向きを優先\n前頂点優先: 前頂点との内積を優先\n※既存設定「再利用」時は無効")
+            logger.transtext("末端頂点から根元頂点を走査する際の手法\n根元頂点優先: 推定根元頂点への向きを優先\n前頂点優先: 前頂点との内積を優先")
         )
         self.route_search_type_txt.Wrap(-1)
         self.advance_option_grid_sizer.Add(self.route_search_type_txt, 0, wx.ALL, 5)
@@ -4255,7 +4255,7 @@ class PhysicsParam:
             self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
 
         if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(コットン)"):
-            self.simple_mass_slider.SetValue(2)
+            self.simple_mass_slider.SetValue(1.3)
             self.simple_air_resistance_slider.SetValue(1.7)
             self.simple_shape_maintenance_slider.SetValue(2.2)
 
@@ -4269,7 +4269,7 @@ class PhysicsParam:
             self.advance_horizonal_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ベルベッド)"):
-            self.simple_mass_slider.SetValue(3.0)
+            self.simple_mass_slider.SetValue(2.0)
             self.simple_air_resistance_slider.SetValue(1.4)
             self.simple_shape_maintenance_slider.SetValue(1.9)
 
@@ -4277,9 +4277,9 @@ class PhysicsParam:
             self.advance_diagonal_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(レザー)"):
-            self.simple_mass_slider.SetValue(3.2)
-            self.simple_air_resistance_slider.SetValue(2.2)
-            self.simple_shape_maintenance_slider.SetValue(3.8)
+            self.simple_mass_slider.SetValue(2.2)
+            self.simple_air_resistance_slider.SetValue(1.9)
+            self.simple_shape_maintenance_slider.SetValue(3.6)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
@@ -4287,7 +4287,7 @@ class PhysicsParam:
             self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(デニム)"):
-            self.simple_mass_slider.SetValue(2.9)
+            self.simple_mass_slider.SetValue(1.9)
             self.simple_air_resistance_slider.SetValue(3.3)
             self.simple_shape_maintenance_slider.SetValue(2.3)
 
@@ -4297,7 +4297,7 @@ class PhysicsParam:
             self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("単一揺れ物"):
-            self.simple_mass_slider.SetValue(2.3)
+            self.simple_mass_slider.SetValue(1.3)
             self.simple_air_resistance_slider.SetValue(2.5)
             self.simple_shape_maintenance_slider.SetValue(2.8)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
