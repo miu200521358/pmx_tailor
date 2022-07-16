@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-from cmath import isnan
-from locale import normalize
 import logging
 import os
 import traceback
@@ -14,7 +12,6 @@ import csv
 import random
 import string
 from glob import glob
-from collections import Counter
 
 from module.MOptions import MExportOptions
 from mmd.PmxData import (
@@ -2563,12 +2560,20 @@ class PmxTailorExportService:
                         all_vertex_distances = np.sqrt(np.sum(all_vertex_diffs**2, axis=-1))
                         x_size = np.median(all_vertex_distances)
 
-                    if v_yidx > 0 and v_yidx == registed_max_v_yidx and now_above_bone:
-                        # 末端は上との長さにしておく
-                        y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
-                    else:
+                    if now_above_bone and now_below_bone:
+                        # 上下揃ってる場合、average
+                        y_size = np.max(
+                            [
+                                now_now_bone.position.distanceToPoint(now_above_bone.position),
+                                now_now_bone.position.distanceToPoint(now_below_bone.position),
+                            ],
+                        )
+                    elif now_below_bone:
                         # その他は下のボーンとの距離
                         y_size = now_now_bone.position.distanceToPoint(now_below_bone.position)
+                    else:
+                        # 末端は上との長さにしておく
+                        y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
 
                     if rigidbody_shape_type == 0:
                         # 球剛体の場合
@@ -2682,8 +2687,8 @@ class PmxTailorExportService:
 
                     if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
                         # 末端は軸方向がひとつ上の向きとする
-                        x_direction_from_pos = now_now_bone.position
-                        x_direction_to_pos = y_direction_from_pos = now_above_bone.position
+                        x_direction_from_pos = now_above_bone.position
+                        x_direction_to_pos = y_direction_from_pos = now_now_bone.position
                         if tuple(vertex_map[above_yidx, ceil_mean_xidx]) in virtual_vertices:
                             y_direction_to_pos = virtual_vertices[
                                 tuple(vertex_map[above_yidx, ceil_mean_xidx])
@@ -2691,8 +2696,8 @@ class PmxTailorExportService:
                         else:
                             y_direction_to_pos = y_direction_from_pos + MVector3D(1, 0, 0)
                     else:
-                        x_direction_from_pos = now_below_bone.position
-                        x_direction_to_pos = y_direction_from_pos = now_now_bone.position
+                        x_direction_from_pos = now_now_bone.position
+                        x_direction_to_pos = y_direction_from_pos = now_below_bone.position
                         if (
                             tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
                             and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
@@ -2714,17 +2719,26 @@ class PmxTailorExportService:
                         math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
                     )
 
-                    if (
-                        v_yidx == 0
-                        and param_option["joint_pos_type"] == logger.transtext("ボーン間")
-                        and rigidbody_shape_type == 1
-                    ):
-                        # ボーン間の箱剛体の根元は剛体位置を中間に来るよう調整
-                        mat = MMatrix4x4()
-                        mat.setToIdentity()
-                        mat.translate(shape_position)
-                        mat.rotate(shape_qq)
-                        shape_position = mat * MVector3D(0, -shape_size.y(), 0)
+                    if param_option["joint_pos_type"] == logger.transtext("ボーン間") and rigidbody_shape_type == 1:
+                        if v_yidx == 0:
+                            # ボーン間の箱剛体の根元は剛体位置を中間に来るよう調整
+                            mat = MMatrix4x4()
+                            mat.setToIdentity()
+                            mat.translate(shape_position)
+                            mat.rotate(shape_qq)
+                            shape_position = mat * MVector3D(0, shape_size.y(), 0)
+                        elif (
+                            now_above_vv
+                            and base_map_idx in now_above_vv.map_rigidbodies
+                            and now_above_vv.map_rigidbodies[base_map_idx].name in created_rigidbodies
+                        ):
+                            # 中間は上の剛体の端から計算しなおす
+                            mat = MMatrix4x4()
+                            mat.setToIdentity()
+                            mat.translate(now_above_vv.map_rigidbodies[base_map_idx].shape_position)
+                            mat.rotate(now_above_vv.map_rigidbodies[base_map_idx].shape_qq)
+                            mat.translate(MVector3D(0, now_above_vv.map_rigidbodies[base_map_idx].shape_size.y(), 0))
+                            shape_position = mat * MVector3D(0, shape_size.y(), 0)
 
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                     mode = 2 if 0 == v_yidx else 1
@@ -3930,11 +3944,11 @@ class PmxTailorExportService:
             logger.info("--【No.%s】ボーン生成", base_map_idx + 1)
 
             if param_option["density_type"] == logger.transtext("距離"):
-                median_vertical_distance = np.median(
-                    all_bone_vertical_distances[base_map_idx][:, int(vertex_map.shape[1] / 2)]
+                median_vertical_distance = (
+                    np.median(all_bone_vertical_distances[base_map_idx][:, int(vertex_map.shape[1] / 2)]) * 0.9
                 )
-                median_horizonal_distance = np.median(
-                    all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), :]
+                median_horizonal_distance = (
+                    np.median(all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), :]) * 0.9
                 )
 
                 logger.debug(
@@ -3994,6 +4008,10 @@ class PmxTailorExportService:
                             or not all_bone_connected[base_map_idx][v_yidx, v_xidx]
                         ):
                             regist_bones[v_yidx, v_xidx] = True
+
+                            if vertex_map.shape[0] - 2 <= v_yidx and not regist_bones[:v_yidx, v_xidx].any():
+                                # 仮想ボーン＋末端はそれより上が繋がってたら登録しない
+                                regist_bones[v_yidx, v_xidx] = False
 
             for v_yidx in range(vertex_map.shape[0]):
                 for v_xidx in range(vertex_map.shape[1]):
