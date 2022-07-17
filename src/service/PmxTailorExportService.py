@@ -2548,7 +2548,7 @@ class PmxTailorExportService:
                                 x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
                             if prev_below_bone:
                                 x_sizes.append(now_below_bone.position.distanceToPoint(prev_below_bone.position))
-                            x_size = np.max(x_sizes)
+                            x_size = np.max(x_sizes) if x_sizes else 0.2
                         else:
                             x_size = 0.2
                     else:

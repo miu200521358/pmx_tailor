@@ -616,5 +616,5 @@
     "同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s": "Since the same bone name is already registered, add a random number at the end. Existing bone name: %s",
     "裏面対象頂点が見つからなかったため、処理をスキップします": "The backside target vertex was not found, so processing is skipped.",
     "グラデーション対象頂点が見つからなかったため、処理をスキップします": "Gradation target vertex was not found, so processing is skipped",
-    "削除対象頂点が取得できなかったため、処理を終了します": ""
+    "削除対象頂点が取得できなかったため、処理を終了します": "Processing ends because the vertex to be deleted could not be acquired."
 }
