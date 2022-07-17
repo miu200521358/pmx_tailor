@@ -2687,8 +2687,8 @@ class PmxTailorExportService:
 
                     if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
                         # 末端は軸方向がひとつ上の向きとする
-                        x_direction_from_pos = now_above_bone.position
-                        x_direction_to_pos = y_direction_from_pos = now_now_bone.position
+                        x_direction_to_pos = now_above_bone.position
+                        x_direction_from_pos = y_direction_from_pos = now_now_bone.position
                         if tuple(vertex_map[above_yidx, ceil_mean_xidx]) in virtual_vertices:
                             y_direction_to_pos = virtual_vertices[
                                 tuple(vertex_map[above_yidx, ceil_mean_xidx])
@@ -2696,8 +2696,8 @@ class PmxTailorExportService:
                         else:
                             y_direction_to_pos = y_direction_from_pos + MVector3D(1, 0, 0)
                     else:
-                        x_direction_from_pos = now_now_bone.position
-                        x_direction_to_pos = y_direction_from_pos = now_below_bone.position
+                        x_direction_to_pos = now_now_bone.position
+                        x_direction_from_pos = y_direction_from_pos = now_below_bone.position
                         if (
                             tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
                             and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
@@ -2726,7 +2726,7 @@ class PmxTailorExportService:
                             mat.setToIdentity()
                             mat.translate(shape_position)
                             mat.rotate(shape_qq)
-                            shape_position = mat * MVector3D(0, shape_size.y(), 0)
+                            shape_position = mat * MVector3D(0, -shape_size.y(), 0)
                         elif (
                             now_above_vv
                             and base_map_idx in now_above_vv.map_rigidbodies
@@ -2737,8 +2737,8 @@ class PmxTailorExportService:
                             mat.setToIdentity()
                             mat.translate(now_above_vv.map_rigidbodies[base_map_idx].shape_position)
                             mat.rotate(now_above_vv.map_rigidbodies[base_map_idx].shape_qq)
-                            mat.translate(MVector3D(0, now_above_vv.map_rigidbodies[base_map_idx].shape_size.y(), 0))
-                            shape_position = mat * MVector3D(0, shape_size.y(), 0)
+                            mat.translate(MVector3D(0, -now_above_vv.map_rigidbodies[base_map_idx].shape_size.y(), 0))
+                            shape_position = mat * MVector3D(0, -shape_size.y(), 0)
 
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                     mode = 2 if 0 == v_yidx else 1
@@ -2959,13 +2959,14 @@ class PmxTailorExportService:
         for vidx in target_map_vertices:
             v = model.vertex_dict[vidx]
             v_key = v.position.to_key(threshold)
-            if v_key not in target_vertices and v.index not in weighted_vidxs:
-                # まだ登録されてない、かつ既に塗り終わった頂点ではない場合、対象
-                target_vertices[v_key] = VirtualVertex(v_key)
+            if v.index not in weighted_vidxs:
+                if v_key not in target_vertices:
+                    # まだ登録されてない、かつ既に塗り終わった頂点ではない場合、対象
+                    target_vertices[v_key] = VirtualVertex(v_key)
                 target_vertices[v_key].append([v], [], [])
 
         if not target_vertices:
-            logger.info("裏面対象頂点が見つからなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
+            logger.info("グラデーション対象頂点が見つからなかったため、処理をスキップします")
             return
 
         # 親ボーン
@@ -2980,7 +2981,7 @@ class PmxTailorExportService:
         weight_cnt = 0
         prev_weight_cnt = 0
 
-        for vkey, vv in target_vertices.items():
+        for v_key, vv in target_vertices.items():
             if not vv.vidxs():
                 continue
 
@@ -3002,17 +3003,15 @@ class PmxTailorExportService:
             # 処理対象頂点の評価軸位置
             target_axis_pos = vv.position().data()[np.where(np.abs(base_vertical_axis.data()))][0]
 
-            if not nearest_vertex_axis_pos <= target_axis_pos <= parent_axis_pos:
-                # 処理対象頂点が範囲外の場合、スルー
-                continue
+            # if not nearest_vertex_axis_pos <= target_axis_pos <= parent_axis_pos:
+            #     # 処理対象頂点が範囲外の場合、スルー
+            #     continue
 
             # 処理対象頂点の直近頂点ボーンウェイト比率
-            target_ratio = abs(target_axis_pos - nearest_vertex_axis_pos) / abs(
-                parent_axis_pos - nearest_vertex_axis_pos
-            )
+            target_ratio = (target_axis_pos - nearest_vertex_axis_pos) / (parent_axis_pos - nearest_vertex_axis_pos)
 
             # ウェイト比率からウェイト量を調整
-            vertex_weights = np.array(copy_weighted_vertex.deform.get_weights()) * (1 - target_ratio)
+            vertex_weights = np.array(copy_weighted_vertex.deform.get_weights()) * min(1, max(0, (1 - target_ratio)))
 
             # 残りは親ボーンに割り当てる
             parent_weight = 1 - np.sum(vertex_weights)

@@ -614,5 +614,6 @@
     "頂点再設定": "Vertex reset",
     "-- 頂点再設定: %s個目:終了": "--Vertex reset: %sth: End",
     "同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s": "Since the same bone name is already registered, add a random number at the end. Existing bone name: %s",
-    "裏面対象頂点が見つからなかったため、処理をスキップします": "The backside target vertex was not found, so processing is skipped."
+    "裏面対象頂点が見つからなかったため、処理をスキップします": "The backside target vertex was not found, so processing is skipped.",
+    "グラデーション対象頂点が見つからなかったため、処理をスキップします": "Gradation target vertex was not found, so processing is skipped"
 }

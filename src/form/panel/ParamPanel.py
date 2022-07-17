@@ -4322,7 +4322,7 @@ class PhysicsParam:
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
-            self.simple_mass_slider.SetValue(0.8)
+            self.simple_mass_slider.SetValue(1.2)
             self.simple_air_resistance_slider.SetValue(2.7)
             self.simple_shape_maintenance_slider.SetValue(3.8)
 
