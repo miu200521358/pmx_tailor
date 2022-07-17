@@ -280,59 +280,32 @@ class PmxTailorExportService:
         weighted_bone_indecies = list(sorted(list(set(weighted_bone_indecies) - set(semi_standard_bone_indecies))))
 
         is_executable = True
-        for bone_index in weighted_bone_indecies:
-            if bone_index not in model.bone_indexes:
-                continue
-            bone = model.bones[model.bone_indexes[bone_index]]
+        if is_overwrite:
+            for bone_index in weighted_bone_indecies:
+                if bone_index not in model.bone_indexes:
+                    continue
+                bone = model.bones[model.bone_indexes[bone_index]]
 
-            for morph in model.org_morphs.values():
-                if morph.morph_type == 2:
-                    for offset in morph.offsets:
-                        if type(offset) is BoneMorphData:
-                            if offset.bone_index == bone.index:
-                                logger.error(
-                                    "削除対象ボーンがボーンモーフとして登録されているため、削除出来ません。\n"
-                                    + "事前にボーンモーフから外すか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s), モーフ名: %s",
-                                    bone.name,
-                                    morph.name,
-                                    decoration=MLogger.DECORATION_BOX,
-                                )
-                                is_executable = False
+                for morph in model.org_morphs.values():
+                    if morph.morph_type == 2:
+                        for offset in morph.offsets:
+                            if type(offset) is BoneMorphData:
+                                if offset.bone_index == bone.index:
+                                    logger.error(
+                                        "削除対象ボーンがボーンモーフとして登録されているため、削除出来ません。\n"
+                                        + "事前にボーンモーフから外すか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s), モーフ名: %s",
+                                        bone.name,
+                                        bone.index,
+                                        morph.name,
+                                        decoration=MLogger.DECORATION_BOX,
+                                    )
+                                    is_executable = False
 
-            for sub_bone in model.bones.values():
-                if sub_bone.parent_index == bone.index and sub_bone.index not in weighted_bone_indecies:
-                    logger.error(
-                        "削除対象ボーンが削除対象外ボーンの親ボーンとして登録されているため、削除出来ません。\n"
-                        + "事前に親子関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外子ボーン: %s(%s)",
-                        bone.name,
-                        bone.index,
-                        sub_bone.name,
-                        sub_bone.index,
-                        decoration=MLogger.DECORATION_BOX,
-                    )
-                    is_executable = False
-
-                if (
-                    (sub_bone.getExternalRotationFlag() or sub_bone.getExternalTranslationFlag())
-                    and sub_bone.effect_index == bone.index
-                    and sub_bone.index not in weighted_bone_indecies
-                ):
-                    logger.error(
-                        "削除対象ボーンが削除対象外ボーンの付与親ボーンとして登録されているため、削除出来ません。\n"
-                        + "事前に付与関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外付与子ボーン: %s(%s)",
-                        bone.name,
-                        bone.index,
-                        sub_bone.name,
-                        sub_bone.index,
-                        decoration=MLogger.DECORATION_BOX,
-                    )
-                    is_executable = False
-
-                if sub_bone.getIkFlag():
-                    if sub_bone.ik.target_index == bone.index and sub_bone.index not in weighted_bone_indecies:
+                for sub_bone in model.bones.values():
+                    if sub_bone.parent_index == bone.index and sub_bone.index not in weighted_bone_indecies:
                         logger.error(
-                            "削除対象ボーンが削除対象外ボーンのリンクターゲットボーンとして登録されているため、削除出来ません。\n"
-                            + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)",
+                            "削除対象ボーンが削除対象外ボーンの親ボーンとして登録されているため、削除出来ません。\n"
+                            + "事前に親子関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外子ボーン: %s(%s)",
                             bone.name,
                             bone.index,
                             sub_bone.name,
@@ -341,10 +314,26 @@ class PmxTailorExportService:
                         )
                         is_executable = False
 
-                    for link in sub_bone.ik.link:
-                        if link.bone_index == bone.index and sub_bone.index not in weighted_bone_indecies:
+                    if (
+                        (sub_bone.getExternalRotationFlag() or sub_bone.getExternalTranslationFlag())
+                        and sub_bone.effect_index == bone.index
+                        and sub_bone.index not in weighted_bone_indecies
+                    ):
+                        logger.error(
+                            "削除対象ボーンが削除対象外ボーンの付与親ボーンとして登録されているため、削除出来ません。\n"
+                            + "事前に付与関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外付与子ボーン: %s(%s)",
+                            bone.name,
+                            bone.index,
+                            sub_bone.name,
+                            sub_bone.index,
+                            decoration=MLogger.DECORATION_BOX,
+                        )
+                        is_executable = False
+
+                    if sub_bone.getIkFlag():
+                        if sub_bone.ik.target_index == bone.index and sub_bone.index not in weighted_bone_indecies:
                             logger.error(
-                                "削除対象ボーンが削除対象外ボーンのリンクボーンとして登録されているため、削除出来ません。\n"
+                                "削除対象ボーンが削除対象外ボーンのリンクターゲットボーンとして登録されているため、削除出来ません。\n"
                                 + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)",
                                 bone.name,
                                 bone.index,
@@ -354,8 +343,21 @@ class PmxTailorExportService:
                             )
                             is_executable = False
 
-            if n > 0 and n % 20 == 0:
-                logger.info("-- ウェイトボーンチェック確認: %s個目:終了", n)
+                        for link in sub_bone.ik.link:
+                            if link.bone_index == bone.index and sub_bone.index not in weighted_bone_indecies:
+                                logger.error(
+                                    "削除対象ボーンが削除対象外ボーンのリンクボーンとして登録されているため、削除出来ません。\n"
+                                    + "事前にIK関係を解除するか、再利用で物理を生成してください。\n削除対象ボーン：%s(%s)\n削除対象外IKボーン: %s(%s)",
+                                    bone.name,
+                                    bone.index,
+                                    sub_bone.name,
+                                    sub_bone.index,
+                                    decoration=MLogger.DECORATION_BOX,
+                                )
+                                is_executable = False
+
+                if n > 0 and n % 20 == 0:
+                    logger.info("-- ウェイトボーンチェック確認: %s個目:終了", n)
 
         if not is_executable:
             return None
@@ -1197,6 +1199,7 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             joint_key, joint = self.build_joint(
                                 "↓",
@@ -1267,6 +1270,7 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 joint_key, joint = self.build_joint(
                                     "↑",
@@ -1326,6 +1330,7 @@ class PmxTailorExportService:
                                     ).normalized()
                                     joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                                     joint_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
+                                    joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                     joint_key, joint = self.build_joint(
                                         "B",
@@ -1439,6 +1444,7 @@ class PmxTailorExportService:
                             # ボーン進行方向に対しての縦軸(z)
                             z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                            joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             ratio = 1
                             if param_option["horizonal_joint_restruct"]:
@@ -1561,6 +1567,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 joint_key, joint = self.build_joint(
                                     "→",
@@ -1627,6 +1634,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 joint_key, joint = self.build_joint(
                                     "←",
@@ -1682,6 +1690,7 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                     joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                                    joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                     joint_key, joint = self.build_joint(
                                         "←",
@@ -1770,6 +1779,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                            joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             joint_key, joint = self.build_joint(
                                 "＼",
@@ -1856,6 +1866,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                            joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             joint_key, joint = self.build_joint(
                                 "／",
@@ -2720,6 +2731,7 @@ class PmxTailorExportService:
                     # ボーン進行方向に対しての縦軸(z)
                     z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
                     shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                    shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
                     shape_euler = shape_qq.toEulerAngles()
                     shape_rotation_radians = MVector3D(
                         math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
@@ -2855,6 +2867,7 @@ class PmxTailorExportService:
                             # 上を向いてたらX方向に反転
                             shape_qq = org_rigidbody.shape_qq.copy()
                             shape_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                        shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
 
                         shape_euler = shape_qq.toEulerAngles()
                         shape_rotation_radians = MVector3D(
