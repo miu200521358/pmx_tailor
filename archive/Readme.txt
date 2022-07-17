@@ -39,17 +39,19 @@
 
 ■　【MMD】布っぽい物理を入れられるツールを作ってみた【ツール配布】【PmxTailor ver1.00】
 https://www.nicovideo.jp/watch/sm39696512
+https://youtu.be/yOCPhRNFE2k
 
-■　【MMD】MMDでクロスシミュできるツールを作ってみた【ツール配布】【PmxTailor ver2.00】
-
+■　【MMD】MMDでクロスシミュできるツールを簡単にしてみた【ツール配布】【PmxTailor ver2.00】
+https://www.nicovideo.jp/watch/sm40783084
+https://youtu.be/aQ70AHE8Rdo
 
 ----------------------------------------------------------------
 ■　同梱ファイル
 ----------------------------------------------------------------
 
-　・PmxTailor2.00.00.exe　　　…　ツール本体
+　・PmxTailor2.00.00.exe　　　…　ツール本体（言語別ショートカットあり）
 　・Readme.txt　　　　　　　　…　リドミ
-　・PmxTailor Wiki　　　　　　…　Wikiへのリンク
+　・VMDサイジングWiki　　　　 …　Wikiへのリンク
 　・コンテンツツリー用静画　　…　コンテンツツリー用静画へのリンク
 
 
@@ -57,7 +59,7 @@ https://www.nicovideo.jp/watch/sm39696512
 ■　動作環境
 ----------------------------------------------------------------
 
-　Windows8.1/10 64bit（確認はWindows10のみ）
+　Windows8.1/10/11 64bit（確認はWindows10のみ）
 
 
 ----------------------------------------------------------------

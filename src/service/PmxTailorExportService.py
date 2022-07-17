@@ -2416,8 +2416,11 @@ class PmxTailorExportService:
             # 縦段INDEX
             v_yidxs = list(range(regist_bones.shape[0]))
             rigidbody_masses = np.linspace(
-                param_rigidbody.param.mass, param_rigidbody.param.mass / coefficient, len(v_yidxs)
+                param_rigidbody.param.mass / max(1, (coefficient / 2)),
+                param_rigidbody.param.mass / coefficient,
+                len(v_yidxs),
             )
+            rigidbody_masses[0] = param_rigidbody.param.mass
 
             # 厚みは比較キーの数分だけ作る
             rigidbody_limit_thicks = np.linspace(
