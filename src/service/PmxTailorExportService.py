@@ -139,13 +139,16 @@ class PmxTailorExportService:
             model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor"
 
             # 既存物理を削除する
-            is_clear = False
+            is_overwrite = False
+            is_reuse = False
             for pidx, param_option in enumerate(self.options.param_options):
                 if param_option["exist_physics_clear"] == logger.transtext("上書き"):
-                    is_clear = True
+                    is_overwrite = True
+                if param_option["exist_physics_clear"] == logger.transtext("再利用"):
+                    is_reuse = True
 
-            if is_clear:
-                model = self.clear_physics(model)
+            if is_overwrite or is_reuse:
+                model = self.clear_physics(model, is_overwrite)
 
                 if not model:
                     return False
@@ -192,27 +195,26 @@ class PmxTailorExportService:
         finally:
             logging.shutdown()
 
-    def clear_physics(self, model: PmxModel):
+    def clear_physics(self, model: PmxModel, is_overwrite: bool):
         logger.info("既存物理削除", decoration=MLogger.DECORATION_LINE)
         target_vertices = []
 
         for param_option in self.options.param_options:
             material_name = param_option["material_name"]
 
-            if param_option["exist_physics_clear"] == logger.transtext("上書き"):
-                # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
-                if param_option["vertices_csv"]:
-                    try:
-                        with open(param_option["vertices_csv"], encoding="cp932", mode="r") as f:
-                            reader = csv.reader(f)
-                            next(reader)  # ヘッダーを読み飛ばす
-                            for row in reader:
-                                if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
-                                    target_vertices.append(int(row[1]))
-                    except Exception:
-                        continue
-                else:
-                    target_vertices.extend(list(model.material_vertices[material_name]))
+            # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
+            if param_option["vertices_csv"]:
+                try:
+                    with open(param_option["vertices_csv"], encoding="cp932", mode="r") as f:
+                        reader = csv.reader(f)
+                        next(reader)  # ヘッダーを読み飛ばす
+                        for row in reader:
+                            if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
+                                target_vertices.append(int(row[1]))
+                except Exception:
+                    continue
+            else:
+                target_vertices.extend(list(model.material_vertices[material_name]))
 
             if len(target_vertices) > 0 and len(target_vertices) % 1000 == 0:
                 logger.info("-- 頂点確認: %s個目:終了", len(target_vertices))
@@ -389,10 +391,13 @@ class PmxTailorExportService:
         for rigidbody_name in weighted_rigidbody_indexes.keys():
             del model.rigidbodies[rigidbody_name]
 
-        logger.info("ボーン削除: %s", ", ".join([model.bone_indexes[bone_index] for bone_index in weighted_bone_indecies]))
+        if is_overwrite:
+            logger.info(
+                "ボーン削除: %s", ", ".join([model.bone_indexes[bone_index] for bone_index in weighted_bone_indecies])
+            )
 
-        for bone_index in weighted_bone_indecies:
-            del model.bones[model.bone_indexes[bone_index]]
+            for bone_index in weighted_bone_indecies:
+                del model.bones[model.bone_indexes[bone_index]]
 
         reset_rigidbodies = {}
         for ridx, (rigidbody_name, rigidbody) in enumerate(model.rigidbodies.items()):
@@ -427,165 +432,166 @@ class PmxTailorExportService:
             if n > 0 and n % 100 == 0:
                 logger.info("-- 剛体再設定: %s個目:終了", n)
 
-        logger.info("表示枠再設定")
+        if is_overwrite:
+            logger.info("表示枠再設定")
 
-        for n, display_slot in enumerate(model.display_slots.values()):
-            new_references = []
-            for display_type, bone_idx in display_slot.references:
-                if display_type == 0:
-                    if bone_idx in reset_bones:
-                        new_references.append((display_type, reset_bones[bone_idx]["index"]))
-                else:
-                    new_references.append((display_type, bone_idx))
-            display_slot.references = new_references
-
-            if n > 0 and n % 100 == 0:
-                logger.info("-- 表示枠再設定: %s個目:終了", n)
-
-        logger.info("モーフ再設定")
-
-        for n, morph in enumerate(model.org_morphs.values()):
-            if morph.morph_type == 2:
-                new_offsets = []
-                for offset in morph.offsets:
-                    if type(offset) is BoneMorphData:
-                        if offset.bone_index in reset_bones:
-                            offset.bone_index = reset_bones[offset.bone_index]["index"]
-                            new_offsets.append(offset)
-                        else:
-                            offset.bone_index = -1
-                            new_offsets.append(offset)
+            for n, display_slot in enumerate(model.display_slots.values()):
+                new_references = []
+                for display_type, bone_idx in display_slot.references:
+                    if display_type == 0:
+                        if bone_idx in reset_bones:
+                            new_references.append((display_type, reset_bones[bone_idx]["index"]))
                     else:
-                        new_offsets.append(offset)
-                morph.offsets = new_offsets
+                        new_references.append((display_type, bone_idx))
+                display_slot.references = new_references
 
-            if n > 0 and n % 100 == 0:
-                logger.info("-- モーフ再設定: %s個目:終了", n)
+                if n > 0 and n % 100 == 0:
+                    logger.info("-- 表示枠再設定: %s個目:終了", n)
 
-        logger.info("ボーン再設定")
+            logger.info("モーフ再設定")
 
-        for n, bone in enumerate(model.bones.values()):
-            if bone.parent_index in reset_bones:
-                bone.parent_index = reset_bones[bone.parent_index]["index"]
-            else:
-                bone.parent_index = -1
+            for n, morph in enumerate(model.org_morphs.values()):
+                if morph.morph_type == 2:
+                    new_offsets = []
+                    for offset in morph.offsets:
+                        if type(offset) is BoneMorphData:
+                            if offset.bone_index in reset_bones:
+                                offset.bone_index = reset_bones[offset.bone_index]["index"]
+                                new_offsets.append(offset)
+                            else:
+                                offset.bone_index = -1
+                                new_offsets.append(offset)
+                        else:
+                            new_offsets.append(offset)
+                    morph.offsets = new_offsets
 
-            if bone.getConnectionFlag():
-                if bone.tail_index in reset_bones:
-                    bone.tail_index = reset_bones[bone.tail_index]["index"]
+                if n > 0 and n % 100 == 0:
+                    logger.info("-- モーフ再設定: %s個目:終了", n)
+
+            logger.info("ボーン再設定")
+
+            for n, bone in enumerate(model.bones.values()):
+                if bone.parent_index in reset_bones:
+                    bone.parent_index = reset_bones[bone.parent_index]["index"]
                 else:
-                    bone.tail_index = -1
+                    bone.parent_index = -1
 
-            if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag():
-                if bone.effect_index in reset_bones:
-                    bone.effect_index = reset_bones[bone.effect_index]["index"]
-                else:
-                    bone.effect_index = -1
+                if bone.getConnectionFlag():
+                    if bone.tail_index in reset_bones:
+                        bone.tail_index = reset_bones[bone.tail_index]["index"]
+                    else:
+                        bone.tail_index = -1
 
-            if bone.getIkFlag():
-                if bone.ik.target_index in reset_bones:
-                    bone.ik.target_index = reset_bones[bone.ik.target_index]["index"]
-                    for link in bone.ik.link:
-                        link.bone_index = reset_bones[link.bone_index]["index"]
-                else:
-                    bone.ik.target_index = -1
-                    for link in bone.ik.link:
-                        link.bone_index = -1
+                if bone.getExternalRotationFlag() or bone.getExternalTranslationFlag():
+                    if bone.effect_index in reset_bones:
+                        bone.effect_index = reset_bones[bone.effect_index]["index"]
+                    else:
+                        bone.effect_index = -1
 
-            if n > 0 and n % 100 == 0:
-                logger.info("-- ボーン再設定: %s個目:終了", n)
+                if bone.getIkFlag():
+                    if bone.ik.target_index in reset_bones:
+                        bone.ik.target_index = reset_bones[bone.ik.target_index]["index"]
+                        for link in bone.ik.link:
+                            link.bone_index = reset_bones[link.bone_index]["index"]
+                    else:
+                        bone.ik.target_index = -1
+                        for link in bone.ik.link:
+                            link.bone_index = -1
 
-        logger.info("頂点再設定")
+                if n > 0 and n % 100 == 0:
+                    logger.info("-- ボーン再設定: %s個目:終了", n)
 
-        parent_bone = model.bones[param_option["parent_bone_name"]]
+            logger.info("頂点再設定")
 
-        for n, vertex in enumerate(model.vertex_dict.values()):
-            if type(vertex.deform) is Bdef1:
-                vertex.deform.index0 = (
-                    reset_bones[vertex.deform.index0]["index"]
-                    if vertex.deform.index0 in reset_bones
-                    else parent_bone.index
-                )
-            elif type(vertex.deform) is Bdef2:
-                v_indices = [
-                    (reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0),
-                    (reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0),
-                ]
-                v_weights = [
-                    (vertex.deform.weight0 if v_indices[0] else 0),
-                ]
-                v_weights.append(1 - v_weights[0])
+            parent_bone = model.bones[param_option["parent_bone_name"]]
 
-                v_weights_idxs = np.nonzero(v_weights)[0]
-                v_indices = np.array(v_indices)[v_weights_idxs]
-                v_weights = np.array(v_weights)[v_weights_idxs]
-
-                if len(v_indices) == 0:
-                    vertex.deform = Bdef1(parent_bone.index)
-                elif len(v_indices) == 1:
-                    vertex.deform = Bdef1(v_indices[0])
-                else:
-                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
-                    vertex.deform = Bdef2(v_indices[0], v_indices[1], deform_weights[0])
-            elif type(vertex.deform) is Bdef4:
-                v_indices = [
-                    (reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0),
-                    (reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0),
-                    (reset_bones[vertex.deform.index2]["index"] if vertex.deform.index2 in reset_bones else 0),
-                    (reset_bones[vertex.deform.index3]["index"] if vertex.deform.index3 in reset_bones else 0),
-                ]
-                v_weights = [
-                    (vertex.deform.weight0 if v_indices[0] else 0),
-                    (vertex.deform.weight1 if v_indices[1] else 0),
-                    (vertex.deform.weight2 if v_indices[2] else 0),
-                    (vertex.deform.weight3 if v_indices[3] else 0),
-                ]
-                v_weights_idxs = np.nonzero(v_weights)[0]
-                v_indices = np.array(v_indices)[v_weights_idxs]
-                v_weights = np.array(v_weights)[v_weights_idxs]
-
-                if len(v_indices) == 0:
-                    vertex.deform = Bdef1(parent_bone.index)
-                elif len(v_indices) == 1:
-                    vertex.deform = Bdef1(v_indices[0])
-                elif len(v_indices) == 2:
-                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
-                    vertex.deform = Bdef2(v_indices[0], v_indices[1], deform_weights[0])
-                elif len(v_indices) == 3:
-                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
-                    vertex.deform = Bdef4(
-                        v_indices[0],
-                        v_indices[1],
-                        v_indices[2],
-                        parent_bone.index,
-                        deform_weights[0],
-                        deform_weights[1],
-                        deform_weights[2],
-                        0,
+            for n, vertex in enumerate(model.vertex_dict.values()):
+                if type(vertex.deform) is Bdef1:
+                    vertex.deform.index0 = (
+                        reset_bones[vertex.deform.index0]["index"]
+                        if vertex.deform.index0 in reset_bones
+                        else parent_bone.index
                     )
-                else:
-                    deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
-                    vertex.deform = Bdef4(
-                        v_indices[0],
-                        v_indices[1],
-                        v_indices[2],
-                        v_indices[3],
-                        deform_weights[0],
-                        deform_weights[1],
-                        deform_weights[2],
-                        deform_weights[3],
+                elif type(vertex.deform) is Bdef2:
+                    v_indices = [
+                        (reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0),
+                        (reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0),
+                    ]
+                    v_weights = [
+                        (vertex.deform.weight0 if v_indices[0] else 0),
+                    ]
+                    v_weights.append(1 - v_weights[0])
+
+                    v_weights_idxs = np.nonzero(v_weights)[0]
+                    v_indices = np.array(v_indices)[v_weights_idxs]
+                    v_weights = np.array(v_weights)[v_weights_idxs]
+
+                    if len(v_indices) == 0:
+                        vertex.deform = Bdef1(parent_bone.index)
+                    elif len(v_indices) == 1:
+                        vertex.deform = Bdef1(v_indices[0])
+                    else:
+                        deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                        vertex.deform = Bdef2(v_indices[0], v_indices[1], deform_weights[0])
+                elif type(vertex.deform) is Bdef4:
+                    v_indices = [
+                        (reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0),
+                        (reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0),
+                        (reset_bones[vertex.deform.index2]["index"] if vertex.deform.index2 in reset_bones else 0),
+                        (reset_bones[vertex.deform.index3]["index"] if vertex.deform.index3 in reset_bones else 0),
+                    ]
+                    v_weights = [
+                        (vertex.deform.weight0 if v_indices[0] else 0),
+                        (vertex.deform.weight1 if v_indices[1] else 0),
+                        (vertex.deform.weight2 if v_indices[2] else 0),
+                        (vertex.deform.weight3 if v_indices[3] else 0),
+                    ]
+                    v_weights_idxs = np.nonzero(v_weights)[0]
+                    v_indices = np.array(v_indices)[v_weights_idxs]
+                    v_weights = np.array(v_weights)[v_weights_idxs]
+
+                    if len(v_indices) == 0:
+                        vertex.deform = Bdef1(parent_bone.index)
+                    elif len(v_indices) == 1:
+                        vertex.deform = Bdef1(v_indices[0])
+                    elif len(v_indices) == 2:
+                        deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                        vertex.deform = Bdef2(v_indices[0], v_indices[1], deform_weights[0])
+                    elif len(v_indices) == 3:
+                        deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                        vertex.deform = Bdef4(
+                            v_indices[0],
+                            v_indices[1],
+                            v_indices[2],
+                            parent_bone.index,
+                            deform_weights[0],
+                            deform_weights[1],
+                            deform_weights[2],
+                            0,
+                        )
+                    else:
+                        deform_weights = v_weights / v_weights.sum(axis=0, keepdims=1)
+                        vertex.deform = Bdef4(
+                            v_indices[0],
+                            v_indices[1],
+                            v_indices[2],
+                            v_indices[3],
+                            deform_weights[0],
+                            deform_weights[1],
+                            deform_weights[2],
+                            deform_weights[3],
+                        )
+
+                elif type(vertex.deform) is Sdef:
+                    vertex.deform.index0 = (
+                        reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0
+                    )
+                    vertex.deform.index1 = (
+                        reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0
                     )
 
-            elif type(vertex.deform) is Sdef:
-                vertex.deform.index0 = (
-                    reset_bones[vertex.deform.index0]["index"] if vertex.deform.index0 in reset_bones else 0
-                )
-                vertex.deform.index1 = (
-                    reset_bones[vertex.deform.index1]["index"] if vertex.deform.index1 in reset_bones else 0
-                )
-
-            if n > 0 and n % 1000 == 0:
-                logger.info("-- 頂点再設定: %s個目:終了", n)
+                if n > 0 and n % 1000 == 0:
+                    logger.info("-- 頂点再設定: %s個目:終了", n)
 
         return model
 
