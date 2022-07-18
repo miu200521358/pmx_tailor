@@ -288,10 +288,47 @@ cdef class MVector2D:
         self.__data[1] = y
 
     cpdef MVector2D copy(self):
-        return MVector2D(self.x(), self.y())
+        return MVector2D(float(self.x()), float(self.y()))
 
     def to_log(self):
         return "x: {0}, y: {1}".format(round(self.x(), 5), round(self.y(), 5))
+
+
+class MPoint:
+
+    def __init__(self, p=MVector3D()):
+        self.point = p
+
+    def get_point(self, f: float):
+        return self.point * f
+
+
+class MLine:
+
+    def __init__(self, p=MPoint(), v=MVector3D()):
+        self.point = p
+        self.vector_start = v
+
+
+class MSegment(MLine):
+
+    def __init__(self, p=MPoint(), sv=MVector3D(), ev=MVector3D()):
+        super().__init__(p, sv)
+        self.vector_end = ev
+
+
+class MSphere:
+
+    def __init__(self, p=MPoint(), r=1.0):
+        self.point = p
+        self.radius = r
+
+
+class MCapsule:
+
+    def __init__(self, s=MSegment(), r=0.0):
+        self.segment = s
+        self.radius = r
 
 
 cdef class MVector3D:
@@ -310,7 +347,7 @@ cdef class MVector3D:
             self.__data = np.array([x, y, z], dtype=np.float64)
 
     cpdef MVector3D copy(self):
-        return MVector3D(self.x(), self.y(), self.z())
+        return MVector3D(float(self.x()), float(self.y()), float(self.z()))
 
     cpdef double length(self):
         return float(np.linalg.norm(self.data(), ord=2))
@@ -420,6 +457,11 @@ cdef class MVector3D:
 
     def to_log(self):
         return "x: {0}, y: {1} z: {2}".format(round(self.__data[0], 5), round(self.__data[1], 5), round(self.__data[2], 5))
+
+    def to_key(self, threshold=0.1):
+        # return (round(self.__data[0], 1), round(self.__data[1], 1), round(self.__data[2], 1))
+        # return (round(self.__data[0] * 5) / 5, round(self.__data[1] * 5) / 5, round(self.__data[2] * 5) / 5)
+        return (round(self.__data[0] / threshold), round(self.__data[1] / threshold), round(self.__data[2] / threshold))
 
     def __str__(self):
         return "MVector3D({0}, {1}, {2})".format(self.__data[0], self.__data[1], self.__data[2])
@@ -663,7 +705,7 @@ cdef class MVector4D:
             self.__data = np.array([x, y, z, w], dtype=np.float64)
 
     cpdef MVector4D copy(self):
-        return MVector4D(self.x(), self.y(), self.z(), self.w())
+        return MVector4D(float(self.x()), float(self.y()), float(self.z()), float(self.w()))
     
     cpdef double length(self):
         return np.linalg.norm(self.data(), ord=2)
@@ -952,7 +994,7 @@ cdef class MQuaternion:
             self.__data = np.array([w, x, y, z], dtype=np.float64)
 
     cpdef MQuaternion copy(self):
-        return MQuaternion(self.scalar(), self.x(), self.y(), self.z())
+        return MQuaternion(float(self.scalar()), float(self.x()), float(self.y()), float(self.z()))
     
     def __str__(self):
         return "MQuaternion({0}, {1}, {2}, {3})".format(self.scalar(), self.x(), self.y(), self.z())
@@ -978,8 +1020,8 @@ cdef class MQuaternion:
     cpdef effective(self):
         self.data().components[np.isnan(self.data().components)] = 0
         self.data().components[np.isinf(self.data().components)] = 0
-        # Scalarは1がデフォルトとなる
-        self.setScalar(1 if self.scalar() == 0 else self.scalar())
+        # # Scalarは1がデフォルトとなる
+        # self.setScalar(1 if self.scalar() == 0 else self.scalar())
 
     cpdef MMatrix4x4 toMatrix4x4(self):
         cdef MMatrix4x4 mat = MMatrix4x4()
@@ -1073,6 +1115,20 @@ cdef class MQuaternion:
     # 角度に変換
     cpdef double toDegree(self):
         return degrees(2 * acos(min(1, max(-1, self.scalar()))))
+
+    # 軸による符号付き角度に変換
+    cpdef double toDegreeSign(self, MVector3D local_axis):
+        cdef double deg =  self.toDegree()
+        cdef double sign = np.sign(MVector3D.dotProduct(self.vector(), local_axis)) * np.sign(self.scalar())
+
+        if sign != 0:
+            deg *= sign
+
+        if abs(deg) > 180:
+            # 180度を超してる場合、フリップなので、除去
+            return (abs(deg) - 180) * np.sign(deg)
+            
+        return deg
 
     # 自分ともうひとつの値vとのtheta（変位量）を返す
     cpdef double calcTheata(self, MQuaternion v):

@@ -22,18 +22,27 @@ cdef class Deform:
     def copy(self):
         return Deform(self.index0)
 
+    def get_idx_list(self, weight=0):
+        return []
+
+    def get_weights(self):
+        return []
+
 class Bdef1(Deform):
     def __init__(self, index0):
         self.index0 = index0
     
     def get_idx_list(self, weight=0):
         return [self.index0]
+    
+    def get_weights(self):
+        return [1]
         
     def __str__(self):
         return "<Bdef1 {0}>".format(self.index0)
 
     def copy(self):
-        return Bdef2(self.index0)
+        return Bdef1(self.index0)
 
 class Bdef2(Deform):
     def __init__(self, index0, index1, weight0):
@@ -48,6 +57,9 @@ class Bdef2(Deform):
         if (1 - self.weight0) >= weight:
             idx_list.append(self.index1)
         return idx_list
+    
+    def get_weights(self):
+        return [self.weight0, 1 - self.weight0]
         
     def __str__(self):
         return "<Bdef2 {0}, {1}, {2}>".format(self.index0, self.index1, self.weight0)
@@ -69,6 +81,9 @@ class Bdef4(Deform):
     def get_idx_list(self, weight=0):
         weight_idxs = np.where(np.array([self.weight0, self.weight1, self.weight2, self.weight3]) >= weight)
         return (np.array([self.index0, self.index1, self.index2, self.index3])[weight_idxs]).tolist()
+    
+    def get_weights(self):
+        return [self.weight0, self.weight1, self.weight2, self.weight3]
 
     def __str__(self):
         return "<Bdef4 {0}:{1}, {2}:{3}, {4}:{5}, {6}:{7}>".format(self.index0, self.index1, self.index2, self.index3, self.weight0, self.weight1, self.weight2, self.weight3)
@@ -88,6 +103,9 @@ class Sdef(Deform):
     def get_idx_list(self):
         return [self.index0, self.index1]
 
+    def get_weights(self):
+        return [self.weight0, 1 - self.weight0]
+        
     def __str__(self):
         return "<Sdef {0}, {1}, {2}, {3} {4} {5}>".format(self.index0, self.index1, self.weight0, self.sdef_c, self.sdef_r0, self.sdef_r1)
 
@@ -106,6 +124,9 @@ class Qdef(Deform):
     def get_idx_list(self):
         return [self.index0, self.index1]
 
+    def get_weights(self):
+        return [self.weight0, 1 - self.weight0]
+        
     def __str__(self):
         return "<Sdef {0}, {1}, {2}, {3} {4} {5}>".format(self.index0, self.index1, self.weight0, self.sdef_c, self.sdef_r0, self.sdef_r1)
 
@@ -291,8 +312,6 @@ cdef class Bone:
         self.display = False
         # サイジング用特殊ボーンであるか
         self.is_sizing = is_sizing
-        # 親ボーンから見た相対位置
-        self.relative_position = MVector3D()
 
         # 親ボーンからの長さ3D版(計算して求める）
         self.len_3d = MVector3D()
@@ -506,6 +525,10 @@ cdef class RigidBody:
         self.bone_name = ""
         self.is_arm_upper = False
         self.is_small = False
+        self.shape_qq = MQuaternion()
+        self.x_direction = MVector3D()
+        self.y_direction = MVector3D()
+        self.z_direction = MVector3D()
 
         self.SHAPE_SPHERE = 0
         self.SHAPE_BOX = 1
@@ -1018,6 +1041,7 @@ cdef class Capsule(OBB):
 class Joint:
     def __init__(self, name, english_name, joint_type, rigidbody_index_a, rigidbody_index_b, position, rotation, \
                  translation_limit_min, translation_limit_max, rotation_limit_min, rotation_limit_max, spring_constant_translation, spring_constant_rotation):
+        self.index = -1
         self.name = name
         self.english_name = english_name
         self.joint_type = joint_type
@@ -1462,12 +1486,14 @@ cdef class PmxModel:
                 = self.get_bone_end_vertex(bone_name_list, self.def_calc_vertex_pos_original, def_is_target=None)
 
             if not up_max_vertex:
-                if "頭" in self.bones:
-                    return Vertex(-1, self.bones["頭"].position.copy() + 2.5, MVector3D(), [], [], Bdef1(-1), -1)
+                if "頭" in self.bones and "上半身" in self.bones and "首" in self.bones:
+                    return Vertex(-1, self.bones["頭"].position.copy() + ((self.bones["首"].position - self.bones["上半身"].position) / 2), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
+                elif "頭" in self.bones:
+                    return Vertex(-1, self.bones["頭"].position.copy() + 2.5, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
                 elif "首" in self.bones:
-                    return Vertex(-1, self.bones["首"].position.copy() + 3, MVector3D(), [], [], Bdef1(-1), -1)
+                    return Vertex(-1, self.bones["首"].position.copy() + 3, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
                 else:
-                    return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+                    return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         return up_max_vertex
     
@@ -1528,7 +1554,7 @@ cdef class PmxModel:
             target_bone_name = "{0}足ＩＫ".format(direction)
         else:
             # 足末端系ボーンがない場合、処理終了
-            return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+            return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
 
         # 足末端系ボーン
         for bk, bv in self.bones.items():
@@ -1539,15 +1565,15 @@ cdef class PmxModel:
         if len(bone_name_list) == 0:
             # ウェイトボーンがない場合、つま先ボーン系の位置
             if "{0}つま先".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}つま先".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}つま先".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             elif "{0}つま先ＩＫ".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}つま先ＩＫ".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}つま先ＩＫ".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             elif "{0}足首".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}足首".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}足首".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             elif "{0}足ＩＫ".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             else:
-                return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
 
         up_max_pos, up_max_vertex, down_max_pos, down_max_vertex, right_max_pos, right_max_vertex, left_max_pos, left_max_vertex, \
             back_max_pos, back_max_vertex, front_max_pos, front_max_vertex, multi_max_pos, multi_max_vertex \
@@ -1557,15 +1583,15 @@ cdef class PmxModel:
         if not front_max_vertex:
             # つま先頂点が取れなかった場合
             if "{0}つま先".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}つま先".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}つま先".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             elif "{0}つま先ＩＫ".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}つま先ＩＫ".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}つま先ＩＫ".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             elif "{0}足首".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}足首".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}足首".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             elif "{0}足ＩＫ".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             else:
-                return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         return front_max_vertex
 
@@ -1581,7 +1607,7 @@ cdef class PmxModel:
             target_bone_name = "{0}足ＩＫ".format(direction)
         else:
             # 足末端系ボーンがない場合、処理終了
-            return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+            return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
 
         # 足末端系ボーン
         for bk, bv in self.bones.items():
@@ -1592,9 +1618,9 @@ cdef class PmxModel:
         if len(bone_name_list) == 0:
             # ウェイトボーンがない場合、足ＩＫの位置
             if "{0}足ＩＫ".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             else:
-                return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
 
         up_max_pos, up_max_vertex, down_max_pos, down_max_vertex, right_max_pos, right_max_vertex, left_max_pos, left_max_vertex, \
             back_max_pos, back_max_vertex, front_max_pos, front_max_vertex, multi_max_pos, multi_max_vertex \
@@ -1604,9 +1630,9 @@ cdef class PmxModel:
         if not multi_max_vertex:
             # 足底頂点が取れなかった場合
             if "{0}足ＩＫ".format(direction) in self.bones:
-                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}足ＩＫ".format(direction)].position, MVector3D(), MVector2D(), [], Bdef1(-1), -1)
             else:
-                return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         return multi_max_vertex
 
@@ -1621,7 +1647,7 @@ cdef class PmxModel:
                     bone_name_list.append(bk)
         else:
             # 手首ボーンがない場合、処理終了
-            return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+            return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         # 腕の傾き（正確にはひじ以降の傾き）
         _, arm_stance_qq = self.calc_arm_stance("{0}ひじ".format(direction), "{0}手首".format(direction))
@@ -1641,7 +1667,7 @@ cdef class PmxModel:
 
             if not down_max_vertex:
                 # それでも取れなければ手首位置
-                return Vertex(-1, self.bones["{0}手首".format(direction)].position.copy(), MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}手首".format(direction)].position.copy(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         return down_max_vertex
 
@@ -1655,7 +1681,7 @@ cdef class PmxModel:
             bone_name_list.append(finger_name)
         else:
             # 指ボーンがない場合、処理終了
-            return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+            return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         # 腕の傾き（正確にはひじ以降の傾き）
         _, arm_stance_qq = self.calc_arm_stance("{0}手首".format(direction), finger_name)
@@ -1672,7 +1698,7 @@ cdef class PmxModel:
             return left_max_vertex
 
         # それでも取れなければ手首位置
-        return Vertex(-1, self.bones[finger_name].position.copy(), MVector3D(), [], [], Bdef1(-1), -1)
+        return Vertex(-1, self.bones[finger_name].position.copy(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
 
     # ひじの厚みをはかる頂点を取得
     def get_elbow_vertex(self, direction: str):
@@ -1688,7 +1714,7 @@ cdef class PmxModel:
                     bone_name_list.append(bk)
         else:
             # ひじボーンがない場合、処理終了
-            return Vertex(-1, MVector3D(), MVector3D(), [], [], Bdef1(-1), -1)
+            return Vertex(-1, MVector3D(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         # 腕の傾き（正確にはひじ以降の傾き）
         _, arm_stance_qq = self.calc_arm_stance("{0}腕".format(direction), "{0}ひじ".format(direction))
@@ -1708,7 +1734,7 @@ cdef class PmxModel:
 
             if not down_max_vertex:
                 # それでも取れなければひじ位置
-                return Vertex(-1, self.bones["{0}ひじ".format(direction)].position.copy(), MVector3D(), [], [], Bdef1(-1), -1)
+                return Vertex(-1, self.bones["{0}ひじ".format(direction)].position.copy(), MVector3D(), MVector2D(), [], Bdef1(-1), -1)
         
         return down_max_vertex
 
