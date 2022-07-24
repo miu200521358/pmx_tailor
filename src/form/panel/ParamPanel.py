@@ -4520,7 +4520,6 @@ class PhysicsParam:
             # 横ジョイント
             base_horizonal_ratio = shape_maintenance_ratio * mass_ratio
             horizonal_joint_mov = 1 - base_horizonal_ratio * 3
-            self.horizonal_joint_mov_y_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov)
 
             if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
@@ -4562,10 +4561,6 @@ class PhysicsParam:
             diagonal_spring_rot = max(0, min(180, base_diagonal_ratio * 180 * 2))
             diagonal_spring_y_rot = max(0, min(89, base_diagonal_ratio * 89 * 2))
 
-            diagonal_joint_mov = 1 - base_diagonal_ratio * 3
-            self.diagonal_joint_mov_y_min_spin.SetValue(-diagonal_joint_mov)
-            self.diagonal_joint_mov_y_max_spin.SetValue(diagonal_joint_mov)
-
             self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
             self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
             self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_y_rot)
@@ -4582,8 +4577,7 @@ class PhysicsParam:
                 self.advance_vertical_joint_coefficient_spin.GetValue()
             )
 
-            self.vertical_reverse_joint_mov_y_min_spin.SetValue(self.vertical_joint_mov_y_min_spin.GetValue())
-            self.vertical_reverse_joint_mov_y_max_spin.SetValue(self.vertical_joint_mov_y_min_spin.GetValue())
+            self.vertical_reverse_joint_mov_y_max_spin.SetValue(self.vertical_joint_mov_y_max_spin.GetValue())
 
             self.vertical_reverse_joint_rot_x_min_spin.SetValue(self.vertical_joint_rot_x_min_spin.GetValue())
             self.vertical_reverse_joint_rot_x_max_spin.SetValue(self.vertical_joint_rot_x_max_spin.GetValue())
@@ -4604,8 +4598,7 @@ class PhysicsParam:
                 self.advance_horizonal_joint_coefficient_spin.GetValue()
             )
 
-            self.horizonal_reverse_joint_mov_y_min_spin.SetValue(self.horizonal_joint_mov_y_min_spin.GetValue())
-            self.horizonal_reverse_joint_mov_y_max_spin.SetValue(self.horizonal_joint_mov_y_min_spin.GetValue())
+            self.horizonal_reverse_joint_mov_y_max_spin.SetValue(self.horizonal_joint_mov_y_max_spin.GetValue())
 
             self.horizonal_reverse_joint_rot_x_min_spin.SetValue(self.horizonal_joint_rot_x_min_spin.GetValue())
             self.horizonal_reverse_joint_rot_x_max_spin.SetValue(self.horizonal_joint_rot_x_max_spin.GetValue())
