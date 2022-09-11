@@ -100,8 +100,13 @@ class Sdef(Deform):
         self.sdef_r0 = sdef_r0
         self.sdef_r1 = sdef_r1
         
-    def get_idx_list(self):
-        return [self.index0, self.index1]
+    def get_idx_list(self, weight=0):
+        idx_list = []
+        if self.weight0 >= weight:
+            idx_list.append(self.index0)
+        if (1 - self.weight0) >= weight:
+            idx_list.append(self.index1)
+        return idx_list
 
     def get_weights(self):
         return [self.weight0, 1 - self.weight0]

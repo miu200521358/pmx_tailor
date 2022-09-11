@@ -147,7 +147,8 @@ class PmxTailorExportService:
                 if param_option["exist_physics_clear"] == logger.transtext("再利用"):
                     is_reuse = True
 
-            if is_overwrite or is_reuse:
+            # FIXME とりあえず再利用時の既存削除処理OFF（2022/08/07）
+            if is_overwrite:
                 model = self.clear_physics(model, is_overwrite)
 
                 if not model:
@@ -204,15 +205,7 @@ class PmxTailorExportService:
 
             # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
             if param_option["vertices_csv"]:
-                try:
-                    with open(param_option["vertices_csv"], encoding="cp932", mode="r") as f:
-                        reader = csv.reader(f)
-                        next(reader)  # ヘッダーを読み飛ばす
-                        for row in reader:
-                            if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
-                                target_vertices.append(int(row[1]))
-                except Exception:
-                    continue
+                target_vertices.extend(read_vertices_from_file(param_option["vertices_csv"], model, material_name))
             else:
                 target_vertices.extend(list(model.material_vertices[material_name]))
 
@@ -746,15 +739,8 @@ class PmxTailorExportService:
 
         # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["vertices_csv"]:
-            target_vertices = []
-            try:
-                with open(param_option["vertices_csv"], encoding="cp932", mode="r") as f:
-                    reader = csv.reader(f)
-                    next(reader)  # ヘッダーを読み飛ばす
-                    for row in reader:
-                        if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
-                            target_vertices.append(int(row[1]))
-            except Exception:
+            target_vertices = read_vertices_from_file(param_option["vertices_csv"], model, material_name)
+            if not target_vertices:
                 logger.warning("物理対象頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
                 return False, None, None
         else:
@@ -934,7 +920,7 @@ class PmxTailorExportService:
             regist_bones = all_regist_bones[base_map_idx]
 
             # キーは縦段の数分生成
-            vv_keys = sorted(np.unique(np.where(vertex_map)[0]))
+            vv_keys = list(range(vertex_map.shape[0]))
 
             # 縦ジョイント情報
             (
@@ -1088,7 +1074,7 @@ class PmxTailorExportService:
                         parent_bone_rigidbody.shape_size.x(),
                     )
 
-                    bone_y_idx = np.where(np.array(vv_keys) == v_yidx)[0][0] + 1
+                    bone_y_idx = v_yidx
 
                     (
                         prev_map_idx,
@@ -3116,15 +3102,8 @@ class PmxTailorExportService:
 
         if param_option["vertices_back_csv"]:
             try:
-                csv_back_vertices = []
                 for vertices_back_csv_path in glob(param_option["vertices_back_csv"]):
-                    with open(vertices_back_csv_path, encoding="cp932", mode="r") as f:
-                        reader = csv.reader(f)
-                        next(reader)  # ヘッダーを読み飛ばす
-                        for row in reader:
-                            if len(row) > 1 and int(row[1]):
-                                csv_back_vertices.append(int(row[1]))
-                back_vertices += csv_back_vertices
+                    back_vertices.extend(read_vertices_from_file(vertices_back_csv_path, model, None))
             except Exception:
                 logger.warning("裏面対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
 
@@ -5002,15 +4981,8 @@ class PmxTailorExportService:
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
-            top_target_vertices = []
-            try:
-                with open(param_option["top_vertices_csv"], encoding="cp932", mode="r") as f:
-                    reader = csv.reader(f)
-                    next(reader)  # ヘッダーを読み飛ばす
-                    for row in reader:
-                        if len(row) > 1 and int(row[1]) in model.material_vertices[material_name]:
-                            top_target_vertices.append(int(row[1]))
-            except Exception:
+            top_target_vertices = read_vertices_from_file(param_option["top_vertices_csv"], model, material_name)
+            if not top_target_vertices:
                 logger.warning("根元頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
                 return None, None, None, None, None
 
@@ -6409,6 +6381,30 @@ def calc_intersect(P0: MVector3D, P1: MVector3D, Q0: MVector3D, Q1: MVector3D) -
     #     return Pt, tt, uu, np.iinfo(np.int32).max
 
     return Pt, tt, uu, length
+
+
+def read_vertices_from_file(file_path: str, model: PmxModel, material_name=None):
+    target_vertices = []
+
+    # 材質が指定されている場合、範囲を限定(指定されてなければ全頂点対象)
+    material_vertices = model.material_vertices[material_name] if material_name else list(model.vertex_dict.keys())
+
+    for encoding in ["cp932", "utf-8"]:
+        # PmxEditor0.2.7.3以降は出力ファイルがUTF-8なので、両方試す
+        # フォーマットは汎用固定とする
+        try:
+            with open(file_path, encoding=encoding, mode="r") as f:
+                reader = csv.reader(f)
+                next(reader)  # ヘッダーを読み飛ばす
+                for row in reader:
+                    if len(row) > 1 and int(row[1]) in material_vertices:
+                        target_vertices.append(int(row[1]))
+            # 無事頂点を読み終えたら終了
+            break
+        except Exception:
+            continue
+
+    return target_vertices
 
 
 SEMI_STANDARD_BONE_NAMES = [
