@@ -618,5 +618,13 @@
     "グラデーション対象頂点が見つからなかったため、処理をスキップします": "Gradation target vertex was not found, so processing is skipped",
     "削除対象頂点が取得できなかったため、処理を終了します": "Processing ends because the vertex to be deleted could not be acquired.",
     "モーフ名が重複しているため、後のモーフを無視します。\nモデル: %s\n重複モーフ名: %s(%s - %s)": "Ignores later morphs due to duplicate morph names.\nModel: %s\nDuplicate morph name: %s(%s - %s)",
-    "物理対象頂点CSVが正常に読み込めなかったため、処理を終了します": "The process ends because the physical target vertex CSV could not be read normally."
+    "物理対象頂点CSVが正常に読み込めなかったため、処理を終了します": "The process ends because the physical target vertex CSV could not be read normally.",
+    "頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）\nセンター：メッシュ縦方向の真ん中のみ計算対象とする": "Vertices: calculate with actual vertex density (no vertex skip possibility)\nDistance: Calculate the distance of vertices with a density that connects them at equal intervals (possibility of skipping vertices)\nCenter: Only the center of the mesh in the vertical direction is subject to calculation",
+    "センター": "Center",
+    "裾対象頂点CSV": "Bottom target vertex CSV",
+    "裾対象頂点CSVファイルを開く": "Open hem target vertex CSV file",
+    "材質ではなく特定の頂点だけ裾対象としてウェイトを塗り直したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nファイル名を「*.csv」にすることで、フォルダ内の全CSVファイルを対象とすることができます。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。": "If you want to repaint weights for specific vertices instead of materials, specify the vertex CSV file saved with the vertex list selected in PmxEditor.\nBy setting the file name to \"*.csv\", all CSV files in the folder can be targeted.\nYou can specify by D&D, specify from the open button, or select from the history.",
+    "これまで指定された裾対象頂点CSVを再指定できます。": "You can respecify the tail target vertex CSV that has been specified so far.",
+    "頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）\n中央：メッシュ縦方向の真ん中のみ計算対象とする": "Vertices: calculate with actual vertex density (no vertex skip possibility)\nDistance: Calculate the distance of vertices with a density that connects them at equal intervals (possibility of skipping vertices)\nCenter: Only the center of the mesh in the vertical direction is subject to calculation",
+    "中央": "center"
 }

@@ -841,6 +841,31 @@ class PhysicsParam:
         self.top_vertices_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
         self.simple_param_sizer.Add(self.top_vertices_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
 
+        # 裾対象頂点CSVファイルコントロール
+        self.vertices_edge_csv_file_ctrl = HistoryFilePickerCtrl(
+            self.main_frame,
+            self.simple_window,
+            logger.transtext("裾対象頂点CSV"),
+            logger.transtext("裾対象頂点CSVファイルを開く"),
+            ("csv"),
+            wx.FLP_DEFAULT_STYLE,
+            logger.transtext(
+                "材質ではなく特定の頂点だけ裾対象としてウェイトを塗り直したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\n"
+                + "ファイル名を「*.csv」にすることで、フォルダ内の全CSVファイルを対象とすることができます。\n"
+                + "D&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+            ),
+            file_model_spacer=0,
+            title_parts_ctrl=None,
+            title_parts2_ctrl=None,
+            file_histories_key="vertices_edge_csv",
+            is_change_output=False,
+            is_aster=True,
+            is_save=False,
+            set_no=0,
+        )
+        self.vertices_edge_csv_file_ctrl.file_ctrl.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_change_vertices_csv)
+        self.simple_param_sizer.Add(self.vertices_edge_csv_file_ctrl.sizer, 0, wx.EXPAND, 0)
+
         # 裏面対象頂点CSVファイルコントロール
         self.vertices_back_csv_file_ctrl = HistoryFilePickerCtrl(
             self.main_frame,
@@ -938,13 +963,17 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("密度基準"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.density_type_txt.SetToolTip(
-            logger.transtext("頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）")
+            logger.transtext(
+                "頂点：実際の頂点の密度で計算する（頂点スキップ可能性なし）\n距離：頂点の距離を等間隔に繋いだ密度で計算する（頂点スキップ可能性あり）\n中央：メッシュ縦方向の真ん中のみ計算対象とする"
+            )
         )
         self.density_type_txt.Wrap(-1)
         self.advance_bone_grid_sizer.Add(self.density_type_txt, 0, wx.ALL, 5)
 
         self.density_type_ctrl = wx.Choice(
-            self.advance_window, id=wx.ID_ANY, choices=[logger.transtext("頂点"), logger.transtext("距離")]
+            self.advance_window,
+            id=wx.ID_ANY,
+            choices=[logger.transtext("頂点"), logger.transtext("距離"), logger.transtext("中央")],
         )
         self.density_type_ctrl.SetToolTip(self.density_type_txt.GetToolTipText())
         self.density_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -3076,6 +3105,7 @@ class PhysicsParam:
                 return params, False
 
             self.vertices_csv_file_ctrl.save()
+            self.vertices_edge_csv_file_ctrl.save()
             self.vertices_back_csv_file_ctrl.save()
             self.top_vertices_csv_file_ctrl.save()
 
@@ -3098,6 +3128,7 @@ class PhysicsParam:
                     self.frame.material_list[cidx + 1] for cidx in self.simple_extend_edge_choice_ctrl.GetSelections()
                 ),
                 "vertices_csv": self.vertices_csv_file_ctrl.path(),
+                "vertices_edge_csv": self.vertices_edge_csv_file_ctrl.path(),
                 "vertices_back_csv": self.vertices_back_csv_file_ctrl.path(),
                 "top_vertices_csv": self.top_vertices_csv_file_ctrl.path(),
                 "physics_parent": self.physics_parent_spin.GetValue(),
@@ -3126,6 +3157,7 @@ class PhysicsParam:
             params["exist_physics_clear"] = self.simple_exist_physics_clear_ctrl.GetStringSelection()
             params["special_shape"] = self.simple_special_shape_ctrl.GetStringSelection()
             params["vertices_csv"] = self.vertices_csv_file_ctrl.path()
+            params["vertices_edge_csv"] = self.vertices_edge_csv_file_ctrl.path()
             params["vertices_back_csv"] = self.vertices_back_csv_file_ctrl.path()
             params["top_vertices_csv"] = self.top_vertices_csv_file_ctrl.path()
             # params["threshold"] = self.simple_threshold_slider.GetValue()
@@ -4078,6 +4110,8 @@ class PhysicsParam:
                 self.simple_extend_edge_choice_ctrl.SetSelections(selected_idxs)
             if not self.vertices_csv_file_ctrl.path():
                 self.vertices_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_csv", ""))
+            if not self.vertices_edge_csv_file_ctrl.path():
+                self.vertices_edge_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_edge_csv", ""))
             if not self.vertices_back_csv_file_ctrl.path():
                 self.vertices_back_csv_file_ctrl.file_ctrl.SetPath(abb_setting.get("vertices_back_csv", ""))
             if not self.top_vertices_csv_file_ctrl.path():

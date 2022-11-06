@@ -914,6 +914,9 @@ class PmxTailorExportService:
         created_joints = {}
         prev_joint_cnt = 0
 
+        # 中央配置か否か
+        is_center = param_option["density_type"] == logger.transtext("中央")
+
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
 
@@ -1387,7 +1390,7 @@ class PmxTailorExportService:
                                         )
                                         created_joints[joint_key] = joint
 
-                    if param_option["horizonal_joint"] and next_connected and next_now_vv:
+                    if param_option["horizonal_joint"] and next_connected and next_now_vv and not is_center:
                         # 横ジョイント
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
@@ -1709,7 +1712,7 @@ class PmxTailorExportService:
                                     )
                                     created_joints[joint_key] = joint
 
-                    if param_option["diagonal_joint"] and next_connected and next_below_vv:
+                    if param_option["diagonal_joint"] and next_connected and next_below_vv and not is_center:
                         # 斜めジョイント
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_below_vv.map_rigidbodies.get(next_map_idx, None)
@@ -1796,7 +1799,13 @@ class PmxTailorExportService:
                             )
                             created_joints[joint_key] = joint
 
-                    if param_option["diagonal_joint"] and v_yidx > 0 and next_connected and next_above_vv:
+                    if (
+                        param_option["diagonal_joint"]
+                        and v_yidx > 0
+                        and next_connected
+                        and next_above_vv
+                        and not is_center
+                    ):
                         # 斜めジョイント
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_above_vv.map_rigidbodies.get(next_map_idx, None)
@@ -2326,6 +2335,8 @@ class PmxTailorExportService:
         coefficient = param_option["rigidbody_coefficient"]
         # 剛体形状
         rigidbody_shape_type = param_option["rigidbody_shape_type"]
+        # 中央配置か否か
+        is_center = param_option["density_type"] == logger.transtext("中央")
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         parent_bone = model.bones[param_option["parent_bone_name"]]
@@ -2459,7 +2470,13 @@ class PmxTailorExportService:
                         max_v_yidx,
                         max_v_xidx,
                     ) = self.get_block_vidxs(
-                        v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
+                        v_yidx,
+                        v_xidx,
+                        vertex_maps,
+                        all_regist_bones,
+                        all_bone_connected,
+                        base_map_idx,
+                        is_center=is_center,
                     )
 
                     nan_vertex_maps = np.full((max_v_yidx + 1, max_v_xidx + 1, 3), (np.nan, np.nan, np.nan))
@@ -2534,7 +2551,17 @@ class PmxTailorExportService:
                         # ウェイトを持ってないボーンは登録対象外（有り得るので警告なし）
                         continue
 
-                    if next_connected:
+                    if is_center:
+                        x_sizes = []
+                        if prev_now_vv and next_now_vv:
+                            x_sizes.append(next_now_vv.position().distanceToPoint(prev_now_vv.position()))
+                        elif prev_now_vv and not next_now_vv:
+                            x_sizes.append(now_now_vv.position().distanceToPoint(prev_now_vv.position()))
+                        elif not prev_now_vv and next_now_vv:
+                            x_sizes.append(next_now_vv.position().distanceToPoint(now_now_vv.position()))
+                        x_size = np.max(x_sizes) if x_sizes else 0.2
+
+                    elif next_connected:
                         x_sizes = []
                         if next_now_bone:
                             x_sizes.append(now_now_bone.position.distanceToPoint(next_now_bone.position))
@@ -2973,7 +3000,7 @@ class PmxTailorExportService:
                     target_vertices[v_key] = VirtualVertex(v_key)
                 target_vertices[v_key].append([v], [], [])
 
-        if not target_vertices:
+        if not target_vertices or not weighted_vidxs:
             logger.info("グラデーション対象頂点が見つからなかったため、処理をスキップします")
             return
 
@@ -3170,8 +3197,9 @@ class PmxTailorExportService:
         weighted_poses = {}
         for vkey in weighted_vkeys:
             vv = virtual_vertices[vkey]
-            weighted_poses[vkey] = vv.position().data()
-            weighted_vidxs.extend(vv.vidxs())
+            if vv.vidxs():
+                weighted_poses[vkey] = vv.position().data()
+                weighted_vidxs.extend(vv.vidxs())
 
         # 登録済みのボーンの位置リスト
         bone_poses = {}
@@ -3208,8 +3236,29 @@ class PmxTailorExportService:
                         vv.append([v], [], [])
                     remaining_vertices[v_key].append([v], [], [])
 
-        for vkey, vv in remaining_vertices.items():
+        if param_option["vertices_edge_csv"]:
+            try:
+                for vertices_edge_csv_path in glob(param_option["vertices_edge_csv"]):
+                    for vidx in read_vertices_from_file(vertices_edge_csv_path, model, None):
+                        v = model.vertex_dict[vidx]
+                        v_key = v.position.to_key(threshold)
+                        if v_key not in remaining_vertices:
+                            remaining_vertices[v_key] = VirtualVertex(v_key)
+                            vv.append([v], [], [])
+                        remaining_vertices[v_key].append([v], [], [])
+            except Exception:
+                logger.warning("裾対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
+
+        remain_cnt = len(remaining_vertices) * 2
+        while remaining_vertices.items() and remain_cnt > 0:
+            remain_cnt -= 1
+            # ランダムで選ぶ
+            vkey = list(remaining_vertices.keys())[random.randrange(len(remaining_vertices))]
+            vv = remaining_vertices[vkey]
+
             if not vv.vidxs():
+                # vidx がないのはそもそも対象外
+                del remaining_vertices[vkey]
                 continue
 
             # ウェイト済み頂点のうち、最も近いのを抽出
@@ -3222,14 +3271,21 @@ class PmxTailorExportService:
             nearest_deform = nearest_vv.deform
             # nearest_vv.connected_vvs.extend(vv.vidxs())
 
+            if not nearest_vv.deform:
+                # デフォームの対象がない場合、他で埋まる可能性があるので、一旦据え置き
+                continue
+
             if type(nearest_deform) is Bdef1:
                 logger.debug(
                     f"remaining1 nearest_vv: {nearest_vv.vidxs()}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
                 )
 
                 for rv in vv.real_vertices:
+                    weighted_vidxs.append(rv.index)
                     rv.deform = Bdef1(nearest_deform.index0)
+                    vv.deform = Bdef1(nearest_deform.index0)
 
+                del remaining_vertices[vkey]
             elif type(nearest_deform) is Bdef2:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -3277,8 +3333,10 @@ class PmxTailorExportService:
                     )
 
                 for rv in vv.real_vertices:
+                    weighted_vidxs.append(rv.index)
                     rv.deform = vv.deform
 
+                del remaining_vertices[vkey]
             elif type(nearest_deform) is Bdef4:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -3342,6 +3400,8 @@ class PmxTailorExportService:
                 for rv in vv.real_vertices:
                     weighted_vidxs.append(rv.index)
                     rv.deform = vv.deform
+
+                del remaining_vertices[vkey]
 
             vertex_cnt += 1
 
@@ -3994,7 +4054,7 @@ class PmxTailorExportService:
                     for v_xidx, x_regist in enumerate(x_regists):
                         regist_bones[v_yidx, v_xidx] = y_regist and x_regist
 
-            else:
+            elif param_option["density_type"] == logger.transtext("頂点"):
                 # 間隔が頂点タイプの場合、規則的に間を空ける(Yは末端は非表示になるので、もう一つ上も登録対象)
                 for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
                     vertex_map.shape[0] - 2,
@@ -4012,6 +4072,15 @@ class PmxTailorExportService:
                             if vertex_map.shape[0] - 2 <= v_yidx and not regist_bones[:v_yidx, v_xidx].any():
                                 # 仮想ボーン＋末端はそれより上が繋がってたら登録しない
                                 regist_bones[v_yidx, v_xidx] = False
+            else:
+                # 間隔がセンタータイプの場合、真ん中にのみボーンを張る
+                # 末端は非表示で登録する
+                for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
+                    vertex_map.shape[0] - 1
+                ]:
+                    v_xidx = vertex_map.shape[1] // 2
+                    if not np.isnan(vertex_map[v_yidx, v_xidx]).any():
+                        regist_bones[v_yidx, v_xidx] = True
 
             for v_yidx in range(vertex_map.shape[0]):
                 for v_xidx in range(vertex_map.shape[1]):
@@ -5936,6 +6005,7 @@ class PmxTailorExportService:
         all_bone_connected: dict,
         base_map_idx: int,
         is_weight=False,
+        is_center=False,
     ):
         regist_bones = all_regist_bones[base_map_idx]
         vertex_map = vertex_maps[base_map_idx]
@@ -5975,7 +6045,11 @@ class PmxTailorExportService:
         prev_xidx = 0
         prev_map_idx = base_map_idx
         prev_connected = False
-        if v_xidx == 0:
+        if is_center:
+            # 中央配置の場合、端っこ
+            prev_xidx = 0
+            prev_connected = True
+        elif v_xidx == 0:
             if len(all_bone_connected) == 1 and all_bone_connected[base_map_idx][target_v_yidx, -1]:
                 # 最後が先頭と繋がっている場合、最後と繋ぐ
                 prev_xidx = registed_max_v_xidx
@@ -6030,7 +6104,11 @@ class PmxTailorExportService:
         next_xidx = registed_max_v_xidx
         next_map_idx = base_map_idx
         next_connected = False
-        if v_xidx >= registed_max_v_xidx:
+        if is_center:
+            # 中央配置の場合、端っこ
+            next_xidx = regist_bones.shape[1] - 1
+            next_connected = True
+        elif v_xidx >= registed_max_v_xidx:
             if len(all_bone_connected) == 1 and all_bone_connected[base_map_idx][v_yidx, registed_max_v_xidx:].any():
                 # 最後が先頭と繋がっている場合(最後の有効ボーンから最初までがどこか繋がっている場合）、最後と繋ぐ（マップが1つの場合）
                 next_xidx = 0
