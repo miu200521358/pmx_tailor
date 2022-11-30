@@ -1163,16 +1163,24 @@ class PmxTailorExportService:
                                 and b_rigidbody.index >= 0
                                 and a_rigidbody.index != b_rigidbody.index
                             ):
-                                logger.warning(
-                                    "縦ジョイント生成に必要な情報が取得できなかった為、スルーします。\n"
-                                    + "縦ジョイントがないと、物理がチーズのように伸びる可能性があります。\n"
-                                    + "頂点マップで一行目（根元）がNoneの要素がないか確認してください。\n"
-                                    + "Noneの要素が根元にあり、かつ根元CSVが未指定の場合、根元CSVを指定して下さい。　処理対象: %s",
-                                    vv.map_bones[base_map_idx].name
-                                    if vv.map_bones.get(base_map_idx, None)
-                                    else vv.vidxs(),
-                                    decoration=MLogger.DECORATION_BOX,
-                                )
+                                if v_yidx == 0:
+                                    logger.warning(
+                                        "縦ジョイント生成に必要な情報が取得できなかった為、スルーします。\n"
+                                        + "縦ジョイントがないと、物理がチーズのように伸びる可能性があります。\n"
+                                        + "頂点マップで一行目（根元）がNoneの要素がないか確認してください。\n"
+                                        + "Noneの要素が根元にあり、かつ根元CSVが未指定の場合、根元CSVを指定して下さい。　処理対象: %s",
+                                        vv.map_bones[base_map_idx].name
+                                        if vv.map_bones.get(base_map_idx, None)
+                                        else vv.vidxs(),
+                                        decoration=MLogger.DECORATION_BOX,
+                                    )
+                                else:
+                                    logger.warning(
+                                        "縦ジョイント生成に必要な情報が取得できなかった為、スルーします。　処理対象: %s",
+                                        vv.map_bones[base_map_idx].name
+                                        if vv.map_bones.get(base_map_idx, None)
+                                        else vv.vidxs(),
+                                    )
                         else:
                             a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                             b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
@@ -5238,6 +5246,10 @@ class PmxTailorExportService:
             [(ek, virtual_vertices[ek].vidxs()) for ek in horizonal_top_edge_keys],
         )
 
+        top_edge_poses = []
+        for key in horizonal_top_edge_keys:
+            top_edge_poses.append(virtual_vertices[key].position().data())
+
         # bottomはエッジが分かれてたら分ける
         all_bottom_edge_keys = []
 
@@ -5250,13 +5262,13 @@ class PmxTailorExportService:
             # if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
             #     edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
             # else:
-            edge_distances = np.linalg.norm((np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+            edge_distances = np.linalg.norm((np.array(edge_poses) - np.mean(top_edge_poses, axis=0)), ord=2, axis=1)
             edge_mean_distance = np.mean(edge_distances)
 
-            if np.array(edge_lines)[edge_distances > mean_distance].shape[0] > 0:
-                # 距離が全体の距離より遠い場合、下部とみなす
+            if np.array(edge_lines)[edge_distances > mean_distance * 0.5].shape[0] > 0:
+                # 上部エッジからの距離が全体の距離/2より遠い場合、下部とみなす
                 # bottom はスリットの可能性があるので、中央値でさらに区分けする
-                distance_idxs = np.where(edge_distances > mean_distance)[0]
+                distance_idxs = np.where(edge_distances > mean_distance * 0.5)[0]
                 if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
                     idxs = (
                         [0] + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)] + [len(distance_idxs) - 1]
@@ -5287,10 +5299,6 @@ class PmxTailorExportService:
                 f"{(ei + 1):02d}",
                 [(ek, virtual_vertices[ek].vidxs()) for ek in eks],
             )
-
-        top_edge_poses = []
-        for key in horizonal_top_edge_keys:
-            top_edge_poses.append(virtual_vertices[key].position().data())
 
         top_edge_mean_pos = MVector3D(np.mean(top_edge_poses, axis=0))
         top_edge_start_pos = MVector3D(
