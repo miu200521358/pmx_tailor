@@ -86,7 +86,7 @@ def exec():
         params["mass"] = 0
         params["air_resistance"] = 0
         params["shape_maintenance"] = 0
-        params["vertical_bone_density"] = 6
+        params["vertical_bone_density"] = 4
 
         vertex_map, virtual_vertices, threshold, max_pos, remaining_vertices = create_vertex_map(
             model, params, params["material_name"], target_vertices
@@ -445,12 +445,11 @@ def create_bone(
         np.array([not np.isnan(vertex_map[yidx, :]).any() for yidx in range(vertex_map.shape[0])]) == True
     )[0][0]
 
-    # 間隔が頂点タイプの場合、規則的に間を空ける(Yは末端は非表示になるので、もう一つ上も登録対象)
+    # 間隔が頂点タイプの場合、規則的に間を空ける
     for v_yidx in list(range(root_yidx, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
-        vertex_map.shape[0] - 2,
         vertex_map.shape[0] - 1,
     ]:
-        regist_bones[v_yidx] = not np.isnan(vertex_map[v_yidx, :]).any()
+        regist_bones[v_yidx] = True
 
     registered_bones = np.full(vertex_map.shape[0], fill_value=None)
     prev_bone = None
@@ -464,7 +463,10 @@ def create_bone(
 
         bone_name = f"{abb_name}-{(v_yidx + 1):03d}"
 
-        bone_pos = MVector3D(np.mean(vertex_map[v_yidx, :], axis=0) * threshold)
+        bone_pos = MVector3D(
+            np.mean(vertex_map[v_yidx, np.unique(np.where(np.isnan(vertex_map[v_yidx, :]) == False)[0])], axis=0)
+            * threshold
+        )
         bone = Bone(bone_name, bone_name, bone_pos, parent_bone.index, 0, 0x0000 | 0x0002 | 0x0800)
 
         bone.parent_index = parent_bone.index
@@ -473,13 +475,12 @@ def create_bone(
 
         # 登録対象の場合のみボーン保持
         bone.index = len(model.bones)
+        parent_bone.tail_index = bone.index
         if v_yidx < vertex_map.shape[0] - 1:
-            # それ以外は表示ありで操作可能
             bone.flag |= 0x0008 | 0x0010 | 0x0001
             registered_bones[v_yidx] = bone
-            parent_bone.tail_index = bone.index
 
-            model.display_slots[display_name].references.append((0, bone.index))
+        model.display_slots[display_name].references.append((0, bone.index))
 
         logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
 
