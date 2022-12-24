@@ -4685,6 +4685,7 @@ class PmxTailorExportService:
 
             # 布は横の繋がりをチェックする
             for v_yidx in range(vertex_map.shape[0]):
+                v_xidx = 0
                 for v_xidx in range(0, vertex_map.shape[1] - 1):
                     if (
                         not np.isnan(vertex_map[v_yidx, v_xidx]).any()
