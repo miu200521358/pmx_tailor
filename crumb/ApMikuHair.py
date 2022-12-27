@@ -8,6 +8,7 @@ import os
 import numpy as np
 import random
 from glob import glob
+import math
 
 # このソースのあるディレクトリの絶対パスを取得
 current_dir = pathlib.Path(__file__).resolve().parent
@@ -53,6 +54,203 @@ from service.PmxTailorExportService import read_vertices_from_file, VirtualVerte
 
 MLogger.initialize(level=MLogger.DEBUG, is_file=True)
 logger = MLogger(__name__, level=MLogger.DEBUG)
+
+
+def exec_joint():
+    model = PmxReader(
+        "E:/MMD/MikuMikuDance_v926x64/Work/202101_vroid/_報告/ラワイル1223/APmiku_nakedhair_IKx_onlyee_4_20221224_152739_20221224_165809_strong.pmx",
+        is_check=False,
+        is_sizing=False,
+    ).read_data()
+    print(model.name)
+
+    right_bone_name1 = [
+        "右髪1中心",
+        "右髪1-007",
+        "右髪1-011",
+        "右髪1-015",
+        "右髪1-019",
+        "右髪1-023",
+        "右髪1-027",
+        "右髪1-031",
+        "右髪1-035",
+        # "右髪1-039",
+        # "右髪1-043",
+        # "右髪1-047",
+        # "右髪1-051",
+        # "右髪1-055",
+    ]
+    right_bone_name2 = [
+        "右髪2中心",
+        "右髪2-003",
+        "右髪2-007",
+        "右髪2-011",
+        "右髪2-015",
+        "右髪2-019",
+        "右髪2-023",
+        "右髪2-027",
+        "右髪2-031",
+        # "右髪2-035",
+        # "右髪2-039",
+        # "右髪2-043",
+        # "右髪2-047",
+        # "右髪2-051",
+    ]
+    right_bone_name3 = [
+        "右髪3中心",
+        "右髪3-007",
+        "右髪3-011",
+        "右髪3-015",
+        "右髪3-019",
+        "右髪3-023",
+        "右髪3-027",
+        "右髪3-031",
+        "右髪3-035",
+        # "右髪3-039",
+        # "右髪3-043",
+        # "右髪3-047",
+    ]
+
+    left_bone_name1 = [
+        "左髪1中心",
+        "左髪1-007",
+        "左髪1-011",
+        "左髪1-015",
+        "左髪1-019",
+        "左髪1-023",
+        "左髪1-027",
+        "左髪1-031",
+        "左髪1-035",
+        # "左髪1-039",
+        # "左髪1-043",
+        # "左髪1-047",
+        # "左髪1-051",
+        # "左髪1-055",
+    ]
+    left_bone_name2 = [
+        "左髪2中心",
+        "左髪2-005",
+        "左髪2-009",
+        "左髪2-013",
+        "左髪2-017",
+        "左髪2-021",
+        "左髪2-025",
+        "左髪2-029",
+        "左髪2-033",
+        # "左髪2-037",
+        # "左髪2-041",
+        # "左髪2-045",
+        # "左髪2-049",
+        # "左髪2-053",
+    ]
+    left_bone_name3 = [
+        "左髪3中心",
+        "左髪3-010",
+        "左髪3-014",
+        "左髪3-018",
+        "左髪3-022",
+        "左髪3-026",
+        "左髪3-030",
+        "左髪3-034",
+        "左髪3-038",
+        # "左髪3-042",
+        # "左髪3-046",
+        # "左髪3-050",
+    ]
+
+    for bone_names in [
+        zip(right_bone_name1, right_bone_name1[1:], right_bone_name2, right_bone_name2[1:]),
+        zip(right_bone_name2, right_bone_name2[1:], right_bone_name3, right_bone_name3[1:]),
+        zip(right_bone_name3, right_bone_name3[1:], right_bone_name1, right_bone_name1[1:]),
+        zip(left_bone_name1, left_bone_name1[1:], left_bone_name2, left_bone_name2[1:]),
+        zip(left_bone_name2, left_bone_name2[1:], left_bone_name3, left_bone_name3[1:]),
+        zip(left_bone_name3, left_bone_name3[1:], left_bone_name1, left_bone_name1[1:]),
+    ]:
+        for n, (a_bone_from_name, a_bone_to_name, b_bone_from_name, b_bone_to_name) in enumerate(bone_names):
+            a_bone_from = model.bones[a_bone_from_name]
+            a_bone_to = model.bones[a_bone_to_name]
+            b_bone_from = model.bones[b_bone_from_name]
+            b_bone_to = model.bones[b_bone_to_name]
+
+            horizontal_joint = build_joint(model, a_bone_from, a_bone_to, b_bone_from, b_bone_to, "→", n)
+            # reverse_joint = build_joint(model, b_bone_from, b_bone_to, a_bone_from, a_bone_to, "←")
+
+            model.joints[horizontal_joint.name] = horizontal_joint
+            # model.joints[reverse_joint.name] = reverse_joint
+
+    PmxWriter().write(
+        model,
+        f"E:/MMD/MikuMikuDance_v926x64/Work/202101_vroid/_報告/ラワイル1223/APmiku_nakedhair_IKx_onlyee_4_20221224_152739_20221224_165809_strong_{datetime.now():%Y%m%d_%H%M%S}.pmx",
+    )
+
+
+def build_joint(
+    model: PmxModel,
+    a_bone_from: Bone,
+    a_bone_to: Bone,
+    b_bone_from: Bone,
+    b_bone_to: Bone,
+    direction_mark: str,
+    limit: float,
+):
+    # 剛体 --------
+    a_rigidbody = model.rigidbodies[a_bone_to.name]
+    b_rigidbody = model.rigidbodies[b_bone_to.name]
+
+    # 剛体のZ軸方向を求める -----
+    a_x_direction_from_pos = a_y_direction_from_pos = a_bone_from.position
+    a_x_direction_to_pos = a_bone_to.position
+    a_y_direction_to_pos = a_y_direction_from_pos + MVector3D(1, 0, 0)
+
+    # ボーン進行方向(x)
+    a_x_direction_pos = (a_x_direction_to_pos - a_x_direction_from_pos).normalized()
+    # ボーン進行方向に対しての横軸(y)
+    a_y_direction_pos = (a_y_direction_to_pos - a_y_direction_from_pos).normalized()
+    # ボーン進行方向に対しての縦軸(z)
+    a_z_direction_pos = MVector3D.crossProduct(a_x_direction_pos, a_y_direction_pos)
+
+    # --------
+    b_x_direction_from_pos = b_y_direction_from_pos = b_bone_from.position
+    b_x_direction_to_pos = b_bone_to.position
+    b_y_direction_to_pos = b_y_direction_from_pos + MVector3D(1, 0, 0)
+
+    # ボーン進行方向(x)
+    b_x_direction_pos = (b_x_direction_to_pos - b_x_direction_from_pos).normalized()
+    # ボーン進行方向に対しての横軸(y)
+    b_y_direction_pos = (b_y_direction_to_pos - b_y_direction_from_pos).normalized()
+    # ボーン進行方向に対しての縦軸(z)
+    b_z_direction_pos = MVector3D.crossProduct(b_x_direction_pos, b_y_direction_pos)
+    # --------
+
+    # ボーン進行方向(x)
+    x_direction_pos = (b_bone_to.position - a_bone_to.position).normalized()
+    # ボーン進行方向に対しての縦軸(z)
+    z_direction_pos = ((a_z_direction_pos + b_z_direction_pos) / 2).normalized()
+    joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+    joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+
+    joint_name = f"{direction_mark}|{a_rigidbody.name}|{b_rigidbody.name}"
+
+    joint_euler = joint_qq.toEulerAngles()
+    joint_rotation_radians = MVector3D(
+        math.radians(joint_euler.x()), math.radians(joint_euler.y()), math.radians(joint_euler.z())
+    )
+
+    return Joint(
+        joint_name,
+        joint_name,
+        0,
+        a_rigidbody.index,
+        b_rigidbody.index,
+        b_bone_to.position,
+        joint_rotation_radians,
+        MVector3D(0, -0.1 * (limit**1.2), 0),
+        MVector3D(0, 0.1 * (limit**1.2), 0),
+        MVector3D(),
+        MVector3D(),
+        MVector3D(),
+        MVector3D(),
+    )
 
 
 def exec():
@@ -961,4 +1159,4 @@ def get_edge_lines(edge_line_pairs: dict, start_vkey: tuple, edge_lines: list, e
 
 
 if __name__ == "__main__":
-    exec()
+    exec_joint()
