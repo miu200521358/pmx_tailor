@@ -588,7 +588,7 @@ class PhysicsParam:
             choices=[logger.transtext("なし"), logger.transtext("全て表面")],
         )
         self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
-        self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.on_special_shape)
         self.simple_header_grid_sizer.Add(self.simple_special_shape_ctrl, 0, wx.ALL, 5)
 
         self.simple_param_sizer.Add(self.simple_header_grid_sizer, 0, wx.ALL | wx.EXPAND, 0)
@@ -2940,7 +2940,7 @@ class PhysicsParam:
         self.route_search_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("根元頂点優先"), logger.transtext("前頂点優先")],
+            choices=[logger.transtext("前頂点優先"), logger.transtext("根元頂点優先")],
         )
         self.route_search_type_ctrl.SetToolTip(self.route_search_type_txt.GetToolTipText())
         self.route_search_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -2951,7 +2951,7 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("根元頂点推定"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.route_estimate_type_txt.SetToolTip(
-            logger.transtext("根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定")
+            logger.transtext("根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\n軸方向: 物理方向の逆方向を根元として推定")
         )
         self.route_estimate_type_txt.Wrap(-1)
         self.advance_option_grid_sizer.Add(self.route_estimate_type_txt, 0, wx.ALL, 5)
@@ -2959,7 +2959,7 @@ class PhysicsParam:
         self.route_estimate_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("角度"), logger.transtext("縮尺")],
+            choices=[logger.transtext("縮尺"), logger.transtext("角度"), logger.transtext("軸方向")],
         )
         self.route_estimate_type_ctrl.SetToolTip(self.route_estimate_type_txt.GetToolTipText())
         self.route_estimate_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -4051,6 +4051,9 @@ class PhysicsParam:
         self.main_frame.on_wheel_spin_ctrl(event, inc)
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
+    def on_special_shape(self, event: wx.Event):
+        self.main_frame.file_panel_ctrl.on_change_file(event)
+
     def set_material_name(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         # setValueでそのままset_abb_nameを起動する
@@ -4130,9 +4133,9 @@ class PhysicsParam:
                 self.route_search_type_ctrl.SetStringSelection(
                     abb_setting.get("route_search_type", logger.transtext("根元頂点優先"))
                 )
-            if self.route_estimate_type_ctrl.GetStringSelection() == logger.transtext("角度"):
+            if self.route_estimate_type_ctrl.GetStringSelection() == logger.transtext("縮尺"):
                 self.route_estimate_type_ctrl.SetStringSelection(
-                    abb_setting.get("route_estimate_type", logger.transtext("角度"))
+                    abb_setting.get("route_estimate_type", logger.transtext("縮尺"))
                 )
             if not self.physics_parent_spin.GetValue():
                 self.physics_parent_spin.SetValue(int(abb_setting.get("physics_parent", 0)))
@@ -4254,8 +4257,8 @@ class PhysicsParam:
         self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
-        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
+        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
+        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("縮尺"))
 
         self.advance_vertical_joint_valid_check.SetValue(1)
         self.advance_horizonal_joint_valid_check.SetValue(0)
@@ -4535,10 +4538,11 @@ class PhysicsParam:
 
             if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
                 # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を小さめにしておく
+                # Yの捩れを許可しない
                 vertical_joint_rot /= 1.2
-                vertical_joint_y_rot /= 1.2
+                vertical_joint_y_rot = 0
                 vertical_spring_rot /= 3
-                vertical_spring_y_rot /= 3
+                vertical_spring_y_rot = 0
 
             self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
             self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
@@ -4681,8 +4685,8 @@ class PhysicsParam:
         self.density_type_ctrl.SetStringSelection(logger.transtext("頂点"))
         self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
-        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
+        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
+        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("縮尺"))
 
         self.set_material_name(event)
         # self.set_fineness(event)

@@ -731,9 +731,177 @@ class PmxTailorExportService:
         model.comment += f"\r\n　　{logger.transtext('略称')}: {param_option['abb_name']}"
         model.comment += f", {logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
         # model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"
-        model.comment += f", {logger.transtext('質量')}: {param_option['mass']}"
-        model.comment += f", {logger.transtext('柔らかさ')}: {param_option['air_resistance']}"
-        model.comment += f", {logger.transtext('張り')}: {param_option['shape_maintenance']}"
+        model.comment += f", {logger.transtext('質量')}: {round(param_option['mass'], 3)}"
+        model.comment += f", {logger.transtext('柔らかさ')}: {round(param_option['air_resistance'], 3)}"
+        model.comment += f", {logger.transtext('張り')}: {round(param_option['shape_maintenance'], 3)}"
+        model.comment += f", {logger.transtext('特殊形状')}: {param_option['special_shape']}"
+        model.comment += f"\r\n　　{logger.transtext('ボーン密度')}"
+        model.comment += f", {logger.transtext('縦密度')}: {param_option['vertical_bone_density']}"
+        model.comment += f", {logger.transtext('横密度')}: {param_option['horizonal_bone_density']}"
+        model.comment += f", {logger.transtext('オフセット')}: {param_option['horizonal_bone_offset']}"
+        model.comment += f", {logger.transtext('密度基準')}: {param_option['density_type']}"
+        model.comment += f"\r\n　　{logger.transtext('根元剛体')}"
+        model.comment += f", {logger.transtext('質量')}: {round(param_option['rigidbody'].param.mass, 3)}"
+        model.comment += f", {logger.transtext('移動減衰')}: {round(param_option['rigidbody'].param.linear_damping, 3)}"
+        model.comment += f", {logger.transtext('回転減衰')}: {round(param_option['rigidbody'].param.angular_damping, 3)}"
+        model.comment += f", {logger.transtext('反発力')}: {round(param_option['rigidbody'].param.restitution, 3)}"
+        model.comment += f", {logger.transtext('摩擦力')}: {round(param_option['rigidbody'].param.friction, 3)}"
+        model.comment += f", {logger.transtext('係数')}: {round(param_option['rigidbody_coefficient'], 3)}"
+        model.comment += f"\r\n　　{logger.transtext('剛体の厚み')}"
+        model.comment += f", {logger.transtext('根元厚み')}: {round(param_option['rigidbody_root_thicks'], 3)}"
+        model.comment += f", {logger.transtext('末端厚み')}: {round(param_option['rigidbody_end_thicks'], 3)}"
+        model.comment += f"\r\n　　{logger.transtext('詳細オプション')}"
+        model.comment += f", {logger.transtext('物理接続')}: {param_option['parent_type']}"
+        model.comment += f", {logger.transtext('物理タイプ')}: {param_option['physics_type']}"
+        model.comment += f", {logger.transtext('ジョイント位置')}: {param_option['joint_pos_type']}"
+        model.comment += f", {logger.transtext('ルート探索')}: {param_option['route_search_type']}"
+        model.comment += f", {logger.transtext('根元頂点推定')}: {param_option['route_estimate_type']}"
+        model.comment += f", {logger.transtext('物理親')}: {param_option['physics_parent']}"
+
+        if param_option["vertical_joint"]:
+            model.comment += f"\r\n　　{logger.transtext('縦ジョイント')}"
+            model.comment += f", {logger.transtext('制限係数')}: {round(param_option['vertical_joint_coefficient'], 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.x(), 3)}"
+            model.comment += (
+                f", {logger.transtext('回転Y(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.y(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Z(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.z(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転X(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.x(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Y(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.y(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Z(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.z(), 3)}"
+            )
+            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['vertical_joint'].spring_constant_translation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['vertical_joint'].spring_constant_translation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['vertical_joint'].spring_constant_translation.z(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['vertical_joint'].spring_constant_rotation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['vertical_joint'].spring_constant_rotation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['vertical_joint'].spring_constant_rotation.z(), 3)}"
+
+        if param_option["horizonal_joint"]:
+            model.comment += f"\r\n　　{logger.transtext('横ジョイント')}"
+            model.comment += f", {logger.transtext('制限係数')}: {param_option['horizonal_joint_coefficient']}"
+            model.comment += f", {logger.transtext('親剛体距離制限')}: {param_option['horizonal_joint_restruct']}"
+            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.x(), 3)}"
+            model.comment += (
+                f", {logger.transtext('回転Y(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.y(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Z(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.z(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転X(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.x(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Y(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.y(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Z(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.z(), 3)}"
+            )
+            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['horizonal_joint'].spring_constant_translation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['horizonal_joint'].spring_constant_translation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['horizonal_joint'].spring_constant_translation.z(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.z(), 3)}"
+
+        if param_option["diagonal_joint"]:
+            model.comment += f"\r\n　　{logger.transtext('斜めジョイント')}"
+            model.comment += f", {logger.transtext('制限係数')}: {round(param_option['diagonal_joint_coefficient'], 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.x(), 3)}"
+            model.comment += (
+                f", {logger.transtext('回転Y(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.y(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Z(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.z(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転X(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.x(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Y(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.y(), 3)}"
+            )
+            model.comment += (
+                f", {logger.transtext('回転Z(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.z(), 3)}"
+            )
+            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['diagonal_joint'].spring_constant_translation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['diagonal_joint'].spring_constant_translation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['diagonal_joint'].spring_constant_translation.z(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.z(), 3)}"
+
+        if param_option["vertical_reverse_joint"]:
+            model.comment += f"\r\n　　{logger.transtext('縦逆ジョイント')}"
+            model.comment += (
+                f", {logger.transtext('制限係数')}: {round(param_option['vertical_reverse_joint_coefficient'], 3)}"
+            )
+            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.z(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.z(), 3)}"
+
+        if param_option["horizonal_reverse_joint"]:
+            model.comment += f"\r\n　　{logger.transtext('横逆ジョイント')}"
+            model.comment += (
+                f", {logger.transtext('制限係数')}: {round(param_option['horizonal_reverse_joint_coefficient'], 3)}"
+            )
+            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.x(), 3)}"
+            model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.y(), 3)}"
+            model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.z(), 3)}"
+            model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.x(), 3)}"
+            model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.y(), 3)}"
+            model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.z(), 3)}"
+            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.z(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.x(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.y(), 3)}"
+            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.z(), 3)}"
 
         material_name = param_option["material_name"]
 
@@ -2518,6 +2686,8 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and above_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and prev_xidx < v_xidx
+                        and above_yidx < v_yidx
                         else VirtualVertex("")
                     )
 
@@ -2526,6 +2696,7 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and v_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and prev_xidx < v_xidx
                         else VirtualVertex("")
                     )
 
@@ -2534,6 +2705,8 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and below_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and prev_xidx < v_xidx
+                        and below_yidx > v_yidx
                         else VirtualVertex("")
                     )
 
@@ -2542,6 +2715,7 @@ class PmxTailorExportService:
                         if base_map_idx in vertex_maps
                         and above_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
+                        and above_yidx < v_yidx
                         else VirtualVertex("")
                     )
 
@@ -2558,6 +2732,7 @@ class PmxTailorExportService:
                         if base_map_idx in vertex_maps
                         and below_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
+                        and below_yidx > v_yidx
                         else VirtualVertex("")
                     )
 
@@ -2566,6 +2741,8 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and above_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and next_xidx > v_xidx
+                        and above_yidx < v_yidx
                         else VirtualVertex("")
                     )
 
@@ -2574,6 +2751,7 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and v_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and next_xidx > v_xidx
                         else VirtualVertex("")
                     )
 
@@ -2582,6 +2760,8 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and below_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and next_xidx > v_xidx
+                        and below_yidx > v_yidx
                         else VirtualVertex("")
                     )
 
@@ -2715,7 +2895,7 @@ class PmxTailorExportService:
                         if next_connected:
                             mean_x_idx = v_xidx + (max_v_xidx + 1 - v_xidx) / 2
                         else:
-                            mean_x_idx = v_xidx
+                            mean_x_idx = v_xidx - 0.5
                     else:
                         mean_x_idx = v_xidx + (next_xidx - v_xidx) / 2
                     mean_y_idx = v_yidx + (below_yidx - v_yidx) / 2
@@ -2782,6 +2962,7 @@ class PmxTailorExportService:
                                 shape_positions.append(prev_below_bone.position.data())
                             shape_position = MVector3D(np.mean(shape_positions, axis=0))
 
+                    is_y_direction_prev = False
                     if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
                         # 末端は軸方向がひとつ上の向きとする
                         x_direction_to_pos = now_above_bone.position
@@ -2791,7 +2972,10 @@ class PmxTailorExportService:
                                 tuple(vertex_map[above_yidx, ceil_mean_xidx])
                             ].position()
                         else:
-                            y_direction_to_pos = y_direction_from_pos + MVector3D(1, 0, 0)
+                            is_y_direction_prev = True
+                            y_direction_to_pos = virtual_vertices[
+                                tuple(vertex_map[above_yidx, floor_mean_xidx])
+                            ].position()
                     else:
                         x_direction_to_pos = now_now_bone.position
                         x_direction_from_pos = y_direction_from_pos = now_below_bone.position
@@ -2802,7 +2986,10 @@ class PmxTailorExportService:
                         ):
                             y_direction_to_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
                         else:
-                            y_direction_to_pos = y_direction_from_pos + MVector3D(1, 0, 0)
+                            is_y_direction_prev = True
+                            y_direction_to_pos = virtual_vertices[
+                                tuple(vertex_map[v_yidx, floor_mean_xidx])
+                            ].position()
 
                     # ボーン進行方向(x)
                     x_direction_pos = (x_direction_to_pos - x_direction_from_pos).normalized()
@@ -2811,7 +2998,8 @@ class PmxTailorExportService:
                     # ボーン進行方向に対しての縦軸(z)
                     z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
                     shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                    shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
+                    if is_y_direction_prev:
+                        shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
                     shape_euler = shape_qq.toEulerAngles()
                     shape_rotation_radians = MVector3D(
                         math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
@@ -4128,8 +4316,13 @@ class PmxTailorExportService:
                         vertex_map.shape[1] - 1
                     ]:
                         if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and (
-                            v_xidx <= vertex_map.shape[1] - param_option["horizonal_bone_density"]
-                            or not all_bone_connected[base_map_idx][v_yidx, v_xidx]
+                            all_bone_connected[base_map_idx][v_yidx, v_xidx]
+                            or (
+                                not all_bone_connected[base_map_idx][v_yidx, v_xidx]
+                                and (v_xidx == vertex_map.shape[1] - 1 or v_xidx == 0)
+                            )
+                            or v_yidx >= vertex_map.shape[0] - 2
+                            or v_yidx == 0
                         ):
                             regist_bones[v_yidx, v_xidx] = True
 
@@ -4257,13 +4450,7 @@ class PmxTailorExportService:
             for rbone_name in registed_bone_names.values():
                 # 登録済みのボーンリストと比較
                 rbone = model.bones[rbone_name]
-                if (
-                    rbone.position == bone.position
-                    and rbone.parent_index in model.bone_indexes
-                    and bone.parent_index in model.bone_indexes
-                    and model.bones[model.bone_indexes[rbone.parent_index]].position
-                    == model.bones[model.bone_indexes[bone.parent_index]].position
-                ):
+                if rbone.position == bone.position:
                     # ボーン構成がまったく同じ場合、このボーンそのものは登録対象外
                     is_regist = False
                     break
@@ -4290,7 +4477,7 @@ class PmxTailorExportService:
             if bone.parent_index in registed_bone_names:
                 # 登録前のINDEXから名称を引っ張ってきて、それを新しいINDEXで置き換える
                 parent_bone = model.bones[registed_bone_names[bone.parent_index]]
-                bone.parent_index = parent_bone.index
+            bone.parent_index = parent_bone.index
 
             # 親ボーンの表示先も同時設定
             if parent_bone != root_bone:
@@ -5105,12 +5292,13 @@ class PmxTailorExportService:
 
         horizonal_top_edge_keys = []
 
-        # 処理対象頂点の距離の中央値
-        # if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
-        #     mean_distances = np.linalg.norm((np.array(all_mean_poses) - parent_bone.position.data()), ord=2, axis=1)
-        # else:
-        mean_distances = np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
-        mean_distance = np.mean(mean_distances)
+        # 処理対象頂点の距離の基準値(できるだけ根元の値)
+        if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
+            all_root_val = np.min(all_mean_poses, axis=0)[target_idx]
+        else:
+            all_root_val = np.max(all_mean_poses, axis=0)[target_idx]
+
+        all_mean_distance = np.abs(np.mean(np.array(all_mean_poses)[:, target_idx] - all_root_val))
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
@@ -5134,25 +5322,18 @@ class PmxTailorExportService:
             for n, (edge_lines, edge_poses, target_dots) in enumerate(
                 zip(all_edge_lines, all_edge_poses, target_diff_dots)
             ):
-                if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
-                    edge_distances = np.linalg.norm(
-                        (np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1
-                    )
-                else:
-                    edge_distances = np.linalg.norm(
-                        (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
-                    )
+                edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
                 edge_mean_distance = np.mean(edge_distances)
-                if len(all_edge_lines) == 2 and edge_mean_distance < mean_distance:
+                if len(all_edge_lines) == 2 and edge_mean_distance < all_mean_distance:
                     # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
                     all_top_edge_keys = edge_lines
                     all_top_edge_poses = edge_poses
                     all_top_edge_dots = target_dots
                     all_top_edge_distances = edge_distances
 
-                if len(all_edge_lines) != 2 and np.array(edge_lines)[edge_distances < mean_distance].shape[0] > 0:
+                if len(all_edge_lines) != 2 and np.array(edge_lines)[edge_distances < edge_mean_distance].shape[0] > 0:
                     # 距離が全体の距離より近い場合、上部とみなす
-                    for idx in np.where(edge_distances < mean_distance)[0]:
+                    for idx in np.where(edge_distances < edge_mean_distance)[0]:
                         all_top_edge_keys.append(edge_lines[idx])
                         all_top_edge_poses.append(edge_poses[idx])
                         all_top_edge_dots.append(target_dots[idx])
@@ -5177,11 +5358,11 @@ class PmxTailorExportService:
             )
             top_move_values = np.array(all_top_edge_poses)[:, move_idx]
 
-            # の最大の1/2を閾値とする
-            horizonal_threshold = np.max(np.abs(np.diff(top_move_values))) / 2
+            # 移動量の最大の1/2を閾値とする
+            horizonal_threshold = np.max(np.abs(np.diff(top_move_values))) * 0.5
 
             # 内積差の最大の1/2を閾値とする(ただし、最下限を設ける)
-            dot_threshold = max(0.2, np.max(np.abs(np.diff(all_top_edge_dots))) / 2)
+            dot_threshold = max(0.2, np.max(np.abs(np.diff(all_top_edge_dots))) * 0.5)
 
             logger.debug(
                 f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
@@ -5263,13 +5444,12 @@ class PmxTailorExportService:
             # if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
             #     edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
             # else:
-            edge_distances = np.linalg.norm((np.array(edge_poses) - np.mean(top_edge_poses, axis=0)), ord=2, axis=1)
-            edge_mean_distance = np.mean(edge_distances)
+            edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
 
-            if np.array(edge_lines)[edge_distances > mean_distance * 0.5].shape[0] > 0:
+            if np.array(edge_lines)[edge_distances > all_mean_distance].shape[0] > 0:
                 # 上部エッジからの距離が全体の距離/2より遠い場合、下部とみなす
                 # bottom はスリットの可能性があるので、中央値でさらに区分けする
-                distance_idxs = np.where(edge_distances > mean_distance * 0.5)[0]
+                distance_idxs = np.where(edge_distances > all_mean_distance)[0]
                 if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
                     idxs = (
                         [0] + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)] + [len(distance_idxs) - 1]
@@ -5302,9 +5482,7 @@ class PmxTailorExportService:
             )
 
         top_edge_mean_pos = MVector3D(np.mean(top_edge_poses, axis=0))
-        top_edge_start_pos = MVector3D(
-            0, 0, MVector3D(top_edge_mean_pos * np.abs(base_vertical_axis.data())).length()
-        ) + MVector3D(top_edge_mean_pos * np.abs(base_vertical_axis.data()))
+        top_edge_start_pos = top_edge_mean_pos + MVector3D(0, 0, 20)
 
         top_degrees = {}
         for top_pos in top_edge_poses:
@@ -5323,11 +5501,9 @@ class PmxTailorExportService:
             for key in bottom_edge_keys:
                 bottom_edge_poses.append(virtual_vertices[key].position().data())
 
-        bottom_edge_mean_pos = MVector3D(np.mean(bottom_edge_poses, axis=0))
-        # 中央から真後ろ
-        bottom_edge_start_pos = MVector3D(
-            0, 0, MVector3D(bottom_edge_mean_pos * np.abs(base_vertical_axis.data())).length()
-        ) + MVector3D(bottom_edge_mean_pos * np.abs(base_vertical_axis.data()))
+        # 下端の中央は上部に合わせる
+        bottom_edge_mean_pos = top_edge_mean_pos.copy()
+        bottom_edge_start_pos = bottom_edge_mean_pos + MVector3D(0, 0, 20)
 
         # できるだけ評価軸は離して登録する
         if param_option["direction"] in [logger.transtext("下")]:
@@ -5357,6 +5533,13 @@ class PmxTailorExportService:
             bottom_x_radius = 1
             bottom_y_radius = np.max(np.abs(np.array(bottom_edge_poses)[:, 1] - bottom_edge_mean_pos.data()[1]))
             bottom_z_radius = np.max(np.abs(np.array(bottom_edge_poses)[:, 2] - bottom_edge_mean_pos.data()[2]))
+
+        if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
+            top_max_val = np.min(np.array(top_edge_poses)[:, target_idx])
+            bottom_max_val = np.max(np.array(bottom_edge_poses)[:, target_idx])
+        else:
+            top_max_val = np.max(np.array(top_edge_poses)[:, target_idx])
+            bottom_max_val = np.min(np.array(bottom_edge_poses)[:, target_idx])
 
         logger.info(
             "%s: エッジ上部 中央位置[%s] 半径[x: %s, y: %s, z: %s]",
@@ -5388,21 +5571,31 @@ class PmxTailorExportService:
                 if param_option["route_estimate_type"] == logger.transtext("縮尺"):
                     # 中心から見た処理対象仮想頂点の位置
                     bottom_local_pos = (bottom_target_pos - bottom_edge_mean_pos) * base_reverse_axis
+                    bottom_radius_vec = bottom_local_pos.copy()
+                    bottom_radius_vec.abs()
+                    bottom_radius_vec.one()
                     # 上部の理想位置をざっくり比率から求めておく
-                    top_ideal_pos = top_edge_mean_pos + (
+                    top_target_pos = top_edge_mean_pos + (
                         bottom_local_pos
+                        # 全体の縮尺
                         * (
                             np.array([top_x_radius, top_y_radius, top_z_radius])
                             / np.array([bottom_x_radius, bottom_y_radius, bottom_z_radius])
                         )
+                        # 下端エッジの上の方を小さめに判定
+                        * abs(
+                            abs(top_max_val - bottom_target_pos.data()[target_idx]) / abs(top_max_val - bottom_max_val)
+                        )
                     )
-                    top_distances = np.linalg.norm((np.array(top_edge_poses) - top_ideal_pos.data()), ord=2, axis=1)
-                    top_target_pos = MVector3D(np.array(top_edge_poses)[np.argmin(top_distances)])
+                    top_distances = np.linalg.norm((np.array(top_edge_poses) - top_target_pos.data()), ord=2, axis=1)
+                    top_nearest_pos = MVector3D(np.array(top_edge_poses)[np.argmin(top_distances)])
                     logger.debug(
-                        f"◆上部縮尺推定: top_vidxs: [{virtual_vertices[top_target_pos.to_key(threshold)].vidxs()}, bottom_vidxs: [{virtual_vertices[bottom_key].vidxs()}], top_ideal_pos: [{top_ideal_pos.to_log()}], top_target_pos: [{top_target_pos.to_log()}]"
+                        f"◆上部縮尺推定: bottom_vidxs: [{virtual_vertices[bottom_key].vidxs()}], top_vidxs: [{virtual_vertices[top_nearest_pos.to_key(threshold)].vidxs()}, top_target_pos: [{top_target_pos.to_log()}], top_nearest_pos: [{top_nearest_pos.to_log()}]"
                     )
-                else:
+                elif param_option["route_estimate_type"] == logger.transtext("角度"):
                     # 下部の角度に類似した上部角度を選ぶ
+                    bottom_edge_start_pos.setY(bottom_target_pos.y())
+                    bottom_edge_mean_pos.setY(bottom_target_pos.y())
                     bottom_degree0, bottom_degree1 = self.calc_arc_degree(
                         bottom_edge_start_pos,
                         bottom_edge_mean_pos,
@@ -5414,16 +5607,21 @@ class PmxTailorExportService:
                     degree_diffs0 = np.abs(np.array(list(top_degrees.keys())) - bottom_degree0)
                     degree_diffs1 = np.abs(np.array(list(top_degrees.keys())) - bottom_degree1)
 
-                    if np.min(degree_diffs0) < np.min(degree_diffs1):
+                    if np.min(degree_diffs0) <= np.min(degree_diffs1):
+                        bottom_degree = bottom_degree0
                         top_target_pos = np.array(list(top_degrees.values()))[np.argmin(degree_diffs0)]
                         top_degree = np.array(list(top_degrees.keys()))[np.argmin(degree_diffs0)]
                     else:
+                        bottom_degree = bottom_degree1
                         top_target_pos = np.array(list(top_degrees.values()))[np.argmin(degree_diffs1)]
                         top_degree = np.array(list(top_degrees.keys()))[np.argmin(degree_diffs1)]
 
                     logger.debug(
-                        f"◆上部角度推定: top_vidxs: [{virtual_vertices[top_target_pos.to_key(threshold)].vidxs()}], bottom_vidxs: [{virtual_vertices[bottom_key].vidxs()}], bottom_degree: [{round(bottom_degree0, 3)}], nearest_top_degree: [{round(top_degree, 3)}], top_pos: [{top_target_pos.to_log()}]"
+                        f"◆上部角度推定: bottom_vidxs: [{virtual_vertices[bottom_key].vidxs()}], top_vidxs: [{virtual_vertices[top_target_pos.to_key(threshold)].vidxs()}], bottom_degree: [{round(bottom_degree, 3)}], nearest_top_degree: [{round(top_degree, 3)}], top_pos: [{top_target_pos.to_log()}]"
                     )
+                else:
+                    # 反対方向にまっすぐ伸ばす
+                    top_target_pos = bottom_target_pos + (base_vertical_axis * 3 * -1)
 
                 vkeys, vscores = self.create_vertex_line_map(
                     bottom_key,
@@ -5431,7 +5629,7 @@ class PmxTailorExportService:
                     bottom_key,
                     horizonal_top_edge_keys,
                     virtual_vertices,
-                    base_vertical_axis,
+                    (base_vertical_axis * -1),
                     [bottom_key],
                     [],
                     param_option,
@@ -5805,7 +6003,7 @@ class PmxTailorExportService:
         from_key: tuple,
         top_edge_keys: list,
         virtual_vertices: dict,
-        base_vertical_axis: MVector3D,
+        base_vertical_reverse_axis: MVector3D,
         vkeys: list,
         vscores: list,
         param_option: dict,
@@ -5820,31 +6018,30 @@ class PmxTailorExportService:
         from_pos = from_vv.position()
 
         bottom_vv = virtual_vertices[bottom_key]
-        bottom_pos = bottom_vv.position()
-
-        local_next_base_pos = MVector3D(1, 0, 0)
 
         # ボーン進行方向(x)
-        top_x_pos = (top_pos - bottom_pos).normalized()
+        top_x_pos = (top_pos - from_pos).normalized()
         # ボーン進行方向に対しての縦軸(y)
         top_y_pos = MVector3D(1, 0, 0)
         # ボーン進行方向に対しての横軸(z)
         top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
         top_qq = MQuaternion.fromDirection(top_z_pos, top_y_pos)
         logger.debug(
-            f" - top({bottom_vv.vidxs()}): x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]"
+            f" - bottom({bottom_vv.vidxs()}): x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]"
         )
 
         scores = []
         prev_dots = []
         for n, to_key in enumerate(from_vv.connected_vvs):
             if to_key not in virtual_vertices:
+                # 存在しないキーは無視
                 scores.append(0)
                 prev_dots.append(0)
                 logger.debug(f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_key}], 対象外")
                 continue
 
             if to_key in registed_vkeys:
+                # 登録済みのは無視（違う列は参照しない）
                 scores.append(0)
                 prev_dots.append(0)
                 logger.debug(f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_key}], 登録済み")
@@ -5853,7 +6050,15 @@ class PmxTailorExportService:
             to_vv = virtual_vertices[to_key]
             to_pos = to_vv.position()
 
-            direction_dot = MVector3D.dotProduct(top_x_pos, (to_pos - from_pos).normalized())
+            mat = MMatrix4x4()
+            mat.setToIdentity()
+            mat.translate(from_pos)
+            mat.rotate(top_qq)
+
+            local_top_vpos = (mat.inverted() * top_pos).normalized()
+            local_next_vpos = (mat.inverted() * to_pos).normalized()
+
+            direction_dot = MVector3D.dotProduct(local_top_vpos, local_next_vpos)
 
             if to_key in vkeys:
                 # 到達済みのベクトルには行かせない
@@ -5864,7 +6069,7 @@ class PmxTailorExportService:
                 )
                 continue
 
-            if direction_dot < 0.3:
+            if direction_dot < 0.2:
                 # 反対方向のベクトルには行かせない
                 scores.append(0)
                 prev_dots.append(0)
@@ -5873,33 +6078,13 @@ class PmxTailorExportService:
                 )
                 continue
 
-            mat = MMatrix4x4()
-            mat.setToIdentity()
-            mat.translate(from_pos)
-            mat.rotate(top_qq)
+            local_vpos_diff = local_top_vpos - local_next_vpos
+            local_vpos_diff.abs()
 
-            local_next_vpos = (mat.inverted() * to_pos).normalized()
-
-            vec_yaw1 = (local_next_base_pos * MVector3D(1, 0, 1)).normalized()
-            vec_yaw2 = (local_next_vpos * MVector3D(1, 0, 1)).normalized()
-            yaw_score = calc_ratio(MVector3D.dotProduct(vec_yaw1, vec_yaw2), -1, 1, 0, 1)
-
-            vec_pitch1 = (local_next_base_pos * MVector3D(0, 1, 1)).normalized()
-            vec_pitch2 = (local_next_vpos * MVector3D(0, 1, 1)).normalized()
-            pitch_score = calc_ratio(MVector3D.dotProduct(vec_pitch1, vec_pitch2), -1, 1, 0, 1)
-
-            vec_roll1 = (local_next_base_pos * MVector3D(1, 1, 0)).normalized()
-            vec_roll2 = (local_next_vpos * MVector3D(1, 1, 0)).normalized()
-            roll_score = calc_ratio(MVector3D.dotProduct(vec_roll1, vec_roll2), -1, 1, 0, 1)
-
-            # if direction_dot < 1 and yaw_score < 0.5:
-            #     # ズレた方向には行かせない
-            #     scores.append(0)
-            #     prev_dots.append(0)
-            #     logger.debug(
-            #         f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, ズレ方向"
-            #     )
-            #     continue
+            # できるだけ差が小さい
+            yaw_score = 1 - local_vpos_diff.x()
+            pitch_score = 1 - local_vpos_diff.y()
+            roll_score = 1 - local_vpos_diff.z()
 
             if param_option["route_search_type"] == logger.transtext("前頂点優先"):
                 # 前頂点との内積差を考慮する場合
@@ -5914,24 +6099,25 @@ class PmxTailorExportService:
 
                 if prev_dot < 0.5:
                     # ズレた方向には行かせない
-                    scores.append(0)
-                    prev_dots.append(0)
-                    logger.debug(
-                        f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}, 前ズレ方向"
-                    )
-                    continue
+                    yaw_score = 0
+                    pitch_score = 0
+                    roll_score = 0
             else:
                 # 根元頂点の向きのみ参照する場合
                 prev_dot = 1
 
-            score = (yaw_score * 20) + pitch_score + (roll_score * 2)
+            score = yaw_score + roll_score
 
             # scores.append(score * (2 if to_key in top_keys else 1))
             scores.append(score)
-            prev_dots.append(prev_dot * direction_dot)
+            prev_dots.append(prev_dot)
 
             logger.debug(
-                f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], prev_dot[{prev_dot}], local_next_vpos[{local_next_vpos.to_log()}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
+                f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_top_vpos[{local_top_vpos.to_log()}], local_next_vpos[{local_next_vpos.to_log()}], local_vpos_diff[{local_vpos_diff.to_log()}]"
+            )
+
+            logger.debug(
+                f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], prev_dot[{prev_dot}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
             )
 
         if np.count_nonzero(scores) == 0:
@@ -5939,7 +6125,7 @@ class PmxTailorExportService:
             return vkeys, vscores
 
         # 最もスコアの高いINDEXを採用
-        nearest_idx = np.argmax(np.array(scores) * np.array(prev_dots))
+        nearest_idx = np.argmax(np.array(scores) * (np.array(prev_dots) ** 5))
         vertical_key = from_vv.connected_vvs[nearest_idx]
 
         # 前の辺との内積差を考慮する（プリーツライン選択用）
@@ -5953,7 +6139,7 @@ class PmxTailorExportService:
         )
 
         logger.debug(
-            f"direction: from: [{virtual_vertices[from_key].vidxs()}], to: [{virtual_vertices[vertical_key].vidxs()}], prev_diff_dot[{round(prev_diff_dot, 4)}]"
+            f"◇direction: from: [{virtual_vertices[from_key].vidxs()}], to: [{virtual_vertices[vertical_key].vidxs()}], prev_diff_dot[{round(prev_diff_dot, 4)}]"
         )
 
         vkeys.insert(0, vertical_key)
@@ -5963,13 +6149,35 @@ class PmxTailorExportService:
             # 上端に辿り着いたら終了
             return vkeys, vscores
 
+        # 上部を求め直す
+        if param_option["route_estimate_type"] == logger.transtext("軸方向") or param_option[
+            "route_search_type"
+        ] == logger.transtext("前頂点優先"):
+            # 進行方向に合わせて進行方向を検出する
+            # ボーン進行方向(x)
+            top_x_pos = (
+                virtual_vertices[vertical_key].position() - virtual_vertices[from_key].position()
+            ).normalized()
+            # ボーン進行方向に対しての縦軸(y)
+            top_y_pos = MVector3D(1, 0, 0)
+            # ボーン進行方向に対しての横軸(z)
+            top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
+            top_qq = MQuaternion.fromDirection(top_z_pos, top_y_pos)
+
+            mat = MMatrix4x4()
+            mat.setToIdentity()
+            mat.translate(virtual_vertices[from_key].position())
+            mat.rotate(top_qq)
+
+            top_pos = mat * MVector3D(10, 0, 0)
+
         return self.create_vertex_line_map(
             bottom_key,
             top_pos,
             vertical_key,
             top_edge_keys,
             virtual_vertices,
-            base_vertical_axis,
+            base_vertical_reverse_axis,
             vkeys,
             vscores,
             param_option,

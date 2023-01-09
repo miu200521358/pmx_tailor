@@ -1064,6 +1064,18 @@ cdef class MQuaternion:
 
         return MVector3D(euler.x(), -euler.y(), -euler.z())
 
+    cpdef MVector3D separateEulerAngles(self):
+        # ZXYの回転順序でオイラー角度を分割する
+        # https://programming-surgeon.com/script/euler-python-script/
+        cdef MMatrix4x4 mat = self.normalized().toMatrix4x4()
+        cdef np.ndarray[DTYPE_FLOAT_t, ndim=2] m = mat.data()
+
+        cdef float z_radian = atan2(-m[0, 1], m[0, 0])
+        cdef float x_radian = atan2(m[2, 1] * cos(z_radian), m[1, 1])
+        cdef float y_radian = atan2(-m[2, 0], m[2, 2])
+
+        return MVector3D(degrees(x_radian), degrees(y_radian), degrees(z_radian))
+
     # http://www.j3d.org/matrix_faq/matrfaq_latest.html#Q37
     cpdef MVector3D toEulerAngles(self):
         cdef DTYPE_FLOAT_t xp = self.data().x
