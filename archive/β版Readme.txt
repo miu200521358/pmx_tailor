@@ -16,7 +16,8 @@
 
 　・ニコニコミュニティ「miuの実験室」
 　　　https://com.nicovideo.jp/community/co5387214
-　・ディスコード「MMDの集い　DISCORD支部」
+　・ディスコード「MMDの集い　Discord支部」
+　　　https://discord.gg/wBcwFreHJ8
 
 　※基本的にβ版は上記二箇所でのみ配布しておりますので、上記以外で見かけたらお手数ですがご連絡下さい。
 

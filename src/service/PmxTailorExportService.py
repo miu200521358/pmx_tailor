@@ -4307,28 +4307,38 @@ class PmxTailorExportService:
                         regist_bones[v_yidx, v_xidx] = y_regist and x_regist
 
             elif param_option["density_type"] == logger.transtext("頂点"):
-                # 間隔が頂点タイプの場合、規則的に間を空ける(Yは末端は非表示になるので、もう一つ上も登録対象)
-                for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
-                    vertex_map.shape[0] - 2,
-                    vertex_map.shape[0] - 1,
-                ]:
-                    for v_xidx in list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"])) + [
-                        vertex_map.shape[1] - 1
-                    ]:
-                        if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and (
-                            all_bone_connected[base_map_idx][v_yidx, v_xidx]
-                            or (
-                                not all_bone_connected[base_map_idx][v_yidx, v_xidx]
-                                and (v_xidx == vertex_map.shape[1] - 1 or v_xidx == 0)
-                            )
-                            or v_yidx >= vertex_map.shape[0] - 2
-                            or v_yidx == 0
-                        ):
-                            regist_bones[v_yidx, v_xidx] = True
+                # 間隔が頂点タイプの場合、規則的に間を空ける
+                regist_bones[
+                    :: param_option["vertical_bone_density"], :: param_option["horizonal_bone_density"]
+                ] = True
+                # Yは末端は非表示になるので、もう一つ上も登録対象
+                regist_bones[-2:, :: param_option["horizonal_bone_density"]] = True
+                if not np.where(all_bone_connected[base_map_idx][:, v_xidx])[0].any():
+                    # X方向の最終列がすべて繋がってない（一枚物）の場合、ボーンを張る
+                    regist_bones[:: param_option["vertical_bone_density"], -1] = True
+                    regist_bones[-2:, -1] = True
 
-                            if vertex_map.shape[0] - 2 <= v_yidx and not regist_bones[:v_yidx, v_xidx].any():
-                                # 仮想ボーン＋末端はそれより上が繋がってたら登録しない
-                                regist_bones[v_yidx, v_xidx] = False
+                # for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
+                #     vertex_map.shape[0] - 2,
+                #     vertex_map.shape[0] - 1,
+                # ]:
+                #     for v_xidx in list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"])) + [
+                #         vertex_map.shape[1] - 1
+                #     ]:
+                #         if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and (
+                #             (all_bone_connected[base_map_idx][v_yidx, v_xidx] and v_xidx < vertex_map.shape[1] - 1)
+                #             or (
+                #                 not all_bone_connected[base_map_idx][:, v_xidx].all()
+                #                 and (v_xidx == vertex_map.shape[1] - 1 or v_xidx == 0)
+                #             )
+                #             or v_yidx >= vertex_map.shape[0] - 2
+                #             or v_yidx == 0
+                #         ):
+                #             regist_bones[v_yidx, v_xidx] = True
+
+                #             if vertex_map.shape[0] - 2 <= v_yidx and not regist_bones[:v_yidx, v_xidx].any():
+                #                 # 仮想ボーン＋末端はそれより上が繋がってたら登録しない
+                #                 regist_bones[v_yidx, v_xidx] = False
             else:
                 # 間隔がセンタータイプの場合、真ん中にのみボーンを張る
                 # 末端は非表示で登録する
@@ -5534,12 +5544,9 @@ class PmxTailorExportService:
             bottom_y_radius = np.max(np.abs(np.array(bottom_edge_poses)[:, 1] - bottom_edge_mean_pos.data()[1]))
             bottom_z_radius = np.max(np.abs(np.array(bottom_edge_poses)[:, 2] - bottom_edge_mean_pos.data()[2]))
 
-        if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
-            top_max_val = np.min(np.array(top_edge_poses)[:, target_idx])
-            bottom_max_val = np.max(np.array(bottom_edge_poses)[:, target_idx])
-        else:
-            top_max_val = np.max(np.array(top_edge_poses)[:, target_idx])
-            bottom_max_val = np.min(np.array(bottom_edge_poses)[:, target_idx])
+        # 評価軸の平均値
+        top_mean_val = np.mean(np.array(top_edge_poses)[:, target_idx])
+        bottom_mean_val = np.mean(np.array(bottom_edge_poses)[:, target_idx])
 
         logger.info(
             "%s: エッジ上部 中央位置[%s] 半径[x: %s, y: %s, z: %s]",
@@ -5584,7 +5591,8 @@ class PmxTailorExportService:
                         )
                         # 下端エッジの上の方を小さめに判定
                         * abs(
-                            abs(top_max_val - bottom_target_pos.data()[target_idx]) / abs(top_max_val - bottom_max_val)
+                            abs(top_mean_val - bottom_target_pos.data()[target_idx])
+                            / abs(top_mean_val - bottom_mean_val)
                         )
                     )
                     top_distances = np.linalg.norm((np.array(top_edge_poses) - top_target_pos.data()), ord=2, axis=1)
@@ -6030,30 +6038,27 @@ class PmxTailorExportService:
             f" - bottom({bottom_vv.vidxs()}): x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]"
         )
 
+        mat = MMatrix4x4()
+        mat.setToIdentity()
+        mat.translate(from_pos)
+        mat.rotate(top_qq)
+
         scores = []
-        prev_dots = []
         for n, to_key in enumerate(from_vv.connected_vvs):
             if to_key not in virtual_vertices:
                 # 存在しないキーは無視
                 scores.append(0)
-                prev_dots.append(0)
                 logger.debug(f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_key}], 対象外")
                 continue
 
             if to_key in registed_vkeys:
                 # 登録済みのは無視（違う列は参照しない）
                 scores.append(0)
-                prev_dots.append(0)
                 logger.debug(f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_key}], 登録済み")
                 continue
 
             to_vv = virtual_vertices[to_key]
             to_pos = to_vv.position()
-
-            mat = MMatrix4x4()
-            mat.setToIdentity()
-            mat.translate(from_pos)
-            mat.rotate(top_qq)
 
             local_top_vpos = (mat.inverted() * top_pos).normalized()
             local_next_vpos = (mat.inverted() * to_pos).normalized()
@@ -6063,28 +6068,23 @@ class PmxTailorExportService:
             if to_key in vkeys:
                 # 到達済みのベクトルには行かせない
                 scores.append(0)
-                prev_dots.append(0)
                 logger.debug(
-                    f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], 到達済み"
+                    f" - ×get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], 到達済み"
                 )
                 continue
 
             if direction_dot < 0.2:
                 # 反対方向のベクトルには行かせない
                 scores.append(0)
-                prev_dots.append(0)
                 logger.debug(
-                    f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], 反対方向"
+                    f" - ×get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], 反対方向"
                 )
                 continue
 
-            local_vpos_diff = local_top_vpos - local_next_vpos
-            local_vpos_diff.abs()
-
-            # できるだけ差が小さい
-            yaw_score = 1 - local_vpos_diff.x()
-            pitch_score = 1 - local_vpos_diff.y()
-            roll_score = 1 - local_vpos_diff.z()
+            # ローカル軸の向きが出来るだけTOPの向きに沿っている
+            yaw_score = 1 - (MVector3D(local_top_vpos.x(), 0, 0) - MVector3D(local_next_vpos.x(), 0, 0)).length()
+            pitch_score = 1 - (MVector3D(local_top_vpos.y(), 0, 0) - MVector3D(local_next_vpos.y(), 0, 0)).length()
+            roll_score = 1 - (MVector3D(local_top_vpos.z(), 0, 0) - MVector3D(local_next_vpos.z(), 0, 0)).length()
 
             if param_option["route_search_type"] == logger.transtext("前頂点優先"):
                 # 前頂点との内積差を考慮する場合
@@ -6096,28 +6096,18 @@ class PmxTailorExportService:
                     if len(vkeys) > 1
                     else 1
                 )
-
-                if prev_dot < 0.5:
-                    # ズレた方向には行かせない
-                    yaw_score = 0
-                    pitch_score = 0
-                    roll_score = 0
             else:
                 # 根元頂点の向きのみ参照する場合
                 prev_dot = 1
 
-            score = yaw_score + roll_score
+            score = (yaw_score) * (pitch_score**3) * (roll_score**2)
 
-            # scores.append(score * (2 if to_key in top_keys else 1))
-            scores.append(score)
-            prev_dots.append(prev_dot)
+            scores.append((score**2) * (direction_dot**3) * (prev_dot**5))
 
             logger.debug(
-                f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_top_vpos[{local_top_vpos.to_log()}], local_next_vpos[{local_next_vpos.to_log()}], local_vpos_diff[{local_vpos_diff.to_log()}]"
-            )
-
-            logger.debug(
-                f" - get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], direction_dot[{direction_dot}], prev_dot[{prev_dot}], score: [{score}], yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
+                f" - ○get_vertical_key({n}): from[{from_vv.vidxs()}], to[{to_vv.vidxs()}], local_top_vpos[{local_top_vpos.to_log()}], local_next_vpos[{local_next_vpos.to_log()}]"
+                + f", direction_dot[{round(direction_dot, 5)}], prev_dot[{round(prev_dot, 5)}], total_score: [{round(score * direction_dot * prev_dot, 5)}], score: [{round(score, 5)}]"
+                + f", yaw_score: {round(yaw_score, 5)}, pitch_score: {round(pitch_score, 5)}, roll_score: {round(roll_score, 5)}"
             )
 
         if np.count_nonzero(scores) == 0:
@@ -6125,7 +6115,7 @@ class PmxTailorExportService:
             return vkeys, vscores
 
         # 最もスコアの高いINDEXを採用
-        nearest_idx = np.argmax(np.array(scores) * (np.array(prev_dots) ** 5))
+        nearest_idx = np.argmax(scores)
         vertical_key = from_vv.connected_vvs[nearest_idx]
 
         # 前の辺との内積差を考慮する（プリーツライン選択用）

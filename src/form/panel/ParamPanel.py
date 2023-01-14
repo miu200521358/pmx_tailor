@@ -2940,7 +2940,7 @@ class PhysicsParam:
         self.route_search_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("前頂点優先"), logger.transtext("根元頂点優先")],
+            choices=[logger.transtext("根元頂点優先"), logger.transtext("前頂点優先")],
         )
         self.route_search_type_ctrl.SetToolTip(self.route_search_type_txt.GetToolTipText())
         self.route_search_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -4052,6 +4052,14 @@ class PhysicsParam:
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def on_special_shape(self, event: wx.Event):
+        if self.simple_special_shape_ctrl.GetStringSelection() == logger.transtext("全て表面"):
+            # すべて表面の場合、推定を角度に変更する
+            self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
+            self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
+        else:
+            # なしの場合、とりあえずデフォルトに戻す
+            self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("縮尺"))
+            self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def set_material_name(self, event: wx.Event):
@@ -4257,7 +4265,7 @@ class PhysicsParam:
         self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
+        self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("縮尺"))
 
         self.advance_vertical_joint_valid_check.SetValue(1)
@@ -4685,7 +4693,7 @@ class PhysicsParam:
         self.density_type_ctrl.SetStringSelection(logger.transtext("頂点"))
         self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
+        self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("縮尺"))
 
         self.set_material_name(event)
