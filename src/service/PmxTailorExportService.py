@@ -4283,7 +4283,7 @@ class PmxTailorExportService:
                         y_regists[v_yidx] = True
                         prev_y_regist = v_yidx
                 # 最初と最後は必ず登録する
-                y_regists[0] = y_regists[-1] = True
+                y_regists[0] = y_regists[-2:] = True
 
                 x_regists = np.zeros(vertex_map.shape[1], dtype=np.int)
                 prev_x_regist = 0
@@ -4304,7 +4304,26 @@ class PmxTailorExportService:
 
                 for v_yidx, y_regist in enumerate(y_regists):
                     for v_xidx, x_regist in enumerate(x_regists):
-                        regist_bones[v_yidx, v_xidx] = y_regist and x_regist
+                        # XYの両方が距離条件を満たしていて、かつボーンが張れる状態なら登録対象
+                        regist_bones[v_yidx, v_xidx] = (
+                            y_regist
+                            and x_regist
+                            and (
+                                all_bone_connected[base_map_idx][v_yidx, v_xidx]
+                                or v_yidx >= vertex_map.shape[0] - 2
+                                or v_xidx >= vertex_map.shape[1] - 1
+                            )
+                        )
+
+                for v_xidx in range(vertex_map.shape[1]):
+                    if v_xidx > 0 and not all_bone_connected[base_map_idx][:-1, v_xidx].all():
+                        # 繋がってない箇所にもボーンを張る
+                        regist_bones[np.array(y_regists), v_xidx] = True
+                        # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
+                        last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
+                        regist_bones[
+                            last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
+                        ] = True
 
             elif param_option["density_type"] == logger.transtext("頂点"):
                 # 間隔が頂点タイプの場合、規則的に間を空ける
@@ -4313,32 +4332,16 @@ class PmxTailorExportService:
                 ] = True
                 # Yは末端は非表示になるので、もう一つ上も登録対象
                 regist_bones[-2:, :: param_option["horizonal_bone_density"]] = True
-                if not np.where(all_bone_connected[base_map_idx][:, v_xidx])[0].any():
-                    # X方向の最終列がすべて繋がってない（一枚物）の場合、ボーンを張る
-                    regist_bones[:: param_option["vertical_bone_density"], -1] = True
-                    regist_bones[-2:, -1] = True
+                for v_xidx in range(vertex_map.shape[1]):
+                    if v_xidx > 0 and not all_bone_connected[base_map_idx][:-1, v_xidx].all():
+                        # 繋がってない箇所にもボーンを張る
+                        regist_bones[:: param_option["vertical_bone_density"], v_xidx] = True
+                        # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
+                        last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
+                        regist_bones[
+                            last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
+                        ] = True
 
-                # for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
-                #     vertex_map.shape[0] - 2,
-                #     vertex_map.shape[0] - 1,
-                # ]:
-                #     for v_xidx in list(range(0, vertex_map.shape[1], param_option["horizonal_bone_density"])) + [
-                #         vertex_map.shape[1] - 1
-                #     ]:
-                #         if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and (
-                #             (all_bone_connected[base_map_idx][v_yidx, v_xidx] and v_xidx < vertex_map.shape[1] - 1)
-                #             or (
-                #                 not all_bone_connected[base_map_idx][:, v_xidx].all()
-                #                 and (v_xidx == vertex_map.shape[1] - 1 or v_xidx == 0)
-                #             )
-                #             or v_yidx >= vertex_map.shape[0] - 2
-                #             or v_yidx == 0
-                #         ):
-                #             regist_bones[v_yidx, v_xidx] = True
-
-                #             if vertex_map.shape[0] - 2 <= v_yidx and not regist_bones[:v_yidx, v_xidx].any():
-                #                 # 仮想ボーン＋末端はそれより上が繋がってたら登録しない
-                #                 regist_bones[v_yidx, v_xidx] = False
             else:
                 # 間隔がセンタータイプの場合、真ん中にのみボーンを張る
                 # 末端は非表示で登録する
@@ -5368,11 +5371,11 @@ class PmxTailorExportService:
             )
             top_move_values = np.array(all_top_edge_poses)[:, move_idx]
 
-            # 移動量の最大の1/2を閾値とする
-            horizonal_threshold = np.max(np.abs(np.diff(top_move_values))) * 0.5
+            # 移動量の中央の1/2を閾値とする
+            horizonal_threshold = np.median(np.abs(np.diff(top_move_values))) * 1.5
 
             # 内積差の最大の1/2を閾値とする(ただし、最下限を設ける)
-            dot_threshold = max(0.2, np.max(np.abs(np.diff(all_top_edge_dots))) * 0.5)
+            dot_threshold = max(0.2, np.max(np.abs(np.diff(np.abs(all_top_edge_dots)))) * 0.5)
 
             logger.debug(
                 f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
@@ -5383,7 +5386,7 @@ class PmxTailorExportService:
 
             logger.debug(f"target_idx_pose_f_prime_diff: [{np.round(target_idx_pose_f_prime_diff, decimals=3)}]")
 
-            if len(target_idx_pose_f_prime_diff) < 3 or np.isclose(horizonal_threshold, 0, rtol=1e-02, atol=1e-04):
+            if len(target_idx_pose_f_prime_diff) < 3:
                 # 変曲点が一枚物（四角でない）場合、ほぼ均一である場合、エッジが均一に水平に繋がってるとみなす
                 horizonal_top_edge_keys = all_top_edge_keys
             else:
