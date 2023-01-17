@@ -633,6 +633,6 @@
     "根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\n軸方向: 物理方向の逆方向を根元として推定": "method for estimating root vertices\nAngle: Estimate root vertex similar to terminal vertex angle\nScale: Estimate the scale of the terminal vertex circumference and the root vertex circumference\nAxial: Estimated with the opposite direction of the physical direction as the root",
     "軸方向": "axial direction",
     "オフセット": "offset",
-    "-- --【No.%s】ボーン生成: %s個目:終了": "",
-    "末端頂点から根元頂点を走査する際の手法\n前頂点優先: 推定根元頂点への向きを優先\n根元頂点優先: 前頂点との内積を優先": ""
+    "-- --【No.%s】ボーン生成: %s個目:終了": "-- -- [No.%s] Bone creation: %sth: Finished",
+    "末端頂点から根元頂点を走査する際の手法\n前頂点優先: 推定根元頂点への向きを優先\n根元頂点優先: 前頂点との内積を優先": "Techniques for traversing root vertices from terminal vertices\nPrior Vertex Prefer: Prefer orientation to estimated root vertex\nRoot vertex priority: Prioritize inner product with previous vertex"
 }
