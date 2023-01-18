@@ -576,7 +576,9 @@ class PhysicsParam:
         )
         self.simple_special_shape_txt.SetToolTip(
             logger.transtext(
-                "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）"
+                "スカート等で特殊な処理が必要な形状\n"
+                + "全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n"
+                + "スリット：ポリ割りに切れ目がある場合にメッシュ走査が成功しやすい設定を入れます"
             )
         )
         self.simple_special_shape_txt.Wrap(-1)
@@ -585,7 +587,7 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("全て表面")],
+            choices=[logger.transtext("なし"), logger.transtext("全て表面"), logger.transtext("スリット")],
         )
         self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
         self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.on_special_shape)
@@ -4053,8 +4055,8 @@ class PhysicsParam:
 
     def on_special_shape(self, event: wx.Event):
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
-        if self.simple_special_shape_ctrl.GetStringSelection() == logger.transtext("全て表面"):
-            # すべて表面の場合、推定を角度に変更する
+        if self.simple_special_shape_ctrl.GetStringSelection() in [logger.transtext("全て表面"), logger.transtext("スリット")]:
+            # すべて表面もしくはスリットの場合、推定を角度に変更する
             self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
         else:
             # なしの場合、とりあえずデフォルトに戻す

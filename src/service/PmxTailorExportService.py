@@ -4337,7 +4337,16 @@ class PmxTailorExportService:
                         # 繋がってない箇所にもボーンを張る
                         regist_bones[:: param_option["vertical_bone_density"], v_xidx] = True
                         # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
-                        last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
+                        if np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0].any():
+                            last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
+                            regist_bones[
+                                last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
+                            ] = True
+
+                    elif v_xidx == 0 and base_map_idx > 0 and not np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0].all():
+                        # スリット等でメッシュが分かれてる場合、ひとつ前のメッシュとの繋がりを確認する
+                        # 繋がっていない箇所にボーンを張る
+                        last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0])
                         regist_bones[
                             last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
                         ] = True
@@ -5046,6 +5055,7 @@ class PmxTailorExportService:
             .data()[np.where(np.abs(base_vertical_axis.data()))]
         )[0]
         logger.info("%s: 材質頂点の傾き算出: %s", material_name, round(material_direction, 5))
+        is_material_horizonal = np.isclose(material_direction, 0.0)
 
         # 頂点間の距離
         # https://blog.shikoan.com/distance-without-for-loop/
@@ -5306,12 +5316,21 @@ class PmxTailorExportService:
         horizonal_top_edge_keys = []
 
         # 処理対象頂点の距離の基準値(できるだけ根元の値)
-        if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
-            all_root_val = np.min(all_mean_poses, axis=0)[target_idx]
+        if is_material_horizonal:
+            # 水平の場合、全体の距離から小さいのを選ぶ
+            all_root_val = np.min(
+                np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+            )
+            all_mean_distance = np.mean(
+                np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+            )
         else:
-            all_root_val = np.max(all_mean_poses, axis=0)[target_idx]
-
-        all_mean_distance = np.abs(np.mean(np.array(all_mean_poses)[:, target_idx] - all_root_val))
+            # 角度がある場合、ノイズが入らないよう一軸でのみ判定する
+            if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
+                all_root_val = np.min(all_mean_poses, axis=0)[target_idx]
+            else:
+                all_root_val = np.max(all_mean_poses, axis=0)[target_idx]
+            all_mean_distance = np.abs(np.mean(np.array(all_mean_poses)[:, target_idx] - all_root_val))
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
@@ -5332,10 +5351,16 @@ class PmxTailorExportService:
 
                 horizonal_top_edge_keys.append(vkey)
         else:
+            # 根元頂点CSVが指定されていない場合
             for n, (edge_lines, edge_poses, target_dots) in enumerate(
                 zip(all_edge_lines, all_edge_poses, target_diff_dots)
             ):
-                edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
+                if is_material_horizonal:
+                    edge_distances = np.linalg.norm(
+                        (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+                    )
+                else:
+                    edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
                 edge_mean_distance = np.mean(edge_distances)
                 if len(all_edge_lines) == 2 and edge_mean_distance < all_mean_distance:
                     # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
@@ -5454,10 +5479,12 @@ class PmxTailorExportService:
             if edge_lines == horizonal_top_edge_keys:
                 continue
 
-            # if param_option["direction"] in [logger.transtext("上"), logger.transtext("下")]:
-            #     edge_distances = np.linalg.norm((np.array(edge_poses) - parent_bone.position.data()), ord=2, axis=1)
-            # else:
-            edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
+            if is_material_horizonal:
+                edge_distances = np.linalg.norm(
+                    (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+                )
+            else:
+                edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
 
             if np.array(edge_lines)[edge_distances > all_mean_distance].shape[0] > 0:
                 # 上部エッジからの距離が全体の距離/2より遠い場合、下部とみなす
