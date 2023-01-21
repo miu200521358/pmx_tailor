@@ -1213,8 +1213,8 @@ class PmxTailorExportService:
                 param_option["horizonal_reverse_joint"], vv_keys, param_option["horizonal_reverse_joint_coefficient"]
             )
 
-            for v_yidx in range(vertex_map.shape[0]):
-                for v_xidx in range(vertex_map.shape[1]):
+            for v_xidx in range(vertex_map.shape[1]):
+                for v_yidx in range(vertex_map.shape[0]):
 
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any():
                         continue
@@ -2636,8 +2636,8 @@ class PmxTailorExportService:
             )
             # rigidbody_size_ratios = np.linspace(1, 0.7, len(v_yidxs))
 
-            for v_yidx in range(vertex_map.shape[0]):
-                for v_xidx in range(vertex_map.shape[1]):
+            for v_xidx in range(vertex_map.shape[1]):
+                for v_yidx in range(vertex_map.shape[0] - 1):
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any() or not regist_bones[v_yidx, v_xidx]:
                         continue
 
@@ -4100,12 +4100,9 @@ class PmxTailorExportService:
             root_bone.name += randomname(3)
 
         root_bone.index = len(model.bones)
-        model.bones[root_bone.name] = root_bone
-        model.bone_indexes[root_bone.index] = root_bone.name
 
         # 表示枠
         model.display_slots[display_name] = DisplaySlot(display_name, display_name, 0, 0)
-        model.display_slots[display_name].references.append((0, model.bones[root_bone.name].index))
 
         return display_name, root_bone
 
@@ -4134,6 +4131,9 @@ class PmxTailorExportService:
         display_name, root_bone = self.create_root_bone(
             model, param_option, material_name, parent_bone.position.copy()
         )
+
+        tmp_all_bones = {root_bone.name: root_bone}
+        tmp_all_bone_indexes = {root_bone.index: root_bone.name}
 
         logger.info("【%s】頂点距離の算出", material_name)
 
@@ -4239,7 +4239,6 @@ class PmxTailorExportService:
         # 全体通してのX番号
         prev_xs = []
         all_regist_bones = {}
-        tmp_all_bones = {}
         for base_map_idx, vertex_map in vertex_maps.items():
 
             prev_bone_cnt = 0
@@ -4336,19 +4335,37 @@ class PmxTailorExportService:
                     if v_xidx > 0 and not all_bone_connected[base_map_idx][:-1, v_xidx].all():
                         # 繋がってない箇所にもボーンを張る
                         regist_bones[:: param_option["vertical_bone_density"], v_xidx] = True
+                        regist_bones[-2:, v_xidx] = True
                         # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
                         if np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0].any():
                             last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
                             regist_bones[
-                                last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
+                                last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
                             ] = True
 
-                    elif v_xidx == 0 and base_map_idx > 0 and not np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0].all():
+                    elif (
+                        v_xidx == 0
+                        and base_map_idx > 0
+                        and not np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0].all()
+                    ):
                         # スリット等でメッシュが分かれてる場合、ひとつ前のメッシュとの繋がりを確認する
                         # 繋がっていない箇所にボーンを張る
                         last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0])
                         regist_bones[
-                            last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
+                            last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
+                        ] = True
+
+                    elif (
+                        v_xidx == 0
+                        and base_map_idx == 0
+                        and len(vertex_maps) > 1
+                        and not np.where(all_bone_connected[len(vertex_maps) - 1][:-1, -1])[0].all()
+                    ):
+                        # スリット等でメッシュが分かれてる場合、先頭は最後のメッシュとの繋がりを確認する
+                        # 繋がっていない箇所にボーンを張る
+                        last_connected_v_yidx = np.max(np.where(all_bone_connected[len(vertex_maps) - 1][:-1, -1])[0])
+                        regist_bones[
+                            last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
                         ] = True
 
             else:
@@ -4362,8 +4379,8 @@ class PmxTailorExportService:
                     if not np.isnan(vertex_map[v_yidx, v_xidx]).any():
                         regist_bones[v_yidx, v_xidx] = True
 
-            for v_yidx in range(vertex_map.shape[0]):
-                for v_xidx in range(vertex_map.shape[1]):
+            for v_xidx in range(vertex_map.shape[1]):
+                for v_yidx in range(vertex_map.shape[0]):
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any() or not regist_bones[v_yidx, v_xidx]:
                         # 登録対象ではない場合、スルー
                         continue
@@ -4386,6 +4403,8 @@ class PmxTailorExportService:
                             # 登録されていたら終了
                             break
 
+                    is_regist = True
+                    substitute_bone = None
                     if not parent_bone:
                         if v_yidx > 0:
                             # 0番目以降は既に登録済みの上のボーンを採用する
@@ -4420,12 +4439,10 @@ class PmxTailorExportService:
 
                     if not vv.map_bones.get(base_map_idx, None):
                         # ボーン仮登録
-                        is_add_random = False
                         bone_name = self.get_bone_name(abb_name, v_yno, v_xno)
                         if bone_name in model.bones or bone_name in tmp_all_bones:
-                            # 仮登録の時点で乱数は後ろに付けておくが、メッセージは必要なのだけ出す
-                            is_add_random = True
                             bone_name += randomname(3)
+                            logger.warning("同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s", bone_name)
 
                         bone = Bone(bone_name, bone_name, vv.position().copy(), parent_bone.index, 0, 0x0000 | 0x0002)
                         bone.local_z_vector = vv.normal().copy()
@@ -4440,19 +4457,21 @@ class PmxTailorExportService:
                         if regist_bones[v_yidx, v_xidx]:
                             # 登録対象の場合のみボーン保持
                             vv.map_bones[base_map_idx] = bone
-                            bone.index = len(tmp_all_bones) + len(model.bones)
-                            if v_yidx == vertex_map.shape[0] - 1:
-                                # 末端は非表示
-                                regist_bones[v_yidx, v_xidx] = False
-                            else:
-                                # それ以外は表示ありで操作可能
-                                bone.flag |= 0x0008 | 0x0010
+                            if v_yidx < vertex_map.shape[0] - 1:
+                                # 末端より上は表示ありで操作可能
+                                bone.flag |= 0x0008 | 0x0010 | 0x0001
 
-                            if is_add_random:
-                                logger.warning("同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s", bone.name)
-
-                            # 登録対象である場合
-                            tmp_all_bones[bone.name] = bone
+                            if is_regist:
+                                # 登録対象である場合、一旦仮登録
+                                bone.index = len(model.bones) + len(tmp_all_bones)
+                                tmp_all_bones[bone.name] = bone
+                                tmp_all_bone_indexes[bone.index] = bone.name
+                            elif substitute_bone:
+                                # 登録対象ではない場合、同じ位置のボーンを参照する
+                                # 仮想頂点に紐付くボーンも統一する
+                                vv = virtual_vertices[bone.position.to_key(threshold)]
+                                for midx in vv.map_bones.keys():
+                                    vv.map_bones[midx] = substitute_bone
 
                         logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
 
@@ -4463,50 +4482,114 @@ class PmxTailorExportService:
 
             prev_xs.extend(list(range(vertex_map.shape[1])))
 
-        # まずはソートしたボーン名で登録
-        registed_bone_names = {}
-        for bone_name in sorted(tmp_all_bones.keys()):
+        tmp_all_bone_parents = {}
+        tmp_all_bone_targets = []
+        for bone_name in tmp_all_bones.keys():
             bone = tmp_all_bones[bone_name]
 
-            is_regist = True
-            for rbone_name in registed_bone_names.values():
-                # 登録済みのボーンリストと比較
-                rbone = model.bones[rbone_name]
-                if rbone.position == bone.position:
-                    # ボーン構成がまったく同じ場合、このボーンそのものは登録対象外
-                    is_regist = False
-                    break
+            # 自身と同じ位置のボーンを親に持つ子ボーン
+            cbones = [
+                cbone
+                for cbone in tmp_all_bones.values()
+                if cbone.index != root_bone.index
+                and (
+                    (
+                        cbone.parent_index in tmp_all_bone_indexes
+                        and tmp_all_bones[tmp_all_bone_indexes[cbone.parent_index]].position == bone.position
+                    )
+                    or (
+                        cbone.parent_index in model.bone_indexes
+                        and model.bones[model.bone_indexes[cbone.parent_index]].position == bone.position
+                    )
+                )
+            ]
 
-            if is_regist:
-                registed_bone_names[bone.index] = bone_name
+            if not cbones:
+                # 子ボーンがない場合、そのまま登録
+                tmp_all_bone_parents[bone.name] = tmp_all_bone_indexes[bone.parent_index]
+                tmp_all_bone_targets.append(bone.name)
+            else:
+                cbone_poses = {}
+                for cbone in cbones:
+                    pos = tuple(cbone.position.data().tolist())
+                    if pos not in cbone_poses:
+                        cbone_poses[pos] = []
+                    cbone_poses[pos].append(cbone)
+
+                for in_cbones in cbone_poses.values():
+                    tmp_all_bone_targets.append(in_cbones[0].name)
+                    if len(in_cbones) == 1:
+                        # 同じ位置の子ボーンが1つならそのまま親を登録
+                        tmp_all_bone_parents[in_cbones[0].name] = tmp_all_bone_indexes[in_cbones[0].parent_index]
+                    else:
+                        for cbone in in_cbones[1:]:
+                            # 2つ以上ある場合、後のボーンは最初のボーンの親を代用する
+                            parent_bone_name = tmp_all_bone_indexes[in_cbones[0].parent_index]
+                            tmp_all_bone_parents[cbone.name] = parent_bone_name
+                            tmp_all_bone_targets.append(cbone.name)
+
+                            # 自分の親は登録対象外とする
+                            if cbone.parent_index in tmp_all_bone_indexes:
+                                for n, pname in enumerate(tmp_all_bone_targets):
+                                    if pname == tmp_all_bone_indexes[cbone.parent_index]:
+                                        del tmp_all_bone_targets[n]
+                                        break
+
+        # このタイミングで中心ボーン登録
+        model.bones[root_bone.name] = root_bone
+        model.bone_indexes[root_bone.index] = root_bone.name
+        model.display_slots[display_name].references.append((0, model.bones[root_bone.name].index))
+
+        for bone_name in tmp_all_bones.keys():
+            if bone_name not in tmp_all_bone_targets:
+                continue
+
+            bone = tmp_all_bones[bone_name]
+            if bone_name in tmp_all_bone_parents:
+                parent_bone_name = tmp_all_bone_parents[bone_name]
+                parent_bone = model.bones[parent_bone_name]
+
+                # 登録対象である場合、そのまま登録
                 bone.index = len(model.bones)
-                model.bones[bone_name] = bone
+                bone.parent_index = parent_bone.index
+                model.bones[bone.name] = bone
                 model.bone_indexes[bone.index] = bone_name
 
                 model.display_slots[display_name].references.append((0, bone.index))
-            else:
-                # 登録対象外だった場合、前に登録されているボーン名を参照する
-                registed_bone_names[bone.index] = rbone_name
-                # 仮想頂点に紐付くボーンも統一する
-                vv = virtual_vertices[bone.position.to_key(threshold)]
-                for midx in vv.map_bones.keys():
-                    vv.map_bones[midx] = rbone
 
-        # その後で親ボーン・表示先ボーンのINDEXを切り替える
-        for bone_name in sorted(list(set(list(registed_bone_names.values())))):
-            bone = model.bones[bone_name]
-            parent_bone = root_bone
-            if bone.parent_index in registed_bone_names:
-                # 登録前のINDEXから名称を引っ張ってきて、それを新しいINDEXで置き換える
-                parent_bone = model.bones[registed_bone_names[bone.parent_index]]
-            bone.parent_index = parent_bone.index
-
-            # 親ボーンの表示先も同時設定
-            if parent_bone != root_bone:
+                # 親ボーンの表示先再設定
                 parent_bone.tail_index = bone.index
-                parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
-                # 親ボーンを表示対象にする
-                parent_bone.flag |= 0x0001
+            else:
+                bone.index = len(model.bones)
+                model.bones[bone.name] = bone
+                model.bone_indexes[bone.index] = bone_name
+
+                model.display_slots[display_name].references.append((0, bone.index))
+
+                model.bones[model.bone_indexes[bone.parent_index]].tail_index = bone.index
+
+        # # まずはソートしたボーン名で登録
+        # registed_bone_names = {}
+        # for bone_name in sorted(tmp_all_bones.keys()):
+        #     self.register_bone(
+        #         model, bone_name, tmp_all_bones, registed_bone_names, virtual_vertices, display_name, threshold
+        #     )
+
+        # # その後で親ボーン・表示先ボーンのINDEXを切り替える
+        # for bone_name in sorted(list(set(list(registed_bone_names.values())))):
+        #     bone = model.bones[bone_name]
+        #     parent_bone = root_bone
+        #     if bone.parent_index in registed_bone_names:
+        #         # 登録前のINDEXから名称を引っ張ってきて、それを新しいINDEXで置き換える
+        #         parent_bone = model.bones[registed_bone_names[bone.parent_index]]
+        #     bone.parent_index = parent_bone.index
+
+        #     # 親ボーンの表示先も同時設定
+        #     if parent_bone != root_bone:
+        #         parent_bone.tail_index = bone.index
+        #         parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
+        #         # 親ボーンを表示対象にする
+        #         parent_bone.flag |= 0x0001
 
         return (
             root_bone,
@@ -4516,6 +4599,55 @@ class PmxTailorExportService:
             all_bone_horizonal_distances,
             all_bone_connected,
         )
+
+    # def register_bone(
+    #     self,
+    #     model: PmxModel,
+    #     bone_name: str,
+    #     tmp_all_bones: dict,
+    #     registed_bone_names: dict,
+    #     virtual_vertices: dict,
+    #     display_name: str,
+    #     threshold: float,
+    # ):
+    #     bone = tmp_all_bones[bone_name]
+
+    #     is_regist = True
+    #     for rbone_name in registed_bone_names.values():
+    #         # 登録済みのボーンリストと比較
+    #         rbone = model.bones[rbone_name]
+    #         if rbone.position == bone.position:
+    #             # ボーン構成がまったく同じ場合、このボーンそのものは登録対象外
+    #             is_regist = False
+    #             break
+
+    #     if is_regist:
+    #         registed_bone_names[bone.index] = bone_name
+    #         bone.index = len(model.bones)
+    #         model.bones[bone_name] = bone
+    #         model.bone_indexes[bone.index] = bone_name
+
+    #         model.display_slots[display_name].references.append((0, bone.index))
+
+    #         for cbone in tmp_all_bones.values():
+    #             if cbone.parent_index == bone.index:
+    #                 # 子どもがいる場合、先にそっちを登録する
+    #                 self.register_bone(
+    #                     model,
+    #                     cbone.name,
+    #                     tmp_all_bones,
+    #                     registed_bone_names,
+    #                     virtual_vertices,
+    #                     display_name,
+    #                     threshold,
+    #                 )
+    #     else:
+    #         # 登録対象外だった場合、前に登録されているボーン名を参照する
+    #         registed_bone_names[bone.index] = rbone_name
+    #         # 仮想頂点に紐付くボーンも統一する
+    #         vv = virtual_vertices[bone.position.to_key(threshold)]
+    #         for midx in vv.map_bones.keys():
+    #             vv.map_bones[midx] = rbone
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
         return f"{abb_name}-{(v_yno):03d}-{(v_xno):03d}"
@@ -5127,7 +5259,7 @@ class PmxTailorExportService:
                 v0_dot = MVector3D.dotProduct(material_normal, mean_line_segment)
                 surface_dot = MVector3D.dotProduct(material_normal, surface_line_segment)
 
-                logger.debug(
+                logger.test(
                     f"material_normal[{material_normal.to_log()}], mean_line_segment[{mean_line_segment.to_log()}], surface_line_segment[{surface_line_segment.to_log()}], v0_dot[{round(v0_dot, 3)}], surface_dot[{round(surface_dot, 3)}]"
                 )
                 # (v1・n) * (v2・n) <= 0ならば線分は平面と衝突を起こしている
@@ -5140,7 +5272,7 @@ class PmxTailorExportService:
                 #     parent_bone.position + -parent_direction * 1000,
                 #     parent_bone.position + parent_direction * 1000,
                 # )
-                # logger.debug(
+                # logger.test(
                 #     f"tt[{round(intersect_tt, 5)}], uu[{round(intersect_uu, 5)}], len[{round(intersect_len, 5)}], iv[{intersect_vec.to_log()}]"
                 # )
                 # # どちらかが範囲内なら表。両方とも範囲外なら裏
@@ -5173,7 +5305,7 @@ class PmxTailorExportService:
                     if vv0_key not in remaining_vertices:
                         remaining_vertices[vv0_key] = virtual_vertices[vv0_key]
 
-                logger.debug(
+                logger.test(
                     f"☆表 index[{index_idx}], v0[{v0.index}:{v0_key}], v1[{v1.index}:{v1_key}], v2[{v2.index}:{v2_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
                 )
             else:
@@ -5181,7 +5313,7 @@ class PmxTailorExportService:
                 back_vertices.append(v0_idx)
                 back_vertices.append(v1_idx)
                 back_vertices.append(v2_idx)
-                logger.debug(
+                logger.test(
                     f"★裏 index[{index_idx}], v0[{v0.index}:{v0_key}], v1[{v1.index}:{v1_key}], v2[{v2.index}:{v2_key}], i[{round(intersect, 5)}], dot[{round(direction_dot, 4)}], mn[{mean_pos.to_log()}], sn[{surface_normal.to_log()}], pa[{parent_bone.position.to_log()}]"
                 )
 
@@ -5198,7 +5330,7 @@ class PmxTailorExportService:
             logger.warning("対象範囲にエッジが見つけられなかった為、処理を終了します。\n面が表裏反転してないかご確認ください。", decoration=MLogger.DECORATION_BOX)
             return None, None, None, None, None
 
-        logger.debug("--------------------------")
+        logger.test("--------------------------")
         edge_line_pairs = {}
         for n, ((min_vkey, max_vkey), line_iidxs) in enumerate(edge_pair_lkeys.items()):
             surface_normals = index_surface_normals[(min_vkey, max_vkey)]
@@ -5206,18 +5338,18 @@ class PmxTailorExportService:
             if len(line_iidxs) <= 1:
                 is_pair = True
 
-                logger.debug(
+                logger.test(
                     f"○ min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], only-one-index"
                 )
             else:
                 surface_dots = [MVector3D.dotProduct(surface_normals[0], sn) for sn in surface_normals]
                 surface_dot_diffs = np.abs(np.array(surface_dots) - surface_dots[0])
                 if np.where(surface_dot_diffs < 0.2)[0].shape[0] == 1:
-                    logger.debug(
+                    logger.test(
                         f"△ min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], surface_dots[{[round(sd, 4) for sd in surface_dots]}], surface_diffs[{[round(sd, 4) for sd in surface_dot_diffs]}], surface-one-index"
                     )
                 else:
-                    logger.debug(
+                    logger.test(
                         f"× min_vkey: [{min_vkey}({virtual_vertices[min_vkey].vidxs()})], max_vkey: [{max_vkey}({virtual_vertices[max_vkey].vidxs()})], line_iidxs: [{line_iidxs}], surface_dots[{[round(sd, 4) for sd in surface_dots]}], surface_diffs[{[round(sd, 4) for sd in surface_dot_diffs]}], multi-index"
                     )
 
@@ -5689,7 +5821,7 @@ class PmxTailorExportService:
                     material_name,
                     f"{(ti + 1):03d}",
                     virtual_vertices[vkeys[0]].vidxs() if vkeys else "NG",
-                    virtual_vertices[vkeys[-1]].vidxs(),
+                    virtual_vertices[vkeys[-1]].vidxs() if vkeys else "NG",
                     round(score, 4) if vscores else "-",
                 )
                 if len(vkeys) > 1:
@@ -6063,15 +6195,17 @@ class PmxTailorExportService:
         top_y_pos = MVector3D(1, 0, 0)
         # ボーン進行方向に対しての横軸(z)
         top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
-        top_qq = MQuaternion.fromDirection(top_z_pos, top_y_pos)
+        top_qq = MQuaternion.fromDirection(top_z_pos, top_x_pos)
         logger.debug(
-            f" - bottom({bottom_vv.vidxs()}): x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]"
+            f" - bottom({bottom_vv.vidxs()}): top[{top_pos.to_log()}], x[{top_x_pos.to_log()}], y[{top_y_pos.to_log()}], z[{top_z_pos.to_log()}]"
         )
 
         mat = MMatrix4x4()
         mat.setToIdentity()
         mat.translate(from_pos)
         mat.rotate(top_qq)
+
+        local_top_vpos = (mat.inverted() * top_pos).normalized()
 
         scores = []
         for n, to_key in enumerate(from_vv.connected_vvs):
@@ -6090,9 +6224,7 @@ class PmxTailorExportService:
             to_vv = virtual_vertices[to_key]
             to_pos = to_vv.position()
 
-            local_top_vpos = (mat.inverted() * top_pos).normalized()
             local_next_vpos = (mat.inverted() * to_pos).normalized()
-
             direction_dot = MVector3D.dotProduct(local_top_vpos, local_next_vpos)
 
             if to_key in vkeys:
@@ -6182,14 +6314,19 @@ class PmxTailorExportService:
             top_y_pos = MVector3D(1, 0, 0)
             # ボーン進行方向に対しての横軸(z)
             top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
-            top_qq = MQuaternion.fromDirection(top_z_pos, top_y_pos)
+            top_qq = MQuaternion.fromDirection(top_z_pos, top_x_pos)
 
             mat = MMatrix4x4()
             mat.setToIdentity()
             mat.translate(virtual_vertices[from_key].position())
             mat.rotate(top_qq)
+            vertical_pos = mat.inverted() * virtual_vertices[vertical_key].position()
 
-            top_pos = mat * MVector3D(10, 0, 0)
+            mat = MMatrix4x4()
+            mat.setToIdentity()
+            mat.translate(virtual_vertices[vertical_key].position())
+            mat.rotate(top_qq)
+            top_pos = mat * MVector3D(0, vertical_pos.y(), 0)
 
         return self.create_vertex_line_map(
             bottom_key,

@@ -578,7 +578,6 @@ class PhysicsParam:
             logger.transtext(
                 "スカート等で特殊な処理が必要な形状\n"
                 + "全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n"
-                + "スリット：ポリ割りに切れ目がある場合にメッシュ走査が成功しやすい設定を入れます"
             )
         )
         self.simple_special_shape_txt.Wrap(-1)
@@ -587,7 +586,7 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("全て表面"), logger.transtext("スリット")],
+            choices=[logger.transtext("なし"), logger.transtext("全て表面")],
         )
         self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
         self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.on_special_shape)
@@ -2934,7 +2933,7 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("ルート探索"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.route_search_type_txt.SetToolTip(
-            logger.transtext("末端頂点から根元頂点を走査する際の手法\n根元頂点優先: 推定根元頂点への向きを優先\n前頂点優先: 前頂点との内積を優先")
+            logger.transtext("末端頂点から根元頂点を走査する際の手法\n前頂点優先: 前頂点との角度差を優先\n根元頂点優先: 推定根元頂点への向きを優先")
         )
         self.route_search_type_txt.Wrap(-1)
         self.advance_option_grid_sizer.Add(self.route_search_type_txt, 0, wx.ALL, 5)
@@ -2942,7 +2941,7 @@ class PhysicsParam:
         self.route_search_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("根元頂点優先"), logger.transtext("前頂点優先")],
+            choices=[logger.transtext("前頂点優先"), logger.transtext("根元頂点優先")],
         )
         self.route_search_type_ctrl.SetToolTip(self.route_search_type_txt.GetToolTipText())
         self.route_search_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -4054,13 +4053,10 @@ class PhysicsParam:
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def on_special_shape(self, event: wx.Event):
-        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
-        if self.simple_special_shape_ctrl.GetStringSelection() in [logger.transtext("全て表面"), logger.transtext("スリット")]:
-            # すべて表面もしくはスリットの場合、推定を角度に変更する
+        if self.simple_special_shape_ctrl.GetStringSelection() in [logger.transtext("全て表面")]:
+            # すべて表面の場合、推定を角度に再設定する（デフォルトで入っているはずだが、念のため）
+            self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
             self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
-        else:
-            # なしの場合、とりあえずデフォルトに戻す
-            self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def set_material_name(self, event: wx.Event):
@@ -4138,9 +4134,9 @@ class PhysicsParam:
                 self.joint_pos_type_ctrl.SetStringSelection(
                     abb_setting.get("joint_pos_type", logger.transtext("ボーン間"))
                 )
-            if self.route_search_type_ctrl.GetStringSelection() == logger.transtext("根元頂点優先"):
+            if self.route_search_type_ctrl.GetStringSelection() == logger.transtext("前頂点優先"):
                 self.route_search_type_ctrl.SetStringSelection(
-                    abb_setting.get("route_search_type", logger.transtext("根元頂点優先"))
+                    abb_setting.get("route_search_type", logger.transtext("前頂点優先"))
                 )
             if self.route_estimate_type_ctrl.GetStringSelection() == logger.transtext("角度"):
                 self.route_estimate_type_ctrl.SetStringSelection(
@@ -4266,7 +4262,7 @@ class PhysicsParam:
         self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
+        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
 
         self.advance_vertical_joint_valid_check.SetValue(1)
@@ -4694,7 +4690,7 @@ class PhysicsParam:
         self.density_type_ctrl.SetStringSelection(logger.transtext("頂点"))
         self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("根元頂点優先"))
+        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
 
         self.set_material_name(event)
