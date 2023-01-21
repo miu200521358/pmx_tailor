@@ -638,5 +638,7 @@
     "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\nスリット：ポリ割りに切れ目がある場合にメッシュ走査が成功しやすい設定を入れます": "Shapes that require special treatment such as skirts\nAll Surfaces: Forcibly treats all surfaces as front surfaces (separate the thickness by back surface material) when the back surface detection misdetects a shape such as pleats (folded back on the poly split).\nSlit: Add settings that make it easier for mesh scanning to succeed when there is a break in the poly split.",
     "スリット": "slit",
     "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n": "Shapes that require special treatment such as skirts\nAll Surfaces: Forcibly treats all surfaces as front surfaces (separate the thickness by back surface material) when the back surface detection misdetects shapes such as pleats (folded poly cracks).\n",
-    "末端頂点から根元頂点を走査する際の手法\n前頂点優先: 前頂点との角度差を優先\n根元頂点優先: 推定根元頂点への向きを優先": "Techniques for traversing root vertices from terminal vertices\nPrioritize previous vertex: Prioritize angle difference with previous vertex\nRoot Vertex Prefer: Prefer the orientation to the inferred root vertex"
+    "末端頂点から根元頂点を走査する際の手法\n前頂点優先: 前頂点との角度差を優先\n根元頂点優先: 推定根元頂点への向きを優先": "Techniques for traversing root vertices from terminal vertices\nPrioritize previous vertex: Prioritize angle difference with previous vertex\nRoot Vertex Prefer: Prefer the orientation to the inferred root vertex",
+    "-- %s: 仮想面追加: [%s, %s, %s]": "",
+    "-- エッジ検出: %s個目:終了": ""
 }
