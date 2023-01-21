@@ -4,13 +4,14 @@ import logging
 import os
 import traceback
 import numpy as np
-import itertools
 import math
 import copy
 import bezier
 import csv
 import random
 import string
+from itertools import combinations
+from collections import Counter
 from glob import glob
 
 from module.MOptions import MExportOptions
@@ -3730,7 +3731,7 @@ class PmxTailorExportService:
                                 [
                                     mbone.index
                                     for mbone in virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].map_bones.values()
-                                    if mbone
+                                    if mbone and mbone.index in model.bones
                                 ]
                             )
                         )
@@ -4971,7 +4972,7 @@ class PmxTailorExportService:
                 if weights[3] > 0:
                     weighted_bone_indexes.append(v.deform.index3)
 
-                for bi0, bi1 in list(itertools.combinations(weighted_bone_indexes, 2)):
+                for bi0, bi1 in list(combinations(weighted_bone_indexes, 2)):
                     # ボーン2つずつのペアでウェイト繋がり具合を保持する
                     key = (min(bi0, bi1), max(bi0, bi1))
                     if key not in weighted_bone_pairs:
@@ -5205,6 +5206,9 @@ class PmxTailorExportService:
         virtual_vertices = {}
         index_surface_normals = {}
         edge_pair_lkeys = {}
+        all_edge_pairs = {}
+        all_indexes_vertices = []
+        all_same_pair_edges = {}
         n = 0
         for index_idx in model.material_indices[material_name]:
             # 頂点の組み合わせから面INDEXを引く
@@ -5227,6 +5231,18 @@ class PmxTailorExportService:
             v0_key = v0.position.to_key(threshold)
             v1_key = v1.position.to_key(threshold)
             v2_key = v2.position.to_key(threshold)
+
+            for (l1, l2) in combinations([v0_key, v1_key, v2_key], 2):
+                if l1 not in all_edge_pairs:
+                    all_edge_pairs[l1] = []
+                if l2 not in all_edge_pairs[l1]:
+                    all_edge_pairs[l1].append(l2)
+
+                if l2 not in all_edge_pairs:
+                    all_edge_pairs[l2] = []
+                if l1 not in all_edge_pairs[l2]:
+                    all_edge_pairs[l2].append(l1)
+            all_indexes_vertices.append(tuple(list(sorted([v0_key, v1_key, v2_key]))))
 
             # 一旦ルートボーンにウェイトを一括置換
             v0.deform = Bdef1(parent_bone.index)
@@ -5289,8 +5305,10 @@ class PmxTailorExportService:
                     lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
                     if lkey not in edge_pair_lkeys:
                         edge_pair_lkeys[lkey] = []
+                        all_same_pair_edges[lkey] = []
                     if index_idx not in edge_pair_lkeys[lkey]:
                         edge_pair_lkeys[lkey].append(index_idx)
+                    all_same_pair_edges[lkey].append(vv2_key)
 
                     if lkey not in index_surface_normals:
                         index_surface_normals[lkey] = []
@@ -5331,6 +5349,7 @@ class PmxTailorExportService:
             return None, None, None, None, None
 
         logger.test("--------------------------")
+
         edge_line_pairs = {}
         for n, ((min_vkey, max_vkey), line_iidxs) in enumerate(edge_pair_lkeys.items()):
             surface_normals = index_surface_normals[(min_vkey, max_vkey)]
@@ -5376,25 +5395,156 @@ class PmxTailorExportService:
                     f"key[{v_key}:{virtual_vertices[v_key].vidxs()}], pair[{pair_vkeys}:{[virtual_vertices[pair_vkey].vidxs() for pair_vkey in pair_vkeys]}]"
                 )
 
+        logger.debug("仮想面の確認")
+
+        for n, (v0_key, pair_vertices) in enumerate(all_edge_pairs.items()):
+            for (v1_key, v2_key) in combinations(pair_vertices, 2):
+                if not (v0_key in edge_line_pairs and v1_key in edge_line_pairs and v2_key in edge_line_pairs):
+                    # 全部エッジになければスルー
+                    continue
+
+                ikey = tuple(list(sorted([v0_key, v1_key, v2_key])))
+                if ikey in all_indexes_vertices:
+                    # 既に面のエッジの組み合わせである場合、スルー
+                    continue
+
+                edge_existed = {}
+                for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
+                    lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
+                    edge_existed[lkey] = lkey in all_same_pair_edges
+
+                if 1 < Counter(edge_existed.values())[False]:
+                    # 仮想エッジが1件より多い場合スルー
+                    logger.debug(
+                        "** 仮想エッジスルー: [%s:%s, %s:%s, %s:%s][%s]",
+                        v0_key,
+                        virtual_vertices[v0_key].vidxs(),
+                        v1_key,
+                        virtual_vertices[v1_key].vidxs(),
+                        v2_key,
+                        virtual_vertices[v2_key].vidxs(),
+                        edge_existed,
+                    )
+                    continue
+
+                virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
+                ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
+                ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
+                ve_line = MSegment(ve1_vec, ve1_vec, ve2_vec)
+
+                relation_vkeys = [v0_key, v1_key, v2_key]
+                for vk in [v0_key, v1_key, v2_key]:
+                    relation_vkeys.extend(virtual_vertices[vk].connected_vvs)
+                relation_vkeys = set(relation_vkeys)
+
+                is_intersect = False
+                for (vv0_key, vv1_key) in all_same_pair_edges.keys():
+                    if not (vv0_key in relation_vkeys and vv1_key in relation_vkeys):
+                        # 関係する頂点でない場合スルー
+                        continue
+
+                    vv1_vec = virtual_vertices[vv0_key].position()
+                    vv2_vec = virtual_vertices[vv1_key].position()
+                    vv_line = MSegment(vv1_vec, vv1_vec, vv2_vec)
+                    min_length, p1, p2, t1, t2 = calc_segment_segment_dist(ve_line, vv_line)
+                    if 0 < min_length < threshold * 0.5:
+                        # 閾値の半分より小さい場合、交差していると見なす
+                        is_intersect = True
+                        logger.debug(
+                            "** 交差スルー: [%s:%s, %s:%s, %s:%s][%s]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            min_length,
+                        )
+                        break
+
+                if is_intersect:
+                    # 既存のエッジと交差していたらスルー
+                    continue
+
+                area = poly_area(
+                    np.array(
+                        [
+                            virtual_vertices[v0_key].position().data(),
+                            virtual_vertices[v1_key].position().data(),
+                            virtual_vertices[v2_key].position().data(),
+                        ]
+                    )
+                )
+                if area < threshold:
+                    # 閾値の一定量を超えないのはスルー（多分直線上）
+                    logger.debug(
+                        "** 面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                        v0_key,
+                        virtual_vertices[v0_key].vidxs(),
+                        v1_key,
+                        virtual_vertices[v1_key].vidxs(),
+                        v2_key,
+                        virtual_vertices[v2_key].vidxs(),
+                        area,
+                        threshold,
+                    )
+                    continue
+
+                logger.debug(
+                    "* 仮想面: [%s:%s, %s:%s, %s:%s]",
+                    v0_key,
+                    virtual_vertices[v0_key].vidxs(),
+                    v1_key,
+                    virtual_vertices[v1_key].vidxs(),
+                    v2_key,
+                    virtual_vertices[v2_key].vidxs(),
+                )
+                logger.info(
+                    "-- %s: 仮想面追加: [%s, %s, %s]",
+                    material_name,
+                    virtual_vertices[v0_key].vidxs(),
+                    virtual_vertices[v1_key].vidxs(),
+                    virtual_vertices[v2_key].vidxs(),
+                )
+
+                # 頂点を繋げた辺がエッジペアに含まれてない場合、仮想面を追加する
+                for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
+
+                    if vv0_key not in edge_line_pairs:
+                        edge_line_pairs[vv0_key] = []
+                    if vv1_key not in edge_line_pairs:
+                        edge_line_pairs[vv1_key] = []
+
+                    edge_line_pairs[vv0_key].append(vv1_key)
+                    edge_line_pairs[vv1_key].append(vv0_key)
+
+            if n > 0 and n % 200 == 0:
+                logger.info("-- 仮想面確認: %s個目:終了", n)
+
         logger.info("%s: エッジの抽出準備", material_name)
 
         # エッジを繋いでいく
         tmp_edge_lines = []
         edge_vkeys = []
-        while len(edge_vkeys) < len(edge_line_pairs.keys()):
+        n = 0
+        remain_start_vkeys = list(edge_line_pairs.keys())
+        while remain_start_vkeys:
             _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
-                edge_line_pairs, None, tmp_edge_lines, edge_vkeys, param_option
+                edge_line_pairs, None, tmp_edge_lines, edge_vkeys, param_option, 0, n
             )
+            remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
+            n += 1
+            logger.info("-- エッジ検出: %s個目:終了", n)
 
         all_edge_lines = []
         for n, edge_lines in enumerate(tmp_edge_lines):
-            if len(edge_lines) < 3:
+            if 0 < len(edge_lines) < 3:
                 logger.info(
                     "-- %s: 検出エッジ（件数が少ないため対象外）: %s",
                     material_name,
                     [f"{ekey}:{virtual_vertices[ekey].vidxs()}" for ekey in edge_lines],
                 )
-            else:
+            elif edge_lines:
                 logger.info(
                     "-- %s: 検出エッジ: %s",
                     material_name,
@@ -6361,55 +6511,74 @@ class PmxTailorExportService:
         return degree, degree + 360
 
     def get_edge_lines(
-        self, edge_line_pairs: dict, start_vkey: tuple, edge_lines: list, edge_vkeys: list, param_option: dict, loop=0
+        self,
+        edge_line_pairs: dict,
+        start_vkey: tuple,
+        edge_lines: list,
+        edge_vkeys: list,
+        param_option: dict,
+        loop: int,
+        n: int,
     ):
-        if len(edge_vkeys) >= len(edge_line_pairs.keys()) or loop > 500:
+        if n > 0 and n % 20 == 0:
+            logger.info("-- エッジ検出: %s個目(%s)", n, loop)
+
+        remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
+
+        if not remain_start_vkeys or loop > 500:
             return start_vkey, edge_lines, edge_vkeys
 
         if not start_vkey:
             if param_option["direction"] == logger.transtext("上"):
                 # Y(昇順) - X(中央揃え) - Z(降順)
-                sorted_edge_line_pairs = sorted(
-                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (x[1], abs(x[0]), -x[2])
-                )
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (x[1], abs(x[0]), -x[2]))
             elif param_option["direction"] == logger.transtext("右"):
                 # X(降順) - Y(降順) - Z(降順)
-                sorted_edge_line_pairs = sorted(
-                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (-x[0], -x[1], -x[2])
-                )
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (-x[0], -x[1], -x[2]))
             elif param_option["direction"] == logger.transtext("左"):
                 # X(昇順) - Y(降順) - Z(降順)
-                sorted_edge_line_pairs = sorted(
-                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (x[0], -x[1], -x[2])
-                )
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (x[0], -x[1], -x[2]))
             else:
                 # 下: Y(降順) - X(中央揃え) - Z(降順)
-                sorted_edge_line_pairs = sorted(
-                    list(set(edge_line_pairs.keys()) - set(edge_vkeys)), key=lambda x: (-x[1], abs(x[0]), -x[2])
-                )
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (-x[1], abs(x[0]), -x[2]))
             start_vkey = sorted_edge_line_pairs[0]
             edge_lines.append([start_vkey])
-            edge_vkeys.append(start_vkey)
 
+        remain_next_vkeys = [
+            nk
+            for nk in edge_line_pairs[start_vkey]
+            if (start_vkey, nk) not in edge_vkeys and (nk, start_vkey) not in edge_vkeys
+        ]
         if param_option["direction"] == logger.transtext("上"):
             # X(中央揃え) - Z(降順) - Y(昇順)
-            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (abs(x[0]), -x[2], x[1]))
+            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], x[1]))
         elif param_option["direction"] == logger.transtext("右"):
             # Y(降順) - Z(降順) - X(降順)
-            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (-x[1], -x[2], -x[0]))
+            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], -x[0]))
         elif param_option["direction"] == logger.transtext("左"):
             # Y(降順) - Z(降順) - X(昇順)
-            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (-x[1], -x[2], x[0]))
+            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], x[0]))
         else:
             # 下: X(中央揃え) - Z(降順) - Y(降順)
-            sorted_edge_line_pairs = sorted(edge_line_pairs[start_vkey], key=lambda x: (abs(x[0]), -x[2], -x[1]))
+            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], -x[1]))
 
         for next_vkey in sorted_edge_line_pairs:
-            if next_vkey not in edge_vkeys:
+            if start_vkey and (start_vkey, next_vkey) not in edge_vkeys:
                 edge_lines[-1].append(next_vkey)
-                edge_vkeys.append(next_vkey)
+                edge_vkeys.append((start_vkey, next_vkey))
+
+                for n, nk in enumerate(edge_line_pairs[start_vkey]):
+                    if nk == next_vkey:
+                        del edge_line_pairs[start_vkey][n]
+                        break
+
+                for n, sk in enumerate(edge_line_pairs[next_vkey]):
+                    if sk == start_vkey:
+                        del edge_line_pairs[next_vkey][n]
+                        break
+
                 start_vkey, edge_lines, edge_vkeys = self.get_edge_lines(
-                    edge_line_pairs, next_vkey, edge_lines, edge_vkeys, param_option, loop + 1
+                    edge_line_pairs, next_vkey, edge_lines, edge_vkeys, param_option, loop + 1, n
                 )
 
         return None, edge_lines, edge_vkeys
@@ -6703,27 +6872,27 @@ def calc_point_segment_dist(point: MPoint, segment: MSegment):
 # t1 : L1側のベクトル係数（戻り値）
 # t2 : L2側のベクトル係数（戻り値）
 # 戻り値: 最短距離
-def calc_line_line_dist(l1: MLine, l2: MLine):
+def calc_line_line_dist(s1: MLine, s2: MLine):
 
     # 2直線が平行？
-    if MVector3D.dotProduct(l1.vector_start.normalized(), l2.vector_start.normalized()) == 1:
+    if MVector3D.dotProduct(s1.vector_start.normalized(), s2.vector_start.normalized()) == 1:
         # 点P11と直線L2の最短距離の問題に帰着
-        min_length, p2, t2 = calc_point_line_dist(l1.point, l2)
-        return min_length, l1.point, p2, 0.0, t2
+        min_length, p2, t2 = calc_point_line_dist(s1.point, s2)
+        return min_length, s1.point, p2, 0.0, t2
 
     # 2直線はねじれ関係
-    DV1V2 = MVector3D.dotProduct(l1.vector_start.normalized(), l2.vector_start.normalized())
-    DV1V1 = l1.vector_start.lengthSquared()
-    DV2V2 = l2.vector_start.lengthSquared()
-    P21P11 = l1.point - l2.point
+    DV1V2 = MVector3D.dotProduct(s1.vector_start.normalized(), s2.vector_start.normalized())
+    DV1V1 = s1.vector_start.lengthSquared()
+    DV2V2 = s2.vector_start.lengthSquared()
+    P21P11 = s1.point - s2.point
 
     t1 = (
-        DV1V2 * MVector3D.dotProduct(l2.vector_start.normalized(), P21P11.normalized())
-        - DV2V2 * MVector3D.dotProduct(l1.vector_start.normalized(), P21P11.normalized())
+        DV1V2 * MVector3D.dotProduct(s2.vector_start.normalized(), P21P11.normalized())
+        - DV2V2 * MVector3D.dotProduct(s1.vector_start.normalized(), P21P11.normalized())
     ) / (DV1V1 * DV2V2 - DV1V2 * DV1V2)
-    p1 = l1.vector_start * t1
-    t2 = MVector3D.dotProduct(l2.vector_start.normalized(), (p1 - l2.point).normalized()) / DV2V2
-    p2 = l2.vector_start * t2
+    p1 = s1.vector_start * t1
+    t2 = MVector3D.dotProduct(s2.vector_start.normalized(), (p1 - s2.point).normalized()) / DV2V2
+    p2 = s2.vector_start * t2
 
     return (p2 - p1).length(), p1, p2, t1, t2
 
@@ -6851,7 +7020,7 @@ def is_col_capsule_capsule(c1: MCapsule, c2: MCapsule):
 
 
 # https://stackoverflow.com/questions/34602761/intersecting-3d-lines
-def calc_intersect(P0: MVector3D, P1: MVector3D, Q0: MVector3D, Q1: MVector3D) -> MVector3D:
+def calc_intersect(P0: MVector3D, P1: MVector3D, Q0: MVector3D, Q1: MVector3D) -> tuple:
     # Direction vectors
     DP = (P1 - P0).normalized()
     DQ = (Q1 - Q0).normalized()
@@ -6911,6 +7080,32 @@ def read_vertices_from_file(file_path: str, model: PmxModel, material_name=None)
             continue
 
     return target_vertices
+
+
+# area of polygon poly
+def poly_area(poly):
+    if len(poly) < 3:  # not a plane - no area
+        return 0
+    total = [0, 0, 0]
+    N = len(poly)
+    for i in range(N):
+        vi1 = poly[i]
+        vi2 = poly[(i + 1) % N]
+        prod = np.cross(vi1, vi2)
+        total[0] += prod[0]
+        total[1] += prod[1]
+        total[2] += prod[2]
+    result = np.dot(total, unit_normal(poly[0], poly[1], poly[2]))
+    return abs(result / 2)
+
+
+# unit normal vector of plane defined by points a, b, and c
+def unit_normal(a, b, c):
+    x = np.linalg.det([[1, a[1], a[2]], [1, b[1], b[2]], [1, c[1], c[2]]])
+    y = np.linalg.det([[a[0], 1, a[2]], [b[0], 1, b[2]], [c[0], 1, c[2]]])
+    z = np.linalg.det([[a[0], a[1], 1], [b[0], b[1], 1], [c[0], c[1], 1]])
+    magnitude = (x**2 + y**2 + z**2) ** 0.5
+    return (x / magnitude, y / magnitude, z / magnitude)
 
 
 SEMI_STANDARD_BONE_NAMES = [
