@@ -5416,7 +5416,7 @@ class PmxTailorExportService:
                 if 1 < Counter(edge_existed.values())[False]:
                     # 仮想エッジが1件より多い場合スルー
                     logger.debug(
-                        "** 仮想エッジスルー: [%s:%s, %s:%s, %s:%s][%s]",
+                        "** ×仮想エッジスルー: [%s:%s, %s:%s, %s:%s][%s]",
                         v0_key,
                         virtual_vertices[v0_key].vidxs(),
                         v1_key,
@@ -5426,6 +5426,16 @@ class PmxTailorExportService:
                         edge_existed,
                     )
                     continue
+                logger.debug(
+                    "** ○仮想エッジ1件: [%s:%s, %s:%s, %s:%s][%s]",
+                    v0_key,
+                    virtual_vertices[v0_key].vidxs(),
+                    v1_key,
+                    virtual_vertices[v1_key].vidxs(),
+                    v2_key,
+                    virtual_vertices[v2_key].vidxs(),
+                    edge_existed,
+                )
 
                 virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
                 ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
@@ -5451,7 +5461,7 @@ class PmxTailorExportService:
                         # 閾値の半分より小さい場合、交差していると見なす
                         is_intersect = True
                         logger.debug(
-                            "** 交差スルー: [%s:%s, %s:%s, %s:%s][%s]",
+                            "** ×交差スルー: [%s:%s, %s:%s, %s:%s][%s, %s, %s]",
                             v0_key,
                             virtual_vertices[v0_key].vidxs(),
                             v1_key,
@@ -5459,8 +5469,23 @@ class PmxTailorExportService:
                             v2_key,
                             virtual_vertices[v2_key].vidxs(),
                             min_length,
+                            round(t1, 5),
+                            round(t2, 5),
                         )
                         break
+                    else:
+                        logger.debug(
+                            "** ○交差なし: [%s:%s, %s:%s, %s:%s][%s, %s, %s]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            min_length,
+                            round(t1, 5),
+                            round(t2, 5),
+                        )
 
                 if is_intersect:
                     # 既存のエッジと交差していたらスルー
@@ -5478,7 +5503,7 @@ class PmxTailorExportService:
                 if area < threshold:
                     # 閾値の一定量を超えないのはスルー（多分直線上）
                     logger.debug(
-                        "** 面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                        "** ×面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
                         v0_key,
                         virtual_vertices[v0_key].vidxs(),
                         v1_key,
@@ -5489,6 +5514,17 @@ class PmxTailorExportService:
                         threshold,
                     )
                     continue
+                logger.debug(
+                    "** ○面積: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                    v0_key,
+                    virtual_vertices[v0_key].vidxs(),
+                    v1_key,
+                    virtual_vertices[v1_key].vidxs(),
+                    v2_key,
+                    virtual_vertices[v2_key].vidxs(),
+                    area,
+                    threshold,
+                )
 
                 logger.debug(
                     "* 仮想面: [%s:%s, %s:%s, %s:%s]",
@@ -5525,16 +5561,16 @@ class PmxTailorExportService:
 
         # エッジを繋いでいく
         tmp_edge_lines = []
-        edge_vkeys = []
-        n = 0
-        remain_start_vkeys = list(edge_line_pairs.keys())
-        while remain_start_vkeys:
-            _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
-                edge_line_pairs, None, tmp_edge_lines, edge_vkeys, param_option, 0, n
-            )
-            remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
-            n += 1
-            logger.info("-- エッジ検出: %s個目:終了", n)
+        # edge_vkeys = []
+        # n = 0
+        # remain_start_vkeys = list(edge_line_pairs.keys())
+        # while remain_start_vkeys:
+        #     _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
+        #         edge_line_pairs, None, tmp_edge_lines, edge_vkeys, param_option, 0, n
+        #     )
+        #     remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
+        #     n += 1
+        #     logger.info("-- エッジ検出: %s個目:終了", n)
 
         all_edge_lines = []
         for n, edge_lines in enumerate(tmp_edge_lines):
