@@ -5337,7 +5337,7 @@ class PmxTailorExportService:
 
             n += 1
 
-            if n > 0 and n % 500 == 0:
+            if n > 0 and n % 100 == 0:
                 logger.info("-- メッシュ確認: %s個目:終了", n)
 
         if not virtual_vertices:
@@ -5451,6 +5451,26 @@ class PmxTailorExportService:
                 for (vv0_key, vv1_key) in all_same_pair_edges.keys():
                     if not (vv0_key in relation_vkeys and vv1_key in relation_vkeys):
                         # 関係する頂点でない場合スルー
+                        # logger.debug(
+                        #     "** ×交差無関係スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
+                        #     v0_key,
+                        #     virtual_vertices[v0_key].vidxs(),
+                        #     v1_key,
+                        #     virtual_vertices[v1_key].vidxs(),
+                        #     v2_key,
+                        #     virtual_vertices[v2_key].vidxs(),
+                        #     virtual_edge_keys[0],
+                        #     virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                        #     virtual_edge_keys[1],
+                        #     virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                        #     vv0_key,
+                        #     virtual_vertices[vv0_key].vidxs(),
+                        #     vv1_key,
+                        #     virtual_vertices[vv1_key].vidxs(),
+                        #     min_length,
+                        #     round(t1, 5),
+                        #     round(t2, 5),
+                        # )
                         continue
 
                     vv1_vec = virtual_vertices[vv0_key].position()
@@ -5461,13 +5481,21 @@ class PmxTailorExportService:
                         # 閾値の半分より小さい場合、交差していると見なす
                         is_intersect = True
                         logger.debug(
-                            "** ×交差スルー: [%s:%s, %s:%s, %s:%s][%s, %s, %s]",
+                            "** ×交差スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
                             v0_key,
                             virtual_vertices[v0_key].vidxs(),
                             v1_key,
                             virtual_vertices[v1_key].vidxs(),
                             v2_key,
                             virtual_vertices[v2_key].vidxs(),
+                            virtual_edge_keys[0],
+                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                            virtual_edge_keys[1],
+                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                            vv0_key,
+                            virtual_vertices[vv0_key].vidxs(),
+                            vv1_key,
+                            virtual_vertices[vv1_key].vidxs(),
                             min_length,
                             round(t1, 5),
                             round(t2, 5),
@@ -5475,13 +5503,21 @@ class PmxTailorExportService:
                         break
                     else:
                         logger.debug(
-                            "** ○交差なし: [%s:%s, %s:%s, %s:%s][%s, %s, %s]",
+                            "** ○交差なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
                             v0_key,
                             virtual_vertices[v0_key].vidxs(),
                             v1_key,
                             virtual_vertices[v1_key].vidxs(),
                             v2_key,
                             virtual_vertices[v2_key].vidxs(),
+                            virtual_edge_keys[0],
+                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                            virtual_edge_keys[1],
+                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                            vv0_key,
+                            virtual_vertices[vv0_key].vidxs(),
+                            vv1_key,
+                            virtual_vertices[vv1_key].vidxs(),
                             min_length,
                             round(t1, 5),
                             round(t2, 5),
