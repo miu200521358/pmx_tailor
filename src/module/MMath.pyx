@@ -296,7 +296,7 @@ cdef class MVector2D:
 
 class MPoint:
 
-    def __init__(self, p=MVector3D()):
+    def __init__(self, p: MVector3D):
         self.point = p
 
     def get_point(self, f: float):
@@ -305,28 +305,30 @@ class MPoint:
 
 class MLine:
 
-    def __init__(self, p=MPoint(), v=MVector3D()):
+    def __init__(self, p: MPoint, v: MVector3D):
         self.point = p
         self.vector_start = v
+        self.vector_real = p.point - v
+        self.vector = (p.point - v).normalized()
 
 
 class MSegment(MLine):
 
-    def __init__(self, p=MPoint(), sv=MVector3D(), ev=MVector3D()):
-        super().__init__(p, sv)
+    def __init__(self, sv: MVector3D, ev: MVector3D):
+        super().__init__(MPoint((sv + ev) / 2), sv)
         self.vector_end = ev
 
 
 class MSphere:
 
-    def __init__(self, p=MPoint(), r=1.0):
+    def __init__(self, p: MPoint, r=1.0):
         self.point = p
         self.radius = r
 
 
 class MCapsule:
 
-    def __init__(self, s=MSegment(), r=0.0):
+    def __init__(self, s: MSegment, r=0.0):
         self.segment = s
         self.radius = r
 

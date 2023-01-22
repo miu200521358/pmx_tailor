@@ -1240,7 +1240,6 @@ class PmxTailorExportService:
                     parent_capsule = MCapsule(
                         MSegment(
                             mat * MVector3D(-parent_bone_rigidbody.shape_size.y(), 0, 0),
-                            parent_bone_rigidbody.shape_position,
                             mat * MVector3D(parent_bone_rigidbody.shape_size.y(), 0, 0),
                         ),
                         parent_bone_rigidbody.shape_size.x(),
@@ -1652,7 +1651,6 @@ class PmxTailorExportService:
                                     a_capsule = MCapsule(
                                         MSegment(
                                             a_mat * MVector3D(-a_length, 0, 0),
-                                            a_rigidbody.shape_position,
                                             a_mat * MVector3D(a_length, 0, 0),
                                         ),
                                         a_length * check_ratio,
@@ -1672,7 +1670,6 @@ class PmxTailorExportService:
                                         b_capsule = MCapsule(
                                             MSegment(
                                                 b_mat * MVector3D(-b_length, 0, 0),
-                                                b_rigidbody.shape_position,
                                                 b_mat * MVector3D(b_length, 0, 0),
                                             ),
                                             b_length * check_ratio,
@@ -5440,7 +5437,7 @@ class PmxTailorExportService:
                 virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
                 ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
                 ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
-                ve_line = MSegment(ve1_vec, ve1_vec, ve2_vec)
+                ve_line = MSegment(ve1_vec, ve2_vec)
 
                 relation_vkeys = [v0_key, v1_key, v2_key]
                 for vk in [v0_key, v1_key, v2_key]:
@@ -5451,31 +5448,11 @@ class PmxTailorExportService:
                 for (vv0_key, vv1_key) in all_same_pair_edges.keys():
                     if not (vv0_key in relation_vkeys and vv1_key in relation_vkeys):
                         # 関係する頂点でない場合スルー
-                        # logger.debug(
-                        #     "** ×交差無関係スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
-                        #     v0_key,
-                        #     virtual_vertices[v0_key].vidxs(),
-                        #     v1_key,
-                        #     virtual_vertices[v1_key].vidxs(),
-                        #     v2_key,
-                        #     virtual_vertices[v2_key].vidxs(),
-                        #     virtual_edge_keys[0],
-                        #     virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                        #     virtual_edge_keys[1],
-                        #     virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                        #     vv0_key,
-                        #     virtual_vertices[vv0_key].vidxs(),
-                        #     vv1_key,
-                        #     virtual_vertices[vv1_key].vidxs(),
-                        #     min_length,
-                        #     round(t1, 5),
-                        #     round(t2, 5),
-                        # )
                         continue
 
                     vv1_vec = virtual_vertices[vv0_key].position()
                     vv2_vec = virtual_vertices[vv1_key].position()
-                    vv_line = MSegment(vv1_vec, vv1_vec, vv2_vec)
+                    vv_line = MSegment(vv1_vec, vv2_vec)
                     min_length, p1, p2, t1, t2 = calc_segment_segment_dist(ve_line, vv_line)
                     if 0 < min_length < threshold * 0.5:
                         # 閾値の半分より小さい場合、交差していると見なす
@@ -6899,18 +6876,18 @@ def randomname(n) -> str:
 # t :ベクトル係数（戻り値）
 # 戻り値: 最短距離
 def calc_point_line_dist(point: MPoint, line: MLine):
-    v_length_square = line.vector_start.lengthSquared()
+    v_length_square = line.vector_real.lengthSquared()
     t = 0.0
     if v_length_square > 0.0:
-        t = MVector3D.dotProduct(line.vector_start.normalized(), (point - line.point).normalized()) / v_length_square
+        t = MVector3D.dotProduct(line.vector, (point - line.point.point)) / v_length_square
 
-    h = line.point + line.vector_start * t
+    h = line.point.point + line.vector * t
     return (h - point).length(), h, t
 
 
 # ∠p1p2p3は鋭角?
 def is_sharp_angle(p1: MPoint, p2: MPoint, p3: MPoint):
-    return MVector3D.dotProduct((p1.normalized() - p2.normalized()), (p3.normalized() - p2.normalized())) > 0
+    return MVector3D.dotProduct((p1 - p2), (p3 - p2)) > 0
 
 
 # 点と線分の最短距離
@@ -6924,12 +6901,12 @@ def calc_point_segment_dist(point: MPoint, segment: MSegment):
     end_point = segment.vector_end
 
     # 垂線の長さ、垂線の足の座標及びtを算出
-    min_length, h, t = calc_point_line_dist(point, MLine(segment.point, end_point - segment.point))
+    min_length, h, t = calc_point_line_dist(point, MLine(segment.point, end_point - segment.point.point))
 
-    if not is_sharp_angle(point, segment.point, end_point):
+    if not is_sharp_angle(point, segment.point.point, end_point):
         # 始点側の外側
-        return (segment.point - point).length(), segment.point, t
-    elif not is_sharp_angle(point, end_point, segment.point):
+        return (segment.point.point - point).length(), segment.point.point, t
+    elif not is_sharp_angle(point, end_point, segment.point.point):
         # 終点側の外側
         return (end_point - point).length(), end_point, t
 
@@ -6944,27 +6921,29 @@ def calc_point_segment_dist(point: MPoint, segment: MSegment):
 # t1 : L1側のベクトル係数（戻り値）
 # t2 : L2側のベクトル係数（戻り値）
 # 戻り値: 最短距離
-def calc_line_line_dist(s1: MLine, s2: MLine):
+def calc_line_line_dist(l1: MLine, l2: MLine):
 
     # 2直線が平行？
-    if MVector3D.dotProduct(s1.vector_start.normalized(), s2.vector_start.normalized()) == 1:
+    if np.isclose(MVector3D.dotProduct(l1.vector, l2.vector), 1, atol=0.01, rtol=0.01):
         # 点P11と直線L2の最短距離の問題に帰着
-        min_length, p2, t2 = calc_point_line_dist(s1.point, s2)
-        return min_length, s1.point, p2, 0.0, t2
+        min_length, p2, t2 = calc_point_line_dist(l1.point, l2)
+        return min_length, l1.point.point, p2, 0.0, t2
 
     # 2直線はねじれ関係
-    DV1V2 = MVector3D.dotProduct(s1.vector_start.normalized(), s2.vector_start.normalized())
-    DV1V1 = s1.vector_start.lengthSquared()
-    DV2V2 = s2.vector_start.lengthSquared()
-    P21P11 = s1.point - s2.point
+    DV1V2 = MVector3D.dotProduct(l1.vector, l2.vector)
+    DV1V1 = l1.vector_real.lengthSquared()
+    DV2V2 = l2.vector_real.lengthSquared()
+    P21P11 = (l1.point.point.normalized() - l2.point.point.normalized()).normalized()
 
     t1 = (
-        DV1V2 * MVector3D.dotProduct(s2.vector_start.normalized(), P21P11.normalized())
-        - DV2V2 * MVector3D.dotProduct(s1.vector_start.normalized(), P21P11.normalized())
-    ) / (DV1V1 * DV2V2 - DV1V2 * DV1V2)
-    p1 = s1.vector_start * t1
-    t2 = MVector3D.dotProduct(s2.vector_start.normalized(), (p1 - s2.point).normalized()) / DV2V2
-    p2 = s2.vector_start * t2
+        (DV1V2 * MVector3D.dotProduct(l2.vector, P21P11) - DV2V2 * MVector3D.dotProduct(l1.vector, P21P11))
+        / (DV1V1 * DV2V2 - DV1V2 * DV1V2)
+        if DV1V1 * DV2V2 - DV1V2 * DV1V2 != 0
+        else 0
+    )
+    p1 = l1.point.point * t1
+    t2 = MVector3D.dotProduct(l2.vector, (p1 - l2.point.point).normalized()) / DV2V2
+    p2 = l2.point.point * t2
 
     return (p2 - p1).length(), p1, p2, t1, t2
 
@@ -6980,26 +6959,26 @@ def calc_line_line_dist(s1: MLine, s2: MLine):
 def calc_segment_segment_dist(s1: MSegment, s2: MSegment):
 
     # S1が縮退している？
-    if s1.vector_start.lengthSquared() < 0.00001:
+    if s1.vector_real.lengthSquared() < 0.00001:
         # S2も縮退？
-        if s2.vector_start.lengthSquared() < 0.00001:
+        if s2.vector_real.lengthSquared() < 0.00001:
             # 点と点の距離の問題に帰着
-            return (s2.point - s1.point).length(), s1.point, s2.point, 0, 0
+            return (s2.point.point - s1.point.point).length(), s1.point.point, s2.point.point, 0, 0
         else:
             # S1の始点とS2の最短問題に帰着
             min_length, p2, t2 = calc_point_segment_dist(s1.point, s2)
-            return min_length, s1.point, p2, 0.0, max(0, min(1, t2))
+            return min_length, s1.point.point, p2, 0.0, max(0, min(1, t2))
 
     # S2が縮退している？
-    elif s2.vector_start.lengthSquared() < 0.00001:
+    elif s2.vector_real.lengthSquared() < 0.00001:
         # S2の始点とS1の最短問題に帰着
         min_length, p2, t2 = calc_point_segment_dist(s2.point, s1)
-        return min_length, s2.point, p2, 0.0, t2
+        return min_length, s2.point.point, p2, 0.0, t2
 
     # 線分同士 ------
 
     # 2線分が平行だったら垂線の端点の一つをP1に仮決定
-    if MVector3D.dotProduct(s1.vector_start.normalized(), s2.vector_start.normalized()) == 1:
+    if np.isclose(MVector3D.dotProduct(s1.vector, s2.vector), 1, atol=0.01, rtol=0.01):
         p1 = s1.point
         t1 = 0
         min_length, p2, t2 = calc_point_segment_dist(s1.point, s2)
@@ -7015,21 +6994,21 @@ def calc_segment_segment_dist(s1: MSegment, s2: MSegment):
     # 垂線の足が外にある事が判明
     # S1側のt1を0～1の間にクランプして垂線を降ろす
     t1 = max(0, min(1, t1))
-    p1 = s1.vector_start + s1.vector_start * t1
+    p1 = s1.vector + s1.vector * t1
     min_length, p2, t2 = calc_point_segment_dist(p1, s2)
     if 0 <= t2 <= 1:
         return min_length, p1, p2, t1, t2
 
     # S2側が外だったのでS2側をクランプ、S1に垂線を降ろす
     t2 = max(0, min(1, t2))
-    p2 = s2.vector_start + s2.vector_start * t2
+    p2 = s2.vector + s2.vector * t2
     min_length, p1, t1 = calc_point_segment_dist(p2, s1)
     if 0 <= t1 <= 1:
         return min_length, p1, p2, t1, t2
 
     # 双方の端点が最短と判明
     t1 = max(0, min(1, t1))
-    p1 = s1.vector_start + s1.vector_start * t1
+    p1 = s1.vector + s1.vector * t1
     return (p2 - p1).length(), p1, p2, t1, t2
 
 
@@ -7075,7 +7054,7 @@ def is_col_capsule_capsule(c1: MCapsule, c2: MCapsule):
 # def calc_intersect(P0: MVector3D, P1: MVector3D, Q0: MVector3D, Q1: MVector3D) -> MVector3D:
 #     u = P1 - P0
 
-#     dot = MVector3D.dotProduct(Q1.normalized(), u.normalized())
+#     dot = MVector3D.dotProduct(Q1, u)
 #     if np.isclose(dot, 0):
 #         return None
 
