@@ -5203,7 +5203,7 @@ class PmxTailorExportService:
         virtual_vertices = {}
         index_surface_normals = {}
         edge_pair_lkeys = {}
-        all_edge_pairs = {}
+        all_line_pairs = {}
         all_indexes_vertices = []
         all_same_pair_edges = {}
         n = 0
@@ -5230,15 +5230,15 @@ class PmxTailorExportService:
             v2_key = v2.position.to_key(threshold)
 
             for (l1, l2) in combinations([v0_key, v1_key, v2_key], 2):
-                if l1 not in all_edge_pairs:
-                    all_edge_pairs[l1] = []
-                if l2 not in all_edge_pairs[l1]:
-                    all_edge_pairs[l1].append(l2)
+                if l1 not in all_line_pairs:
+                    all_line_pairs[l1] = []
+                if l2 not in all_line_pairs[l1]:
+                    all_line_pairs[l1].append(l2)
 
-                if l2 not in all_edge_pairs:
-                    all_edge_pairs[l2] = []
-                if l1 not in all_edge_pairs[l2]:
-                    all_edge_pairs[l2].append(l1)
+                if l2 not in all_line_pairs:
+                    all_line_pairs[l2] = []
+                if l1 not in all_line_pairs[l2]:
+                    all_line_pairs[l2].append(l1)
             all_indexes_vertices.append(tuple(list(sorted([v0_key, v1_key, v2_key]))))
 
             # 一旦ルートボーンにウェイトを一括置換
@@ -5394,7 +5394,8 @@ class PmxTailorExportService:
 
         logger.debug("仮想面の確認")
 
-        for n, (v0_key, pair_vertices) in enumerate(all_edge_pairs.items()):
+        virtual_edges = []
+        for n, (v0_key, pair_vertices) in enumerate(all_line_pairs.items()):
             for (v1_key, v2_key) in combinations(pair_vertices, 2):
                 if not (v0_key in edge_line_pairs and v1_key in edge_line_pairs and v2_key in edge_line_pairs):
                     # 全部エッジになければスルー
@@ -5403,33 +5404,6 @@ class PmxTailorExportService:
                 ikey = tuple(list(sorted([v0_key, v1_key, v2_key])))
                 if ikey in all_indexes_vertices:
                     # 既に面のエッジの組み合わせである場合、スルー
-                    continue
-
-                # 頂点の組合せの中に他の頂点が含まれているか
-                is_inner_vkey = False
-                vkey_connecteds = {}
-                for vkey in [v1_key, v2_key]:
-                    for vsk in virtual_vertices[vkey].connected_vvs:
-                        if vsk == v0_key:
-                            continue
-                        if vsk not in vkey_connecteds:
-                            vkey_connecteds[vsk] = []
-                        else:
-                            # 既にリストが出来ている場合、頂点の重複があるので、スルー
-                            is_inner_vkey = True
-                        vkey_connecteds[vsk].append(vkey)
-
-                if is_inner_vkey:
-                    logger.debug(
-                        "** ×頂点内頂点重複: [%s:%s, %s:%s, %s:%s][%s]",
-                        v0_key,
-                        virtual_vertices[v0_key].vidxs(),
-                        v1_key,
-                        virtual_vertices[v1_key].vidxs(),
-                        v2_key,
-                        virtual_vertices[v2_key].vidxs(),
-                        vkey_connecteds,
-                    )
                     continue
 
                 edge_existed = {}
@@ -5461,10 +5435,76 @@ class PmxTailorExportService:
                     edge_existed,
                 )
 
+                # 仮想エッジ
                 virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
                 ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
                 ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
                 ve_line = MSegment(ve1_vec, ve2_vec)
+
+                area_threshold = (
+                    np.mean(
+                        [
+                            virtual_vertices[v0_key].position().distanceToPoint(virtual_vertices[v1_key].position()),
+                            virtual_vertices[v0_key].position().distanceToPoint(virtual_vertices[v2_key].position()),
+                            virtual_vertices[v1_key].position().distanceToPoint(virtual_vertices[v2_key].position()),
+                        ]
+                    )
+                    * 0.3
+                )
+
+                # 頂点の組合せの中に他の頂点が含まれているか
+                is_inner_vkey = False
+                for vvkey in edge_line_pairs.keys():
+                    if not (
+                        vvkey in virtual_vertices[virtual_edge_keys[0]].connected_vvs
+                        and vvkey in virtual_vertices[virtual_edge_keys[1]].connected_vvs
+                    ):
+                        # エッジキーが接続先にない場合、スルー
+                        continue
+
+                    # エッジキーが仮想エッジの両方から繋がっている場合、距離チェック
+                    min_length, h, t = calc_point_segment_dist(MPoint(virtual_vertices[vvkey].position()), ve_line)
+                    if 0 < min_length < area_threshold:
+                        is_inner_vkey = True
+                        logger.debug(
+                            "** ×頂点内頂点重複: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s < %s]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            virtual_edge_keys[0],
+                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                            virtual_edge_keys[1],
+                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                            vvkey,
+                            virtual_vertices[vvkey].vidxs(),
+                            min_length,
+                            area_threshold,
+                        )
+                        break
+                    else:
+                        logger.debug(
+                            "** 頂点重複なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s < %s]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            virtual_edge_keys[0],
+                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                            virtual_edge_keys[1],
+                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                            vvkey,
+                            virtual_vertices[vvkey].vidxs(),
+                            min_length,
+                            area_threshold,
+                        )
+
+                if is_inner_vkey:
+                    continue
 
                 relation_vkeys = [v0_key, v1_key, v2_key]
                 for vk in [v0_key, v1_key, v2_key]:
@@ -5494,6 +5534,27 @@ class PmxTailorExportService:
                         )
                         continue
 
+                    if len({vv0_key, vv1_key} - {virtual_edge_keys[0], virtual_edge_keys[1]}) == 1:
+                        # 同じ頂点が残っている場合、交差は見なくていいのでスルー
+                        logger.debug(
+                            "** ×交差交点スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            virtual_edge_keys[0],
+                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                            virtual_edge_keys[1],
+                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                            vv0_key,
+                            virtual_vertices[vv0_key].vidxs(),
+                            vv1_key,
+                            virtual_vertices[vv1_key].vidxs(),
+                        )
+                        continue
+
                     vv1_vec = virtual_vertices[vv0_key].position()
                     vv2_vec = virtual_vertices[vv1_key].position()
                     vv_line = MSegment(vv1_vec, vv2_vec)
@@ -5502,7 +5563,7 @@ class PmxTailorExportService:
                         # 線分があって、閾値より小さい場合、交差していると見なす
                         is_intersect = True
                         logger.debug(
-                            "** ×交差スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
+                            "** ×交差あり: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
                             v0_key,
                             virtual_vertices[v0_key].vidxs(),
                             v1_key,
@@ -5557,7 +5618,7 @@ class PmxTailorExportService:
                         ]
                     )
                 )
-                if area < threshold:
+                if area < area_threshold:
                     # 閾値の一定量を超えないのはスルー（多分直線上）
                     logger.debug(
                         "** ×面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
@@ -5568,7 +5629,7 @@ class PmxTailorExportService:
                         v2_key,
                         virtual_vertices[v2_key].vidxs(),
                         area,
-                        threshold,
+                        area_threshold,
                     )
                     continue
                 logger.debug(
@@ -5611,23 +5672,51 @@ class PmxTailorExportService:
                     edge_line_pairs[vv0_key].append(vv1_key)
                     edge_line_pairs[vv1_key].append(vv0_key)
 
-            if n > 0 and n % 200 == 0:
+                    lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
+                    virtual_edges.append(lkey)
+
+                # 接続先も追加
+                for vvkey in [v0_key, v1_key, v2_key]:
+                    for rvvkey in set([v0_key, v1_key, v2_key]) - {vvkey}:
+                        if rvvkey not in virtual_vertices[vvkey].connected_vvs:
+                            virtual_vertices[vvkey].connected_vvs.append(rvvkey)
+
+            if n > 0 and n % 20 == 0:
                 logger.info("-- 仮想面確認: %s個目:終了", n)
+
+        logger.debug(
+            "仮想エッジ: %s",
+            ", ".join(
+                [
+                    "[{0}:{1}, {2}:{3}]".format(
+                        vv0_key,
+                        virtual_vertices[vv0_key].vidxs(),
+                        vv1_key,
+                        virtual_vertices[vv1_key].vidxs(),
+                    )
+                    for vv0_key, vv1_key in virtual_edges
+                ]
+            ),
+        )
 
         logger.info("%s: エッジの抽出準備", material_name)
 
         # エッジを繋いでいく
         tmp_edge_lines = []
-        # edge_vkeys = []
-        # n = 0
-        # remain_start_vkeys = list(edge_line_pairs.keys())
-        # while remain_start_vkeys:
-        #     _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
-        #         edge_line_pairs, None, tmp_edge_lines, edge_vkeys, param_option, 0, n
-        #     )
-        #     remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
-        #     n += 1
-        #     logger.info("-- エッジ検出: %s個目:終了", n)
+        edge_vkeys = []
+        n = 0
+        remain_start_vkeys = list(edge_line_pairs.keys())
+        remain_existed_indexes = [True]
+        while remain_existed_indexes and True in remain_existed_indexes:
+            _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
+                edge_line_pairs, None, tmp_edge_lines, edge_vkeys, virtual_vertices, param_option, 0, n
+            )
+            remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
+            remain_existed_indexes = set(
+                [(vk, vkk) in virtual_edges for vk in remain_start_vkeys for vkk in edge_line_pairs[vk]]
+            )
+            n += 1
+            logger.info("-- エッジ検出: %s個目:終了", n)
 
         all_edge_lines = []
         for n, edge_lines in enumerate(tmp_edge_lines):
@@ -6609,11 +6698,12 @@ class PmxTailorExportService:
         start_vkey: tuple,
         edge_lines: list,
         edge_vkeys: list,
+        virtual_vertices: dict,
         param_option: dict,
         loop: int,
         n: int,
     ):
-        if n > 0 and n % 20 == 0:
+        if loop > 0 and loop % 20 == 0:
             logger.info("-- エッジ検出: %s個目(%s)", n, loop)
 
         remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
@@ -6637,42 +6727,73 @@ class PmxTailorExportService:
             start_vkey = sorted_edge_line_pairs[0]
             edge_lines.append([start_vkey])
 
-        remain_next_vkeys = [
-            nk
-            for nk in edge_line_pairs[start_vkey]
-            if (start_vkey, nk) not in edge_vkeys and (nk, start_vkey) not in edge_vkeys
-        ]
-        if param_option["direction"] == logger.transtext("上"):
-            # X(中央揃え) - Z(降順) - Y(昇順)
-            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], x[1]))
-        elif param_option["direction"] == logger.transtext("右"):
-            # Y(降順) - Z(降順) - X(降順)
-            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], -x[0]))
-        elif param_option["direction"] == logger.transtext("左"):
-            # Y(降順) - Z(降順) - X(昇順)
-            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], x[0]))
+        remain_next_vkeys = list(
+            set(
+                [
+                    nk
+                    for nk in edge_line_pairs[start_vkey]
+                    if (start_vkey, nk) not in edge_vkeys and (nk, start_vkey) not in edge_vkeys
+                ]
+            )
+        )
+
+        if not remain_next_vkeys:
+            if start_vkey and start_vkey in edge_line_pairs:
+                del edge_line_pairs[start_vkey]
+
+            return None, edge_lines, edge_vkeys
+
+        if len(edge_lines[-1]) == 1:
+            # 初回はルールに沿って次を抽出する
+            if param_option["direction"] == logger.transtext("上"):
+                # X(中央揃え) - Z(降順) - Y(昇順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], x[1]))[0]
+            elif param_option["direction"] == logger.transtext("右"):
+                # Y(降順) - Z(降順) - X(降順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], -x[0]))[0]
+            elif param_option["direction"] == logger.transtext("左"):
+                # Y(降順) - Z(降順) - X(昇順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], x[0]))[0]
+            else:
+                # 下: X(中央揃え) - Z(降順) - Y(降順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], -x[1]))[0]
         else:
-            # 下: X(中央揃え) - Z(降順) - Y(降順)
-            sorted_edge_line_pairs = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], -x[1]))
-
-        for next_vkey in sorted_edge_line_pairs:
-            if start_vkey and (start_vkey, next_vkey) not in edge_vkeys:
-                edge_lines[-1].append(next_vkey)
-                edge_vkeys.append((start_vkey, next_vkey))
-
-                for n, nk in enumerate(edge_line_pairs[start_vkey]):
-                    if nk == next_vkey:
-                        del edge_line_pairs[start_vkey][n]
-                        break
-
-                for n, sk in enumerate(edge_line_pairs[next_vkey]):
-                    if sk == start_vkey:
-                        del edge_line_pairs[next_vkey][n]
-                        break
-
-                start_vkey, edge_lines, edge_vkeys = self.get_edge_lines(
-                    edge_line_pairs, next_vkey, edge_lines, edge_vkeys, param_option, loop + 1, n
+            # 2回目以降は出来るだけ内積が近いのを選ぶ
+            next_dots = []
+            for vkey in remain_next_vkeys:
+                next_dots.append(
+                    MVector3D.dotProduct(
+                        (
+                            virtual_vertices[edge_lines[-1][-1]].position()
+                            - virtual_vertices[edge_lines[-1][-2]].position()
+                        ).normalized(),
+                        (
+                            virtual_vertices[vkey].position() - virtual_vertices[edge_lines[-1][-1]].position()
+                        ).normalized(),
+                    )
                 )
+            next_vkey = remain_next_vkeys[np.argmax(next_dots)]
+
+        if start_vkey and (start_vkey, next_vkey) not in edge_vkeys:
+            edge_lines[-1].append(next_vkey)
+            edge_vkeys.append((start_vkey, next_vkey))
+
+            for n, nk in enumerate(edge_line_pairs[start_vkey]):
+                if nk == next_vkey:
+                    del edge_line_pairs[start_vkey][n]
+                    break
+
+            for n, sk in enumerate(edge_line_pairs[next_vkey]):
+                if sk == start_vkey:
+                    del edge_line_pairs[next_vkey][n]
+                    break
+
+            _, edge_lines, edge_vkeys = self.get_edge_lines(
+                edge_line_pairs, next_vkey, edge_lines, edge_vkeys, virtual_vertices, param_option, loop + 1, n
+            )
+
+            if start_vkey in edge_line_pairs:
+                del edge_line_pairs[start_vkey]
 
         return None, edge_lines, edge_vkeys
 
@@ -6977,18 +7098,23 @@ def calc_line_line_dist(l1: MLine, l2: MLine):
         return min_length, l1.point.point, p2, 0.0, t2
 
     # 2直線はねじれ関係
-    DV1V2 = MVector3D.dotProduct(l1.vector, l2.vector)
+    DV1V2 = MVector3D.dotProduct(l1.vector_real, l2.vector_real)
     DV1V1 = l1.vector_real.lengthSquared()
     DV2V2 = l2.vector_real.lengthSquared()
     P21P11 = (l1.point.point - l2.point.point).normalized()
 
-    t1 = (DV1V2 * MVector3D.dotProduct(l2.vector, P21P11) - DV2V2 * MVector3D.dotProduct(l1.vector, P21P11)) / (
-        DV1V1 * DV2V2 - DV1V2 * DV1V2
-    )
-    p1 = l1.point.point * t1
-    t2 = MVector3D.dotProduct(l2.vector, (p1 - l2.point.point).normalized()) / DV2V2
-    p2 = l2.point.point * t2
+    t1 = (
+        DV1V2 * MVector3D.dotProduct(l2.vector_real, P21P11) - DV2V2 * MVector3D.dotProduct(l1.vector_real, P21P11)
+    ) / (DV1V1 * DV2V2 - DV1V2 * DV1V2)
+    p1 = l1.get_point(t1)
+    t2 = MVector3D.dotProduct(l2.vector_real, (p1 - l2.point.point)) / DV2V2
+    p2 = l2.get_point(t2)
     length = (p2 - p1).length()
+    length2 = (l1.point.point - l2.point.point).length()
+
+    if length > length2:
+        # 仮対応
+        return length2, l1.point.point, l2.point.point, 0.5, 0.5
 
     return length, p1, p2, t1, t2
 
@@ -7039,21 +7165,21 @@ def calc_segment_segment_dist(s1: MSegment, s2: MSegment):
     # 垂線の足が外にある事が判明
     # S1側のt1を0～1の間にクランプして垂線を降ろす
     t1 = max(0, min(1, t1))
-    p1 = s1.vector * t1
+    p1 = s1.get_point(t1)
     min_length, p2, t2 = calc_point_segment_dist(MPoint(p1), s2)
     if 0 <= t2 <= 1:
         return min_length, p1, p2, t1, t2
 
     # S2側が外だったのでS2側をクランプ、S1に垂線を降ろす
     t2 = max(0, min(1, t2))
-    p2 = s2.vector * t2
+    p2 = s2.get_point(t2)
     min_length, p1, t1 = calc_point_segment_dist(MPoint(p2), s1)
     if 0 <= t1 <= 1:
         return min_length, p1, p2, t1, t2
 
     # 双方の端点が最短と判明
     t1 = max(0, min(1, t1))
-    p1 = s1.vector * t1
+    p1 = s1.get_point(t1)
     return (p2 - p1).length(), p1, p2, t1, t2
 
 

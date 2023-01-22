@@ -311,6 +311,9 @@ class MLine:
         self.vector_real = p.point - v
         self.vector = (p.point - v).normalized()
 
+    def get_point(self, f: float):
+        return self.vector_start + (self.vector_real * f)
+
 
 class MSegment(MLine):
 
@@ -319,6 +322,9 @@ class MSegment(MLine):
         self.vector_end = ev
         self.vector_real = ev - sv
         self.vector = self.vector_real.normalized()
+
+    def get_point(self, f: float):
+        return self.vector_start + (self.vector_real * f)
 
 
 class MSphere:
