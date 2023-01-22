@@ -317,6 +317,8 @@ class MSegment(MLine):
     def __init__(self, sv: MVector3D, ev: MVector3D):
         super().__init__(MPoint((sv + ev) / 2), sv)
         self.vector_end = ev
+        self.vector_real = ev - sv
+        self.vector = self.vector_real.normalized()
 
 
 class MSphere:
