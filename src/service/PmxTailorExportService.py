@@ -2836,7 +2836,7 @@ class PmxTailorExportService:
                         x_size = np.median(all_vertex_distances)
 
                     if now_above_bone and now_below_bone:
-                        # 上下揃ってる場合、average
+                        # 上下揃ってる場合、max
                         y_size = np.max(
                             [
                                 now_now_bone.position.distanceToPoint(now_above_bone.position),
@@ -2847,7 +2847,7 @@ class PmxTailorExportService:
                         # その他は下のボーンとの距離
                         y_size = now_now_bone.position.distanceToPoint(now_below_bone.position)
                     else:
-                        # 末端は上との長さにしておく
+                        # 末端
                         y_size = now_now_bone.position.distanceToPoint(now_above_bone.position)
 
                     if rigidbody_shape_type == 0:
@@ -4566,29 +4566,6 @@ class PmxTailorExportService:
 
                 model.bones[model.bone_indexes[bone.parent_index]].tail_index = bone.index
 
-        # # まずはソートしたボーン名で登録
-        # registed_bone_names = {}
-        # for bone_name in sorted(tmp_all_bones.keys()):
-        #     self.register_bone(
-        #         model, bone_name, tmp_all_bones, registed_bone_names, virtual_vertices, display_name, threshold
-        #     )
-
-        # # その後で親ボーン・表示先ボーンのINDEXを切り替える
-        # for bone_name in sorted(list(set(list(registed_bone_names.values())))):
-        #     bone = model.bones[bone_name]
-        #     parent_bone = root_bone
-        #     if bone.parent_index in registed_bone_names:
-        #         # 登録前のINDEXから名称を引っ張ってきて、それを新しいINDEXで置き換える
-        #         parent_bone = model.bones[registed_bone_names[bone.parent_index]]
-        #     bone.parent_index = parent_bone.index
-
-        #     # 親ボーンの表示先も同時設定
-        #     if parent_bone != root_bone:
-        #         parent_bone.tail_index = bone.index
-        #         parent_bone.local_x_vector = (bone.position - parent_bone.position).normalized()
-        #         # 親ボーンを表示対象にする
-        #         parent_bone.flag |= 0x0001
-
         return (
             root_bone,
             virtual_vertices,
@@ -4597,55 +4574,6 @@ class PmxTailorExportService:
             all_bone_horizonal_distances,
             all_bone_connected,
         )
-
-    # def register_bone(
-    #     self,
-    #     model: PmxModel,
-    #     bone_name: str,
-    #     tmp_all_bones: dict,
-    #     registed_bone_names: dict,
-    #     virtual_vertices: dict,
-    #     display_name: str,
-    #     threshold: float,
-    # ):
-    #     bone = tmp_all_bones[bone_name]
-
-    #     is_regist = True
-    #     for rbone_name in registed_bone_names.values():
-    #         # 登録済みのボーンリストと比較
-    #         rbone = model.bones[rbone_name]
-    #         if rbone.position == bone.position:
-    #             # ボーン構成がまったく同じ場合、このボーンそのものは登録対象外
-    #             is_regist = False
-    #             break
-
-    #     if is_regist:
-    #         registed_bone_names[bone.index] = bone_name
-    #         bone.index = len(model.bones)
-    #         model.bones[bone_name] = bone
-    #         model.bone_indexes[bone.index] = bone_name
-
-    #         model.display_slots[display_name].references.append((0, bone.index))
-
-    #         for cbone in tmp_all_bones.values():
-    #             if cbone.parent_index == bone.index:
-    #                 # 子どもがいる場合、先にそっちを登録する
-    #                 self.register_bone(
-    #                     model,
-    #                     cbone.name,
-    #                     tmp_all_bones,
-    #                     registed_bone_names,
-    #                     virtual_vertices,
-    #                     display_name,
-    #                     threshold,
-    #                 )
-    #     else:
-    #         # 登録対象外だった場合、前に登録されているボーン名を参照する
-    #         registed_bone_names[bone.index] = rbone_name
-    #         # 仮想頂点に紐付くボーンも統一する
-    #         vv = virtual_vertices[bone.position.to_key(threshold)]
-    #         for midx in vv.map_bones.keys():
-    #             vv.map_bones[midx] = rbone
 
     def get_bone_name(self, abb_name: str, v_yno: int, v_xno: int):
         return f"{abb_name}-{(v_yno):03d}-{(v_xno):03d}"
@@ -6469,7 +6397,7 @@ class PmxTailorExportService:
                                 # 仮想頂点の位置
                                 target_position = mat * MVector3D(
                                     0,
-                                    -nearest_distance,
+                                    max(-0.5, -nearest_distance * 0.3),
                                     0,
                                 )
                                 target_key = target_position.to_key(threshold)
@@ -6788,12 +6716,12 @@ class PmxTailorExportService:
                     del edge_line_pairs[next_vkey][n]
                     break
 
+            if start_vkey in edge_line_pairs and not edge_line_pairs[start_vkey]:
+                del edge_line_pairs[start_vkey]
+
             _, edge_lines, edge_vkeys = self.get_edge_lines(
                 edge_line_pairs, next_vkey, edge_lines, edge_vkeys, virtual_vertices, param_option, loop + 1, n
             )
-
-            if start_vkey in edge_line_pairs:
-                del edge_line_pairs[start_vkey]
 
         return None, edge_lines, edge_vkeys
 
