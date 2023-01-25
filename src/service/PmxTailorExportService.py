@@ -5591,17 +5591,28 @@ class PmxTailorExportService:
 
                 # 頂点を繋げた辺がエッジペアに含まれてない場合、仮想面を追加する
                 for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
+                    if vv0_key in virtual_edge_keys and vv1_key in virtual_edge_keys:
+                        # 仮想エッジの場合、追加
+                        if vv0_key not in edge_line_pairs:
+                            edge_line_pairs[vv0_key] = []
+                        if vv1_key not in edge_line_pairs:
+                            edge_line_pairs[vv1_key] = []
 
-                    if vv0_key not in edge_line_pairs:
-                        edge_line_pairs[vv0_key] = []
-                    if vv1_key not in edge_line_pairs:
-                        edge_line_pairs[vv1_key] = []
+                        edge_line_pairs[vv0_key].append(vv1_key)
+                        edge_line_pairs[vv1_key].append(vv0_key)
 
-                    edge_line_pairs[vv0_key].append(vv1_key)
-                    edge_line_pairs[vv1_key].append(vv0_key)
-
-                    lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
-                    virtual_edges.append(lkey)
+                        lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
+                        virtual_edges.append(lkey)
+                    else:
+                        # 仮想エッジではない場合、エッジから除外
+                        for vvv0_key, vvv1_key in [(vv0_key, vv1_key), (vv1_key, vv0_key)]:
+                            if vvv0_key in edge_line_pairs:
+                                for n, vk in enumerate(edge_line_pairs[vvv0_key]):
+                                    if vk == vvv1_key:
+                                        del edge_line_pairs[vvv0_key][n]
+                                        break
+                                if not edge_line_pairs[vvv0_key]:
+                                    del edge_line_pairs[vvv0_key]
 
                 # 接続先も追加
                 for vvkey in [v0_key, v1_key, v2_key]:
@@ -5676,6 +5687,7 @@ class PmxTailorExportService:
 
         logger.info("%s: エッジの抽出", material_name)
 
+        all_edge_keys = []
         all_mean_poses = []
         all_edge_poses = []
         target_diff_dots = []
@@ -5683,21 +5695,25 @@ class PmxTailorExportService:
             all_edge_poses.append([])
             target_diff_dots.append([])
 
-            for prev_edge_key, now_edge_key, next_edge_key in zip(
-                edge_lines, edge_lines[1:] + edge_lines[:1], edge_lines[2:] + edge_lines[:2]
+            for n, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
+                zip(edge_lines, edge_lines[1:] + edge_lines[:1], edge_lines[2:] + edge_lines[:2])
             ):
                 prev_edge_pos = virtual_vertices[prev_edge_key].position()
                 now_edge_pos = virtual_vertices[now_edge_key].position()
                 next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                target_diff_dots[-1].append(
-                    MVector3D.dotProduct(
-                        (next_edge_pos - now_edge_pos).normalized(), (now_edge_pos - prev_edge_pos).normalized()
+                if n == 0:
+                    target_diff_dots[-1].append(1)
+                else:
+                    target_diff_dots[-1].append(
+                        MVector3D.dotProduct(
+                            (next_edge_pos - now_edge_pos).normalized(), (now_edge_pos - prev_edge_pos).normalized()
+                        )
                     )
-                )
 
                 all_edge_poses[-1].append(now_edge_pos.data())
                 all_mean_poses.append(now_edge_pos.data())
+                all_edge_keys.append(now_edge_key)
 
         # topは全部並列
         all_top_edge_distances = []
@@ -5706,10 +5722,17 @@ class PmxTailorExportService:
         all_top_edge_dots = []
 
         horizonal_top_edge_keys = []
+        all_root_key_idx = 0
+        all_root_key = None
+        all_root_val = 0
+        all_mean_distance = 0
 
         # 処理対象頂点の距離の基準値(できるだけ根元の値)
         if is_material_horizonal:
             # 水平の場合、全体の距離から小さいのを選ぶ
+            all_root_key_idx = np.argmin(
+                np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+            )
             all_root_val = np.min(
                 np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
             )
@@ -5720,9 +5743,12 @@ class PmxTailorExportService:
             # 角度がある場合、ノイズが入らないよう一軸でのみ判定する
             if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
                 all_root_val = np.min(all_mean_poses, axis=0)[target_idx]
+                all_root_key_idx = np.argmin(all_mean_poses, axis=0)[target_idx]
             else:
                 all_root_val = np.max(all_mean_poses, axis=0)[target_idx]
+                all_root_key_idx = np.argmax(all_mean_poses, axis=0)[target_idx]
             all_mean_distance = np.abs(np.mean(np.array(all_mean_poses)[:, target_idx] - all_root_val))
+        all_root_key = all_edge_keys[all_root_key_idx]
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
@@ -5744,106 +5770,136 @@ class PmxTailorExportService:
                 horizonal_top_edge_keys.append(vkey)
         else:
             # 根元頂点CSVが指定されていない場合
-            for n, (edge_lines, edge_poses, target_dots) in enumerate(
-                zip(all_edge_lines, all_edge_poses, target_diff_dots)
-            ):
-                if is_material_horizonal:
-                    edge_distances = np.linalg.norm(
-                        (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+
+            # 最もキーが上の一点から大体水平に繋がっている辺を上部エッジとする
+            for n, edge_lines in enumerate(all_edge_lines + [list(reversed(ael)) for ael in all_edge_lines]):
+                if all_root_key not in edge_lines:
+                    # そもそもルートキーが含まれてなければスルー
+                    continue
+
+                root_key_idx = [n for n, el in enumerate(edge_lines) if el == all_root_key][0]
+
+                for m, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
+                    zip(
+                        edge_lines[(root_key_idx):] + edge_lines[:(root_key_idx)],
+                        edge_lines[(root_key_idx + 1) :] + edge_lines[: (root_key_idx + 1)],
+                        edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
                     )
-                else:
-                    edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
-                edge_mean_distance = np.mean(edge_distances)
-                if len(all_edge_lines) == 2 and edge_mean_distance < all_mean_distance:
-                    # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
-                    all_top_edge_keys = edge_lines
-                    all_top_edge_poses = edge_poses
-                    all_top_edge_dots = target_dots
-                    all_top_edge_distances = edge_distances
+                ):
+                    prev_edge_pos = virtual_vertices[prev_edge_key].position()
+                    now_edge_pos = virtual_vertices[now_edge_key].position()
+                    next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                if len(all_edge_lines) != 2 and np.array(edge_lines)[edge_distances < edge_mean_distance].shape[0] > 0:
-                    # 距離が全体の距離より近い場合、上部とみなす
-                    for idx in np.where(edge_distances < edge_mean_distance)[0]:
-                        all_top_edge_keys.append(edge_lines[idx])
-                        all_top_edge_poses.append(edge_poses[idx])
-                        all_top_edge_dots.append(target_dots[idx])
-                        all_top_edge_distances.append(edge_distances[idx])
-
-            if not all_top_edge_keys:
-                logger.warning(
-                    "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
-                    decoration=MLogger.DECORATION_BOX,
-                )
-                return None, None, None, None, None
-
-            vertical_top_edge_keys = []
-
-            # 主に移動する軸（水平：Z、上下：Y、左右：X）
-            move_idx = (
-                2
-                if material_direction == 0
-                else 1
-                if param_option["direction"] in [logger.transtext("下"), logger.transtext("上")]
-                else 0
-            )
-            top_move_values = np.array(all_top_edge_poses)[:, move_idx]
-
-            # 移動量の中央の1/2を閾値とする
-            horizonal_threshold = np.median(np.abs(np.diff(top_move_values))) * 1.5
-
-            # 内積差の最大の1/2を閾値とする(ただし、最下限を設ける)
-            dot_threshold = max(0.2, np.max(np.abs(np.diff(np.abs(all_top_edge_dots)))) * 0.5)
-
-            logger.debug(
-                f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
-            )
-
-            # 変曲点を求める
-            target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_dots)) >= dot_threshold)[0]
-
-            logger.debug(f"target_idx_pose_f_prime_diff: [{np.round(target_idx_pose_f_prime_diff, decimals=3)}]")
-
-            if len(target_idx_pose_f_prime_diff) < 3:
-                # 変曲点が一枚物（四角でない）場合、ほぼ均一である場合、エッジが均一に水平に繋がってるとみなす
-                horizonal_top_edge_keys = all_top_edge_keys
-            else:
-                target_idx_pose_indices = (
-                    [0] + (target_idx_pose_f_prime_diff[::2] + 1).tolist() + [len(top_move_values)]
-                )
-
-                # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
-                for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
-                    target_all_top_edge_keys = (
-                        all_top_edge_keys[ssi : (esi + 2)] if 0 == ssi else all_top_edge_keys[(ssi + 1) : (esi + 1)]
-                    )
-                    slice_top_move_values = top_move_values[ssi : (esi + 1)]
-
-                    if len(slice_top_move_values) < 2:
-                        # diffが取れないくらい小さいのは無視
-                        logger.debug(
-                            f"SKIP ssi[{ssi}], esi[{esi}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+                    if m == 0:
+                        horizonal_top_edge_keys.append(prev_edge_key)
+                        horizonal_top_edge_keys.append(now_edge_key)
+                    elif m > 0:
+                        dot = MVector3D.dotProduct(
+                            (next_edge_pos - now_edge_pos).normalized(),
+                            (now_edge_pos - prev_edge_pos).normalized(),
                         )
-                        continue
+                        horizonal_top_edge_keys.append(now_edge_key)
 
-                    sliced_diff = np.mean(np.abs(np.diff(slice_top_move_values)))
+                        if dot < 0.8:
+                            break
 
-                    if sliced_diff <= horizonal_threshold:
-                        # 同一方向の傾きに変化が小さければ、水平方向
-                        horizonal_top_edge_keys.extend(target_all_top_edge_keys)
+                # if is_material_horizonal:
+                #     edge_distances = np.linalg.norm(
+                #         (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+                #     )
+                # else:
+                #     edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
+                # edge_mean_distance = np.mean(edge_distances)
+                # if len(all_edge_lines) == 2 and edge_mean_distance < all_mean_distance:
+                #     # エッジが2つの場合、半分で分ける(下右は大きい方、上左は小さい方)
+                #     all_top_edge_keys = edge_lines
+                #     all_top_edge_poses = edge_poses
+                #     all_top_edge_dots = target_dots
+                #     all_top_edge_distances = edge_distances
 
-                        logger.debug(
-                            f"HOR ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
-                        )
-                    else:
-                        # 同一方向の傾きに変化があれば、垂直方向
-                        vertical_top_edge_keys.extend(target_all_top_edge_keys)
+                # if len(all_edge_lines) != 2 and np.array(edge_lines)[edge_distances < edge_mean_distance].shape[0] > 0:
+                #     # 距離が全体の距離より近い場合、上部とみなす
+                #     for idx in np.where(edge_distances < edge_mean_distance)[0]:
+                #         all_top_edge_keys.append(edge_lines[idx])
+                #         all_top_edge_poses.append(edge_poses[idx])
+                #         all_top_edge_dots.append(target_dots[idx])
+                #         all_top_edge_distances.append(edge_distances[idx])
 
-                        logger.debug(
-                            f"VER ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
-                        )
+            # if not all_top_edge_keys:
+            #     logger.warning(
+            #         "物理方向に対して上部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+            #         decoration=MLogger.DECORATION_BOX,
+            #     )
+            #     return None, None, None, None, None
+
+            # vertical_top_edge_keys = []
+
+            # # 主に移動する軸（水平：Z、上下：Y、左右：X）
+            # move_idx = (
+            #     2
+            #     if material_direction == 0
+            #     else 1
+            #     if param_option["direction"] in [logger.transtext("下"), logger.transtext("上")]
+            #     else 0
+            # )
+            # top_move_values = np.array(all_top_edge_poses)[:, move_idx]
+
+            # # 移動量の中央の1/2を閾値とする
+            # horizonal_threshold = np.median(np.abs(np.diff(top_move_values))) * 1.5
+
+            # # 内積差の最大の1/2を閾値とする(ただし、最下限を設ける)
+            # dot_threshold = max(0.2, np.max(np.abs(np.diff(np.abs(all_top_edge_dots)))) * 0.5)
+
+            # logger.debug(
+            #     f"horizonal_threshold: [{round(horizonal_threshold, 5)}], dot_threshold: [{round(dot_threshold, 5)}]"
+            # )
+
+            # # 変曲点を求める
+            # target_idx_pose_f_prime_diff = np.where(np.abs(np.diff(all_top_edge_dots)) >= dot_threshold)[0]
+
+            # logger.debug(f"target_idx_pose_f_prime_diff: [{np.round(target_idx_pose_f_prime_diff, decimals=3)}]")
+
+            # if len(target_idx_pose_f_prime_diff) < 3:
+            #     # 変曲点が一枚物（四角でない）場合、ほぼ均一である場合、エッジが均一に水平に繋がってるとみなす
+            #     horizonal_top_edge_keys = all_top_edge_keys
+            # else:
+            #     target_idx_pose_indices = (
+            #         [0] + (target_idx_pose_f_prime_diff[::2] + 1).tolist() + [len(top_move_values)]
+            #     )
+
+            #     # 角度の変曲点が3つ以上ある場合、エッジが分断されてるとみなす
+            #     for ssi, esi in zip(target_idx_pose_indices, target_idx_pose_indices[1:]):
+            #         target_all_top_edge_keys = (
+            #             all_top_edge_keys[ssi : (esi + 2)] if 0 == ssi else all_top_edge_keys[(ssi + 1) : (esi + 1)]
+            #         )
+            #         slice_top_move_values = top_move_values[ssi : (esi + 1)]
+
+            #         if len(slice_top_move_values) < 2:
+            #             # diffが取れないくらい小さいのは無視
+            #             logger.debug(
+            #                 f"SKIP ssi[{ssi}], esi[{esi}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+            #             )
+            #             continue
+
+            #         sliced_diff = np.mean(np.abs(np.diff(slice_top_move_values)))
+
+            #         if sliced_diff <= horizonal_threshold:
+            #             # 同一方向の傾きに変化が小さければ、水平方向
+            #             horizonal_top_edge_keys.extend(target_all_top_edge_keys)
+
+            #             logger.debug(
+            #                 f"HOR ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+            #             )
+            #         else:
+            #             # 同一方向の傾きに変化があれば、垂直方向
+            #             vertical_top_edge_keys.extend(target_all_top_edge_keys)
+
+            #             logger.debug(
+            #                 f"VER ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
+            #             )
 
             logger.debug(f"horizonal[{horizonal_top_edge_keys}]")
-            logger.debug(f"vertical[{vertical_top_edge_keys}]")
+            # logger.debug(f"vertical[{vertical_top_edge_keys}]")
 
             if not horizonal_top_edge_keys:
                 logger.warning(
@@ -5868,35 +5924,42 @@ class PmxTailorExportService:
         for n, (edge_lines, edge_poses, target_dots) in enumerate(
             zip(all_edge_lines, all_edge_poses, target_diff_dots)
         ):
-            if edge_lines == horizonal_top_edge_keys:
+            bottom_edge_lines = [el for el in edge_lines if el not in horizonal_top_edge_keys]
+
+            if not bottom_edge_lines:
+                # 全部上部エッジの場合、スルー
                 continue
 
-            if is_material_horizonal:
-                edge_distances = np.linalg.norm(
-                    (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
-                )
-            else:
-                edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
+            # 上部エッジではないのは全て下部エッジ扱い
+            all_bottom_edge_keys.append(bottom_edge_lines)
 
-            if np.array(edge_lines)[edge_distances > all_mean_distance].shape[0] > 0:
-                # 上部エッジからの距離が全体の距離/2より遠い場合、下部とみなす
-                # bottom はスリットの可能性があるので、中央値でさらに区分けする
-                distance_idxs = np.where(edge_distances > all_mean_distance)[0]
-                if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
-                    idxs = (
-                        [0] + [t[0] for t in np.where(np.abs(np.diff(distance_idxs)) > 1)] + [len(distance_idxs) - 1]
-                    )
-                else:
-                    idxs = [0, len(distance_idxs) - 1]
+            # if is_material_horizonal:
+            #     # 材質が水平の場合
+            #     edge_distances = np.linalg.norm(
+            #         (np.array(edge_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1
+            #     )
+            # else:
+            #     edge_distances = np.abs(np.array(edge_poses)[:, target_idx] - all_root_val)
 
-                for i, (sidx, eidx) in enumerate(zip(idxs, idxs[1:])):
-                    is_registed = False
-                    for idx in range(sidx + (0 if i == 0 else 1), eidx + 1):
-                        if edge_lines[distance_idxs[idx]] not in horizonal_top_edge_keys:
-                            if not is_registed:
-                                all_bottom_edge_keys.append([])
-                                is_registed = True
-                            all_bottom_edge_keys[-1].append(edge_lines[distance_idxs[idx]])
+            # if np.array(edge_lines)[edge_distances > all_mean_distance].shape[0] > 0:
+            #     # 上部エッジからの距離が全体の距離/2より遠い場合、下部とみなす
+            #     # bottom はスリットの可能性があるので、中央値でさらに区分けする
+            #     distance_idxs = np.where(edge_distances > all_mean_distance)[0]
+            #     if np.where(np.diff(distance_idxs) > 1)[0].shape[0] > 0:
+            #         idxs = (
+            #             [0] + [t for t in np.where(np.diff(distance_idxs) > 1)][0].tolist() + [len(distance_idxs) - 1]
+            #         )
+            #     else:
+            #         idxs = [0, len(distance_idxs) - 1]
+
+            #     for i, (sidx, eidx) in enumerate(zip(idxs, idxs[1:])):
+            #         is_registed = False
+            #         for idx in range(sidx + (0 if i == 0 else 1), eidx + 1):
+            #             if edge_lines[distance_idxs[idx]] not in horizonal_top_edge_keys:
+            #                 if not is_registed:
+            #                     all_bottom_edge_keys.append([])
+            #                     is_registed = True
+            #                 all_bottom_edge_keys[-1].append(edge_lines[distance_idxs[idx]])
 
         if not all_bottom_edge_keys:
             logger.warning(
@@ -6397,7 +6460,7 @@ class PmxTailorExportService:
                                 # 仮想頂点の位置
                                 target_position = mat * MVector3D(
                                     0,
-                                    max(-0.5, -nearest_distance * 0.3),
+                                    -nearest_distance,
                                     0,
                                 )
                                 target_key = target_position.to_key(threshold)
@@ -6686,7 +6749,7 @@ class PmxTailorExportService:
                 # 下: X(中央揃え) - Z(降順) - Y(降順)
                 next_vkey = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], -x[1]))[0]
         else:
-            # 2回目以降は出来るだけ内積が近いのを選ぶ
+            # 2回目以降は出来るだけ内積が遠いのを選ぶ（曲がりやすいように）
             next_dots = []
             for vkey in remain_next_vkeys:
                 next_dots.append(
@@ -6700,7 +6763,7 @@ class PmxTailorExportService:
                         ).normalized(),
                     )
                 )
-            next_vkey = remain_next_vkeys[np.argmax(next_dots)]
+            next_vkey = remain_next_vkeys[np.argmin(next_dots)]
 
         if start_vkey and (start_vkey, next_vkey) not in edge_vkeys:
             edge_lines[-1].append(next_vkey)
@@ -7030,6 +7093,10 @@ def calc_line_line_dist(l1: MLine, l2: MLine):
     DV1V1 = l1.vector_real.lengthSquared()
     DV2V2 = l2.vector_real.lengthSquared()
     P21P11 = (l1.point.point - l2.point.point).normalized()
+
+    if (DV1V1 * DV2V2 - DV1V2 * DV1V2) == 0:
+        min_length, p2, t2 = calc_point_line_dist(l1.point, l2)
+        return min_length, l1.point.point, p2, 0.0, t2
 
     t1 = (
         DV1V2 * MVector3D.dotProduct(l2.vector_real, P21P11) - DV2V2 * MVector3D.dotProduct(l1.vector_real, P21P11)
