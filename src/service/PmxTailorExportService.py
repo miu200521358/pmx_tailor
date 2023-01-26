@@ -5687,68 +5687,61 @@ class PmxTailorExportService:
 
         logger.info("%s: エッジの抽出", material_name)
 
-        all_edge_keys = []
-        all_mean_poses = []
-        all_edge_poses = []
-        target_diff_dots = []
-        for n, edge_lines in enumerate(all_edge_lines):
-            all_edge_poses.append([])
-            target_diff_dots.append([])
+        # all_edge_keys = []
+        # all_mean_poses = []
+        # all_edge_poses = []
+        # target_diff_dots = []
+        # for n, edge_lines in enumerate(all_edge_lines):
+        #     all_edge_poses.append([])
+        #     target_diff_dots.append([])
 
-            for n, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
-                zip(edge_lines, edge_lines[1:] + edge_lines[:1], edge_lines[2:] + edge_lines[:2])
-            ):
-                prev_edge_pos = virtual_vertices[prev_edge_key].position()
-                now_edge_pos = virtual_vertices[now_edge_key].position()
-                next_edge_pos = virtual_vertices[next_edge_key].position()
+        #     for n, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
+        #         zip(edge_lines, edge_lines[1:] + edge_lines[:1], edge_lines[2:] + edge_lines[:2])
+        #     ):
+        #         prev_edge_pos = virtual_vertices[prev_edge_key].position()
+        #         now_edge_pos = virtual_vertices[now_edge_key].position()
+        #         next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                if n == 0:
-                    target_diff_dots[-1].append(1)
-                else:
-                    target_diff_dots[-1].append(
-                        MVector3D.dotProduct(
-                            (next_edge_pos - now_edge_pos).normalized(), (now_edge_pos - prev_edge_pos).normalized()
-                        )
-                    )
+        #         if n == 0:
+        #             target_diff_dots[-1].append(1)
+        #         else:
+        #             target_diff_dots[-1].append(
+        #                 MVector3D.dotProduct(
+        #                     (next_edge_pos - now_edge_pos).normalized(), (now_edge_pos - prev_edge_pos).normalized()
+        #                 )
+        #             )
 
-                all_edge_poses[-1].append(now_edge_pos.data())
-                all_mean_poses.append(now_edge_pos.data())
-                all_edge_keys.append(now_edge_key)
+        #         all_edge_poses[-1].append(now_edge_pos.data())
+        #         all_mean_poses.append(now_edge_pos.data())
+        #         all_edge_keys.append(now_edge_key)
 
         # topは全部並列
-        all_top_edge_distances = []
-        all_top_edge_keys = []
-        all_top_edge_poses = []
-        all_top_edge_dots = []
-
         horizonal_top_edge_keys = []
-        all_root_key_idx = 0
-        all_root_key = None
-        all_root_val = 0
-        all_mean_distance = 0
+        # 始点をルートとする（下方向の場合、センターの真後ろ側）
+        all_root_key = all_edge_lines[0][0]
 
-        # 処理対象頂点の距離の基準値(できるだけ根元の値)
-        if is_material_horizonal:
-            # 水平の場合、全体の距離から小さいのを選ぶ
-            all_root_key_idx = np.argmin(
-                np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
-            )
-            all_root_val = np.min(
-                np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
-            )
-            all_mean_distance = np.mean(
-                np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
-            )
-        else:
-            # 角度がある場合、ノイズが入らないよう一軸でのみ判定する
-            if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
-                all_root_val = np.min(all_mean_poses, axis=0)[target_idx]
-                all_root_key_idx = np.argmin(all_mean_poses, axis=0)[target_idx]
-            else:
-                all_root_val = np.max(all_mean_poses, axis=0)[target_idx]
-                all_root_key_idx = np.argmax(all_mean_poses, axis=0)[target_idx]
-            all_mean_distance = np.abs(np.mean(np.array(all_mean_poses)[:, target_idx] - all_root_val))
-        all_root_key = all_edge_keys[all_root_key_idx]
+        # # 処理対象頂点の距離の基準値(できるだけ根元の値)
+        # if is_material_horizonal:
+        #     # 水平の場合、全体の距離から小さいのを選ぶ
+        #     all_root_key_idx = np.argmin(
+        #         np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+        #     )
+        #     all_root_val = np.min(
+        #         np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+        #     )
+        #     all_mean_distance = np.mean(
+        #         np.linalg.norm((np.array(all_mean_poses) - np.mean(all_mean_poses, axis=0)), ord=2, axis=1)
+        #     )
+        # else:
+        #     # 角度がある場合、ノイズが入らないよう一軸でのみ判定する
+        #     if param_option["direction"] in [logger.transtext("上"), logger.transtext("左")]:
+        #         all_root_val = np.min(all_mean_poses, axis=0)[target_idx]
+        #         all_root_key_idx = np.argmin(all_mean_poses, axis=0)[target_idx]
+        #     else:
+        #         all_root_val = np.max(all_mean_poses, axis=0)[target_idx]
+        #         all_root_key_idx = np.argmax(all_mean_poses, axis=0)[target_idx]
+        #     all_mean_distance = np.abs(np.mean(np.array(all_mean_poses)[:, target_idx] - all_root_val))
+        # all_root_key = all_edge_keys[all_root_key_idx]
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
@@ -5772,36 +5765,49 @@ class PmxTailorExportService:
             # 根元頂点CSVが指定されていない場合
 
             # 最もキーが上の一点から大体水平に繋がっている辺を上部エッジとする
-            for n, edge_lines in enumerate(all_edge_lines + [list(reversed(ael)) for ael in all_edge_lines]):
-                if all_root_key not in edge_lines:
-                    # そもそもルートキーが含まれてなければスルー
-                    continue
+            # 既存のラインと逆方向のラインを試す
+            for target_edge_lines, is_reverse in [
+                (all_edge_lines, False),
+                ([list(reversed(ael)) for ael in all_edge_lines], True),
+            ]:
+                for n, edge_lines in enumerate(target_edge_lines):
+                    if all_root_key not in edge_lines:
+                        # そもそもルートキーが含まれてなければスルー
+                        continue
 
-                root_key_idx = [n for n, el in enumerate(edge_lines) if el == all_root_key][0]
+                    root_key_idx = [n for n, el in enumerate(edge_lines) if el == all_root_key][0]
 
-                for m, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
-                    zip(
-                        edge_lines[(root_key_idx):] + edge_lines[:(root_key_idx)],
-                        edge_lines[(root_key_idx + 1) :] + edge_lines[: (root_key_idx + 1)],
-                        edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
-                    )
-                ):
-                    prev_edge_pos = virtual_vertices[prev_edge_key].position()
-                    now_edge_pos = virtual_vertices[now_edge_key].position()
-                    next_edge_pos = virtual_vertices[next_edge_key].position()
-
-                    if m == 0:
-                        horizonal_top_edge_keys.append(prev_edge_key)
-                        horizonal_top_edge_keys.append(now_edge_key)
-                    elif m > 0:
-                        dot = MVector3D.dotProduct(
-                            (next_edge_pos - now_edge_pos).normalized(),
-                            (now_edge_pos - prev_edge_pos).normalized(),
+                    for m, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
+                        zip(
+                            edge_lines[(root_key_idx):] + edge_lines[:(root_key_idx)],
+                            edge_lines[(root_key_idx + 1) :] + edge_lines[: (root_key_idx + 1)],
+                            edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
                         )
-                        horizonal_top_edge_keys.append(now_edge_key)
+                    ):
+                        prev_edge_pos = virtual_vertices[prev_edge_key].position()
+                        now_edge_pos = virtual_vertices[now_edge_key].position()
+                        next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                        if dot < 0.8:
-                            break
+                        if m == 0:
+                            if is_reverse:
+                                # 反転は0番目は既に入ってるので now のみ
+                                horizonal_top_edge_keys.insert(0, now_edge_key)
+                            else:
+                                horizonal_top_edge_keys.append(prev_edge_key)
+                                horizonal_top_edge_keys.append(now_edge_key)
+                        elif m > 0:
+                            if is_reverse:
+                                horizonal_top_edge_keys.insert(0, now_edge_key)
+                            else:
+                                horizonal_top_edge_keys.append(now_edge_key)
+
+                            dot = MVector3D.dotProduct(
+                                (next_edge_pos - now_edge_pos).normalized(),
+                                (now_edge_pos - prev_edge_pos).normalized(),
+                            )
+
+                            if dot < 0.5:
+                                break
 
                 # if is_material_horizonal:
                 #     edge_distances = np.linalg.norm(
@@ -5921,9 +5927,7 @@ class PmxTailorExportService:
         # bottomはエッジが分かれてたら分ける
         all_bottom_edge_keys = []
 
-        for n, (edge_lines, edge_poses, target_dots) in enumerate(
-            zip(all_edge_lines, all_edge_poses, target_diff_dots)
-        ):
+        for n, edge_lines in enumerate(all_edge_lines):
             bottom_edge_lines = [el for el in edge_lines if el not in horizonal_top_edge_keys]
 
             if not bottom_edge_lines:
@@ -6695,7 +6699,7 @@ class PmxTailorExportService:
         n: int,
     ):
         if loop > 0 and loop % 20 == 0:
-            logger.info("-- エッジ検出: %s個目(%s)", n, loop)
+            logger.info("---- エッジ検出: %s個目(%s)", (n + 1), (loop + 1))
 
         remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
 
@@ -6749,7 +6753,7 @@ class PmxTailorExportService:
                 # 下: X(中央揃え) - Z(降順) - Y(降順)
                 next_vkey = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], -x[1]))[0]
         else:
-            # 2回目以降は出来るだけ内積が遠いのを選ぶ（曲がりやすいように）
+            # 2回目以降は出来るだけ内積が大きいのを選ぶ
             next_dots = []
             for vkey in remain_next_vkeys:
                 next_dots.append(
@@ -6763,21 +6767,21 @@ class PmxTailorExportService:
                         ).normalized(),
                     )
                 )
-            next_vkey = remain_next_vkeys[np.argmin(next_dots)]
+            next_vkey = remain_next_vkeys[np.argmax(next_dots)]
 
-        if start_vkey and (start_vkey, next_vkey) not in edge_vkeys:
-            edge_lines[-1].append(next_vkey)
-            edge_vkeys.append((start_vkey, next_vkey))
+        if start_vkey:
+            if start_vkey and (start_vkey, next_vkey) not in edge_vkeys:
+                # まだ組み合わせが登録されていない場合のみ登録
+                edge_lines[-1].append(next_vkey)
+                edge_vkeys.append((start_vkey, next_vkey))
 
             for n, nk in enumerate(edge_line_pairs[start_vkey]):
                 if nk == next_vkey:
                     del edge_line_pairs[start_vkey][n]
-                    break
 
             for n, sk in enumerate(edge_line_pairs[next_vkey]):
                 if sk == start_vkey:
                     del edge_line_pairs[next_vkey][n]
-                    break
 
             if start_vkey in edge_line_pairs and not edge_line_pairs[start_vkey]:
                 del edge_line_pairs[start_vkey]

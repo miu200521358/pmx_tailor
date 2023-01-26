@@ -643,5 +643,6 @@
     "-- エッジ検出: %s個目:終了": "-- edge detection: %s: end",
     "エッジが検出できなかったため、処理を中断します。\n裏面のある材質で「すべて表面」を選択してないか、確認してください。": "Processing is aborted because an edge could not be detected.\nMake sure that you have not selected \"All Front\" for the material with back side.",
     "-- 仮想面確認: %s個目:終了": "-- Virtual face confirmation: %sth: end",
-    "-- エッジ検出: %s個目(%s)": "-- edge detection: %sth(%s)"
+    "-- エッジ検出: %s個目(%s)": "-- edge detection: %sth(%s)",
+    "---- エッジ検出: %s個目(%s)": ""
 }
