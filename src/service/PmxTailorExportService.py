@@ -4249,227 +4249,14 @@ class PmxTailorExportService:
                 # ボーン生成対象外の場合、スルー
                 continue
 
-            # ボーン登録有無
+            # 全ボーン登録有無
+            full_regist_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
+            # 実際のボーン登録有無
             regist_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
-            all_regist_bones[base_map_idx] = regist_bones
 
             logger.info("--【No.%s】ボーン生成", base_map_idx + 1)
 
-            # ボーンが繋がってるトコロが生成範囲
-            regist_bones = all_bone_connected[base_map_idx].copy()
-            x_diffs = np.diff(all_bone_connected[base_map_idx], axis=1)
-            for v_yidx, v_xidx in zip(np.where(x_diffs)[0], np.where(x_diffs)[1]):
-                if x_diffs[v_yidx][v_xidx] < 0:
-                    # マイナスの場合、前と繋がっていない
-                    regist_bones[v_yidx][v_xidx + 1] = True
-
-            if param_option["density_type"] == logger.transtext("距離"):
-                median_vertical_distance = (
-                    np.median(all_bone_vertical_distances[base_map_idx][:, int(vertex_map.shape[1] / 2)]) * 0.9
-                )
-                median_horizonal_distance = (
-                    np.median(all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), :]) * 0.9
-                )
-
-                logger.debug(
-                    f"median_horizonal_distance: {round(median_horizonal_distance, 4)}, median_vertical_distance: {round(median_vertical_distance, 4)}"
-                )
-
-                # 間隔が距離タイプの場合、均等になるように間を空ける
-                y_regists = np.zeros(vertex_map.shape[0], dtype=np.int)
-                prev_y_regist = 0
-                for v_yidx in range(vertex_map.shape[0]):
-                    if (
-                        np.sum(
-                            all_bone_vertical_distances[base_map_idx][
-                                (prev_y_regist + 1) : (v_yidx + 1), int(vertex_map.shape[1] / 2)
-                            ]
-                        )
-                        > median_vertical_distance * param_option["vertical_bone_density"]
-                    ):
-                        # 前の登録ボーンから一定距離離れたら登録対象
-                        y_regists[v_yidx] = True
-                        prev_y_regist = v_yidx
-                # 最初と最後は必ず登録する
-                y_regists[0] = y_regists[-2:] = True
-
-                x_regists = np.zeros(vertex_map.shape[1], dtype=np.int)
-                prev_x_regist = 0
-                for v_xidx in range(vertex_map.shape[1]):
-                    if (
-                        np.sum(
-                            all_bone_horizonal_distances[base_map_idx][
-                                int(vertex_map.shape[0] / 2), (prev_x_regist + 1) : (v_xidx + 1)
-                            ]
-                        )
-                        > median_horizonal_distance * param_option["horizonal_bone_density"]
-                    ):
-                        # 前の登録ボーンから一定距離離れたら登録対象
-                        x_regists[v_xidx] = True
-                        prev_x_regist = v_xidx
-                # 最初と最後は必ず登録する
-                x_regists[0] = x_regists[-1] = True
-
-                for v_yidx, y_regist in enumerate(y_regists):
-                    for v_xidx, x_regist in enumerate(x_regists):
-                        # XYの両方が距離条件を満たしていて、かつボーンが張れる状態なら登録対象
-                        regist_bones[v_yidx, v_xidx] = (
-                            y_regist
-                            and x_regist
-                            and (
-                                all_bone_connected[base_map_idx][v_yidx, v_xidx]
-                                or v_yidx >= vertex_map.shape[0] - 2
-                                or v_xidx >= vertex_map.shape[1] - 1
-                            )
-                        )
-
-                for v_xidx in range(vertex_map.shape[1]):
-                    if v_xidx > 0 and not all_bone_connected[base_map_idx][:-1, v_xidx].all():
-                        # 繋がってない箇所にもボーンを張る
-                        regist_bones[np.array(y_regists), v_xidx] = True
-                        # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
-                        last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
-                        regist_bones[
-                            last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]), v_xidx
-                        ] = True
-
-            elif param_option["density_type"] == logger.transtext("頂点"):
-                pass
-                # 間隔が頂点タイプの場合、規則的に間を空ける
-                # for v_xidx in range(vertex_map.shape[1]):
-                #     # まずは上から繋がっている末端を登録する
-                #     if np.where(all_bone_connected[base_map_idx][:, v_xidx])[0].any():
-                #         last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:, v_xidx])[0])
-                #         regist_bones[
-                #             min(last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
-                #             v_xidx + 1,
-                #         ] = True
-
-                # x_diffs = np.diff(all_bone_connected[base_map_idx], axis=1)
-                # for v_yidx, v_xidx in zip(np.where(x_diffs)[0], np.where(x_diffs)[1]):
-                #     if x_diffs[v_yidx][v_xidx] < 0:
-                #         # マイナスの場合、前と繋がっていない
-                #         regist_bones[v_yidx][v_xidx + 1] = True
-                #     elif x_diffs[v_yidx][v_xidx] > 0:
-                #         # プラスの場合、次と繋がっていない
-                #         regist_bones[v_yidx][v_xidx + 1] = True
-
-                # # とりあえずボーンが繋がってるところはボーンを張る
-                # for v_yidx in range(vertex_map.shape[0] - 1, -1, -1):
-                #     for v_xidx in range(vertex_map.shape[1]):
-                #         # if (
-                #         #     all_bone_connected[base_map_idx][v_yidx][v_xidx]
-                #         #     and (v_yidx % param_option["vertical_bone_density"] == 0)
-                #         #     and (v_xidx % param_option["horizonal_bone_density"] == 0)
-                #         # ):
-                #         #     # ボーンが繋がってて切れ目に相当する場合、True
-                #         #     regist_bones[v_yidx][v_xidx] = True
-
-                #         # if (
-                #         #     v_yidx % param_option["vertical_bone_density"] == 0 or v_yidx > vertex_map.shape[0] - 3
-                #         # ) and (
-                #         #     v_xidx % param_option["horizonal_bone_density"] == 0
-                #         #     or v_xidx == 0
-                #         #     or v_xidx == vertex_map.shape[1] - 1
-                #         # ):
-                #         #     # 先頭と末端をTrue
-                #         #     regist_bones[v_yidx][v_xidx] = True
-
-                #         # if (
-                #         #     v_xidx < vertex_map.shape[1] - 1
-                #         #     and v_yidx > 0
-                #         #     and all_bone_connected[base_map_idx][v_yidx][v_xidx] == 0
-                #         #     and all_bone_connected[base_map_idx][v_yidx - 1][v_xidx] == 0
-                #         # ):
-                #         #     # 上がまったく繋がってない場合、False
-                #         #     regist_bones[v_yidx][v_xidx] = False
-
-                #         if (
-                #             v_xidx < vertex_map.shape[1] - 1
-                #             and v_yidx > 0
-                #             and all_bone_connected[base_map_idx][v_yidx][v_xidx] == 0
-                #             and all_bone_connected[base_map_idx][v_yidx - 1][v_xidx] == 1
-                #         ):
-                #             # 上が繋がってない場合、置き換え
-                #             regist_bones[v_yidx - 1][v_xidx] = True
-                #             regist_bones[v_yidx][v_xidx] = False
-
-                # regist_bones[:, :-1] = np.diff(all_bone_connected[base_map_idx], axis=1) != 0
-                # for v_xidx in range(vertex_map.shape[1]):
-                #     if v_xidx == 0 or v_xidx == vertex_map.shape[1] - 1:
-                #         regist_bones[:, v_xidx] = True
-                #     if not all_bone_connected[base_map_idx][:-1, v_xidx].all():
-                #         # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
-                #         if np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0].any():
-                #             last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
-                #             regist_bones[
-                #                 last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
-                #             ] = True
-                # for v_yidx in range(vertex_map.shape[0]):
-                #     if not all_bone_connected[base_map_idx][v_yidx, :-1].all():
-                #         # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
-                #         if np.where(all_bone_connected[base_map_idx][v_yidx, :-1])[0].any():
-                #             last_connected_v_xidx = np.max(np.where(all_bone_connected[base_map_idx][v_yidx, :-1])[0])
-                #             regist_bones[
-                #                 v_yidx, last_connected_v_xidx : min(last_connected_v_xidx + 1, vertex_map.shape[0])
-                #             ] = True
-
-                # # Yは末端は非表示になるので、もう一つ上も登録対象
-                # regist_bones[-2:, :] = True
-
-                # regist_bones[
-                #     :: param_option["vertical_bone_density"], :: param_option["horizonal_bone_density"]
-                # ] = True
-                # # Yは末端は非表示になるので、もう一つ上も登録対象
-                # regist_bones[-2:, :: param_option["horizonal_bone_density"]] = True
-                # for v_xidx in range(vertex_map.shape[1]):
-                #     if not all_bone_connected[base_map_idx][:-1, v_xidx].all():
-                #         regist_bones[:: param_option["vertical_bone_density"], v_xidx] = True
-                #         regist_bones[-2:, v_xidx] = True
-                #         # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
-                #         if np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0].any():
-                #             last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
-                #             regist_bones[
-                #                 last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
-                #             ] = True
-
-                # if v_xidx > 0 and not all_bone_connected[base_map_idx][:-1, v_xidx].all():
-                #     # 繋がってない箇所にもボーンを張る
-                #     regist_bones[:: param_option["vertical_bone_density"], v_xidx] = True
-                #     regist_bones[-2:, v_xidx] = True
-                #     # 途中で繋がりが切れていたら、最後に繋がってる箇所からその次まで繋げる
-                #     if np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0].any():
-                #         last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx][:-1, v_xidx])[0])
-                #         regist_bones[
-                #             last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
-                #         ] = True
-
-                # elif (
-                #     v_xidx == 0
-                #     and base_map_idx > 0
-                #     and not np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0].all()
-                # ):
-                #     # スリット等でメッシュが分かれてる場合、ひとつ前のメッシュとの繋がりを確認する
-                #     # 繋がっていない箇所にボーンを張る
-                #     last_connected_v_yidx = np.max(np.where(all_bone_connected[base_map_idx - 1][:-1, -1])[0])
-                #     regist_bones[
-                #         last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
-                #     ] = True
-
-                # elif (
-                #     v_xidx == 0
-                #     and base_map_idx == 0
-                #     and len(vertex_maps) > 1
-                #     and not np.where(all_bone_connected[len(vertex_maps) - 1][:-1, -1])[0].all()
-                # ):
-                #     # スリット等でメッシュが分かれてる場合、先頭は最後のメッシュとの繋がりを確認する
-                #     # 繋がっていない箇所にボーンを張る
-                #     last_connected_v_yidx = np.max(np.where(all_bone_connected[len(vertex_maps) - 1][:-1, -1])[0])
-                #     regist_bones[
-                #         last_connected_v_yidx : min(last_connected_v_yidx + 1, vertex_map.shape[0]), v_xidx
-                #     ] = True
-
-            else:
+            if param_option["density_type"] == logger.transtext("中央"):
                 # 間隔がセンタータイプの場合、真ん中にのみボーンを張る
                 # 末端は非表示で登録する
                 for v_yidx in list(range(0, vertex_map.shape[0], param_option["vertical_bone_density"])) + [
@@ -4479,6 +4266,124 @@ class PmxTailorExportService:
                     v_xidx = (vertex_map.shape[1] // 2) - (1 - vertex_map.shape[1] % 2)
                     if not np.isnan(vertex_map[v_yidx, v_xidx]).any():
                         regist_bones[v_yidx, v_xidx] = True
+            else:
+                # ボーンが繋がってるトコロが生成範囲
+                full_regist_bones = all_bone_connected[base_map_idx].copy()
+                # 先頭は最初のをコピー
+                full_regist_bones[:, -1] = full_regist_bones[:, -2].copy()
+                # プラスの場合、前と繋がっていないので登録対象
+                full_regist_bones[:, 1:][np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)] = True
+
+                x_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)
+                if x_diffs[0].any():
+                    not_connected_xs = [(yi, xi + 1) for yi, xi in zip(x_diffs[0], x_diffs[1] + 1)]
+                else:
+                    not_connected_xs = []
+
+                y_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=0) < 0)
+                if y_diffs[0].any():
+                    not_connected_ys = [(yi, xi) for yi, xi in zip(y_diffs[0], y_diffs[1])]
+                else:
+                    not_connected_ys = []
+
+                y_registers = np.zeros(vertex_map.shape[0], dtype=np.int)
+                x_registers = np.zeros(vertex_map.shape[1], dtype=np.int)
+
+                if param_option["density_type"] == logger.transtext("距離"):
+                    median_vertical_distance = (
+                        np.median(all_bone_vertical_distances[base_map_idx][:, int(vertex_map.shape[1] / 2)]) * 0.9
+                    )
+                    median_horizonal_distance = (
+                        np.median(all_bone_horizonal_distances[base_map_idx][int(vertex_map.shape[0] / 2), :]) * 0.9
+                    )
+
+                    logger.debug(
+                        f"median_horizonal_distance: {round(median_horizonal_distance, 4)}, median_vertical_distance: {round(median_vertical_distance, 4)}"
+                    )
+
+                    # 間隔が距離タイプの場合、均等になるように間を空ける
+                    prev_y_regist = 0
+                    for v_yidx in range(vertex_map.shape[0]):
+                        if (
+                            np.sum(
+                                all_bone_vertical_distances[base_map_idx][
+                                    (prev_y_regist + 1) : (v_yidx + 1), int(vertex_map.shape[1] / 2)
+                                ]
+                            )
+                            > median_vertical_distance * param_option["vertical_bone_density"]
+                        ):
+                            # 前の登録ボーンから一定距離離れたら登録対象
+                            y_registers[v_yidx] = True
+                            prev_y_regist = v_yidx
+
+                    prev_x_regist = 0
+                    for v_xidx in range(vertex_map.shape[1]):
+                        if (
+                            np.sum(
+                                all_bone_horizonal_distances[base_map_idx][
+                                    int(vertex_map.shape[0] / 2), (prev_x_regist + 1) : (v_xidx + 1)
+                                ]
+                            )
+                            > median_horizonal_distance * param_option["horizonal_bone_density"]
+                        ):
+                            # 前の登録ボーンから一定距離離れたら登録対象
+                            x_registers[v_xidx] = True
+                            prev_x_regist = v_xidx
+
+                elif param_option["density_type"] == logger.transtext("頂点"):
+                    y_registers = (
+                        np.array(list(range(vertex_map.shape[0]))) % param_option["vertical_bone_density"] == 0
+                    )
+                    x_registers = (
+                        np.array(list(range(vertex_map.shape[1]))) % param_option["horizonal_bone_density"] == 0
+                    )
+
+                # 最初と最後は必ず登録する
+                y_registers[0] = y_registers[-2:] = True
+                x_registers[0] = x_registers[-1] = True
+
+                for v_yidx, y_regist in enumerate(y_registers):
+                    for v_xidx, x_regist in enumerate(x_registers):
+                        # XYの両方が距離条件を満たしていて、かつボーンが張れる状態なら登録対象
+                        if full_regist_bones[v_yidx, v_xidx] and (
+                            (y_regist and x_regist)
+                            or len(
+                                np.where(
+                                    full_regist_bones[
+                                        max(0, v_yidx - 1) : min(v_yidx + 2, vertex_map.shape[0]),
+                                        max(0, v_xidx - 1) : min(v_xidx + 2, vertex_map.shape[1]),
+                                    ]
+                                    == 0
+                                )[0]
+                            )
+                            or (v_yidx, v_xidx) in not_connected_xs
+                            or (v_yidx, v_xidx) in not_connected_ys
+                        ):
+                            regist_bones[v_yidx, v_xidx] = True
+
+                for v_xidx in range(vertex_map.shape[1]):
+                    # 末端ボーンを追加登録
+                    x_registered = np.where(regist_bones[:, v_xidx])[0]
+                    if x_registered.any():
+                        first_connected_v_yidx = np.min(x_registered)
+                        last_connected_v_yidx = np.max(x_registered)
+                        if first_connected_v_yidx == last_connected_v_yidx:
+                            # 一列にひとつしか登録されてない場合、不要なので削除
+                            regist_bones[
+                                min(last_connected_v_yidx, vertex_map.shape[0] - 1),
+                                v_xidx,
+                            ] = False
+                        else:
+                            # それ以外はボーン登録が必要なので上端から末端ボーンまでの追加登録
+                            for v_yidx in range(vertex_map.shape[0]):
+                                if y_registers[v_yidx] and v_yidx <= last_connected_v_yidx:
+                                    regist_bones[v_yidx, v_xidx] = True
+                            regist_bones[
+                                min(last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
+                                v_xidx,
+                            ] = True
+
+            all_regist_bones[base_map_idx] = regist_bones
 
             for v_xidx in range(vertex_map.shape[1]):
                 for v_yidx in range(vertex_map.shape[0]):
