@@ -4388,11 +4388,9 @@ class PmxTailorExportService:
                                 v_xidx,
                             ] = True
 
-                for v_yidx in range(vertex_map.shape[0]):
-                    y_registered = np.where(regist_bones[v_yidx, :])[0]
-                    if y_registered.any():
-                        # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
-                        regist_bones[v_yidx, np.where(x_registers & full_regist_bones[v_yidx, :])] = True
+                for v_yidx in np.where(np.sum(regist_bones, axis=1))[0]:
+                    # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
+                    regist_bones[v_yidx, np.where(x_registers & full_regist_bones[v_yidx, :])] = True
 
             all_regist_bones[base_map_idx] = regist_bones
 
