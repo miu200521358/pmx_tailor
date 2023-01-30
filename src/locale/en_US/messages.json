@@ -644,9 +644,9 @@
     "エッジが検出できなかったため、処理を中断します。\n裏面のある材質で「すべて表面」を選択してないか、確認してください。": "Processing is aborted because an edge could not be detected.\nMake sure that you have not selected \"All Front\" for the material with back side.",
     "-- 仮想面確認: %s個目:終了": "-- Virtual face confirmation: %sth: end",
     "-- エッジ検出: %s個目(%s)": "-- edge detection: %sth(%s)",
-    "---- エッジ検出: %s個目(%s)": "",
-    "-- 親ボーンチェック": "",
-    "-- -- 親ボーンチェック: %s個目:終了": "",
-    "-- ボーン配置": "",
-    "-- -- ボーン配置: %s個目:終了": ""
+    "---- エッジ検出: %s個目(%s)": "---- edge detection: %s th (%s)",
+    "-- 親ボーンチェック": "-- parent bone check",
+    "-- -- 親ボーンチェック: %s個目:終了": "-- -- Parent bone check: %s th: end",
+    "-- ボーン配置": "-- bone placement",
+    "-- -- ボーン配置: %s個目:終了": "-- -- Bone Placement: %s:End"
 }
