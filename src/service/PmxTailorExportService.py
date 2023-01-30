@@ -939,6 +939,7 @@ class PmxTailorExportService:
                 param_option,
                 material_name,
                 target_vertices,
+                MVector3D(0, 0, -1),
                 is_root_bone=(param_option["parent_type"] == logger.transtext("中心")),
             )
 
@@ -957,6 +958,7 @@ class PmxTailorExportService:
                     param_option,
                     material_name,
                     target_vertices,
+                    base_vertical_axis,
                     is_root_bone=(param_option["parent_type"] == logger.transtext("中心")),
                 )
             else:
@@ -993,7 +995,14 @@ class PmxTailorExportService:
                     all_bone_horizonal_distances,
                     all_bone_connected,
                 ) = self.create_bone(
-                    model, param_option, material_name, virtual_vertices, vertex_maps, vertex_map_orders, threshold
+                    model,
+                    param_option,
+                    material_name,
+                    virtual_vertices,
+                    vertex_maps,
+                    vertex_map_orders,
+                    threshold,
+                    base_vertical_axis,
                 )
 
                 remaining_vertices = self.create_weight(
@@ -3731,7 +3740,7 @@ class PmxTailorExportService:
                                 [
                                     mbone.index
                                     for mbone in virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].map_bones.values()
-                                    if mbone and mbone.index in model.bones
+                                    if mbone and mbone.name in model.bones
                                 ]
                             )
                         )
@@ -3870,15 +3879,9 @@ class PmxTailorExportService:
                             continue
 
                         above_weight = np.nan_to_num(
-                            np.sum(
-                                all_bone_vertical_distances[base_map_idx][
-                                    (above_yidx + 1) : (v_yidx + 1), (v_xidx - 1)
-                                ]
-                            )
+                            np.sum(all_bone_vertical_distances[base_map_idx][(above_yidx + 1) : (v_yidx + 1), v_xidx])
                             / np.sum(
-                                all_bone_vertical_distances[base_map_idx][
-                                    (above_yidx + 1) : (below_yidx + 1), (v_xidx - 1)
-                                ]
+                                all_bone_vertical_distances[base_map_idx][(above_yidx + 1) : (below_yidx + 1), v_xidx]
                             )
                         )
 
@@ -3956,10 +3959,8 @@ class PmxTailorExportService:
 
                         prev_above_weight = np.nan_to_num(
                             (
-                                np.sum(all_bone_vertical_distances[base_map_idx][v_yidx:below_yidx, (v_xidx - 1)])
-                                / np.sum(
-                                    all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, (v_xidx - 1)]
-                                )
+                                np.sum(all_bone_vertical_distances[base_map_idx][v_yidx:below_yidx, v_xidx])
+                                / np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, v_xidx])
                             )
                             * (
                                 np.sum(all_bone_horizonal_distances[base_map_idx][v_yidx, v_xidx:next_xidx])
@@ -3969,10 +3970,8 @@ class PmxTailorExportService:
 
                         next_above_weight = np.nan_to_num(
                             (
-                                np.sum(all_bone_vertical_distances[base_map_idx][v_yidx:below_yidx, (v_xidx - 1)])
-                                / np.sum(
-                                    all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, (v_xidx - 1)]
-                                )
+                                np.sum(all_bone_vertical_distances[base_map_idx][v_yidx:below_yidx, v_xidx])
+                                / np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, v_xidx])
                             )
                             * (
                                 np.sum(all_bone_horizonal_distances[base_map_idx][v_yidx, prev_xidx:v_xidx])
@@ -3982,10 +3981,8 @@ class PmxTailorExportService:
 
                         prev_below_weight = np.nan_to_num(
                             (
-                                np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:v_yidx, (v_xidx - 1)])
-                                / np.sum(
-                                    all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, (v_xidx - 1)]
-                                )
+                                np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:v_yidx, v_xidx])
+                                / np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, v_xidx])
                             )
                             * (
                                 np.sum(all_bone_horizonal_distances[base_map_idx][v_yidx, v_xidx:next_xidx])
@@ -3995,10 +3992,8 @@ class PmxTailorExportService:
 
                         next_below_weight = np.nan_to_num(
                             (
-                                np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:v_yidx, (v_xidx - 1)])
-                                / np.sum(
-                                    all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, (v_xidx - 1)]
-                                )
+                                np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:v_yidx, v_xidx])
+                                / np.sum(all_bone_vertical_distances[base_map_idx][above_yidx:below_yidx, v_xidx])
                             )
                             * (
                                 np.sum(all_bone_horizonal_distances[base_map_idx][v_yidx, prev_xidx:v_xidx])
@@ -4079,7 +4074,14 @@ class PmxTailorExportService:
 
         return remaining_vertices
 
-    def create_root_bone(self, model: PmxModel, param_option: dict, material_name: str, root_pos: MVector3D):
+    def create_root_bone(
+        self,
+        model: PmxModel,
+        param_option: dict,
+        material_name: str,
+        root_pos: MVector3D,
+        base_vertical_axis: MVector3D,
+    ):
         # 略称
         abb_name = param_option["abb_name"]
         # 表示枠名
@@ -4101,6 +4103,7 @@ class PmxTailorExportService:
             root_bone.name += randomname(3)
 
         root_bone.index = len(model.bones)
+        root_bone.tail_position = base_vertical_axis * 2
 
         # 表示枠
         model.display_slots[display_name] = DisplaySlot(display_name, display_name, 0, 0)
@@ -4116,6 +4119,7 @@ class PmxTailorExportService:
         vertex_maps: dict,
         vertex_map_orders: dict,
         threshold: float,
+        base_vertical_axis: MVector3D,
     ):
         logger.info("【%s:%s】ボーン生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
@@ -4130,11 +4134,12 @@ class PmxTailorExportService:
 
         # 中心ボーン
         display_name, root_bone = self.create_root_bone(
-            model, param_option, material_name, parent_bone.position.copy()
+            model, param_option, material_name, parent_bone.position.copy(), base_vertical_axis
         )
 
         tmp_all_bones = {root_bone.name: root_bone}
         tmp_all_bone_indexes = {root_bone.index: root_bone.name}
+        tmp_all_bone_vvs = {}
 
         logger.info("【%s】頂点距離の算出", material_name)
 
@@ -4383,6 +4388,12 @@ class PmxTailorExportService:
                                 v_xidx,
                             ] = True
 
+                for v_yidx in range(vertex_map.shape[0]):
+                    y_registered = np.where(regist_bones[v_yidx, :])[0]
+                    if y_registered.any():
+                        # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
+                        regist_bones[v_yidx, np.where(x_registers & full_regist_bones[v_yidx, :])] = True
+
             all_regist_bones[base_map_idx] = regist_bones
 
             for v_xidx in range(vertex_map.shape[1]):
@@ -4409,8 +4420,8 @@ class PmxTailorExportService:
                             # 登録されていたら終了
                             break
 
-                    is_regist = True
-                    substitute_bone = None
+                    # is_regist = True
+                    # substitute_bone = None
                     if not parent_bone:
                         if v_yidx > 0:
                             # 0番目以降は既に登録済みの上のボーンを採用する
@@ -4458,28 +4469,34 @@ class PmxTailorExportService:
                         bone.local_z_vector *= MVector3D(-1, 1, -1)
                         if bone.local_z_vector == MVector3D():
                             bone.local_z_vector = MVector3D.crossProduct(bone.local_x_vector, MVector3D(1, 0, 0))
-                        bone.flag |= 0x0800
+                        # ローカル軸ありで回転可能
+                        bone.flag |= 0x0800 | 0x0002
 
                         if regist_bones[v_yidx, v_xidx]:
-                            # 登録対象の場合のみボーン保持
+                            # 一旦仮登録
                             vv.map_bones[base_map_idx] = bone
-                            if v_yidx < vertex_map.shape[0] - 1:
-                                # 末端より上は表示ありで操作可能
-                                bone.flag |= 0x0008 | 0x0010 | 0x0001
+                            bone.index = len(model.bones) + len(tmp_all_bones)
+                            tmp_all_bones[bone.name] = bone
+                            tmp_all_bone_indexes[bone.index] = bone.name
+                            tmp_all_bone_vvs[bone.name] = {"base_map_idx": base_map_idx, "vv": vv}
 
-                            if is_regist:
-                                # 登録対象である場合、一旦仮登録
-                                bone.index = len(model.bones) + len(tmp_all_bones)
-                                tmp_all_bones[bone.name] = bone
-                                tmp_all_bone_indexes[bone.index] = bone.name
-                            elif substitute_bone:
-                                # 登録対象ではない場合、同じ位置のボーンを参照する
-                                # 仮想頂点に紐付くボーンも統一する
-                                vv = virtual_vertices[bone.position.to_key(threshold)]
-                                for midx in vv.map_bones.keys():
-                                    vv.map_bones[midx] = substitute_bone
+                            # # 登録対象の場合のみボーン保持
+                            # vv.map_bones[base_map_idx] = bone
+                            # if is_regist:
+                            #     # 登録対象である場合、一旦仮登録
+                            #     bone.index = len(model.bones) + len(tmp_all_bones)
+                            #     tmp_all_bones[bone.name] = bone
+                            #     tmp_all_bone_indexes[bone.index] = bone.name
+                            # elif substitute_bone:
+                            #     # 登録対象ではない場合、同じ位置のボーンを参照する
+                            #     # 仮想頂点に紐付くボーンも統一する
+                            #     vv = virtual_vertices[bone.position.to_key(threshold)]
+                            #     for midx in vv.map_bones.keys():
+                            #         vv.map_bones[midx] = substitute_bone
 
-                        logger.debug(f"tmp_all_bones: {bone.name}, pos: {bone.position.to_log()}")
+                            logger.debug(
+                                f"tmp_all_bones: {bone.name}, parent: {parent_bone.name}, pos: {bone.position.to_log()}"
+                            )
 
                         bone_cnt += 1
                         if bone_cnt > 0 and bone_cnt // 1000 > prev_bone_cnt:
@@ -4488,9 +4505,11 @@ class PmxTailorExportService:
 
             prev_xs.extend(list(range(vertex_map.shape[1])))
 
+        logger.info("-- 親ボーンチェック")
+
         tmp_all_bone_parents = {}
         tmp_all_bone_targets = []
-        for bone_name in tmp_all_bones.keys():
+        for bi, bone_name in enumerate(tmp_all_bones.keys()):
             bone = tmp_all_bones[bone_name]
 
             # 自身と同じ位置のボーンを親に持つ子ボーン
@@ -4524,13 +4543,13 @@ class PmxTailorExportService:
 
                 for in_cbones in cbone_poses.values():
                     tmp_all_bone_targets.append(in_cbones[0].name)
+                    parent_bone_name = tmp_all_bone_indexes[in_cbones[0].parent_index]
                     if len(in_cbones) == 1:
                         # 同じ位置の子ボーンが1つならそのまま親を登録
-                        tmp_all_bone_parents[in_cbones[0].name] = tmp_all_bone_indexes[in_cbones[0].parent_index]
+                        tmp_all_bone_parents[in_cbones[0].name] = parent_bone_name
                     else:
                         for cbone in in_cbones[1:]:
                             # 2つ以上ある場合、後のボーンは最初のボーンの親を代用する
-                            parent_bone_name = tmp_all_bone_indexes[in_cbones[0].parent_index]
                             tmp_all_bone_parents[cbone.name] = parent_bone_name
                             tmp_all_bone_targets.append(cbone.name)
 
@@ -4541,38 +4560,49 @@ class PmxTailorExportService:
                                         del tmp_all_bone_targets[n]
                                         break
 
+            if bi > 0 and bi % 100 == 0:
+                logger.info("-- -- 親ボーンチェック: %s個目:終了", bi)
+
+        logger.info("-- -- 親ボーンチェック: %s個目:終了", bi)
+
         # このタイミングで中心ボーン登録
         model.bones[root_bone.name] = root_bone
         model.bone_indexes[root_bone.index] = root_bone.name
         model.display_slots[display_name].references.append((0, model.bones[root_bone.name].index))
 
-        for bone_name in tmp_all_bones.keys():
+        logger.info("-- ボーン配置")
+
+        for bi, bone_name in enumerate(tmp_all_bones.keys()):
             if bone_name not in tmp_all_bone_targets:
+                if bi % 100 == 0:
+                    logger.info("-- -- ボーン配置: %s個目:終了", bi)
                 continue
 
             bone = tmp_all_bones[bone_name]
+            bone.index = len(model.bones)
+            model.bones[bone.name] = bone
+            model.bone_indexes[bone.index] = bone_name
+
+            model.display_slots[display_name].references.append((0, bone.index))
+            tmp_all_bone_vvs[bone.name]["vv"].map_bones[tmp_all_bone_vvs[bone.name]["base_map_idx"]] = bone
+
             if bone_name in tmp_all_bone_parents:
+                # 親ボーンを付け替える必要がある場合
                 parent_bone_name = tmp_all_bone_parents[bone_name]
                 parent_bone = model.bones[parent_bone_name]
 
                 # 登録対象である場合、そのまま登録
-                bone.index = len(model.bones)
                 bone.parent_index = parent_bone.index
-                model.bones[bone.name] = bone
-                model.bone_indexes[bone.index] = bone_name
-
-                model.display_slots[display_name].references.append((0, bone.index))
 
                 # 親ボーンの表示先再設定
                 parent_bone.tail_index = bone.index
-            else:
-                bone.index = len(model.bones)
-                model.bones[bone.name] = bone
-                model.bone_indexes[bone.index] = bone_name
+                # 親ボーンは表示ありで操作可能
+                parent_bone.flag |= 0x0008 | 0x0010 | 0x0001
 
-                model.display_slots[display_name].references.append((0, bone.index))
+            if bi > 0 and bi % 100 == 0:
+                logger.info("-- -- ボーン配置: %s個目:終了", bi)
 
-                model.bones[model.bone_indexes[bone.parent_index]].tail_index = bone.index
+        logger.info("-- -- ボーン配置: %s個目:終了", bi)
 
         return (
             root_bone,
@@ -4847,7 +4877,13 @@ class PmxTailorExportService:
         return rigidbody
 
     def create_bone_map(
-        self, model: PmxModel, param_option: dict, material_name: str, target_vertices: list, is_root_bone=True
+        self,
+        model: PmxModel,
+        param_option: dict,
+        material_name: str,
+        target_vertices: list,
+        base_vertical_axis: MVector3D,
+        is_root_bone=True,
     ):
         bone_grid = param_option["bone_grid"]
         bone_grid_cols = param_option["bone_grid_cols"]
@@ -5049,7 +5085,7 @@ class PmxTailorExportService:
         root_bone = None
         if is_root_bone:
             _, root_bone = self.create_root_bone(
-                model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0))
+                model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0)), base_vertical_axis
             )
 
         return virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone
