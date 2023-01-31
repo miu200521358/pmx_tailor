@@ -2683,6 +2683,7 @@ class PmxTailorExportService:
                         all_regist_bones,
                         all_bone_connected,
                         base_map_idx,
+                        is_rigidbody=True,
                         is_center=is_center,
                     )
 
@@ -2812,23 +2813,20 @@ class PmxTailorExportService:
                             x_sizes.append(next_now_vv.position().distanceToPoint(now_now_vv.position()))
                         x_size = np.max(x_sizes) if x_sizes else 0.2
 
-                    elif next_connected:
+                    elif next_connected and (next_now_bone or next_below_bone):
                         x_sizes = []
                         if next_now_bone:
                             x_sizes.append(now_now_bone.position.distanceToPoint(next_now_bone.position))
                         if next_below_bone:
                             x_sizes.append(now_below_bone.position.distanceToPoint(next_below_bone.position))
                         x_size = np.max(x_sizes) if x_sizes else 0.2
-                    elif prev_connected and v_xidx > 0:
-                        if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
-                            x_sizes = []
-                            if prev_now_bone:
-                                x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
-                            if prev_below_bone:
-                                x_sizes.append(now_below_bone.position.distanceToPoint(prev_below_bone.position))
-                            x_size = np.max(x_sizes) if x_sizes else 0.2
-                        else:
-                            x_size = 0.2
+                    elif prev_connected and v_xidx > 0 and (prev_now_bone or prev_below_bone):
+                        x_sizes = []
+                        if prev_now_bone:
+                            x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
+                        if prev_below_bone:
+                            x_sizes.append(now_below_bone.position.distanceToPoint(prev_below_bone.position))
+                        x_size = np.max(x_sizes) if x_sizes else 0.2
                     else:
                         v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[now_now_bone.index]]
 
@@ -5687,15 +5685,13 @@ class PmxTailorExportService:
         edge_vkeys = []
         n = 0
         remain_start_vkeys = list(edge_line_pairs.keys())
-        remain_existed_indexes = [True]
-        while remain_existed_indexes and True in remain_existed_indexes:
+        remain_existed_edges = list(edge_line_pairs.keys())
+        while remain_existed_edges:
             _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
                 edge_line_pairs, None, tmp_edge_lines, edge_vkeys, virtual_vertices, param_option, 0, n
             )
             remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
-            remain_existed_indexes = set(
-                [(vk, vkk) in virtual_edges for vk in remain_start_vkeys for vkk in edge_line_pairs[vk]]
-            )
+            remain_existed_edges = set([vk for vk in remain_start_vkeys if vk in edge_line_pairs])
             n += 1
             logger.info("-- エッジ検出: %s個目:終了", n)
 
@@ -5826,10 +5822,6 @@ class PmxTailorExportService:
                             edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
                         )
                     ):
-                        prev_edge_pos = virtual_vertices[prev_edge_key].position()
-                        now_edge_pos = virtual_vertices[now_edge_key].position()
-                        next_edge_pos = virtual_vertices[next_edge_key].position()
-
                         if m == 0:
                             if is_reverse:
                                 # 反転は0番目は既に入ってるので now のみ
@@ -5843,12 +5835,23 @@ class PmxTailorExportService:
                             else:
                                 horizonal_top_edge_keys.append(now_edge_key)
 
+                            prev_edge_pos = virtual_vertices[prev_edge_key].position()
+                            now_edge_pos = virtual_vertices[now_edge_key].position()
+                            next_edge_pos = virtual_vertices[next_edge_key].position()
+
+                            # エッジの内積
                             dot = MVector3D.dotProduct(
                                 (next_edge_pos - now_edge_pos).normalized(),
                                 (now_edge_pos - prev_edge_pos).normalized(),
                             )
 
-                            if dot < 0.5:
+                            # エッジの評価軸の変動
+                            distance = abs(
+                                abs(next_edge_pos.data()[target_idx] - now_edge_pos.data()[target_idx])
+                                - abs(now_edge_pos.data()[target_idx] - prev_edge_pos.data()[target_idx])
+                            )
+
+                            if dot < 0.5 and (is_material_horizonal or distance > threshold):
                                 break
 
                 # if is_material_horizonal:
@@ -6852,6 +6855,7 @@ class PmxTailorExportService:
         all_regist_bones: dict,
         all_bone_connected: dict,
         base_map_idx: int,
+        is_rigidbody=False,
         is_weight=False,
         is_center=False,
     ):
@@ -6938,6 +6942,14 @@ class PmxTailorExportService:
                         and np.where(all_regist_bones[prev_map_idx][: (target_v_yidx + 1), :])[1].any()
                         else 0
                     )
+        elif is_rigidbody:
+            # 剛体の1番目以降は、自分より前で、縦列のいずれかにボーンが登録されている最も近いの
+            prev_xidx = (
+                np.max(np.where(np.sum(regist_bones[:, :v_xidx], axis=0))[0])
+                if np.where(np.sum(regist_bones[:, :v_xidx], axis=0))[0].any()
+                else 0
+            )
+            prev_connected = True
         else:
             # 1番目以降は、自分より前で、ボーンが登録されている最も近いの
             prev_xidx = (
@@ -6991,6 +7003,14 @@ class PmxTailorExportService:
                 else:
                     # 次のボーンの仮想頂点が自分と違う場合、そのまま前のを採用
                     next_xidx = 0
+        elif is_rigidbody:
+            # 剛体のmaxより前は、自分より前で、縦列のいずれかにボーンが登録されている最も近いの
+            next_xidx = (
+                np.min(np.where(np.sum(regist_bones[:, (v_xidx + 1) :], axis=0))[0]) + (v_xidx + 1)
+                if np.where(np.sum(regist_bones[:, (v_xidx + 1) :], axis=0))[0].any()
+                else registed_max_v_xidx
+            )
+            next_connected = True
         else:
             # maxより前は、自分より前で、ボーンが登録されている最も近いの
             next_xidx = (
@@ -7013,6 +7033,13 @@ class PmxTailorExportService:
                     if np.where(regist_bones[:v_yidx, :v_xidx])[0].any()
                     else 0
                 )
+            elif is_rigidbody:
+                # 剛体の場合、横列のいずれかに登録されている場合
+                above_yidx = (
+                    np.max(np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0])
+                    if np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0].any()
+                    else 0
+                )
             else:
                 above_yidx = (
                     np.max(np.where(regist_bones[:v_yidx, v_xidx])) if regist_bones[:v_yidx, v_xidx].any() else 0
@@ -7029,6 +7056,13 @@ class PmxTailorExportService:
                 else np.max(regist_bones[:, v_xidx])
                 if v_yidx <= np.max(regist_bones[:, v_xidx])
                 else np.max(np.where(vertex_map[:-1, v_xidx, :])[0])
+            )
+        elif is_rigidbody:
+            # 剛体の場合、横列のいずれかに登録されている場合
+            below_yidx = (
+                np.min(np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0]) + (v_yidx + 1)
+                if np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0].any()
+                else registed_max_v_yidx
             )
         else:
             below_yidx = (
