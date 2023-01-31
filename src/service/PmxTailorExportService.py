@@ -4494,10 +4494,10 @@ class PmxTailorExportService:
                                 f"tmp_all_bones: {bone.name}, parent: {parent_bone.name}, pos: {bone.position.to_log()}"
                             )
 
-                        bone_cnt += 1
-                        if bone_cnt > 0 and bone_cnt // 1000 > prev_bone_cnt:
-                            logger.info("-- --【No.%s】ボーン生成: %s個目:終了", base_map_idx + 1, bone_cnt)
-                            prev_bone_cnt = bone_cnt // 1000
+                    bone_cnt += 1
+                    if bone_cnt > 0 and bone_cnt // 1000 > prev_bone_cnt:
+                        logger.info("-- --【No.%s】ボーン生成: %s個目:終了", base_map_idx + 1, bone_cnt)
+                        prev_bone_cnt = bone_cnt // 1000
 
             prev_xs.extend(list(range(vertex_map.shape[1])))
 
@@ -5527,11 +5527,11 @@ class PmxTailorExportService:
                     vv2_vec = virtual_vertices[vv1_key].position()
                     vv_line = MSegment(vv1_vec, vv2_vec)
                     min_length, p1, p2, t1, t2 = calc_segment_segment_dist(vv_line, ve_line)
-                    if 0 < min_length < threshold and t1 and t2:
+                    if 0 < min_length < area_threshold and t1 and t2:
                         # 線分があって、閾値より小さい場合、交差していると見なす
                         is_intersect = True
                         logger.debug(
-                            "** ×交差あり: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
+                            "** ×交差あり: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s < %s, %s, %s]",
                             v0_key,
                             virtual_vertices[v0_key].vidxs(),
                             v1_key,
@@ -5547,13 +5547,14 @@ class PmxTailorExportService:
                             vv1_key,
                             virtual_vertices[vv1_key].vidxs(),
                             min_length,
+                            area_threshold,
                             round(t1, 5),
                             round(t2, 5),
                         )
                         break
                     else:
                         logger.debug(
-                            "** ○交差なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s, %s, %s]",
+                            "** ○交差なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s < %s, %s, %s]",
                             v0_key,
                             virtual_vertices[v0_key].vidxs(),
                             v1_key,
@@ -5569,6 +5570,7 @@ class PmxTailorExportService:
                             vv1_key,
                             virtual_vertices[vv1_key].vidxs(),
                             min_length,
+                            area_threshold,
                             round(t1, 5),
                             round(t2, 5),
                         )
