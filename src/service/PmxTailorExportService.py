@@ -4272,8 +4272,8 @@ class PmxTailorExportService:
             else:
                 # ボーンが繋がってるトコロが生成範囲
                 full_regist_bones = all_bone_connected[base_map_idx].copy()
-                # 先頭は最初のをコピー
-                full_regist_bones[:, -1] = full_regist_bones[:, -2].copy()
+                # # 先頭は最初のをコピー
+                # full_regist_bones[:, -1] = full_regist_bones[:, -2].copy()
                 # プラスの場合、前と繋がっていないので登録対象
                 full_regist_bones[:, 1:][np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)] = True
 
@@ -4389,6 +4389,15 @@ class PmxTailorExportService:
                 for v_yidx in np.where(np.sum(regist_bones, axis=1))[0]:
                     # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
                     regist_bones[v_yidx, np.where(x_registers & full_regist_bones[v_yidx, :])] = True
+
+                if base_map_idx > 0:
+                    # 2枚目以降の場合、前と繋がってる最後のトコロにはボーンを張る
+                    prev_x_registered = np.where(all_bone_connected[base_map_idx - 1][:, -1])[0]
+                    prev_last_connected_v_yidx = np.max(prev_x_registered)
+                    regist_bones[
+                        prev_last_connected_v_yidx : min(prev_last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
+                        0,
+                    ] = True
 
             all_regist_bones[base_map_idx] = regist_bones
 
@@ -4590,10 +4599,11 @@ class PmxTailorExportService:
                 # 登録対象である場合、そのまま登録
                 bone.parent_index = parent_bone.index
 
-                # 親ボーンの表示先再設定
-                parent_bone.tail_index = bone.index
-                # 親ボーンは表示ありで操作可能
-                parent_bone.flag |= 0x0008 | 0x0010 | 0x0001
+                if parent_bone != root_bone:
+                    # 親ボーンの表示先再設定
+                    parent_bone.tail_index = bone.index
+                    # 親ボーンは表示ありで操作可能
+                    parent_bone.flag |= 0x0008 | 0x0010 | 0x0001
 
             if bi > 0 and bi % 100 == 0:
                 logger.info("-- -- ボーン配置: %s個目:終了", bi)
@@ -6520,19 +6530,33 @@ class PmxTailorExportService:
                                 virtual_vertices[target_key].positions.append(target_position.data())
                                 target_vertex_map[v_yidx, v_xidx] = target_key
 
-                    vertex_maps[len(vertex_maps)] = target_vertex_map
+                    # 最上部が同じキーで揃ってるINDEX
+                    same_top_keys = np.where(np.sum(np.abs(np.diff(target_vertex_map[:1], axis=1)), axis=2) == 0)
+                    separated_vertex_maps = []
+                    separated_vertex_display_maps = []
+                    if same_top_keys[1]:
+                        prev_v_xidx = 0
+                        for v_xidx in same_top_keys[1]:
+                            separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx : (v_xidx + 1)])
+                            separated_vertex_display_maps.append(
+                                target_vertex_display_map[:, prev_v_xidx : (v_xidx + 1)]
+                            )
+                            prev_v_xidx = v_xidx + 1
+                        separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx:])
+                        separated_vertex_display_maps.append(target_vertex_display_map[:, prev_v_xidx:])
+                    else:
+                        separated_vertex_maps.append(target_vertex_map)
+                        separated_vertex_display_maps.append(target_vertex_display_map)
 
-                    logger.info("-----------------------")
-                    logger.info("%s: 頂点マップ[%s]: マップ生成 ------", material_name, f"{len(vertex_maps):03d}")
-                    logger.info(
-                        "\n".join(
-                            [
-                                ", ".join(target_vertex_display_map[vx, :])
-                                for vx in range(target_vertex_display_map.shape[0])
-                            ]
-                        ),
-                        translate=False,
-                    )
+                    for (sv_map, svd_map) in zip(separated_vertex_maps, separated_vertex_display_maps):
+                        vertex_maps[len(vertex_maps)] = sv_map
+
+                        logger.info("-----------------------")
+                        logger.info("%s: 頂点マップ[%s]: マップ生成 ------", material_name, f"{len(vertex_maps):03d}")
+                        logger.info(
+                            "\n".join([", ".join(svd_map[vx, :]) for vx in range(svd_map.shape[0])]),
+                            translate=False,
+                        )
 
             logger.info("%s: 頂点マップ[%s]: 終了 ---------", material_name, f"{(bi + 1):03d}")
 
