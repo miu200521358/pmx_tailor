@@ -4386,10 +4386,6 @@ class PmxTailorExportService:
                                 v_xidx,
                             ] = True
 
-                for v_yidx in np.where(np.sum(regist_bones, axis=1))[0]:
-                    # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
-                    regist_bones[v_yidx, np.where(x_registers & full_regist_bones[v_yidx, :])] = True
-
                 if base_map_idx > 0:
                     # 2枚目以降の場合、前と繋がってる最後のトコロにはボーンを張る
                     prev_x_registered = np.where(all_bone_connected[base_map_idx - 1][:, -1])[0]
@@ -4398,6 +4394,10 @@ class PmxTailorExportService:
                         prev_last_connected_v_yidx : min(prev_last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
                         0,
                     ] = True
+
+                for v_yidx in np.where(np.sum(regist_bones, axis=1))[0]:
+                    # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
+                    regist_bones[v_yidx, np.where(x_registers & full_regist_bones[v_yidx, :])] = True
 
             all_regist_bones[base_map_idx] = regist_bones
 
