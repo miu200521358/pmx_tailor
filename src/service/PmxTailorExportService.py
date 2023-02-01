@@ -1330,6 +1330,9 @@ class PmxTailorExportService:
                             b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         else:
                             a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+                            if not a_rigidbody:
+                                # スリットで上の剛体が見つからない場合、ひとつ前の頂点マップを確認する
+                                a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx - 1, None)
                             b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
 
                         if not (a_rigidbody and a_rigidbody.index >= 0):
@@ -2908,8 +2911,13 @@ class PmxTailorExportService:
                     floor_mean_xidx = math.floor(mean_x_idx)
                     ceil_mean_xidx = math.ceil(mean_x_idx)
                     if ceil_mean_xidx >= vertex_map.shape[1]:
-                        # 最後を超えている場合、最初に戻す
-                        ceil_mean_xidx = 0
+                        if len(vertex_maps) == 1:
+                            # 最後を超えている場合、円周（頂点マップが1つ）は最初に戻す
+                            ceil_mean_xidx = 0
+                        else:
+                            # スリットなどの場合、ひとつずつ前にずらす
+                            floor_mean_xidx = math.floor(mean_x_idx - 1)
+                            ceil_mean_xidx = math.ceil(mean_x_idx - 1)
 
                     if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                         # ジョイントがボーン間にある場合、剛体はボーン位置
@@ -3030,6 +3038,18 @@ class PmxTailorExportService:
                             mat.rotate(now_above_vv.map_rigidbodies[base_map_idx].shape_qq)
                             mat.translate(MVector3D(0, -now_above_vv.map_rigidbodies[base_map_idx].shape_size.y(), 0))
                             shape_position = mat * MVector3D(0, -shape_size.y(), 0)
+                        elif (
+                            now_above_vv
+                            and base_map_idx - 1 in now_above_vv.map_rigidbodies
+                            and now_above_vv.map_rigidbodies[base_map_idx - 1].name in created_rigidbodies
+                        ):
+                            # 中間は上の剛体の端から計算しなおす
+                            mat = MMatrix4x4()
+                            mat.setToIdentity()
+                            mat.translate(now_above_vv.map_rigidbodies[base_map_idx - 1].shape_position)
+                            mat.rotate(now_above_vv.map_rigidbodies[base_map_idx - 1].shape_qq)
+                            mat.translate(MVector3D(0, -now_above_vv.map_rigidbodies[base_map_idx - 1].shape_size.y(), 0))
+                            shape_position = mat * MVector3D(0, -shape_size.y(), 0)
 
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                     mode = 2 if 0 == v_yidx else 1
@@ -3072,7 +3092,7 @@ class PmxTailorExportService:
                         logger.info("-- -- 【No.%s】剛体: %s個目:終了", base_map_idx + 1, len(created_rigidbodies))
                         prev_rigidbody_cnt = len(created_rigidbodies) // 50
 
-        for rigidbody_name in sorted(created_rigidbodies.keys()):
+        for rigidbody_name in created_rigidbodies.keys():
             # 剛体を登録
             rigidbody = created_rigidbodies[rigidbody_name]
             rigidbody.index = len(model.rigidbodies)
@@ -3204,7 +3224,7 @@ class PmxTailorExportService:
                         # 質量は子の1.5倍
                         rigidbody_mass = org_rigidbody.param.mass
 
-            for rigidbody_name in sorted(created_rigidbodies.keys()):
+            for rigidbody_name in created_rigidbodies.keys():
                 # ボーンを登録
                 bone = created_bones[rigidbody_name]
                 bone.index = len(model.bones)
@@ -4386,14 +4406,24 @@ class PmxTailorExportService:
                                 v_xidx,
                             ] = True
 
-                if base_map_idx > 0:
+                if len(vertex_maps) > 1 and base_map_idx == 0:
+                    # 最初の場合、最後と繋がっているトコロをチェックする
+                    next_x_registered = np.where(all_bone_connected[len(all_bone_connected) - 1][:, -1])[0]
+                    if next_x_registered.any():
+                        next_last_connected_v_yidx = np.max(next_x_registered)
+                        regist_bones[
+                            next_last_connected_v_yidx : min(next_last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
+                            0,
+                        ] = True
+                elif base_map_idx > 0:
                     # 2枚目以降の場合、前と繋がってる最後のトコロにはボーンを張る
                     prev_x_registered = np.where(all_bone_connected[base_map_idx - 1][:, -1])[0]
-                    prev_last_connected_v_yidx = np.max(prev_x_registered)
-                    regist_bones[
-                        prev_last_connected_v_yidx : min(prev_last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
-                        0,
-                    ] = True
+                    if prev_x_registered.any():
+                        prev_last_connected_v_yidx = np.max(prev_x_registered)
+                        regist_bones[
+                            prev_last_connected_v_yidx : min(prev_last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
+                            0,
+                        ] = True
 
                 for v_yidx in np.where(np.sum(regist_bones, axis=1))[0]:
                     # 横方向のボーン登録が必要なのでX登録対象ボーンまでの追加登録
