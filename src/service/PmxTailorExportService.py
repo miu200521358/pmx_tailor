@@ -1435,6 +1435,9 @@ class PmxTailorExportService:
                                 # 縦逆ジョイント
                                 a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                                 b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+                                # スリットで上の剛体が見つからない場合、ひとつ前の頂点マップを確認する
+                                if not b_rigidbody:
+                                    b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx - 1, None)
 
                                 a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                                 b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
@@ -2654,9 +2657,6 @@ class PmxTailorExportService:
                     rigidbody_bone_key = tuple(vertex_map[v_yidx, v_xidx])
                     vv = virtual_vertices.get(rigidbody_bone_key, None)
 
-                    if vv.map_rigidbodies:
-                        continue
-
                     if not vv:
                         logger.warning(
                             "剛体生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
@@ -3048,7 +3048,9 @@ class PmxTailorExportService:
                             mat.setToIdentity()
                             mat.translate(now_above_vv.map_rigidbodies[base_map_idx - 1].shape_position)
                             mat.rotate(now_above_vv.map_rigidbodies[base_map_idx - 1].shape_qq)
-                            mat.translate(MVector3D(0, -now_above_vv.map_rigidbodies[base_map_idx - 1].shape_size.y(), 0))
+                            mat.translate(
+                                MVector3D(0, -now_above_vv.map_rigidbodies[base_map_idx - 1].shape_size.y(), 0)
+                            )
                             shape_position = mat * MVector3D(0, -shape_size.y(), 0)
 
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
@@ -3731,6 +3733,9 @@ class PmxTailorExportService:
 
                     vkey = tuple(vertex_map[v_yidx, v_xidx])
                     vv = virtual_vertices[vkey]
+
+                    if vv.deform:
+                        continue
 
                     (
                         prev_map_idx,
@@ -4579,10 +4584,8 @@ class PmxTailorExportService:
                 for in_cbones in cbone_poses.values():
                     tmp_all_bone_targets.append(in_cbones[0].name)
                     parent_bone_name = tmp_all_bone_indexes[in_cbones[0].parent_index]
-                    if len(in_cbones) == 1:
-                        # 同じ位置の子ボーンが1つならそのまま親を登録
-                        tmp_all_bone_parents[in_cbones[0].name] = parent_bone_name
-                    else:
+                    tmp_all_bone_parents[in_cbones[0].name] = parent_bone_name
+                    if len(in_cbones) > 1:
                         for cbone in in_cbones[1:]:
                             # 2つ以上ある場合、後のボーンは最初のボーンの親を代用する
                             tmp_all_bone_parents[cbone.name] = parent_bone_name
@@ -4609,6 +4612,13 @@ class PmxTailorExportService:
 
         for bi, bone_name in enumerate(tmp_all_bones.keys()):
             if bone_name not in tmp_all_bone_targets:
+                if bone_name in tmp_all_bone_vvs and tmp_all_bone_vvs[bone_name]["vv"].map_bones:
+                    # 同じ箇所に既にボーン定義がある場合、それを流用
+                    tmp_all_bone_vvs[bone_name]["vv"].map_bones[
+                        tmp_all_bone_vvs[bone_name]["base_map_idx"]
+                    ] = tmp_all_bone_vvs[bone_name]["vv"].map_bones[
+                        list(tmp_all_bone_vvs[bone_name]["vv"].map_bones.keys())[0]
+                    ]
                 if bi % 100 == 0:
                     logger.info("-- -- ボーン配置: %s個目:終了", bi)
                 continue
@@ -6921,7 +6931,7 @@ class PmxTailorExportService:
         target_v_yidx = (
             np.max(np.where(regist_bones[: (v_yidx + 1), v_xidx]))
             if regist_bones[: (v_yidx + 1), v_xidx].any()
-            else np.max(regist_bones[: (v_yidx + 1), : (v_xidx + 1)][0])
+            else np.max(np.where(regist_bones[: (v_yidx + 1), : (v_xidx + 1)])[0])
             if regist_bones[: (v_yidx + 1), : (v_xidx + 1)].any()
             else regist_bones.shape[0] - 1
         )
@@ -7101,7 +7111,7 @@ class PmxTailorExportService:
                     np.max(np.where(regist_bones[:v_yidx, v_xidx])) if regist_bones[:v_yidx, v_xidx].any() else 0
                 )
 
-        below_yidx = np.max(np.where(vertex_map[:, v_xidx, :])[0])
+        below_yidx = registed_max_v_yidx
         if is_weight:
             # ウェイトの場合は近所のも参照
             below_yidx = (
