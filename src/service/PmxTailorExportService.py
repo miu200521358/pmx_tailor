@@ -953,7 +953,14 @@ class PmxTailorExportService:
             )
         else:
             if param_option["exist_physics_clear"] == logger.transtext("再利用"):
-                virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone = self.create_bone_map(
+                (
+                    virtual_vertices,
+                    vertex_maps,
+                    all_regist_bones,
+                    all_bone_connected,
+                    root_bone,
+                    is_material_horizonal,
+                ) = self.create_bone_map(
                     model,
                     param_option,
                     material_name,
@@ -962,7 +969,14 @@ class PmxTailorExportService:
                     is_root_bone=(param_option["parent_type"] == logger.transtext("中心")),
                 )
             else:
-                vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold = self.create_vertex_map(
+                (
+                    vertex_maps,
+                    virtual_vertices,
+                    remaining_vertices,
+                    back_vertices,
+                    threshold,
+                    is_material_horizonal,
+                ) = self.create_vertex_map(
                     model,
                     param_option,
                     material_name,
@@ -1058,6 +1072,7 @@ class PmxTailorExportService:
                 all_bone_connected,
                 root_bone,
                 base_reverse_axis,
+                is_material_horizonal,
             )
 
             self.create_joint(
@@ -2534,6 +2549,7 @@ class PmxTailorExportService:
         all_bone_connected: dict,
         root_bone: Bone,
         base_reverse_axis: MVector3D,
+        is_material_horizonal: bool,
     ):
         logger.info("【%s:%s】剛体生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
@@ -2908,8 +2924,8 @@ class PmxTailorExportService:
                         mean_x_idx = v_xidx + (next_xidx - v_xidx) / 2
                     mean_y_idx = v_yidx + (below_yidx - v_yidx) / 2
 
-                    floor_mean_xidx = math.floor(mean_x_idx)
-                    ceil_mean_xidx = math.ceil(mean_x_idx)
+                    floor_mean_xidx = int(mean_x_idx - 1) if mean_x_idx % 1 == 0 else math.floor(mean_x_idx)
+                    ceil_mean_xidx = int(mean_x_idx + 1) if mean_x_idx % 1 == 0 else math.ceil(mean_x_idx)
                     if ceil_mean_xidx >= vertex_map.shape[1]:
                         if len(vertex_maps) == 1:
                             # 最後を超えている場合、円周（頂点マップが1つ）は最初に戻す
@@ -2979,28 +2995,28 @@ class PmxTailorExportService:
                     if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
                         # 末端は軸方向がひとつ上の向きとする
                         x_direction_to_pos = now_above_bone.position
-                        x_direction_from_pos = y_direction_from_pos = now_now_bone.position
+                        x_direction_from_pos = y_direction_to_pos = now_now_bone.position
                         if tuple(vertex_map[above_yidx, ceil_mean_xidx]) in virtual_vertices:
-                            y_direction_to_pos = virtual_vertices[
+                            y_direction_from_pos = virtual_vertices[
                                 tuple(vertex_map[above_yidx, ceil_mean_xidx])
                             ].position()
                         else:
                             is_y_direction_prev = True
-                            y_direction_to_pos = virtual_vertices[
+                            y_direction_from_pos = virtual_vertices[
                                 tuple(vertex_map[above_yidx, floor_mean_xidx])
                             ].position()
                     else:
                         x_direction_to_pos = now_now_bone.position
-                        x_direction_from_pos = y_direction_from_pos = now_below_bone.position
+                        x_direction_from_pos = y_direction_to_pos = now_below_bone.position
                         if (
                             tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
                             and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
                             != now_now_bone.position
                         ):
-                            y_direction_to_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                            y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
                         else:
                             is_y_direction_prev = True
-                            y_direction_to_pos = virtual_vertices[
+                            y_direction_from_pos = virtual_vertices[
                                 tuple(vertex_map[v_yidx, floor_mean_xidx])
                             ].position()
 
@@ -3011,6 +3027,8 @@ class PmxTailorExportService:
                     # ボーン進行方向に対しての縦軸(z)
                     z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
                     shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                    # if is_material_horizonal:
+                    #     shape_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
                     if is_y_direction_prev:
                         shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
                     shape_euler = shape_qq.toEulerAngles()
@@ -4368,7 +4386,10 @@ class PmxTailorExportService:
 
                 # 最初と最後は必ず登録する
                 y_registers[0] = y_registers[-2:] = True
-                x_registers[0] = x_registers[-1] = True
+                x_registers[0] = True
+                if np.where(all_bone_connected[base_map_idx][:-1, -1] == 0)[0].any():
+                    # X方向の末端がどこか繋がって無いとこがあったら末端にボーンを張る
+                    x_registers[-1] = True
 
                 for v_yidx, y_regist in enumerate(y_registers):
                     for v_xidx, x_regist in enumerate(x_registers):
@@ -5120,12 +5141,16 @@ class PmxTailorExportService:
                 all_regist_bones[grid_col] = regist_bones
                 vertex_maps[len(vertex_maps)] = vertex_map
 
+        vertex_positions = {}
         top_bone_positions = []
         for vertex_map in vertex_maps.values():
-            for vkey in vertex_map[0, :]:
-                if np.isnan(vkey).any() or tuple(vkey) not in virtual_vertices:
-                    continue
-                top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
+            for v_yidx in range(vertex_map.shape[0]):
+                for vkey in vertex_map[v_yidx, :]:
+                    if v_yidx == 0:
+                        if np.isnan(vkey).any() or tuple(vkey) not in virtual_vertices:
+                            continue
+                        top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
+                    vertex_positions[tuple(vkey)] = virtual_vertices[tuple(vkey)].position().data()
 
         # 中心ボーン
         root_bone = None
@@ -5134,7 +5159,25 @@ class PmxTailorExportService:
                 model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0)), base_vertical_axis
             )
 
-        return virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone
+        # 各頂点の位置との差分から距離を測る
+        v_distances = np.linalg.norm(
+            (np.array(list(vertex_positions.values())) - root_bone.position.data()), ord=2, axis=1
+        )
+        # 親ボーンに最も近い頂点
+        nearest_vertex_idx = list(vertex_positions.keys())[np.argmin(v_distances)]
+        # 親ボーンに最も遠い頂点
+        farest_vertex_idx = list(vertex_positions.keys())[np.argmax(v_distances)]
+        # 材質全体の傾き
+        material_direction = (
+            MVector3D(vertex_positions[farest_vertex_idx] - vertex_positions[nearest_vertex_idx])
+            .abs()
+            .normalized()
+            .data()[np.where(np.abs(base_vertical_axis.data()))]
+        )[0]
+        logger.info("%s: 材質頂点の傾き算出: %s", material_name, round(material_direction, 5))
+        is_material_horizonal = np.isclose(material_direction, 0.0)
+
+        return virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone, is_material_horizonal
 
     def create_vertex_map(
         self,
@@ -5410,29 +5453,41 @@ class PmxTailorExportService:
                     f"key[{v_key}:{virtual_vertices[v_key].vidxs()}], pair[{pair_vkeys}:{[virtual_vertices[pair_vkey].vidxs() for pair_vkey in pair_vkeys]}]"
                 )
 
-        logger.debug("仮想面の確認")
+        if param_option["special_shape"] == logger.transtext("面抜け"):
+            logger.debug("仮想面の確認")
 
-        virtual_edges = []
-        for n, (v0_key, pair_vertices) in enumerate(all_line_pairs.items()):
-            for (v1_key, v2_key) in combinations(pair_vertices, 2):
-                if not (v0_key in edge_line_pairs and v1_key in edge_line_pairs and v2_key in edge_line_pairs):
-                    # 全部エッジになければスルー
-                    continue
+            virtual_edges = []
+            for n, (v0_key, pair_vertices) in enumerate(all_line_pairs.items()):
+                for (v1_key, v2_key) in combinations(pair_vertices, 2):
+                    if not (v0_key in edge_line_pairs and v1_key in edge_line_pairs and v2_key in edge_line_pairs):
+                        # 全部エッジになければスルー
+                        continue
 
-                ikey = tuple(list(sorted([v0_key, v1_key, v2_key])))
-                if ikey in all_indexes_vertices:
-                    # 既に面のエッジの組み合わせである場合、スルー
-                    continue
+                    ikey = tuple(list(sorted([v0_key, v1_key, v2_key])))
+                    if ikey in all_indexes_vertices:
+                        # 既に面のエッジの組み合わせである場合、スルー
+                        continue
 
-                edge_existed = {}
-                for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
-                    lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
-                    edge_existed[lkey] = lkey in all_same_pair_edges
+                    edge_existed = {}
+                    for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
+                        lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
+                        edge_existed[lkey] = lkey in all_same_pair_edges
 
-                if 1 < Counter(edge_existed.values())[False]:
-                    # 仮想エッジが1件より多い場合スルー
+                    if 1 < Counter(edge_existed.values())[False]:
+                        # 仮想エッジが1件より多い場合スルー
+                        logger.debug(
+                            "** ×仮想エッジスルー: [%s:%s, %s:%s, %s:%s][%s]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            edge_existed,
+                        )
+                        continue
                     logger.debug(
-                        "** ×仮想エッジスルー: [%s:%s, %s:%s, %s:%s][%s]",
+                        "** ○仮想エッジ1件: [%s:%s, %s:%s, %s:%s][%s]",
                         v0_key,
                         virtual_vertices[v0_key].vidxs(),
                         v1_key,
@@ -5441,207 +5496,214 @@ class PmxTailorExportService:
                         virtual_vertices[v2_key].vidxs(),
                         edge_existed,
                     )
-                    continue
-                logger.debug(
-                    "** ○仮想エッジ1件: [%s:%s, %s:%s, %s:%s][%s]",
-                    v0_key,
-                    virtual_vertices[v0_key].vidxs(),
-                    v1_key,
-                    virtual_vertices[v1_key].vidxs(),
-                    v2_key,
-                    virtual_vertices[v2_key].vidxs(),
-                    edge_existed,
-                )
 
-                # 仮想エッジ
-                virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
-                ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
-                ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
-                ve_line = MSegment(ve1_vec, ve2_vec)
+                    # 仮想エッジ
+                    virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
+                    ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
+                    ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
+                    ve_line = MSegment(ve1_vec, ve2_vec)
 
-                area_threshold = (
-                    np.mean(
-                        [
-                            virtual_vertices[v0_key].position().distanceToPoint(virtual_vertices[v1_key].position()),
-                            virtual_vertices[v0_key].position().distanceToPoint(virtual_vertices[v2_key].position()),
-                            virtual_vertices[v1_key].position().distanceToPoint(virtual_vertices[v2_key].position()),
-                        ]
+                    area_threshold = (
+                        np.mean(
+                            [
+                                virtual_vertices[v0_key]
+                                .position()
+                                .distanceToPoint(virtual_vertices[v1_key].position()),
+                                virtual_vertices[v0_key]
+                                .position()
+                                .distanceToPoint(virtual_vertices[v2_key].position()),
+                                virtual_vertices[v1_key]
+                                .position()
+                                .distanceToPoint(virtual_vertices[v2_key].position()),
+                            ]
+                        )
+                        * 0.3
                     )
-                    * 0.3
-                )
 
-                # 頂点の組合せの中に他の頂点が含まれているか
-                is_inner_vkey = False
-                for vvkey in edge_line_pairs.keys():
-                    if not (
-                        vvkey in virtual_vertices[virtual_edge_keys[0]].connected_vvs
-                        and vvkey in virtual_vertices[virtual_edge_keys[1]].connected_vvs
-                    ):
-                        # エッジキーが接続先にない場合、スルー
+                    # 頂点の組合せの中に他の頂点が含まれているか
+                    is_inner_vkey = False
+                    for vvkey in edge_line_pairs.keys():
+                        if not (
+                            vvkey in virtual_vertices[virtual_edge_keys[0]].connected_vvs
+                            and vvkey in virtual_vertices[virtual_edge_keys[1]].connected_vvs
+                        ):
+                            # エッジキーが接続先にない場合、スルー
+                            continue
+
+                        # エッジキーが仮想エッジの両方から繋がっている場合、距離チェック
+                        min_length, h, t = calc_point_segment_dist(MPoint(virtual_vertices[vvkey].position()), ve_line)
+                        if 0 < min_length < area_threshold:
+                            is_inner_vkey = True
+                            logger.debug(
+                                "** ×頂点内頂点重複: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s < %s]",
+                                v0_key,
+                                virtual_vertices[v0_key].vidxs(),
+                                v1_key,
+                                virtual_vertices[v1_key].vidxs(),
+                                v2_key,
+                                virtual_vertices[v2_key].vidxs(),
+                                virtual_edge_keys[0],
+                                virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                virtual_edge_keys[1],
+                                virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                vvkey,
+                                virtual_vertices[vvkey].vidxs(),
+                                min_length,
+                                area_threshold,
+                            )
+                            break
+                        else:
+                            logger.debug(
+                                "** 頂点重複なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s < %s]",
+                                v0_key,
+                                virtual_vertices[v0_key].vidxs(),
+                                v1_key,
+                                virtual_vertices[v1_key].vidxs(),
+                                v2_key,
+                                virtual_vertices[v2_key].vidxs(),
+                                virtual_edge_keys[0],
+                                virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                virtual_edge_keys[1],
+                                virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                vvkey,
+                                virtual_vertices[vvkey].vidxs(),
+                                min_length,
+                                area_threshold,
+                            )
+
+                    if is_inner_vkey:
                         continue
 
-                    # エッジキーが仮想エッジの両方から繋がっている場合、距離チェック
-                    min_length, h, t = calc_point_segment_dist(MPoint(virtual_vertices[vvkey].position()), ve_line)
-                    if 0 < min_length < area_threshold:
-                        is_inner_vkey = True
-                        logger.debug(
-                            "** ×頂点内頂点重複: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s < %s]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            virtual_edge_keys[0],
-                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                            virtual_edge_keys[1],
-                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                            vvkey,
-                            virtual_vertices[vvkey].vidxs(),
-                            min_length,
-                            area_threshold,
-                        )
-                        break
-                    else:
-                        logger.debug(
-                            "** 頂点重複なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s < %s]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            virtual_edge_keys[0],
-                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                            virtual_edge_keys[1],
-                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                            vvkey,
-                            virtual_vertices[vvkey].vidxs(),
-                            min_length,
-                            area_threshold,
-                        )
+                    relation_vkeys = [v0_key, v1_key, v2_key]
+                    for vk in [v0_key, v1_key, v2_key]:
+                        relation_vkeys.extend(virtual_vertices[vk].connected_vvs)
+                    relation_vkeys = set(relation_vkeys)
 
-                if is_inner_vkey:
-                    continue
+                    is_intersect = False
+                    for (vv0_key, vv1_key) in all_same_pair_edges.keys():
+                        if not (vv0_key in relation_vkeys and vv1_key in relation_vkeys):
+                            # 関係する頂点でない場合スルー
+                            logger.test(
+                                "** ×交差無関係スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]]",
+                                v0_key,
+                                virtual_vertices[v0_key].vidxs(),
+                                v1_key,
+                                virtual_vertices[v1_key].vidxs(),
+                                v2_key,
+                                virtual_vertices[v2_key].vidxs(),
+                                virtual_edge_keys[0],
+                                virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                virtual_edge_keys[1],
+                                virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                vv0_key,
+                                virtual_vertices[vv0_key].vidxs(),
+                                vv1_key,
+                                virtual_vertices[vv1_key].vidxs(),
+                            )
+                            continue
 
-                relation_vkeys = [v0_key, v1_key, v2_key]
-                for vk in [v0_key, v1_key, v2_key]:
-                    relation_vkeys.extend(virtual_vertices[vk].connected_vvs)
-                relation_vkeys = set(relation_vkeys)
+                        if len({vv0_key, vv1_key} - {virtual_edge_keys[0], virtual_edge_keys[1]}) == 1:
+                            # 同じ頂点が残っている場合、交差は見なくていいのでスルー
+                            logger.debug(
+                                "** ×交差交点スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]]",
+                                v0_key,
+                                virtual_vertices[v0_key].vidxs(),
+                                v1_key,
+                                virtual_vertices[v1_key].vidxs(),
+                                v2_key,
+                                virtual_vertices[v2_key].vidxs(),
+                                virtual_edge_keys[0],
+                                virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                virtual_edge_keys[1],
+                                virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                vv0_key,
+                                virtual_vertices[vv0_key].vidxs(),
+                                vv1_key,
+                                virtual_vertices[vv1_key].vidxs(),
+                            )
+                            continue
 
-                is_intersect = False
-                for (vv0_key, vv1_key) in all_same_pair_edges.keys():
-                    if not (vv0_key in relation_vkeys and vv1_key in relation_vkeys):
-                        # 関係する頂点でない場合スルー
-                        logger.test(
-                            "** ×交差無関係スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            virtual_edge_keys[0],
-                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                            virtual_edge_keys[1],
-                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                            vv0_key,
-                            virtual_vertices[vv0_key].vidxs(),
-                            vv1_key,
-                            virtual_vertices[vv1_key].vidxs(),
-                        )
+                        vv1_vec = virtual_vertices[vv0_key].position()
+                        vv2_vec = virtual_vertices[vv1_key].position()
+                        vv_line = MSegment(vv1_vec, vv2_vec)
+                        min_length, p1, p2, t1, t2 = calc_segment_segment_dist(vv_line, ve_line)
+                        if 0 < min_length < area_threshold and t1 and t2:
+                            # 線分があって、閾値より小さい場合、交差していると見なす
+                            is_intersect = True
+                            logger.debug(
+                                "** ×交差あり: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s < %s, %s, %s]",
+                                v0_key,
+                                virtual_vertices[v0_key].vidxs(),
+                                v1_key,
+                                virtual_vertices[v1_key].vidxs(),
+                                v2_key,
+                                virtual_vertices[v2_key].vidxs(),
+                                virtual_edge_keys[0],
+                                virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                virtual_edge_keys[1],
+                                virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                vv0_key,
+                                virtual_vertices[vv0_key].vidxs(),
+                                vv1_key,
+                                virtual_vertices[vv1_key].vidxs(),
+                                min_length,
+                                area_threshold,
+                                round(t1, 5),
+                                round(t2, 5),
+                            )
+                            break
+                        else:
+                            logger.debug(
+                                "** ○交差なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s < %s, %s, %s]",
+                                v0_key,
+                                virtual_vertices[v0_key].vidxs(),
+                                v1_key,
+                                virtual_vertices[v1_key].vidxs(),
+                                v2_key,
+                                virtual_vertices[v2_key].vidxs(),
+                                virtual_edge_keys[0],
+                                virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                virtual_edge_keys[1],
+                                virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                vv0_key,
+                                virtual_vertices[vv0_key].vidxs(),
+                                vv1_key,
+                                virtual_vertices[vv1_key].vidxs(),
+                                min_length,
+                                area_threshold,
+                                round(t1, 5),
+                                round(t2, 5),
+                            )
+
+                    if is_intersect:
+                        # 既存のエッジと交差していたらスルー
                         continue
 
-                    if len({vv0_key, vv1_key} - {virtual_edge_keys[0], virtual_edge_keys[1]}) == 1:
-                        # 同じ頂点が残っている場合、交差は見なくていいのでスルー
-                        logger.debug(
-                            "** ×交差交点スルー: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            virtual_edge_keys[0],
-                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                            virtual_edge_keys[1],
-                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                            vv0_key,
-                            virtual_vertices[vv0_key].vidxs(),
-                            vv1_key,
-                            virtual_vertices[vv1_key].vidxs(),
+                    area = poly_area(
+                        np.array(
+                            [
+                                virtual_vertices[v0_key].position().data(),
+                                virtual_vertices[v1_key].position().data(),
+                                virtual_vertices[v2_key].position().data(),
+                            ]
                         )
-                        continue
-
-                    vv1_vec = virtual_vertices[vv0_key].position()
-                    vv2_vec = virtual_vertices[vv1_key].position()
-                    vv_line = MSegment(vv1_vec, vv2_vec)
-                    min_length, p1, p2, t1, t2 = calc_segment_segment_dist(vv_line, ve_line)
-                    if 0 < min_length < area_threshold and t1 and t2:
-                        # 線分があって、閾値より小さい場合、交差していると見なす
-                        is_intersect = True
-                        logger.debug(
-                            "** ×交差あり: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s < %s, %s, %s]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            virtual_edge_keys[0],
-                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                            virtual_edge_keys[1],
-                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                            vv0_key,
-                            virtual_vertices[vv0_key].vidxs(),
-                            vv1_key,
-                            virtual_vertices[vv1_key].vidxs(),
-                            min_length,
-                            area_threshold,
-                            round(t1, 5),
-                            round(t2, 5),
-                        )
-                        break
-                    else:
-                        logger.debug(
-                            "** ○交差なし: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][vv: [%s:%s, %s:%s]][%s < %s, %s, %s]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            virtual_edge_keys[0],
-                            virtual_vertices[virtual_edge_keys[0]].vidxs(),
-                            virtual_edge_keys[1],
-                            virtual_vertices[virtual_edge_keys[1]].vidxs(),
-                            vv0_key,
-                            virtual_vertices[vv0_key].vidxs(),
-                            vv1_key,
-                            virtual_vertices[vv1_key].vidxs(),
-                            min_length,
-                            area_threshold,
-                            round(t1, 5),
-                            round(t2, 5),
-                        )
-
-                if is_intersect:
-                    # 既存のエッジと交差していたらスルー
-                    continue
-
-                area = poly_area(
-                    np.array(
-                        [
-                            virtual_vertices[v0_key].position().data(),
-                            virtual_vertices[v1_key].position().data(),
-                            virtual_vertices[v2_key].position().data(),
-                        ]
                     )
-                )
-                if area < area_threshold:
-                    # 閾値の一定量を超えないのはスルー（多分直線上）
+                    if area < area_threshold:
+                        # 閾値の一定量を超えないのはスルー（多分直線上）
+                        logger.debug(
+                            "** ×面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                            v0_key,
+                            virtual_vertices[v0_key].vidxs(),
+                            v1_key,
+                            virtual_vertices[v1_key].vidxs(),
+                            v2_key,
+                            virtual_vertices[v2_key].vidxs(),
+                            area,
+                            area_threshold,
+                        )
+                        continue
                     logger.debug(
-                        "** ×面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                        "** ○面積: [%s:%s, %s:%s, %s:%s][%s < %s]",
                         v0_key,
                         virtual_vertices[v0_key].vidxs(),
                         v1_key,
@@ -5649,86 +5711,74 @@ class PmxTailorExportService:
                         v2_key,
                         virtual_vertices[v2_key].vidxs(),
                         area,
-                        area_threshold,
+                        threshold,
                     )
-                    continue
-                logger.debug(
-                    "** ○面積: [%s:%s, %s:%s, %s:%s][%s < %s]",
-                    v0_key,
-                    virtual_vertices[v0_key].vidxs(),
-                    v1_key,
-                    virtual_vertices[v1_key].vidxs(),
-                    v2_key,
-                    virtual_vertices[v2_key].vidxs(),
-                    area,
-                    threshold,
-                )
 
-                logger.debug(
-                    "* 仮想面: [%s:%s, %s:%s, %s:%s]",
-                    v0_key,
-                    virtual_vertices[v0_key].vidxs(),
-                    v1_key,
-                    virtual_vertices[v1_key].vidxs(),
-                    v2_key,
-                    virtual_vertices[v2_key].vidxs(),
-                )
-                logger.info(
-                    "-- %s: 仮想面追加: [%s, %s, %s]",
-                    material_name,
-                    virtual_vertices[v0_key].vidxs(),
-                    virtual_vertices[v1_key].vidxs(),
-                    virtual_vertices[v2_key].vidxs(),
-                )
-
-                # 頂点を繋げた辺がエッジペアに含まれてない場合、仮想面を追加する
-                for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
-                    if vv0_key in virtual_edge_keys and vv1_key in virtual_edge_keys:
-                        # 仮想エッジの場合、追加
-                        if vv0_key not in edge_line_pairs:
-                            edge_line_pairs[vv0_key] = []
-                        if vv1_key not in edge_line_pairs:
-                            edge_line_pairs[vv1_key] = []
-
-                        edge_line_pairs[vv0_key].append(vv1_key)
-                        edge_line_pairs[vv1_key].append(vv0_key)
-
-                        lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
-                        virtual_edges.append(lkey)
-                    else:
-                        # 仮想エッジではない場合、エッジから除外
-                        for vvv0_key, vvv1_key in [(vv0_key, vv1_key), (vv1_key, vv0_key)]:
-                            if vvv0_key in edge_line_pairs:
-                                for n, vk in enumerate(edge_line_pairs[vvv0_key]):
-                                    if vk == vvv1_key:
-                                        del edge_line_pairs[vvv0_key][n]
-                                        break
-                                if not edge_line_pairs[vvv0_key]:
-                                    del edge_line_pairs[vvv0_key]
-
-                # 接続先も追加
-                for vvkey in [v0_key, v1_key, v2_key]:
-                    for rvvkey in set([v0_key, v1_key, v2_key]) - {vvkey}:
-                        if rvvkey not in virtual_vertices[vvkey].connected_vvs:
-                            virtual_vertices[vvkey].connected_vvs.append(rvvkey)
-
-            if n > 0 and n % 20 == 0:
-                logger.info("-- 仮想面確認: %s個目:終了", n)
-
-        logger.debug(
-            "仮想エッジ: %s",
-            ", ".join(
-                [
-                    "[{0}:{1}, {2}:{3}]".format(
-                        vv0_key,
-                        virtual_vertices[vv0_key].vidxs(),
-                        vv1_key,
-                        virtual_vertices[vv1_key].vidxs(),
+                    logger.debug(
+                        "* 仮想面: [%s:%s, %s:%s, %s:%s]",
+                        v0_key,
+                        virtual_vertices[v0_key].vidxs(),
+                        v1_key,
+                        virtual_vertices[v1_key].vidxs(),
+                        v2_key,
+                        virtual_vertices[v2_key].vidxs(),
                     )
-                    for vv0_key, vv1_key in virtual_edges
-                ]
-            ),
-        )
+                    logger.info(
+                        "-- %s: 仮想面追加: [%s, %s, %s]",
+                        material_name,
+                        virtual_vertices[v0_key].vidxs(),
+                        virtual_vertices[v1_key].vidxs(),
+                        virtual_vertices[v2_key].vidxs(),
+                    )
+
+                    # 頂点を繋げた辺がエッジペアに含まれてない場合、仮想面を追加する
+                    for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
+                        if vv0_key in virtual_edge_keys and vv1_key in virtual_edge_keys:
+                            # 仮想エッジの場合、追加
+                            if vv0_key not in edge_line_pairs:
+                                edge_line_pairs[vv0_key] = []
+                            if vv1_key not in edge_line_pairs:
+                                edge_line_pairs[vv1_key] = []
+
+                            edge_line_pairs[vv0_key].append(vv1_key)
+                            edge_line_pairs[vv1_key].append(vv0_key)
+
+                            lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
+                            virtual_edges.append(lkey)
+                        else:
+                            # 仮想エッジではない場合、エッジから除外
+                            for vvv0_key, vvv1_key in [(vv0_key, vv1_key), (vv1_key, vv0_key)]:
+                                if vvv0_key in edge_line_pairs:
+                                    for n, vk in enumerate(edge_line_pairs[vvv0_key]):
+                                        if vk == vvv1_key:
+                                            del edge_line_pairs[vvv0_key][n]
+                                            break
+                                    if not edge_line_pairs[vvv0_key]:
+                                        del edge_line_pairs[vvv0_key]
+
+                    # 接続先も追加
+                    for vvkey in [v0_key, v1_key, v2_key]:
+                        for rvvkey in set([v0_key, v1_key, v2_key]) - {vvkey}:
+                            if rvvkey not in virtual_vertices[vvkey].connected_vvs:
+                                virtual_vertices[vvkey].connected_vvs.append(rvvkey)
+
+                if n > 0 and n % 20 == 0:
+                    logger.info("-- 仮想面確認: %s個目:終了", n)
+
+            logger.debug(
+                "仮想エッジ: %s",
+                ", ".join(
+                    [
+                        "[{0}:{1}, {2}:{3}]".format(
+                            vv0_key,
+                            virtual_vertices[vv0_key].vidxs(),
+                            vv1_key,
+                            virtual_vertices[vv1_key].vidxs(),
+                        )
+                        for vv0_key, vv1_key in virtual_edges
+                    ]
+                ),
+            )
 
         logger.info("%s: エッジの抽出準備", material_name)
 
@@ -5807,8 +5857,14 @@ class PmxTailorExportService:
 
         # topは全部並列
         horizonal_top_edge_keys = []
-        # 始点をルートとする（下方向の場合、センターの真後ろ側）
-        all_root_key = all_edge_lines[0][0]
+        if is_material_horizonal:
+            # 並列の場合、近い方をルートとする
+            all_root_key_poses = np.array([virtual_vertices[el[0]].position().data() for el in all_edge_lines])
+            all_root_key_idx = np.argmin(np.linalg.norm(all_root_key_poses - material_mean_pos.data(), ord=2, axis=1))
+            all_root_key = all_edge_lines[all_root_key_idx][0]
+        else:
+            # 始点をルートとする（下方向の場合、センターの真後ろ側）
+            all_root_key = all_edge_lines[0][0]
 
         # # 処理対象頂点の距離の基準値(できるだけ根元の値)
         # if is_material_horizonal:
@@ -5853,58 +5909,66 @@ class PmxTailorExportService:
                 horizonal_top_edge_keys.append(vkey)
         else:
             # 根元頂点CSVが指定されていない場合
-
-            # 最もキーが上の一点から大体水平に繋がっている辺を上部エッジとする
-            # 既存のラインと逆方向のラインを試す
-            for target_edge_lines, is_reverse in [
-                (all_edge_lines, False),
-                ([list(reversed(ael)) for ael in all_edge_lines], True),
-            ]:
-                for n, edge_lines in enumerate(target_edge_lines):
-                    if all_root_key not in edge_lines:
+            if len(all_edge_lines) == 2:
+                # エッジが2本の場合上下に割る
+                for edge_lines in all_edge_lines:
+                    if all_root_key in edge_lines:
                         # そもそもルートキーが含まれてなければスルー
-                        continue
+                        horizonal_top_edge_keys = edge_lines
+                        break
+            else:
+                # エッジが1本ないし複数本の場合
+                # 最もキーが上の一点から大体水平に繋がっている辺を上部エッジとする
+                # 既存のラインと逆方向のラインを試す
+                for target_edge_lines, is_reverse in [
+                    (all_edge_lines, False),
+                    ([list(reversed(ael)) for ael in all_edge_lines], True),
+                ]:
+                    for n, edge_lines in enumerate(target_edge_lines):
+                        if all_root_key not in edge_lines:
+                            # そもそもルートキーが含まれてなければスルー
+                            continue
 
-                    root_key_idx = [n for n, el in enumerate(edge_lines) if el == all_root_key][0]
+                        root_key_idx = [n for n, el in enumerate(edge_lines) if el == all_root_key][0]
 
-                    for m, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
-                        zip(
-                            edge_lines[(root_key_idx):] + edge_lines[:(root_key_idx)],
-                            edge_lines[(root_key_idx + 1) :] + edge_lines[: (root_key_idx + 1)],
-                            edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
-                        )
-                    ):
-                        if m == 0:
-                            if is_reverse:
-                                # 反転は0番目は既に入ってるので now のみ
-                                horizonal_top_edge_keys.insert(0, now_edge_key)
-                            else:
-                                horizonal_top_edge_keys.append(prev_edge_key)
-                                horizonal_top_edge_keys.append(now_edge_key)
-                        elif m > 0:
-                            if is_reverse:
-                                horizonal_top_edge_keys.insert(0, now_edge_key)
-                            else:
-                                horizonal_top_edge_keys.append(now_edge_key)
-
-                            prev_edge_pos = virtual_vertices[prev_edge_key].position()
-                            now_edge_pos = virtual_vertices[now_edge_key].position()
-                            next_edge_pos = virtual_vertices[next_edge_key].position()
-
-                            # エッジの内積
-                            dot = MVector3D.dotProduct(
-                                (next_edge_pos - now_edge_pos).normalized(),
-                                (now_edge_pos - prev_edge_pos).normalized(),
+                        for m, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
+                            zip(
+                                edge_lines[(root_key_idx):] + edge_lines[:(root_key_idx)],
+                                edge_lines[(root_key_idx + 1) :] + edge_lines[: (root_key_idx + 1)],
+                                edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
                             )
+                        ):
+                            if m == 0:
+                                if is_reverse:
+                                    # 反転は0番目は既に入ってるので now のみ
+                                    horizonal_top_edge_keys.insert(0, now_edge_key)
+                                else:
+                                    horizonal_top_edge_keys.append(prev_edge_key)
+                                    horizonal_top_edge_keys.append(now_edge_key)
+                            elif m > 0:
+                                if is_reverse:
+                                    horizonal_top_edge_keys.insert(0, now_edge_key)
+                                else:
+                                    horizonal_top_edge_keys.append(now_edge_key)
 
-                            # エッジの評価軸の変動
-                            distance = abs(
-                                abs(next_edge_pos.data()[target_idx] - now_edge_pos.data()[target_idx])
-                                - abs(now_edge_pos.data()[target_idx] - prev_edge_pos.data()[target_idx])
-                            )
+                                prev_edge_pos = virtual_vertices[prev_edge_key].position()
+                                now_edge_pos = virtual_vertices[now_edge_key].position()
+                                next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                            if dot < 0.5 and (is_material_horizonal or distance > threshold):
-                                break
+                                # エッジの内積
+                                dot = MVector3D.dotProduct(
+                                    (next_edge_pos - now_edge_pos).normalized(),
+                                    (now_edge_pos - prev_edge_pos).normalized(),
+                                )
+
+                                # エッジの評価軸の変動
+                                distance = abs(
+                                    abs(next_edge_pos.data()[target_idx] - now_edge_pos.data()[target_idx])
+                                    - abs(now_edge_pos.data()[target_idx] - prev_edge_pos.data()[target_idx])
+                                )
+
+                                if dot < 0.5 and (is_material_horizonal or distance > threshold):
+                                    break
 
                 # if is_material_horizonal:
                 #     edge_distances = np.linalg.norm(
@@ -6001,6 +6065,9 @@ class PmxTailorExportService:
             #                 f"VER ssi[{ssi}], esi[{esi}], th[{horizonal_threshold}], sd[{sliced_diff}], edge[{[(ed, virtual_vertices[ed].vidxs()) for ed in target_all_top_edge_keys]}]"
             #             )
 
+            if horizonal_top_edge_keys[0] == horizonal_top_edge_keys[-1]:
+                del horizonal_top_edge_keys[-1]
+
             logger.debug(f"horizonal[{horizonal_top_edge_keys}]")
             # logger.debug(f"vertical[{vertical_top_edge_keys}]")
 
@@ -6030,6 +6097,9 @@ class PmxTailorExportService:
             if not bottom_edge_lines:
                 # 全部上部エッジの場合、スルー
                 continue
+
+            if bottom_edge_lines[0] == bottom_edge_lines[-1]:
+                del bottom_edge_lines[-1]
 
             # 上部エッジではないのは全て下部エッジ扱い
             all_bottom_edge_keys.append(bottom_edge_lines)
@@ -6262,7 +6332,7 @@ class PmxTailorExportService:
 
             # 存在しない頂点INDEXで二次元配列初期化
             tmp_vertex_map = np.full((len(yu) * 2, len(xu), 3), (np.nan, np.nan, np.nan))
-            tmp_score_map = np.full(len(xu), 0.0, dtype=np.float)
+            # tmp_score_map = np.full(len(xu), 0.0, dtype=np.float)
             registed_vertices = []
 
             xx = 0
@@ -6340,17 +6410,17 @@ class PmxTailorExportService:
                     if not vv.vidxs():
                         continue
 
-                    logger.debug(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
+                    logger.test(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
 
                     tmp_vertex_map[y, xx] = vkey
                     registed_vertices.append(vkey)
 
-                tmp_score_map[xx] = score
+                # tmp_score_map[xx] = score
 
                 xx += 1
                 # prev_vkeys = vkeys
                 # prev_y_offset = y_offset
-                logger.debug("-------")
+                logger.test("-------")
 
             logger.info("%s: 頂点マップ[%s]: 不要軸削除", material_name, f"{(bi + 1):03d}")
 
@@ -6362,7 +6432,7 @@ class PmxTailorExportService:
                     remove_xidxs.append(v_xidx)
 
             tmp_vertex_map = np.delete(tmp_vertex_map, remove_xidxs, axis=1)
-            tmp_score_map = np.delete(tmp_score_map, remove_xidxs, axis=0)
+            # tmp_score_map = np.delete(tmp_score_map, remove_xidxs, axis=0)
 
             # Y軸方向の削除
             remove_yidxs = []
@@ -6408,7 +6478,7 @@ class PmxTailorExportService:
                         prev_xx = xx
                         continue
 
-                    logger.debug(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
+                    logger.test(f"x: {x}, y: {y}, vv: {vkey}, vidxs: {vv.vidxs()}")
 
                     vertex_map[y, xx] = vkey
                     registed_vkeys.append(vkey)
@@ -6418,7 +6488,7 @@ class PmxTailorExportService:
                     prev_xx = xx
 
                 xx += 1
-                logger.debug("-------")
+                logger.test("-------")
 
             if vertex_map.any():
                 target_vertex_maps = {}
@@ -6574,7 +6644,7 @@ class PmxTailorExportService:
                     same_top_keys = np.where(np.sum(np.abs(np.diff(target_vertex_map[:1], axis=1)), axis=2) == 0)
                     separated_vertex_maps = []
                     separated_vertex_display_maps = []
-                    if same_top_keys[1]:
+                    if same_top_keys[1].any():
                         prev_v_xidx = 0
                         for v_xidx in same_top_keys[1]:
                             separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx : (v_xidx + 1)])
@@ -6602,7 +6672,7 @@ class PmxTailorExportService:
 
         logger.debug("-----------------------")
 
-        return vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold
+        return vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold, is_material_horizonal
 
     def create_vertex_line_map(
         self,
@@ -6750,6 +6820,9 @@ class PmxTailorExportService:
             ).normalized()
             # ボーン進行方向に対しての縦軸(y)
             top_y_pos = MVector3D(1, 0, 0)
+            if top_x_pos.y() == 0 and top_x_pos.z() == 0:
+                # ちょうど水平で真横に向かってる場合、縦軸を別に設定する
+                top_y_pos = MVector3D(0, 0, -1)
             # ボーン進行方向に対しての横軸(z)
             top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
             top_qq = MQuaternion.fromDirection(top_z_pos, top_x_pos)

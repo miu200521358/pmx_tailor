@@ -578,6 +578,7 @@ class PhysicsParam:
             logger.transtext(
                 "スカート等で特殊な処理が必要な形状\n"
                 + "全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n"
+                + "面抜け: VRoid Studioで「透明メッシュの削除」（デフォルトON）の状態でpmxに出力するなどして、ポリの中に面の空いた場所がある場合、仮想面を貼って安定した物理を設定します\n"
             )
         )
         self.simple_special_shape_txt.Wrap(-1)
@@ -586,7 +587,7 @@ class PhysicsParam:
         self.simple_special_shape_ctrl = wx.Choice(
             self.simple_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("なし"), logger.transtext("全て表面")],
+            choices=[logger.transtext("なし"), logger.transtext("全て表面"), logger.transtext("面抜け")],
         )
         self.simple_special_shape_ctrl.SetToolTip(self.simple_special_shape_txt.GetToolTipText())
         self.simple_special_shape_ctrl.Bind(wx.EVT_CHOICE, self.on_special_shape)
