@@ -2862,7 +2862,7 @@ class PmxTailorExportService:
                         x_size = np.median(all_vertex_distances)
 
                     if now_above_bone and now_below_bone:
-                        # 上下揃ってる場合、max
+                        # 上下揃ってる場合、mean
                         y_size = np.max(
                             [
                                 now_now_bone.position.distanceToPoint(now_above_bone.position),
@@ -2901,7 +2901,7 @@ class PmxTailorExportService:
                             4 / 3 * math.pi * shape_size.x()
                         )
 
-                    logger.debug(
+                    logger.test(
                         "name: %s, size: %s, volume: %s",
                         vv.map_bones[base_map_idx].name,
                         shape_size.to_log(),
@@ -2937,7 +2937,12 @@ class PmxTailorExportService:
 
                     if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                         # ジョイントがボーン間にある場合、剛体はボーン位置
-                        shape_position = now_now_bone.position
+                        if is_material_horizonal:
+                            # 平行である場合、下ボーンとの中間
+                            shape_position = (now_now_bone.position + now_below_bone.position) / 2
+                        else:
+                            # 平行ではない場合、後で調整し直すので一旦ボーン位置
+                            shape_position = now_now_bone.position
                     else:
                         if param_option["exist_physics_clear"] in [logger.transtext("そのまま"), logger.transtext("上書き")]:
                             # そのまま・上書きはメッシュの中間位置で位置を取り直す
@@ -2992,51 +2997,63 @@ class PmxTailorExportService:
                             shape_position = MVector3D(np.mean(shape_positions, axis=0))
 
                     is_y_direction_prev = False
-                    if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
-                        # 末端は軸方向がひとつ上の向きとする
-                        x_direction_to_pos = now_above_bone.position
-                        x_direction_from_pos = y_direction_to_pos = now_now_bone.position
-                        if tuple(vertex_map[above_yidx, ceil_mean_xidx]) in virtual_vertices:
-                            y_direction_from_pos = virtual_vertices[
-                                tuple(vertex_map[above_yidx, ceil_mean_xidx])
-                            ].position()
-                        else:
-                            is_y_direction_prev = True
-                            y_direction_from_pos = virtual_vertices[
-                                tuple(vertex_map[above_yidx, floor_mean_xidx])
-                            ].position()
+                    # if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
+                    #     # 末端は軸方向がひとつ上の向きとする
+                    #     x_direction_to_pos = now_above_bone.position
+                    #     x_direction_from_pos = y_direction_to_pos = now_now_bone.position
+                    #     if tuple(vertex_map[above_yidx, ceil_mean_xidx]) in virtual_vertices:
+                    #         y_direction_from_pos = virtual_vertices[
+                    #             tuple(vertex_map[above_yidx, ceil_mean_xidx])
+                    #         ].position()
+                    #     else:
+                    #         is_y_direction_prev = True
+                    #         y_direction_from_pos = virtual_vertices[
+                    #             tuple(vertex_map[above_yidx, floor_mean_xidx])
+                    #         ].position()
+                    # else:
+                    x_direction_to_pos = now_now_bone.position
+                    x_direction_from_pos = y_direction_to_pos = now_below_bone.position
+                    if (
+                        tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
+                        and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                        != now_now_bone.position
+                    ):
+                        y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
                     else:
-                        x_direction_to_pos = now_now_bone.position
-                        x_direction_from_pos = y_direction_to_pos = now_below_bone.position
-                        if (
-                            tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
-                            and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
-                            != now_now_bone.position
-                        ):
-                            y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
-                        else:
-                            is_y_direction_prev = True
-                            y_direction_from_pos = virtual_vertices[
-                                tuple(vertex_map[v_yidx, floor_mean_xidx])
-                            ].position()
+                        is_y_direction_prev = True
+                        y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, floor_mean_xidx])].position()
 
                     # ボーン進行方向(x)
                     x_direction_pos = (x_direction_to_pos - x_direction_from_pos).normalized()
                     # ボーン進行方向に対しての横軸(y)
                     y_direction_pos = (y_direction_to_pos - y_direction_from_pos).normalized()
                     # ボーン進行方向に対しての縦軸(z)
-                    z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
-                    shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                    # if is_material_horizonal:
-                    #     shape_qq *= MQuaternion.fromEulerAngles(0, 0, -90)
-                    if is_y_direction_prev:
-                        shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
-                    shape_euler = shape_qq.toEulerAngles()
+                    z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos).normalized()
+
+                    if is_material_horizonal:
+                        shape_qq = MQuaternion.rotationTo(MVector3D(0, 0, 1), x_direction_pos)
+                        # shape_qq *= MQuaternion.fromEulerAngles(90, 0, 0)
+                        y_euler = (
+                            90 * -x_direction_pos.y()
+                            if abs(x_direction_pos.y()) == 1
+                            else shape_qq.toEulerAngles().y()
+                        )
+                        shape_qq = MQuaternion.fromEulerAngles(90, -y_euler, 0)
+                        shape_euler = MVector3D(90, y_euler, 0)
+                    else:
+                        shape_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+                        if is_y_direction_prev:
+                            shape_qq *= MQuaternion.fromEulerAngles(0, 180, 0)
+                        shape_euler = shape_qq.toEulerAngles()
                     shape_rotation_radians = MVector3D(
                         math.radians(shape_euler.x()), math.radians(shape_euler.y()), math.radians(shape_euler.z())
                     )
 
-                    if param_option["joint_pos_type"] == logger.transtext("ボーン間") and rigidbody_shape_type == 1:
+                    if (
+                        param_option["joint_pos_type"] == logger.transtext("ボーン間")
+                        and rigidbody_shape_type == 1
+                        and not is_material_horizonal
+                    ):
                         if v_yidx == 0:
                             # ボーン間の箱剛体の根元は剛体位置を中間に来るよう調整
                             mat = MMatrix4x4()
@@ -6618,7 +6635,11 @@ class PmxTailorExportService:
                                 # ボーン進行方向(x)
                                 x_direction_pos = (above_above_vv.position() - above_vv.position()).normalized()
                                 # ボーン進行方向に対しての横軸(y)
-                                y_direction_pos = MVector3D(1, 0, 0)
+                                y_direction_pos = (
+                                    MVector3D(0, 0, -1) * x_direction_pos.x()
+                                    if abs(x_direction_pos.x()) == 1
+                                    else MVector3D(1, 0, 0)
+                                )
                                 # ボーン進行方向に対しての縦軸(z)
                                 z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
                                 above_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
