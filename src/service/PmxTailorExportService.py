@@ -3035,7 +3035,7 @@ class PmxTailorExportService:
                         # shape_qq *= MQuaternion.fromEulerAngles(90, 0, 0)
                         y_euler = (
                             90 * -x_direction_pos.y()
-                            if abs(x_direction_pos.y()) == 1
+                            if np.isclose(abs(x_direction_pos.y()), 1)
                             else shape_qq.toEulerAngles().y()
                         )
                         shape_qq = MQuaternion.fromEulerAngles(90, -y_euler, 0)
@@ -6637,7 +6637,7 @@ class PmxTailorExportService:
                                 # ボーン進行方向に対しての横軸(y)
                                 y_direction_pos = (
                                     MVector3D(0, 0, -1) * x_direction_pos.x()
-                                    if abs(x_direction_pos.x()) == 1
+                                    if np.isclose(abs(x_direction_pos.x()), 1)
                                     else MVector3D(1, 0, 0)
                                 )
                                 # ボーン進行方向に対しての縦軸(z)
@@ -6722,6 +6722,9 @@ class PmxTailorExportService:
         top_x_pos = (top_pos - from_pos).normalized()
         # ボーン進行方向に対しての縦軸(y)
         top_y_pos = MVector3D(1, 0, 0)
+        if np.isclose(abs(top_x_pos.x()), 1):
+            # ちょうど水平で真横に向かってる場合、縦軸を別に設定する
+            top_y_pos = MVector3D(0, 0, -1)
         # ボーン進行方向に対しての横軸(z)
         top_z_pos = MVector3D.crossProduct(top_x_pos, top_y_pos)
         top_qq = MQuaternion.fromDirection(top_z_pos, top_x_pos)
@@ -6841,7 +6844,7 @@ class PmxTailorExportService:
             ).normalized()
             # ボーン進行方向に対しての縦軸(y)
             top_y_pos = MVector3D(1, 0, 0)
-            if top_x_pos.y() == 0 and top_x_pos.z() == 0:
+            if np.isclose(abs(top_x_pos.x()), 1):
                 # ちょうど水平で真横に向かってる場合、縦軸を別に設定する
                 top_y_pos = MVector3D(0, 0, -1)
             # ボーン進行方向に対しての横軸(z)
