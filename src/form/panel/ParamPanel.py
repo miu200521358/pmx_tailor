@@ -2916,14 +2916,14 @@ class PhysicsParam:
         self.joint_pos_type_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("ジョイント位置"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.joint_pos_type_txt.SetToolTip(logger.transtext("ボーン間: ボーンとボーンの間にジョイントが入る\nボーン位置: ボーンの位置にジョイントが入る"))
+        self.joint_pos_type_txt.SetToolTip(logger.transtext("ボーン位置: ボーンの位置にジョイントが入る\nボーン間: ボーンとボーンの間にジョイントが入る"))
         self.joint_pos_type_txt.Wrap(-1)
         self.advance_option_grid_sizer.Add(self.joint_pos_type_txt, 0, wx.ALL, 5)
 
         self.joint_pos_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("ボーン間"), logger.transtext("ボーン位置")],
+            choices=[logger.transtext("ボーン位置"), logger.transtext("ボーン間")],
         )
         self.joint_pos_type_ctrl.SetToolTip(self.joint_pos_type_txt.GetToolTipText())
         self.joint_pos_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)

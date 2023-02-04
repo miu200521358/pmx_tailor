@@ -2812,10 +2812,13 @@ class PmxTailorExportService:
                     next_below_bone = next_below_vv.map_bones.get(next_map_idx, None)
 
                     if not (now_now_bone and now_below_bone):
-                        logger.warning(
-                            "剛体生成に必要な情報(ボーン)が取得できなかった為、スルーします。 処理対象: %s",
-                            vv.map_bones[base_map_idx].name if vv.map_bones.get(base_map_idx, None) else vv.vidxs(),
-                        )
+                        if now_now_bone.getVisibleFlag():
+                            logger.warning(
+                                "剛体生成に必要な情報(ボーン)が取得できなかった為、スルーします。 処理対象: %s",
+                                vv.map_bones[base_map_idx].name
+                                if vv.map_bones.get(base_map_idx, None)
+                                else vv.vidxs(),
+                            )
                         continue
 
                     if not (now_now_bone.index in model.vertices):
@@ -2886,7 +2889,7 @@ class PmxTailorExportService:
                         # 箱剛体の場合
                         shape_size = MVector3D(
                             x_size * (0.5 if next_connected or prev_connected else 1),
-                            max(0.25, y_size) * (0.5 if v_yidx > 0 else 0.25),
+                            max(0.25, y_size) * 0.5,
                             rigidbody_limit_thicks[v_yidx],
                         )
                         shape_volume = shape_size.x() * shape_size.y() * shape_size.z()
@@ -3011,8 +3014,19 @@ class PmxTailorExportService:
                     #             tuple(vertex_map[above_yidx, floor_mean_xidx])
                     #         ].position()
                     # else:
-                    x_direction_to_pos = now_now_bone.position
-                    x_direction_from_pos = y_direction_to_pos = now_below_bone.position
+                    if (
+                        param_option["joint_pos_type"] == logger.transtext("ボーン位置")
+                        and next_now_bone
+                        and next_below_bone
+                    ):
+                        # ボーン位置の場合、次ボーンとの間を進行方向とする
+                        x_direction_from_pos = (now_below_bone.position + next_below_bone.position) / 2
+                        x_direction_to_pos = (now_now_bone.position + next_now_bone.position) / 2
+                    else:
+                        x_direction_from_pos = now_below_bone.position
+                        x_direction_to_pos = now_now_bone.position
+                    y_direction_to_pos = now_below_bone.position
+
                     if (
                         tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
                         and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
@@ -3315,7 +3329,7 @@ class PmxTailorExportService:
                 target_vertices[v_key].append([v], [], [])
 
         if not target_vertices or not weighted_vidxs:
-            logger.info("グラデーション対象頂点が見つからなかったため、処理をスキップします")
+            # 処理対象がないため、終了
             return
 
         # 親ボーン
@@ -5515,7 +5529,10 @@ class PmxTailorExportService:
                     )
 
                     # 仮想エッジ
-                    virtual_edge_keys = [e for e, v in edge_existed.items() if v == False][0]
+                    virtual_edge_keys = [e for e, v in edge_existed.items() if v == False]
+                    if not virtual_edge_keys:
+                        continue
+                    virtual_edge_keys = virtual_edge_keys[0]
                     ve1_vec = virtual_vertices[virtual_edge_keys[0]].position()
                     ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
                     ve_line = MSegment(ve1_vec, ve2_vec)
@@ -5950,9 +5967,9 @@ class PmxTailorExportService:
 
                         for m, (prev_edge_key, now_edge_key, next_edge_key) in enumerate(
                             zip(
+                                edge_lines[(root_key_idx - 1) :] + edge_lines[: (root_key_idx - 1)],
                                 edge_lines[(root_key_idx):] + edge_lines[:(root_key_idx)],
                                 edge_lines[(root_key_idx + 1) :] + edge_lines[: (root_key_idx + 1)],
-                                edge_lines[(root_key_idx + 2) :] + edge_lines[: (root_key_idx + 2)],
                             )
                         ):
                             if m == 0:
@@ -5968,24 +5985,32 @@ class PmxTailorExportService:
                                 else:
                                     horizonal_top_edge_keys.append(now_edge_key)
 
-                                prev_edge_pos = virtual_vertices[prev_edge_key].position()
-                                now_edge_pos = virtual_vertices[now_edge_key].position()
-                                next_edge_pos = virtual_vertices[next_edge_key].position()
+                            prev_edge_pos = virtual_vertices[prev_edge_key].position()
+                            now_edge_pos = virtual_vertices[now_edge_key].position()
+                            next_edge_pos = virtual_vertices[next_edge_key].position()
 
-                                # エッジの内積
-                                dot = MVector3D.dotProduct(
-                                    (next_edge_pos - now_edge_pos).normalized(),
-                                    (now_edge_pos - prev_edge_pos).normalized(),
-                                )
+                            # エッジの内積
+                            dot = MVector3D.dotProduct(
+                                (next_edge_pos - now_edge_pos).normalized(),
+                                (now_edge_pos - prev_edge_pos).normalized(),
+                            )
 
-                                # エッジの評価軸の変動
-                                distance = abs(
-                                    abs(next_edge_pos.data()[target_idx] - now_edge_pos.data()[target_idx])
-                                    - abs(now_edge_pos.data()[target_idx] - prev_edge_pos.data()[target_idx])
-                                )
+                            # エッジの評価軸の変動
+                            distance = abs(
+                                abs(next_edge_pos.data()[target_idx] - now_edge_pos.data()[target_idx])
+                                - abs(now_edge_pos.data()[target_idx] - prev_edge_pos.data()[target_idx])
+                            )
 
-                                if dot < 0.5 and (is_material_horizonal or distance > threshold):
-                                    break
+                            logger.debug(
+                                "now: %s, dot: %s, distance: %s, threshold: %s",
+                                virtual_vertices[now_edge_key].vidxs(),
+                                round(dot, 3),
+                                round(distance, 3),
+                                round(threshold, 3),
+                            )
+
+                            if dot < 0.5 and (is_material_horizonal or distance > threshold):
+                                break
 
                 # if is_material_horizonal:
                 #     edge_distances = np.linalg.norm(
@@ -7199,7 +7224,9 @@ class PmxTailorExportService:
             elif is_rigidbody:
                 # 剛体の場合、横列のいずれかに登録されている場合
                 above_yidx = (
-                    np.max(np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0])
+                    np.max(np.where(regist_bones[:v_yidx, v_xidx])[0])
+                    if np.where(regist_bones[:v_yidx, v_xidx])[0].any()
+                    else np.max(np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0])
                     if np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0].any()
                     else 0
                 )
@@ -7223,7 +7250,9 @@ class PmxTailorExportService:
         elif is_rigidbody:
             # 剛体の場合、横列のいずれかに登録されている場合
             below_yidx = (
-                np.min(np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0]) + (v_yidx + 1)
+                np.min(np.where(regist_bones[(v_yidx + 1) :, v_xidx])[0]) + (v_yidx + 1)
+                if np.where(regist_bones[(v_yidx + 1) :, v_xidx])[0].any()
+                else np.min(np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0]) + (v_yidx + 1)
                 if np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0].any()
                 else registed_max_v_yidx
             )
