@@ -1287,7 +1287,12 @@ class PmxTailorExportService:
                         max_v_yidx,
                         max_v_xidx,
                     ) = self.get_block_vidxs(
-                        v_yidx, v_xidx, vertex_maps, all_regist_bones, all_bone_connected, base_map_idx
+                        v_yidx,
+                        v_xidx,
+                        vertex_maps,
+                        all_regist_bones,
+                        all_bone_connected,
+                        base_map_idx,
                     )
 
                     now_above_vv = (
@@ -1953,7 +1958,7 @@ class PmxTailorExportService:
                             and a_rigidbody.index != b_rigidbody.index
                         ):
                             if (
-                                regist_bones.shape[0] > below_yidx
+                                regist_bones.shape[0] - 1 > below_yidx
                                 and regist_bones.shape[1] > next_xidx
                                 and regist_bones[below_yidx, next_xidx]
                             ):
@@ -2702,7 +2707,6 @@ class PmxTailorExportService:
                         all_regist_bones,
                         all_bone_connected,
                         base_map_idx,
-                        is_rigidbody=True,
                         is_center=is_center,
                     )
 
@@ -7134,7 +7138,6 @@ class PmxTailorExportService:
         all_regist_bones: dict,
         all_bone_connected: dict,
         base_map_idx: int,
-        is_rigidbody=False,
         is_weight=False,
         is_center=False,
     ):
@@ -7221,21 +7224,11 @@ class PmxTailorExportService:
                         and np.where(all_regist_bones[prev_map_idx][: (target_v_yidx + 1), :])[1].any()
                         else 0
                     )
-        elif is_rigidbody:
-            # 剛体の1番目以降は、自分より前で、縦列のいずれかにボーンが登録されている最も近いの
+        else:
+            # 剛体・ジョイントの1番目以降は、自分より前で、縦列のいずれかにボーンが登録されている最も近いの
             prev_xidx = (
                 np.max(np.where(np.sum(regist_bones[:, :v_xidx], axis=0))[0])
                 if np.where(np.sum(regist_bones[:, :v_xidx], axis=0))[0].any()
-                else 0
-            )
-            prev_connected = True
-        else:
-            # 1番目以降は、自分より前で、ボーンが登録されている最も近いの
-            prev_xidx = (
-                np.max(np.where(regist_bones[v_yidx, :v_xidx]))
-                if regist_bones[v_yidx, :v_xidx].any()
-                else np.max(np.where(regist_bones[: (v_yidx + 1), :v_xidx])[1])
-                if np.where(regist_bones[: (v_yidx + 1), :v_xidx])[1].any()
                 else 0
             )
             prev_connected = True
@@ -7282,21 +7275,11 @@ class PmxTailorExportService:
                 else:
                     # 次のボーンの仮想頂点が自分と違う場合、そのまま前のを採用
                     next_xidx = 0
-        elif is_rigidbody:
-            # 剛体のmaxより前は、自分より前で、縦列のいずれかにボーンが登録されている最も近いの
+        else:
+            # 剛体・ジョイントのmaxより前は、自分より前で、縦列のいずれかにボーンが登録されている最も近いの
             next_xidx = (
                 np.min(np.where(np.sum(regist_bones[:, (v_xidx + 1) :], axis=0))[0]) + (v_xidx + 1)
                 if np.where(np.sum(regist_bones[:, (v_xidx + 1) :], axis=0))[0].any()
-                else registed_max_v_xidx
-            )
-            next_connected = True
-        else:
-            # maxより前は、自分より前で、ボーンが登録されている最も近いの
-            next_xidx = (
-                np.min(np.where(regist_bones[v_yidx, (v_xidx + 1) :])) + (v_xidx + 1)
-                if regist_bones[v_yidx, (v_xidx + 1) :].any()
-                else np.min(np.where(regist_bones[: (v_yidx + 1), (v_xidx + 1) :])[1]) + (v_xidx + 1)
-                if np.where(regist_bones[: (v_yidx + 1), (v_xidx + 1) :])[1].any()
                 else registed_max_v_xidx
             )
             next_connected = True
@@ -7312,18 +7295,14 @@ class PmxTailorExportService:
                     if np.where(regist_bones[:v_yidx, :v_xidx])[0].any()
                     else 0
                 )
-            elif is_rigidbody:
-                # 剛体の場合、横列のいずれかに登録されている場合
+            else:
+                # 剛体・ジョイントの場合、横列のいずれかに登録されている場合
                 above_yidx = (
                     np.max(np.where(regist_bones[:v_yidx, v_xidx])[0])
                     if np.where(regist_bones[:v_yidx, v_xidx])[0].any()
                     else np.max(np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0])
                     if np.where(np.sum(regist_bones[:v_yidx, :], axis=1))[0].any()
                     else 0
-                )
-            else:
-                above_yidx = (
-                    np.max(np.where(regist_bones[:v_yidx, v_xidx])) if regist_bones[:v_yidx, v_xidx].any() else 0
                 )
 
         below_yidx = registed_max_v_yidx
@@ -7338,22 +7317,14 @@ class PmxTailorExportService:
                 if v_yidx <= np.max(regist_bones[:, v_xidx])
                 else np.max(np.where(vertex_map[:-1, v_xidx, :])[0])
             )
-        elif is_rigidbody:
-            # 剛体の場合、横列のいずれかに登録されている場合
+        else:
+            # 剛体・ジョイントの場合、横列のいずれかに登録されている場合
             below_yidx = (
                 np.min(np.where(regist_bones[(v_yidx + 1) :, v_xidx])[0]) + (v_yidx + 1)
                 if np.where(regist_bones[(v_yidx + 1) :, v_xidx])[0].any()
                 else np.min(np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0]) + (v_yidx + 1)
                 if np.where(np.sum(regist_bones[(v_yidx + 1) :, :], axis=1))[0].any()
                 else registed_max_v_yidx
-            )
-        else:
-            below_yidx = (
-                np.min(np.where(regist_bones[(v_yidx + 1) :, v_xidx])) + (v_yidx + 1)
-                if regist_bones[(v_yidx + 1) :, v_xidx].any()
-                else np.max(regist_bones[:, v_xidx])
-                if v_yidx <= np.max(regist_bones[:, v_xidx])
-                else np.max(np.where(vertex_map[:, v_xidx, :])[0])
             )
 
         max_v_xidx = np.max(np.where(vertex_map[v_yidx, :, :])[0])
