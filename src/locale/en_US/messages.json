@@ -652,5 +652,7 @@
     "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n面抜け: VRoid Studioで「透明メッシュの削除」（デフォルトON）の状態でpmxに出力するなどして、ポリの中に面の空いた場所がある場合、仮想面を貼って安定した物理を設定します\n": "Shapes that require special treatment such as skirts\nAll Surfaces: Forcibly treats all surfaces as front surfaces (separate the thickness by back surface material) when the back surface detection misdetects shapes such as pleats (folded poly cracks).\nSurface missing: If there is an empty surface in the poly by exporting to pmx with \"Remove transparent mesh\" (default ON) in VRoid Studio, put a virtual surface and set stable physics To do\n",
     "面抜け": "faceless",
     "面抜けあり": "There is an omission",
-    "ボーン位置: ボーンの位置にジョイントが入る\nボーン間: ボーンとボーンの間にジョイントが入る": ""
+    "ボーン位置: ボーンの位置にジョイントが入る\nボーン間: ボーンとボーンの間にジョイントが入る": "Bone Position: The joint enters the position of the bone\nBetween bones: Joints are inserted between bones",
+    "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n面欠け: VRoid Studioで「透明メッシュの削除」（デフォルトON）の状態でpmxに出力するなどして、エッジではなくでこぼこしている場合、仮想面を貼って安定した物理を設定します\n": "Shapes that require special treatment such as skirts\nAll Surfaces: Forcibly treats all surfaces as front surfaces (separate the thickness by back surface material) when the back surface detection misdetects shapes such as pleats (folded poly cracks).\nMissing Faces: If there are irregularities instead of edges, such as outputting to pmx with \"Remove transparent mesh\" (default ON) in VRoid Studio, set a stable physics by pasting a virtual face.\n",
+    "面欠け": "Face chip"
 }

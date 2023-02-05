@@ -2051,7 +2051,7 @@ class PmxTailorExportService:
                                 and regist_bones[above_yidx, v_xidx]
                             ):
                                 logger.warning(
-                                    "斜め（＼）ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
+                                    "斜め（／）ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
                                     vv.map_bones[base_map_idx].name
                                     if vv.map_bones.get(base_map_idx, None)
                                     else vv.vidxs(),
@@ -3048,9 +3048,11 @@ class PmxTailorExportService:
 
                     if next_below_bone and now_below_bone != next_below_bone:
                         y_direction_from_pos = next_below_bone.position
-                    else:
+                    elif prev_below_bone and now_below_bone != prev_below_bone:
                         y_direction_from_pos = prev_below_bone.position
                         is_y_direction_prev = True
+                    else:
+                        y_direction_from_pos = now_below_bone.position
 
                     # if (
                     #     tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
@@ -5529,7 +5531,7 @@ class PmxTailorExportService:
                     f"key[{v_key}:{virtual_vertices[v_key].vidxs()}], pair[{pair_vkeys}:{[virtual_vertices[pair_vkey].vidxs() for pair_vkey in pair_vkeys]}]"
                 )
 
-        if param_option["special_shape"] == logger.transtext("面抜け"):
+        if param_option["special_shape"] == logger.transtext("面欠け"):
             logger.debug("仮想面の確認")
 
             virtual_edges = []
