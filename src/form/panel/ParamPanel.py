@@ -4583,7 +4583,8 @@ class PhysicsParam:
 
             # 横ジョイント
             horizonal_joint_mov = max(0, (1 - air_resistance_ratio * 1.5))
-            self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov)
+            self.horizonal_joint_mov_y_min_spin.SetValue(-horizonal_joint_mov)
+            self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov / 2)
 
             if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
                 self.advance_horizonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 20)
@@ -4629,6 +4630,10 @@ class PhysicsParam:
             self.horizonal_joint_spring_rot_z_spin.SetValue(horizonal_spring_rot)
 
             # 斜めジョイント
+            diagonal_joint_mov = max(0, (1 - air_resistance_ratio * 1.2))
+            self.diagonal_joint_mov_y_min_spin.SetValue(-diagonal_joint_mov)
+            self.diagonal_joint_mov_y_max_spin.SetValue(diagonal_joint_mov / 2)
+
             if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
                 self.advance_diagonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
 
