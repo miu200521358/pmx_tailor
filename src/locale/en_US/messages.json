@@ -655,5 +655,8 @@
     "ボーン位置: ボーンの位置にジョイントが入る\nボーン間: ボーンとボーンの間にジョイントが入る": "Bone Position: The joint enters the position of the bone\nBetween bones: Joints are inserted between bones",
     "スカート等で特殊な処理が必要な形状\n全て表面: プリーツ（ポリ割に折り返しがある）などの形状で裏面判定が誤検知をする場合、強制的に全ての面を表面として扱います（厚みは裏面材質に分けてください）\n面欠け: VRoid Studioで「透明メッシュの削除」（デフォルトON）の状態でpmxに出力するなどして、エッジではなくでこぼこしている場合、仮想面を貼って安定した物理を設定します\n": "Shapes that require special treatment such as skirts\nAll Surfaces: Forcibly treats all surfaces as front surfaces (separate the thickness by back surface material) when the back surface detection misdetects shapes such as pleats (folded poly cracks).\nMissing Faces: If there are irregularities instead of edges, such as outputting to pmx with \"Remove transparent mesh\" (default ON) in VRoid Studio, set a stable physics by pasting a virtual face.\n",
     "面欠け": "Face chip",
-    "同じジョイント名が既に登録されているため、末尾に乱数を追加します。 既存ジョイント名: %s": ""
+    "同じジョイント名が既に登録されているため、末尾に乱数を追加します。 既存ジョイント名: %s": "A random number is added to the end because the same joint name has already been registered. Existing joint name: %s",
+    "同じ材質・同じ略称に対して複数の物理設定が割り当てられています\n異なる箇所に物理を割り当てたい場合、略称を変えているか確認してください。": "Multiple physics settings are assigned to the same material and the same abbreviation\nIf you want to assign physics to different locations, make sure you change the abbreviations.",
+    "【%s:%s】胸物理生成": "[%s:%s] chest physical generation",
+    "-- 胸物理: %s: 終了": "-- chest physics: %s: end"
 }

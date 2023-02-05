@@ -934,7 +934,14 @@ class PmxTailorExportService:
             logger.transtext("胸")
         ]:
             # 胸の場合、N式おっぱい構造ボーンとウェイトを設定する
-            virtual_vertices, vertex_maps, all_regist_bones, all_bone_connected, root_bone = self.create_bone_map(
+            (
+                virtual_vertices,
+                vertex_maps,
+                all_regist_bones,
+                all_bone_connected,
+                root_bone,
+                is_material_horizonal,
+            ) = self.create_bone_map(
                 model,
                 param_option,
                 material_name,
@@ -3223,7 +3230,7 @@ class PmxTailorExportService:
                         y_direction_from_pos = prev_below_bone.position
                         is_y_direction_prev = True
                     else:
-                        y_direction_from_pos = now_below_bone.position
+                        y_direction_from_pos = MVector3D(1, 0, 0)
 
                     # if (
                     #     tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
@@ -5416,9 +5423,15 @@ class PmxTailorExportService:
         # 中心ボーン
         root_bone = None
         if is_root_bone:
-            _, root_bone = self.create_root_bone(
+            display_name, root_bone = self.create_root_bone(
                 model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0)), base_vertical_axis
             )
+
+            model.bones[root_bone.name] = root_bone
+            model.bone_indexes[root_bone.index] = root_bone.name
+            model.display_slots[display_name].references.append((0, model.bones[root_bone.name].index))
+        else:
+            root_bone = model.bones[param_option["parent_bone_name"]]
 
         # 各頂点の位置との差分から距離を測る
         v_distances = np.linalg.norm(
