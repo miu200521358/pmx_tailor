@@ -1251,8 +1251,8 @@ class PmxTailorExportService:
                         logger.warning("ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s", bone_key)
                         continue
 
-                    if not vv.map_rigidbodies.get(base_map_idx, None):
-                        # 剛体はくっついてない場合があるので、その場合はワーニングは出さずにスルー
+                    if not regist_bones[v_yidx, v_xidx]:
+                        # ボーンがない場合ジョイントは不要
                         continue
 
                     # 親剛体の計算用カプセル
@@ -1348,17 +1348,24 @@ class PmxTailorExportService:
                         if v_yidx == 0:
                             a_rigidbody = root_rigidbody
                             b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
+                            a_xidx = v_xidx
+                            a_yidx = -1
+                            b_xidx = v_xidx
+                            b_yidx = v_yidx
                         else:
                             a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
                             if not a_rigidbody:
                                 # スリットで上の剛体が見つからない場合、ひとつ前の頂点マップを確認する
                                 a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx - 1, None)
                             b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
+                            a_xidx = v_xidx
+                            a_yidx = above_yidx
+                            b_xidx = v_xidx
+                            b_yidx = v_yidx
 
-                        if not (a_rigidbody and a_rigidbody.index >= 0):
+                        if not (a_rigidbody and a_rigidbody.index >= 0 and b_rigidbody and b_rigidbody.index >= 0):
                             if not (
-                                regist_bones[below_yidx, v_xidx]
-                                and a_rigidbody
+                                a_rigidbody
                                 and b_rigidbody
                                 and b_rigidbody.index >= 0
                                 and a_rigidbody.index != b_rigidbody.index
@@ -1374,7 +1381,7 @@ class PmxTailorExportService:
                                         else vv.vidxs(),
                                         decoration=MLogger.DECORATION_BOX,
                                     )
-                                else:
+                                elif v_yidx < registed_max_v_yidx:
                                     logger.warning(
                                         "縦ジョイント生成に必要な情報が取得できなかった為、スルーします。　処理対象: %s",
                                         vv.map_bones[base_map_idx].name
@@ -1430,6 +1437,11 @@ class PmxTailorExportService:
                                 b_rigidbody,
                                 joint_pos,
                                 joint_qq,
+                                base_map_idx,
+                                a_xidx,
+                                a_yidx,
+                                b_xidx,
+                                b_yidx,
                                 vertical_limit_min_mov_xs,
                                 vertical_limit_min_mov_ys,
                                 vertical_limit_min_mov_zs,
@@ -1458,6 +1470,11 @@ class PmxTailorExportService:
                                 # スリットで上の剛体が見つからない場合、ひとつ前の頂点マップを確認する
                                 if not b_rigidbody:
                                     b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx - 1, None)
+
+                                a_xidx = v_xidx
+                                a_yidx = v_yidx
+                                b_xidx = v_xidx
+                                b_yidx = above_yidx
 
                                 a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                                 b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
@@ -1504,6 +1521,11 @@ class PmxTailorExportService:
                                     b_rigidbody,
                                     joint_pos,
                                     joint_qq,
+                                    base_map_idx,
+                                    a_xidx,
+                                    a_yidx,
+                                    b_xidx,
+                                    b_yidx,
                                     vertical_reverse_limit_min_mov_xs,
                                     vertical_reverse_limit_min_mov_ys,
                                     vertical_reverse_limit_min_mov_zs,
@@ -1529,6 +1551,11 @@ class PmxTailorExportService:
                             if param_option["rigidbody_balancer"]:
                                 a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                                 b_rigidbody = now_now_vv.map_balance_rigidbodies.get(base_map_idx, None)
+
+                                a_xidx = v_xidx
+                                a_yidx = v_yidx
+                                b_xidx = v_xidx
+                                b_yidx = v_yidx
 
                                 if not (
                                     a_rigidbody
@@ -1564,6 +1591,11 @@ class PmxTailorExportService:
                                         b_rigidbody,
                                         a_rigidbody.shape_position.copy(),
                                         MQuaternion(),
+                                        base_map_idx,
+                                        a_xidx,
+                                        a_yidx,
+                                        b_xidx,
+                                        b_yidx,
                                         [0],
                                         [0],
                                         [0],
@@ -1588,6 +1620,11 @@ class PmxTailorExportService:
                                     a_rigidbody = now_above_vv.map_balance_rigidbodies.get(base_map_idx, None)
                                     b_rigidbody = now_now_vv.map_balance_rigidbodies.get(base_map_idx, None)
 
+                                    a_xidx = v_xidx
+                                    a_yidx = above_yidx
+                                    b_xidx = v_xidx
+                                    b_yidx = v_yidx
+
                                     if (
                                         a_rigidbody
                                         and b_rigidbody
@@ -1604,6 +1641,11 @@ class PmxTailorExportService:
                                             b_rigidbody,
                                             MVector3D(),
                                             MQuaternion(),
+                                            base_map_idx,
+                                            a_xidx,
+                                            a_yidx,
+                                            b_xidx,
+                                            b_yidx,
                                             [-50],
                                             [-50],
                                             [-50],
@@ -1630,7 +1672,14 @@ class PmxTailorExportService:
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
 
-                        if not (a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0):
+                        a_xidx = v_xidx
+                        a_yidx = v_yidx
+                        b_xidx = next_xidx
+                        b_yidx = v_yidx
+
+                        if v_yidx < registed_max_v_yidx and not (
+                            a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0
+                        ):
                             logger.warning(
                                 "横ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
                                 vv.map_bones[base_map_idx].name
@@ -1640,7 +1689,7 @@ class PmxTailorExportService:
                         elif a_rigidbody and b_rigidbody and a_rigidbody.index == b_rigidbody.index:
                             # 同じ剛体なのは同一頂点からボーンが出る場合に有り得るので、警告は出さない
                             pass
-                        else:
+                        elif v_yidx < registed_max_v_yidx:
                             a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                             b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
                             if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
@@ -1731,6 +1780,11 @@ class PmxTailorExportService:
                                 b_rigidbody,
                                 joint_pos,
                                 joint_qq,
+                                base_map_idx,
+                                a_xidx,
+                                a_yidx,
+                                b_xidx,
+                                b_yidx,
                                 horizonal_limit_min_mov_xs,
                                 horizonal_limit_min_mov_ys,
                                 horizonal_limit_min_mov_zs,
@@ -1753,11 +1807,21 @@ class PmxTailorExportService:
                             )
                             created_joints[joint_key] = joint
 
-                            if (
-                                param_option["joint_pos_type"] == logger.transtext("ボーン位置")
-                                and v_yidx == registed_max_v_yidx
-                            ):
-                                # 末端横ジョイント
+                        if (
+                            param_option["joint_pos_type"] == logger.transtext("ボーン位置")
+                            and v_yidx == registed_max_v_yidx
+                        ):
+                            # 末端横ジョイント
+                            # ひとつ上のボーンに紐付くジョイントをチェック
+                            a_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+                            b_rigidbody = next_above_vv.map_rigidbodies.get(next_map_idx, None)
+
+                            a_xidx = v_xidx
+                            a_yidx = above_yidx
+                            b_xidx = next_xidx
+                            b_yidx = above_yidx
+
+                            if a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0:
                                 a_pos = (
                                     model.bones[
                                         model.bone_indexes[
@@ -1793,12 +1857,17 @@ class PmxTailorExportService:
 
                                 joint_key, joint = self.build_joint(
                                     "→",
-                                    22,
+                                    21,
                                     bone_y_idx,
                                     a_rigidbody,
                                     b_rigidbody,
                                     joint_pos,
                                     joint_qq,
+                                    base_map_idx,
+                                    a_xidx,
+                                    a_yidx + 1,
+                                    b_xidx,
+                                    b_yidx + 1,
                                     horizonal_limit_min_mov_xs,
                                     horizonal_limit_min_mov_ys,
                                     horizonal_limit_min_mov_zs,
@@ -1822,11 +1891,17 @@ class PmxTailorExportService:
                                 )
                                 created_joints[joint_key] = joint
 
-                            if param_option["horizonal_reverse_joint"]:
-                                # 横逆ジョイント
-                                a_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
-                                b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
+                        if param_option["horizonal_reverse_joint"]:
+                            # 横逆ジョイント
+                            a_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
+                            b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
 
+                            a_xidx = next_xidx
+                            a_yidx = v_yidx
+                            b_xidx = v_xidx
+                            b_yidx = v_yidx
+
+                            if a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0:
                                 a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
                                 b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
                                 if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
@@ -1866,6 +1941,11 @@ class PmxTailorExportService:
                                     b_rigidbody,
                                     joint_pos,
                                     joint_qq,
+                                    base_map_idx,
+                                    a_xidx,
+                                    a_yidx,
+                                    b_xidx,
+                                    b_yidx,
                                     horizonal_reverse_limit_min_mov_xs,
                                     horizonal_reverse_limit_min_mov_ys,
                                     horizonal_reverse_limit_min_mov_zs,
@@ -1888,10 +1968,21 @@ class PmxTailorExportService:
                                 )
                                 created_joints[joint_key] = joint
 
-                                if (
-                                    param_option["joint_pos_type"] == logger.transtext("ボーン位置")
-                                    and v_yidx == registed_max_v_yidx
-                                ):
+                            if (
+                                param_option["joint_pos_type"] == logger.transtext("ボーン位置")
+                                and v_yidx == registed_max_v_yidx
+                            ):
+                                # 末端横ジョイント
+                                # ひとつ上のボーンに紐付くジョイントをチェック
+                                a_rigidbody = next_above_vv.map_rigidbodies.get(next_map_idx, None)
+                                b_rigidbody = now_above_vv.map_rigidbodies.get(base_map_idx, None)
+
+                                a_xidx = next_xidx
+                                a_yidx = above_yidx
+                                b_xidx = v_xidx
+                                b_yidx = above_yidx
+
+                                if a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0:
                                     # 末端横逆ジョイント
                                     a_bone = model.bones[
                                         model.bone_indexes[
@@ -1916,12 +2007,17 @@ class PmxTailorExportService:
 
                                     joint_key, joint = self.build_joint(
                                         "←",
-                                        24,
+                                        23,
                                         bone_y_idx,
                                         a_rigidbody,
                                         b_rigidbody,
                                         joint_pos,
                                         joint_qq,
+                                        base_map_idx,
+                                        a_xidx,
+                                        a_yidx + 1,
+                                        b_xidx,
+                                        b_yidx + 1,
                                         horizonal_limit_min_mov_xs,
                                         horizonal_limit_min_mov_ys,
                                         horizonal_limit_min_mov_zs,
@@ -1941,7 +2037,7 @@ class PmxTailorExportService:
                                         horizonal_spring_constant_rot_ys,
                                         horizonal_spring_constant_rot_zs,
                                         ratio,
-                                        override_joint_name=f"←|{a_bone.name}|{b_bone.name}",
+                                        override_joint_name=f"←|{a_bone.name}T|{b_bone.name}T",
                                     )
                                     created_joints[joint_key] = joint
 
@@ -1949,6 +2045,11 @@ class PmxTailorExportService:
                         # 斜めジョイント
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_below_vv.map_rigidbodies.get(next_map_idx, None)
+
+                        a_xidx = v_xidx
+                        a_yidx = v_yidx
+                        b_xidx = next_xidx
+                        b_yidx = below_yidx
 
                         if not (
                             a_rigidbody
@@ -1961,6 +2062,7 @@ class PmxTailorExportService:
                                 regist_bones.shape[0] - 1 > below_yidx
                                 and regist_bones.shape[1] > next_xidx
                                 and regist_bones[below_yidx, next_xidx]
+                                and v_yidx < registed_max_v_yidx
                             ):
                                 logger.warning(
                                     "斜め（＼）ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
@@ -2011,6 +2113,11 @@ class PmxTailorExportService:
                                 b_rigidbody,
                                 joint_pos,
                                 joint_qq,
+                                base_map_idx,
+                                a_xidx,
+                                a_yidx,
+                                b_xidx,
+                                b_yidx,
                                 diagonal_limit_min_mov_xs,
                                 diagonal_limit_min_mov_ys,
                                 diagonal_limit_min_mov_zs,
@@ -2043,6 +2150,11 @@ class PmxTailorExportService:
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_above_vv.map_rigidbodies.get(next_map_idx, None)
 
+                        a_xidx = v_xidx
+                        a_yidx = v_yidx
+                        b_xidx = next_xidx
+                        b_yidx = above_yidx
+
                         if not (
                             a_rigidbody
                             and b_rigidbody
@@ -2054,6 +2166,7 @@ class PmxTailorExportService:
                                 regist_bones.shape[0] > above_yidx
                                 and regist_bones.shape[1] > v_xidx
                                 and regist_bones[above_yidx, v_xidx]
+                                and v_yidx < registed_max_v_yidx
                             ):
                                 logger.warning(
                                     "斜め（／）ジョイント生成に必要な情報が取得できなかった為、スルーします。 処理対象: %s",
@@ -2104,6 +2217,11 @@ class PmxTailorExportService:
                                 b_rigidbody,
                                 joint_pos,
                                 joint_qq,
+                                base_map_idx,
+                                a_xidx,
+                                a_yidx,
+                                b_xidx,
+                                b_yidx,
                                 diagonal_limit_min_mov_xs,
                                 diagonal_limit_min_mov_ys,
                                 diagonal_limit_min_mov_zs,
@@ -2152,6 +2270,11 @@ class PmxTailorExportService:
         b_rigidbody: RigidBody,
         joint_pos: MVector3D,
         joint_qq: MQuaternion,
+        base_map_idx: int,
+        a_xidx: int,
+        a_yidx: int,
+        b_xidx: int,
+        b_yidx: int,
         limit_min_mov_xs: np.ndarray,
         limit_min_mov_ys: np.ndarray,
         limit_min_mov_zs: np.ndarray,
@@ -2178,7 +2301,7 @@ class PmxTailorExportService:
             if not override_joint_name
             else override_joint_name
         )
-        joint_key = f"{direction_idx:02d}:{a_rigidbody.index:09d}:{b_rigidbody.index:09d}"
+        joint_key = (direction_idx, base_map_idx, a_xidx, a_yidx, b_xidx, b_yidx)
 
         joint_euler = joint_qq.toEulerAngles()
         joint_rotation_radians = MVector3D(
