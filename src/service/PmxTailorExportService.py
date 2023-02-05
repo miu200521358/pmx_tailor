@@ -2713,7 +2713,6 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and above_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
-                        and prev_xidx < v_xidx
                         and above_yidx < v_yidx
                         else VirtualVertex("")
                     )
@@ -2723,7 +2722,6 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and v_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
-                        and prev_xidx < v_xidx
                         else VirtualVertex("")
                     )
 
@@ -2732,7 +2730,6 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and below_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
-                        and prev_xidx < v_xidx
                         and below_yidx > v_yidx
                         else VirtualVertex("")
                     )
@@ -2768,7 +2765,6 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and above_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
-                        and next_xidx > v_xidx
                         and above_yidx < v_yidx
                         else VirtualVertex("")
                     )
@@ -2778,7 +2774,6 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and v_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
-                        and next_xidx > v_xidx
                         else VirtualVertex("")
                     )
 
@@ -2787,7 +2782,6 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and below_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
-                        and next_xidx > v_xidx
                         and below_yidx > v_yidx
                         else VirtualVertex("")
                     )
@@ -2842,7 +2836,7 @@ class PmxTailorExportService:
                         if next_below_bone:
                             x_sizes.append(now_below_bone.position.distanceToPoint(next_below_bone.position))
                         x_size = np.max(x_sizes) if x_sizes else 0.2
-                    elif prev_connected and v_xidx > 0 and (prev_now_bone or prev_below_bone):
+                    elif prev_connected and (prev_now_bone or prev_below_bone):
                         x_sizes = []
                         if prev_now_bone:
                             x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
@@ -4281,6 +4275,22 @@ class PmxTailorExportService:
                     else:
                         # とりあえずINT最大値を入れておく
                         bone_horizonal_distances[v_yidx, v_xidx] = np.iinfo(np.int).max
+                # elif base_map_idx > 0 and vertex_map.shape[1] == 1:
+                #     # 一列の場合、前との繋がりを見ておく
+                #     if tuple(vertex_map[v_yidx, 0]) in virtual_vertices[
+                #         tuple(vertex_maps[base_map_idx - 1][v_yidx, -1])
+                #     ].connected_vvs or tuple(vertex_map[v_yidx, 0]) == tuple(
+                #         vertex_maps[base_map_idx - 1][v_yidx, -1]
+                #     ):
+                #         # 横の仮想頂点と繋がっている場合、Trueで有効な距離を入れておく
+                #         bone_connected[v_yidx, v_xidx] = True
+
+                #         now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
+                #         prev_v_vec = virtual_vertices[tuple(vertex_maps[base_map_idx - 1][v_yidx, -1])].position()
+                #         bone_horizonal_distances[v_yidx, v_xidx] = now_v_vec.distanceToPoint(prev_v_vec)
+                #     else:
+                #         # とりあえずINT最大値を入れておく
+                #         bone_horizonal_distances[v_yidx, v_xidx] = np.iinfo(np.int).max
 
             logger.debug("bone_horizonal_distances ------------")
             logger.debug(bone_horizonal_distances.tolist())
@@ -4421,6 +4431,10 @@ class PmxTailorExportService:
                 if np.where(all_bone_connected[base_map_idx][:-1, -1] == 0)[0].any():
                     # X方向の末端がどこか繋がって無いとこがあったら末端にボーンを張る
                     x_registers[-1] = True
+
+                if base_map_idx > 0 and vertex_map.shape[1] == 1:
+                    # 2枚目以降で一列の場合、強制的にボーンを張る
+                    full_regist_bones[:-1, :] = True
 
                 for v_yidx, y_regist in enumerate(y_registers):
                     for v_xidx, x_regist in enumerate(x_registers):
@@ -5537,6 +5551,50 @@ class PmxTailorExportService:
                     ve2_vec = virtual_vertices[virtual_edge_keys[1]].position()
                     ve_line = MSegment(ve1_vec, ve2_vec)
 
+                    is_both_connected = False
+                    for vkey in [v0_key, v1_key, v2_key]:
+                        if (
+                            np.array(
+                                [
+                                    cv in virtual_vertices[vkey].connected_vvs
+                                    for cv in virtual_vertices[virtual_edge_keys[0]].vidxs()
+                                ]
+                            ).any()
+                            and np.array(
+                                [
+                                    cv in virtual_vertices[vkey].connected_vvs
+                                    for cv in virtual_vertices[virtual_edge_keys[1]].vidxs()
+                                ]
+                            ).any()
+                        ):
+                            # 仮想エッジの両方に繋がっている場合、内積が大きく違う事（同じ辺でないこと）をチェック
+                            dot = MVector3D.dotProduct(
+                                (virtual_vertices[vkey].position() - ve1_vec).normalized(),
+                                (virtual_vertices[vkey].position() - ve2_vec).normalized(),
+                            )
+                            if abs(dot) > 0.8:
+                                is_both_connected = True
+                                logger.debug(
+                                    "** ×同一辺重複: [%s:%s, %s:%s, %s:%s][ve: [%s:%s, %s:%s]][p: [%s:%s]][%s]",
+                                    v0_key,
+                                    virtual_vertices[v0_key].vidxs(),
+                                    v1_key,
+                                    virtual_vertices[v1_key].vidxs(),
+                                    v2_key,
+                                    virtual_vertices[v2_key].vidxs(),
+                                    virtual_edge_keys[0],
+                                    virtual_vertices[virtual_edge_keys[0]].vidxs(),
+                                    virtual_edge_keys[1],
+                                    virtual_vertices[virtual_edge_keys[1]].vidxs(),
+                                    vvkey,
+                                    virtual_vertices[vvkey].vidxs(),
+                                    dot,
+                                )
+                                break
+
+                    if is_both_connected:
+                        continue
+
                     area_threshold = (
                         np.mean(
                             [
@@ -5713,40 +5771,40 @@ class PmxTailorExportService:
                         # 既存のエッジと交差していたらスルー
                         continue
 
-                    area = poly_area(
-                        np.array(
-                            [
-                                virtual_vertices[v0_key].position().data(),
-                                virtual_vertices[v1_key].position().data(),
-                                virtual_vertices[v2_key].position().data(),
-                            ]
-                        )
-                    )
-                    if area < area_threshold:
-                        # 閾値の一定量を超えないのはスルー（多分直線上）
-                        logger.debug(
-                            "** ×面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
-                            v0_key,
-                            virtual_vertices[v0_key].vidxs(),
-                            v1_key,
-                            virtual_vertices[v1_key].vidxs(),
-                            v2_key,
-                            virtual_vertices[v2_key].vidxs(),
-                            area,
-                            area_threshold,
-                        )
-                        continue
-                    logger.debug(
-                        "** ○面積: [%s:%s, %s:%s, %s:%s][%s < %s]",
-                        v0_key,
-                        virtual_vertices[v0_key].vidxs(),
-                        v1_key,
-                        virtual_vertices[v1_key].vidxs(),
-                        v2_key,
-                        virtual_vertices[v2_key].vidxs(),
-                        area,
-                        threshold,
-                    )
+                    # area = poly_area(
+                    #     np.array(
+                    #         [
+                    #             virtual_vertices[v0_key].position().data(),
+                    #             virtual_vertices[v1_key].position().data(),
+                    #             virtual_vertices[v2_key].position().data(),
+                    #         ]
+                    #     )
+                    # )
+                    # if area < area_threshold:
+                    #     # 閾値の一定量を超えないのはスルー（多分直線上）
+                    #     logger.debug(
+                    #         "** ×面積スルー: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                    #         v0_key,
+                    #         virtual_vertices[v0_key].vidxs(),
+                    #         v1_key,
+                    #         virtual_vertices[v1_key].vidxs(),
+                    #         v2_key,
+                    #         virtual_vertices[v2_key].vidxs(),
+                    #         area,
+                    #         area_threshold,
+                    #     )
+                    #     continue
+                    # logger.debug(
+                    #     "** ○面積: [%s:%s, %s:%s, %s:%s][%s < %s]",
+                    #     v0_key,
+                    #     virtual_vertices[v0_key].vidxs(),
+                    #     v1_key,
+                    #     virtual_vertices[v1_key].vidxs(),
+                    #     v2_key,
+                    #     virtual_vertices[v2_key].vidxs(),
+                    #     area,
+                    #     threshold,
+                    # )
 
                     logger.debug(
                         "* 仮想面: [%s:%s, %s:%s, %s:%s]",
