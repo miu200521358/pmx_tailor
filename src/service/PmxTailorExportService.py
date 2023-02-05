@@ -1295,6 +1295,30 @@ class PmxTailorExportService:
                         base_map_idx,
                     )
 
+                    prev_above_vv = (
+                        virtual_vertices[tuple(vertex_maps[prev_map_idx][above_yidx, prev_xidx])]
+                        if prev_map_idx in vertex_maps
+                        and above_yidx < vertex_maps[prev_map_idx].shape[0]
+                        and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        else VirtualVertex("")
+                    )
+
+                    prev_now_vv = (
+                        virtual_vertices[tuple(vertex_maps[prev_map_idx][v_yidx, prev_xidx])]
+                        if prev_map_idx in vertex_maps
+                        and v_yidx < vertex_maps[prev_map_idx].shape[0]
+                        and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        else VirtualVertex("")
+                    )
+
+                    prev_below_vv = (
+                        virtual_vertices[tuple(vertex_maps[prev_map_idx][below_yidx, prev_xidx])]
+                        if prev_map_idx in vertex_maps
+                        and below_yidx < vertex_maps[prev_map_idx].shape[0]
+                        and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        else VirtualVertex("")
+                    )
+
                     now_above_vv = (
                         virtual_vertices[tuple(vertex_maps[base_map_idx][above_yidx, v_xidx])]
                         if base_map_idx in vertex_maps
@@ -1667,7 +1691,7 @@ class PmxTailorExportService:
                                         )
                                         created_joints[joint_key] = joint
 
-                    if param_option["horizonal_joint"] and next_connected and next_now_vv and not is_center:
+                    if param_option["horizonal_joint"] and not is_center:
                         # 横ジョイント
                         a_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                         b_rigidbody = next_now_vv.map_rigidbodies.get(next_map_idx, None)
@@ -1676,6 +1700,16 @@ class PmxTailorExportService:
                         a_yidx = v_yidx
                         b_xidx = next_xidx
                         b_yidx = v_yidx
+
+                        if not b_rigidbody:
+                            # 横がない場合、入れ替える
+                            a_rigidbody = prev_now_vv.map_rigidbodies.get(base_map_idx, None)
+                            b_rigidbody = now_now_vv.map_rigidbodies.get(next_map_idx, None)
+
+                            a_xidx = prev_xidx
+                            a_yidx = v_yidx
+                            b_xidx = v_xidx
+                            b_yidx = v_yidx
 
                         if v_yidx < registed_max_v_yidx and not (
                             a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0
@@ -1820,6 +1854,16 @@ class PmxTailorExportService:
                             a_yidx = above_yidx
                             b_xidx = next_xidx
                             b_yidx = above_yidx
+
+                            if not b_rigidbody:
+                                # 横がない場合、入れ替える
+                                a_rigidbody = prev_above_vv.map_rigidbodies.get(base_map_idx, None)
+                                b_rigidbody = now_above_vv.map_rigidbodies.get(next_map_idx, None)
+
+                                a_xidx = prev_xidx
+                                a_yidx = above_yidx
+                                b_xidx = v_xidx
+                                b_yidx = above_yidx
 
                             if a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0:
                                 a_pos = (
@@ -4526,12 +4570,17 @@ class PmxTailorExportService:
                     full_regist_bones[np.where(all_bone_connected[base_map_idx - 1][:, -1])[0], 0] = True
 
                 x_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)
+                if base_map_idx > 0:
+                    x_diffs = np.where(all_bone_connected[base_map_idx][:, :1])
                 if x_diffs[0].any():
                     not_connected_xs = [(yi, xi + 1) for yi, xi in zip(x_diffs[0], x_diffs[1] + 1)]
                 else:
                     not_connected_xs = []
 
                 y_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=0) < 0)
+                if base_map_idx > 0:
+                    y_diffs = np.where(all_bone_connected[base_map_idx][:1, :])
+
                 if y_diffs[0].any():
                     not_connected_ys = [(yi, xi) for yi, xi in zip(y_diffs[0], y_diffs[1])]
                 else:
@@ -4620,7 +4669,14 @@ class PmxTailorExportService:
                     x_registered = np.where(regist_bones[:, v_xidx])[0]
                     if x_registered.any():
                         first_connected_v_yidx = np.min(x_registered)
-                        last_connected_v_yidx = np.max(x_registered)
+                        # 末端は横と繋がってない場合もあるので全体から見る
+                        last_connected_v_yidx = max(
+                            [
+                                y
+                                for y in range(vertex_map.shape[0])
+                                if virtual_vertices[tuple(vertex_map[y, v_xidx])].vidxs()
+                            ]
+                        )
                         if first_connected_v_yidx == last_connected_v_yidx:
                             # 一列にひとつしか登録されてない場合、不要なので削除
                             regist_bones[
@@ -7314,7 +7370,7 @@ class PmxTailorExportService:
                 prev_connected = True
             elif (
                 base_map_idx > 0
-                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[1] > 1
+                and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[1] > 0
                 and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]].shape[0] > target_v_yidx
                 and all_bone_connected[list(all_bone_connected.keys())[base_map_idx - 1]][target_v_yidx, -1].any()
             ):
@@ -7324,7 +7380,7 @@ class PmxTailorExportService:
                 if (
                     tuple(vertex_maps[prev_map_idx][target_v_yidx, -1])
                     == tuple(vertex_maps[base_map_idx][target_v_yidx, v_xidx])
-                    and all_bone_connected[prev_map_idx].shape[1] > 2
+                    and all_bone_connected[prev_map_idx].shape[1] > 1
                     and all_bone_connected[prev_map_idx][target_v_yidx, -2].any()
                 ):
                     # 前のボーンが同じ仮想頂点であり、かつそのもうひとつ前と繋がっている場合
