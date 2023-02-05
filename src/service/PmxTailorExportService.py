@@ -2828,21 +2828,20 @@ class PmxTailorExportService:
                         elif not prev_now_vv and next_now_vv:
                             x_sizes.append(next_now_vv.position().distanceToPoint(now_now_vv.position()))
                         x_size = np.max(x_sizes) if x_sizes else 0.2
-
                     elif next_connected and (next_now_bone or next_below_bone):
                         x_sizes = []
                         if next_now_bone:
                             x_sizes.append(now_now_bone.position.distanceToPoint(next_now_bone.position))
                         if next_below_bone:
                             x_sizes.append(now_below_bone.position.distanceToPoint(next_below_bone.position))
-                        x_size = np.max(x_sizes) if x_sizes else 0.2
+                        x_size = np.mean(x_sizes) if x_sizes else 0.2
                     elif prev_connected and (prev_now_bone or prev_below_bone):
                         x_sizes = []
                         if prev_now_bone:
                             x_sizes.append(now_now_bone.position.distanceToPoint(prev_now_bone.position))
                         if prev_below_bone:
                             x_sizes.append(now_below_bone.position.distanceToPoint(prev_below_bone.position))
-                        x_size = np.max(x_sizes) if x_sizes else 0.2
+                        x_size = np.mean(x_sizes) if x_sizes else 0.2
                     else:
                         v_poses = [(v.position * base_reverse_axis).data() for v in model.vertices[now_now_bone.index]]
 
@@ -2911,26 +2910,26 @@ class PmxTailorExportService:
                             round(shape_volume, 5),
                         )
 
-                    if v_xidx == registed_max_v_xidx:
-                        # 円周を描いている場合、最初（最後の次）からの中間にしておく
-                        if next_connected:
-                            mean_x_idx = v_xidx + (max_v_xidx + 1 - v_xidx) / 2
-                        else:
-                            mean_x_idx = v_xidx - 0.5
-                    else:
-                        mean_x_idx = v_xidx + (next_xidx - v_xidx) / 2
-                    mean_y_idx = v_yidx + (below_yidx - v_yidx) / 2
+                    # if v_xidx == registed_max_v_xidx:
+                    #     # 円周を描いている場合、最初（最後の次）からの中間にしておく
+                    #     if next_connected:
+                    #         mean_x_idx = v_xidx + (max_v_xidx + 1 - v_xidx) / 2
+                    #     else:
+                    #         mean_x_idx = v_xidx - 0.5
+                    # else:
+                    #     mean_x_idx = v_xidx + (next_xidx - v_xidx) / 2
+                    # mean_y_idx = v_yidx + (below_yidx - v_yidx) / 2
 
-                    floor_mean_xidx = int(mean_x_idx - 1) if mean_x_idx % 1 == 0 else math.floor(mean_x_idx)
-                    ceil_mean_xidx = int(mean_x_idx + 1) if mean_x_idx % 1 == 0 else math.ceil(mean_x_idx)
-                    if ceil_mean_xidx >= vertex_map.shape[1]:
-                        if len(vertex_maps) == 1:
-                            # 最後を超えている場合、円周（頂点マップが1つ）は最初に戻す
-                            ceil_mean_xidx = 0
-                        else:
-                            # スリットなどの場合、ひとつずつ前にずらす
-                            floor_mean_xidx = math.floor(mean_x_idx - 1)
-                            ceil_mean_xidx = math.ceil(mean_x_idx - 1)
+                    # floor_mean_xidx = int(mean_x_idx - 1) if mean_x_idx % 1 == 0 else math.floor(mean_x_idx)
+                    # ceil_mean_xidx = int(mean_x_idx + 1) if mean_x_idx % 1 == 0 else math.ceil(mean_x_idx)
+                    # if ceil_mean_xidx >= vertex_map.shape[1]:
+                    #     if len(vertex_maps) == 1:
+                    #         # 最後を超えている場合、円周（頂点マップが1つ）は最初に戻す
+                    #         ceil_mean_xidx = 0
+                    #     else:
+                    #         # スリットなどの場合、ひとつずつ前にずらす
+                    #         floor_mean_xidx = math.floor(mean_x_idx - 1)
+                    #         ceil_mean_xidx = math.ceil(mean_x_idx - 1)
 
                     if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                         # ジョイントがボーン間にある場合、剛体はボーン位置
@@ -2941,57 +2940,83 @@ class PmxTailorExportService:
                             # 平行ではない場合、後で調整し直すので一旦ボーン位置
                             shape_position = now_now_bone.position
                     else:
-                        if param_option["exist_physics_clear"] in [logger.transtext("そのまま"), logger.transtext("上書き")]:
-                            # そのまま・上書きはメッシュの中間位置で位置を取り直す
-                            shape_positions = []
-                            if tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx]) in virtual_vertices:
-                                shape_positions.append(
-                                    virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx])]
-                                    .position()
-                                    .data()
-                                )
-                            if tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx]) in virtual_vertices:
-                                shape_positions.append(
-                                    virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx])]
-                                    .position()
-                                    .data()
-                                )
-                            if tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx]) in virtual_vertices:
-                                shape_positions.append(
-                                    virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx])]
-                                    .position()
-                                    .data()
-                                )
-                            if tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx]) in virtual_vertices:
-                                shape_positions.append(
-                                    virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx])]
-                                    .position()
-                                    .data()
-                                )
-
-                            shape_position = MVector3D(
-                                np.mean(
-                                    shape_positions,
-                                    axis=0,
-                                )
-                            )
+                        # ボーン位置は複数のボーンの中央に剛体を配置する
+                        shape_positions = []
+                        shape_positions.append(now_now_bone.position)
+                        if now_above_bone and now_now_bone == now_below_bone:
+                            shape_positions.append(now_above_bone.position.data())
                         else:
-                            # 再利用はボーンの位置だけで判定
-                            shape_positions = []
-                            shape_positions.append(now_now_bone.position)
-                            if now_above_bone and now_now_bone == now_below_bone:
-                                shape_positions.append(now_above_bone.position.data())
-                            else:
-                                shape_positions.append(now_below_bone.position.data())
-                            if next_now_bone:
-                                shape_positions.append(next_now_bone.position.data())
-                            elif prev_now_bone:
-                                shape_positions.append(prev_now_bone.position.data())
-                            if next_below_bone:
-                                shape_positions.append(next_below_bone.position.data())
-                            elif prev_below_bone:
-                                shape_positions.append(prev_below_bone.position.data())
-                            shape_position = MVector3D(np.mean(shape_positions, axis=0))
+                            shape_positions.append(now_below_bone.position.data())
+                        if next_now_bone:
+                            shape_positions.append(next_now_bone.position.data())
+                        elif prev_now_bone:
+                            shape_positions.append(prev_now_bone.position.data())
+                        if next_below_bone:
+                            shape_positions.append(next_below_bone.position.data())
+                        elif prev_below_bone:
+                            shape_positions.append(prev_below_bone.position.data())
+                        shape_position = MVector3D(np.mean(shape_positions, axis=0))
+
+                        # if param_option["exist_physics_clear"] in [logger.transtext("そのまま"), logger.transtext("上書き")]:
+                        #     # そのまま・上書きはメッシュの中間位置で位置を取り直す
+                        #     shape_positions = []
+                        #     if now_now_bone:
+                        #         shape_positions.append(now_now_bone.position)
+                        #     if now_below_bone:
+                        #         shape_positions.append(now_below_bone.position)
+                        #     if next_now_bone:
+                        #         shape_positions.append(next_now_bone.position)
+                        #     if next_below_bone:
+                        #         shape_positions.append(next_below_bone.position)
+
+                        #     # if tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx]) in virtual_vertices:
+                        #     #     shape_positions.append(
+                        #     #         virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), floor_mean_xidx])]
+                        #     #         .position()
+                        #     #         .data()
+                        #     #     )
+                        #     # if tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx]) in virtual_vertices:
+                        #     #     shape_positions.append(
+                        #     #         virtual_vertices[tuple(vertex_map[math.floor(mean_y_idx), ceil_mean_xidx])]
+                        #     #         .position()
+                        #     #         .data()
+                        #     #     )
+                        #     # if tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx]) in virtual_vertices:
+                        #     #     shape_positions.append(
+                        #     #         virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), floor_mean_xidx])]
+                        #     #         .position()
+                        #     #         .data()
+                        #     #     )
+                        #     # if tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx]) in virtual_vertices:
+                        #     #     shape_positions.append(
+                        #     #         virtual_vertices[tuple(vertex_map[math.ceil(mean_y_idx), ceil_mean_xidx])]
+                        #     #         .position()
+                        #     #         .data()
+                        #     #     )
+
+                        #     shape_position = MVector3D(
+                        #         np.mean(
+                        #             shape_positions,
+                        #             axis=0,
+                        #         )
+                        #     )
+                        # else:
+                        #     # 再利用はボーンの位置だけで判定
+                        #     shape_positions = []
+                        #     shape_positions.append(now_now_bone.position)
+                        #     if now_above_bone and now_now_bone == now_below_bone:
+                        #         shape_positions.append(now_above_bone.position.data())
+                        #     else:
+                        #         shape_positions.append(now_below_bone.position.data())
+                        #     if next_now_bone:
+                        #         shape_positions.append(next_now_bone.position.data())
+                        #     elif prev_now_bone:
+                        #         shape_positions.append(prev_now_bone.position.data())
+                        #     if next_below_bone:
+                        #         shape_positions.append(next_below_bone.position.data())
+                        #     elif prev_below_bone:
+                        #         shape_positions.append(prev_below_bone.position.data())
+                        #     shape_position = MVector3D(np.mean(shape_positions, axis=0))
 
                     is_y_direction_prev = False
                     # if v_yidx == max_v_yidx or now_now_bone == now_below_bone:
@@ -3021,15 +3046,21 @@ class PmxTailorExportService:
                         x_direction_to_pos = now_now_bone.position
                     y_direction_to_pos = now_below_bone.position
 
-                    if (
-                        tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
-                        and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
-                        != now_now_bone.position
-                    ):
-                        y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                    if next_below_bone and now_below_bone != next_below_bone:
+                        y_direction_from_pos = next_below_bone.position
                     else:
+                        y_direction_from_pos = prev_below_bone.position
                         is_y_direction_prev = True
-                        y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, floor_mean_xidx])].position()
+
+                    # if (
+                    #     tuple(vertex_map[v_yidx, ceil_mean_xidx]) in virtual_vertices
+                    #     and virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                    #     != now_now_bone.position
+                    # ):
+                    #     y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, ceil_mean_xidx])].position()
+                    # else:
+                    #     is_y_direction_prev = True
+                    #     y_direction_from_pos = virtual_vertices[tuple(vertex_map[v_yidx, floor_mean_xidx])].position()
 
                     # ボーン進行方向(x)
                     x_direction_pos = (x_direction_to_pos - x_direction_from_pos).normalized()
@@ -4361,6 +4392,10 @@ class PmxTailorExportService:
                 # プラスの場合、前と繋がっていないので登録対象
                 full_regist_bones[:, 1:][np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)] = True
 
+                if base_map_idx > 0:
+                    # 2枚目以降の場合、前マップの接続状況を追加
+                    full_regist_bones[np.where(all_bone_connected[base_map_idx - 1][:, -1])[0], 0] = True
+
                 x_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)
                 if x_diffs[0].any():
                     not_connected_xs = [(yi, xi + 1) for yi, xi in zip(x_diffs[0], x_diffs[1] + 1)]
@@ -4431,10 +4466,6 @@ class PmxTailorExportService:
                 if np.where(all_bone_connected[base_map_idx][:-1, -1] == 0)[0].any():
                     # X方向の末端がどこか繋がって無いとこがあったら末端にボーンを張る
                     x_registers[-1] = True
-
-                if base_map_idx > 0 and vertex_map.shape[1] == 1:
-                    # 2枚目以降で一列の場合、強制的にボーンを張る
-                    full_regist_bones[:-1, :] = True
 
                 for v_yidx, y_regist in enumerate(y_registers):
                     for v_xidx, x_regist in enumerate(x_registers):
