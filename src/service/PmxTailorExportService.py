@@ -3579,7 +3579,7 @@ class PmxTailorExportService:
             # 頂点マップ上部直近頂点の評価軸位置
             nearest_top_axis_val = nearest_top_pos[np.where(np.abs(base_vertical_axis.data()))][0]
 
-            if abs(axis_root_val - nearest_top_axis_val) <= abs(axis_root_val - vv_axis_val):
+            if (axis_root_val - nearest_top_axis_val) <= (axis_root_val - vv_axis_val):
                 # 評価軸にTOPより遠い（スカートの場合、TOPより下）の場合、スルー
                 logger.debug(
                     f"×グラデスルー: target [{vv.vidxs()}], axis_root_val [{round(axis_root_val, 3)}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}]"
