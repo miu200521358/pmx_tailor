@@ -983,6 +983,7 @@ class PmxTailorExportService:
                     back_vertices,
                     threshold,
                     is_material_horizonal,
+                    horizonal_top_edge_keys,
                 ) = self.create_vertex_map(
                     model,
                     param_option,
@@ -1040,33 +1041,39 @@ class PmxTailorExportService:
                     threshold,
                 )
 
+                # グラデウェイト
+                remaining_vertices = self.create_grad_weight(
+                    model,
+                    param_option,
+                    target_vertices,
+                    virtual_vertices,
+                    remaining_vertices,
+                    threshold,
+                    base_vertical_axis,
+                    horizonal_top_edge_keys,
+                )
+
+                # 裏ウェイト
+                remaining_vidxs = self.create_back_weight(
+                    model,
+                    param_option,
+                    target_vertices,
+                    virtual_vertices,
+                    back_vertices,
+                    remaining_vertices,
+                    threshold,
+                )
+
                 # 残ウェイト
-                weighted_vidxs = self.create_remaining_weight(
+                self.create_remaining_weight(
                     model,
                     param_option,
                     material_name,
                     virtual_vertices,
                     vertex_maps,
                     all_regist_bones,
-                    remaining_vertices,
+                    remaining_vidxs,
                     threshold,
-                )
-
-                # グラデウェイト
-                self.create_grad_weight(
-                    model,
-                    param_option,
-                    material_name,
-                    virtual_vertices,
-                    target_vertices,
-                    weighted_vidxs,
-                    threshold,
-                    base_vertical_axis,
-                )
-
-                # 裏ウェイト
-                self.create_back_weight(
-                    model, param_option, material_name, virtual_vertices, back_vertices, weighted_vidxs, threshold
                 )
 
             root_rigidbody, parent_bone_rigidbody = self.create_rigidbody(
@@ -1885,7 +1892,7 @@ class PmxTailorExportService:
                                         ]
                                     ].position
                                     if model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index >= 0
-                                    else model.bone_indexes[a_rigidbody.bone_index].position
+                                    else model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
                                     + model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_position
                                 )
 
@@ -1896,7 +1903,7 @@ class PmxTailorExportService:
                                         ]
                                     ].position
                                     if model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index >= 0
-                                    else model.bone_indexes[b_rigidbody.bone_index].position
+                                    else model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                                     + model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_position
                                 )
 
@@ -3517,50 +3524,64 @@ class PmxTailorExportService:
         self,
         model: PmxModel,
         param_option: dict,
-        material_name: str,
+        target_vertices: list,
         virtual_vertices: dict,
-        target_map_vertices: list,
-        weighted_vidxs: list,
+        remaining_vertices: list,
         threshold: float,
         base_vertical_axis: MVector3D,
+        horizonal_top_edge_keys: list,
     ):
-
-        # 裏面対象頂点CSVが指定されていない場合、スルー
-        if not param_option["vertices_csv"]:
+        # 残頂点がない場合、スルー
+        if not remaining_vertices:
             return
 
         logger.info(
-            "【%s:%s】グラデーションウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE
+            "【%s:%s】グラデーションウェイト生成",
+            param_option["material_name"],
+            param_option["abb_name"],
+            decoration=MLogger.DECORATION_LINE,
         )
-
-        target_vertices = {}
-        for vidx in target_map_vertices:
-            v = model.vertex_dict[vidx]
-            v_key = v.position.to_key(threshold)
-            if v.index not in weighted_vidxs:
-                if v_key not in target_vertices:
-                    # まだ登録されてない、かつ既に塗り終わった頂点ではない場合、対象
-                    target_vertices[v_key] = VirtualVertex(v_key)
-                target_vertices[v_key].append([v], [], [])
-
-        if not target_vertices or not weighted_vidxs:
-            # 処理対象がないため、終了
-            return
 
         # 親ボーン
         parent_bone = model.bones[param_option["parent_bone_name"]]
 
+        # 塗り終わった仮想頂点キーリスト
+        weighted_vkeys = list(set(virtual_vertices.keys()) - set(remaining_vertices.keys()))
+
         # 塗り終わった頂点のリスト
         weighted_vertices = {}
-        for vidx in weighted_vidxs:
-            v = model.vertex_dict[vidx]
-            weighted_vertices[v.index] = v.position.data()
+        for vkey in weighted_vkeys:
+            for vidx in virtual_vertices[vkey].vidxs():
+                v = model.vertex_dict[vidx]
+                weighted_vertices[v.index] = v.position.data()
 
         weight_cnt = 0
         prev_weight_cnt = 0
 
-        for v_key, vv in target_vertices.items():
+        # 頂点マップ上部の位置
+        top_vv_poses = np.array([virtual_vertices[tk].position().data() for tk in horizonal_top_edge_keys])
+
+        # 離れた評価軸
+        axis_root_val = base_vertical_axis.data()[np.where(np.abs(base_vertical_axis.data()))][0] * 100
+
+        for v_key, vv in remaining_vertices.items():
             if not vv.vidxs():
+                continue
+
+            # 仮想頂点の評価軸位置
+            vv_axis_val = vv.position().data()[np.where(np.abs(base_vertical_axis.data()))][0]
+
+            # 頂点マップ上部との距離
+            top_vv_poses = np.linalg.norm((top_vv_poses - vv.position().data()), ord=2, axis=1)
+            nearest_top_pos = np.min(top_vv_poses)
+            # 頂点マップ上部直近頂点の評価軸位置
+            nearest_top_axis_val = nearest_top_pos[np.where(np.abs(base_vertical_axis.data()))][0]
+
+            if abs(axis_root_val - nearest_top_axis_val) < abs(axis_root_val - vv_axis_val):
+                # 評価軸にTOPより遠い（スカートの場合、TOPより下）の場合、スルー
+                logger.debug(
+                    f"×グラデスルー: target [{vv.vidxs()}], axis_root_val [{round(axis_root_val, 3)}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv_axis_val[{round(vv_axis_val, 3)}]"
+                )
                 continue
 
             # 各頂点の位置との差分から距離を測る
@@ -3646,6 +3667,10 @@ class PmxTailorExportService:
             for rv in vv.real_vertices:
                 rv.deform = vv.deform
 
+            # 登録対象の場合、残対象から削除
+            if v_key in remaining_vertices:
+                del remaining_vertices[v_key]
+
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
                 logger.info("-- グラデーション頂点ウェイト: %s個目:終了", weight_cnt)
@@ -3653,14 +3678,16 @@ class PmxTailorExportService:
 
         logger.info("-- グラデーション頂点ウェイト: %s個目:終了", weight_cnt)
 
+        return remaining_vertices
+
     def create_back_weight(
         self,
         model: PmxModel,
         param_option: dict,
-        material_name: str,
+        target_vertices: list,
         virtual_vertices: dict,
         back_vertices: list,
-        weighted_vidxs: list,
+        remaining_vertices: dict,
         threshold: float,
     ):
         if param_option["back_material_name"]:
@@ -3675,6 +3702,13 @@ class PmxTailorExportService:
                 for vertices_back_csv_path in glob(param_option["vertices_back_csv"]):
                     back_vertices.extend(read_vertices_from_file(vertices_back_csv_path, model, None))
             except Exception:
+                logger.info(
+                    "【%s:%s】裏ウェイト生成",
+                    param_option["material_name"],
+                    param_option["abb_name"],
+                    decoration=MLogger.DECORATION_LINE,
+                )
+
                 logger.warning("裏面対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
 
         if not back_vertices:
@@ -3683,17 +3717,26 @@ class PmxTailorExportService:
         # 重複を除外
         back_vertices = list(set(back_vertices))
 
-        logger.info("【%s:%s】裏ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
+        logger.info(
+            "【%s:%s】裏ウェイト生成",
+            param_option["material_name"],
+            param_option["abb_name"],
+            decoration=MLogger.DECORATION_LINE,
+        )
 
         weight_cnt = 0
         prev_weight_cnt = 0
 
-        # 塗り終わった頂点と処理対象材質頂点の論理和頂点リストを対象とする
+        # 残っている頂点
+        remaining_vidxs = [vidx for rv in remaining_vertices for vidx in rv.vidxs()]
+
+        # 処理対象材質頂点から残頂点と裏頂点を引いた頂点リストを裏ウェイトの対象とする
         front_vertices = {}
-        for vidx in list(set(weighted_vidxs) | (set(model.material_vertices[material_name]) - set(back_vertices))):
+        for vidx in list(set(target_vertices) - set(remaining_vidxs) - set(back_vertices)):
             v = model.vertex_dict[vidx]
             front_vertices[v.index] = v.position.data()
 
+        back_weighted_vidxs = []
         for vertex_idx in back_vertices:
             bv = model.vertex_dict[vertex_idx]
 
@@ -3708,12 +3751,17 @@ class PmxTailorExportService:
             logger.debug(f"裏頂点: back [{bv.index}], front [{copy_front_vertex_idx}], 距離 [{np.min(bv_distances)}]")
             bv.deform = copy.deepcopy(model.vertex_dict[copy_front_vertex_idx].deform)
 
+            back_weighted_vidxs.append(bv.index)
+
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
                 logger.info("-- 裏頂点ウェイト: %s個目:終了", weight_cnt)
                 prev_weight_cnt = weight_cnt // 200
 
         logger.info("-- 裏頂点ウェイト: %s個目:終了", weight_cnt)
+
+        # 残頂点から塗り終わった裏頂点を除外する
+        return list(set(remaining_vidxs) - set(back_weighted_vidxs))
 
     def create_remaining_weight(
         self,
@@ -3723,7 +3771,7 @@ class PmxTailorExportService:
         virtual_vertices: dict,
         vertex_maps: dict,
         all_regist_bones: dict,
-        remaining_vertices: dict,
+        remaining_vidxs: list,
         threshold: float,
     ):
         logger.info("【%s:%s】残ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
@@ -3731,21 +3779,15 @@ class PmxTailorExportService:
         vertex_cnt = 0
         prev_vertex_cnt = 0
 
-        # ウェイト塗り終わった実頂点リスト
-        weighted_vidxs = []
-
-        # 塗り終わった頂点リスト
-        weighted_vkeys = list(set(list(virtual_vertices.keys())) - set(list(remaining_vertices.keys())))
-
-        weighted_poses = {}
-        for vkey in weighted_vkeys:
-            vv = virtual_vertices[vkey]
-            if vv.vidxs():
-                weighted_poses[vkey] = vv.position().data()
-                weighted_vidxs.extend(vv.vidxs())
-
-        if not weighted_poses:
-            return weighted_vidxs
+        # ウェイト塗り終わった実頂点INDEXとその位置
+        weighted_vidxs = dict(
+            [
+                (vidx, model.vertex_dict[vidx].position.data())
+                for vv in virtual_vertices.values()
+                for vidx in vv.vidxs()
+                if vidx not in remaining_vidxs
+            ]
+        )
 
         # 登録済みのボーンの位置リスト
         bone_poses = {}
@@ -3764,74 +3806,49 @@ class PmxTailorExportService:
                         bone_poses[bones[0].index] = bones[0].position.data()
                         continue
 
-                    # ボーンが登録されてない箇所かつまだウェイトが塗られてないのは残頂点に入れる
-                    if v_key not in remaining_vertices and not vv.deform:
-                        remaining_vertices[v_key] = vv
+                    # まだウェイトが塗られてないのは残頂点に入れる
+                    if not vv.deform:
+                        remaining_vidxs.extend(vv.vidxs())
 
         # 裾材質を追加
         if param_option["edge_material_name"] or param_option["edge_extend_material_names"]:
             for mname in [param_option["edge_material_name"]] + param_option["edge_extend_material_names"]:
                 if not mname:
                     continue
-
-                for vidx in model.material_vertices[param_option["edge_material_name"]]:
-                    v = model.vertex_dict[vidx]
-                    v_key = v.position.to_key(threshold)
-                    if v_key not in remaining_vertices:
-                        remaining_vertices[v_key] = VirtualVertex(v_key)
-                        vv.append([v], [], [])
-                    remaining_vertices[v_key].append([v], [], [])
+                remaining_vidxs.extend(model.material_vertices[param_option["edge_material_name"]])
 
         if param_option["vertices_edge_csv"]:
             try:
                 for vertices_edge_csv_path in glob(param_option["vertices_edge_csv"]):
-                    for vidx in read_vertices_from_file(vertices_edge_csv_path, model, None):
-                        v = model.vertex_dict[vidx]
-                        v_key = v.position.to_key(threshold)
-                        if v_key not in remaining_vertices:
-                            remaining_vertices[v_key] = VirtualVertex(v_key)
-                            vv.append([v], [], [])
-                        remaining_vertices[v_key].append([v], [], [])
+                    remaining_vidxs.extend(read_vertices_from_file(vertices_edge_csv_path, model, None))
             except Exception:
                 logger.warning("裾対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
 
-        remain_cnt = len(remaining_vertices) * 2
-        while remaining_vertices.items() and remain_cnt > 0:
+        # 重複を除外
+        remaining_vidxs = list(set(remaining_vidxs))
+
+        remain_cnt = len(remaining_vidxs) * 2
+        while remaining_vidxs and remain_cnt > 0:
             remain_cnt -= 1
             # ランダムで選ぶ
-            vkey = list(remaining_vertices.keys())[random.randrange(len(remaining_vertices))]
-            vv = remaining_vertices[vkey]
-
-            if not vv.vidxs():
-                # vidx がないのはそもそも対象外
-                del remaining_vertices[vkey]
-                continue
+            vidx = remaining_vidxs[random.randrange(len(remaining_vidxs))]
+            rv = model.vertex_dict[vidx]
 
             # ウェイト済み頂点のうち、最も近いのを抽出
             weighted_diff_distances = np.linalg.norm(
-                np.array(list(weighted_poses.values())) - vv.position().data(), ord=2, axis=1
+                np.array(list(weighted_vidxs.values())) - rv.position.data(), ord=2, axis=1
             )
 
-            nearest_vkey = list(weighted_poses.keys())[np.argmin(weighted_diff_distances)]
-            nearest_vv = virtual_vertices[nearest_vkey]
-            nearest_deform = nearest_vv.deform
-            # nearest_vv.connected_vvs.extend(vv.vidxs())
-
-            if not nearest_vv.deform:
-                # デフォームの対象がない場合、他で埋まる可能性があるので、一旦据え置き
-                continue
+            nearest_vidx = list(weighted_vidxs.keys())[np.argmin(weighted_diff_distances)]
+            nearest_deform = model.vertex_dict[nearest_vidx].deform
 
             if type(nearest_deform) is Bdef1:
                 logger.debug(
-                    f"remaining1 nearest_vv: {nearest_vv.vidxs()}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
+                    f"remaining1 nearest_vidx: {nearest_vidx}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
                 )
+                rv.deform = Bdef1(nearest_deform.index0)
 
-                for rv in vv.real_vertices:
-                    weighted_vidxs.append(rv.index)
-                    rv.deform = Bdef1(nearest_deform.index0)
-                    vv.deform = Bdef1(nearest_deform.index0)
-
-                del remaining_vertices[vkey]
+                del remaining_vidxs[vidx]
             elif type(nearest_deform) is Bdef2:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -3855,19 +3872,19 @@ class PmxTailorExportService:
                 weight_idxs = np.argsort(weights)
 
                 logger.debug(
-                    f"remaining2 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
+                    f"remaining2 nearest_vidx: {nearest_vidx}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
                 )
 
                 if np.count_nonzero(weights) == 1:
-                    vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                    rv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
                 elif np.count_nonzero(weights) == 2:
-                    vv.deform = Bdef2(
+                    rv.deform = Bdef2(
                         model.bones[weight_names[weight_idxs[-1]]].index,
                         model.bones[weight_names[weight_idxs[-2]]].index,
                         weights[weight_idxs[-1]],
                     )
                 else:
-                    vv.deform = Bdef4(
+                    rv.deform = Bdef4(
                         model.bones[weight_names[weight_idxs[-1]]].index,
                         model.bones[weight_names[weight_idxs[-2]]].index,
                         model.bones[weight_names[weight_idxs[-3]]].index,
@@ -3878,11 +3895,7 @@ class PmxTailorExportService:
                         weights[weight_idxs[-4]],
                     )
 
-                for rv in vv.real_vertices:
-                    weighted_vidxs.append(rv.index)
-                    rv.deform = vv.deform
-
-                del remaining_vertices[vkey]
+                del remaining_vidxs[vidx]
             elif type(nearest_deform) is Bdef4:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -3920,19 +3933,19 @@ class PmxTailorExportService:
                 weight_idxs = np.argsort(weights)
 
                 logger.debug(
-                    f"remaining4 nearest_vv: {vv.vidxs()}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
+                    f"remaining4 nearest_vidx: {nearest_vidx}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
                 )
 
                 if np.count_nonzero(weights) == 1:
-                    vv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+                    rv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
                 elif np.count_nonzero(weights) == 2:
-                    vv.deform = Bdef2(
+                    rv.deform = Bdef2(
                         model.bones[weight_names[weight_idxs[-1]]].index,
                         model.bones[weight_names[weight_idxs[-2]]].index,
                         weights[weight_idxs[-1]],
                     )
                 else:
-                    vv.deform = Bdef4(
+                    rv.deform = Bdef4(
                         model.bones[weight_names[weight_idxs[-1]]].index,
                         model.bones[weight_names[weight_idxs[-2]]].index,
                         model.bones[weight_names[weight_idxs[-3]]].index,
@@ -3943,11 +3956,7 @@ class PmxTailorExportService:
                         weights[weight_idxs[-4]],
                     )
 
-                for rv in vv.real_vertices:
-                    weighted_vidxs.append(rv.index)
-                    rv.deform = vv.deform
-
-                del remaining_vertices[vkey]
+                del remaining_vidxs[vidx]
 
             vertex_cnt += 1
 
@@ -4582,10 +4591,6 @@ class PmxTailorExportService:
                 # プラスの場合、前と繋がっていないので登録対象
                 full_regist_bones[:, 1:][np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)] = True
 
-                if base_map_idx > 0:
-                    # 2枚目以降の場合、前マップの接続状況を追加
-                    full_regist_bones[np.where(all_bone_connected[base_map_idx - 1][:, -1])[0], 0] = True
-
                 y_registers = np.zeros(vertex_map.shape[0], dtype=np.int)
                 x_registers = np.zeros(vertex_map.shape[1], dtype=np.int)
 
@@ -4653,8 +4658,8 @@ class PmxTailorExportService:
                     )
                     x_diffs = np.where(
                         (
-                            all_bone_connected[base_map_idx][: (min_y + 1), :1]
-                            - all_bone_connected[base_map_idx - 1][: (min_y + 1), -1:]
+                            all_bone_connected[base_map_idx][:min_y, :1]
+                            - all_bone_connected[base_map_idx - 1][:min_y, -1:]
                         )
                         < 0
                     )
@@ -5566,7 +5571,7 @@ class PmxTailorExportService:
         )
         all_vertex_distances = np.sqrt(np.sum(all_vertex_diffs**2, axis=-1))
         # 頂点同士の距離から閾値生成
-        threshold = np.min(all_vertex_distances[all_vertex_distances > 0]) * 0.8
+        threshold = np.min(all_vertex_distances[all_vertex_distances > 0]) * 0.5
 
         logger.info("%s: 材質頂点の閾値算出: %s", material_name, round(threshold, 5))
 
@@ -7042,7 +7047,15 @@ class PmxTailorExportService:
 
         logger.debug("-----------------------")
 
-        return vertex_maps, virtual_vertices, remaining_vertices, back_vertices, threshold, is_material_horizonal
+        return (
+            vertex_maps,
+            virtual_vertices,
+            remaining_vertices,
+            back_vertices,
+            threshold,
+            is_material_horizonal,
+            horizonal_top_edge_keys,
+        )
 
     def create_vertex_line_map(
         self,
@@ -7255,9 +7268,6 @@ class PmxTailorExportService:
         loop: int,
         n: int,
     ):
-        if loop > 0 and loop % 20 == 0:
-            logger.info("---- エッジ検出: %s個目(%s)", (n + 1), (loop + 1))
-
         remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
 
         if not remain_start_vkeys or loop > 500:
