@@ -1492,7 +1492,8 @@ class PmxTailorExportService:
                                 vertical_spring_constant_rot_ys,
                                 vertical_spring_constant_rot_zs,
                             )
-                            created_joints[joint_key] = joint
+                            if joint.name not in [j.name for j in created_joints.values()]:
+                                created_joints[joint_key] = joint
 
                             if param_option["vertical_reverse_joint"]:
                                 # 縦逆ジョイント
@@ -1576,7 +1577,8 @@ class PmxTailorExportService:
                                     vertical_reverse_spring_constant_rot_ys,
                                     vertical_reverse_spring_constant_rot_zs,
                                 )
-                                created_joints[joint_key] = joint
+                                if joint.name not in [j.name for j in created_joints.values()]:
+                                    created_joints[joint_key] = joint
 
                             # バランサー剛体が必要な場合
                             if param_option["rigidbody_balancer"]:
@@ -1646,7 +1648,8 @@ class PmxTailorExportService:
                                         [100000],
                                         [100000],
                                     )
-                                    created_joints[joint_key] = joint
+                                    if joint.name not in [j.name for j in created_joints.values()]:
+                                        created_joints[joint_key] = joint
 
                                     a_rigidbody = now_above_vv.map_balance_rigidbodies.get(base_map_idx, None)
                                     b_rigidbody = now_now_vv.map_balance_rigidbodies.get(base_map_idx, None)
@@ -1696,7 +1699,8 @@ class PmxTailorExportService:
                                             [0],
                                             [0],
                                         )
-                                        created_joints[joint_key] = joint
+                                        if joint.name not in [j.name for j in created_joints.values()]:
+                                            created_joints[joint_key] = joint
 
                     if param_option["horizonal_joint"] and not is_center:
                         # 横ジョイント
@@ -1846,7 +1850,8 @@ class PmxTailorExportService:
                                 horizonal_spring_constant_rot_zs,
                                 ratio,
                             )
-                            created_joints[joint_key] = joint
+                            if joint.name not in [j.name for j in created_joints.values()]:
+                                created_joints[joint_key] = joint
 
                         if (
                             param_option["joint_pos_type"] == logger.transtext("ボーン位置")
@@ -1940,7 +1945,8 @@ class PmxTailorExportService:
                                     ratio,
                                     override_joint_name=f"→|{a_bone.name}T|{b_bone.name}T",
                                 )
-                                created_joints[joint_key] = joint
+                                if joint.name not in [j.name for j in created_joints.values()]:
+                                    created_joints[joint_key] = joint
 
                         if param_option["horizonal_reverse_joint"]:
                             # 横逆ジョイント
@@ -2017,7 +2023,8 @@ class PmxTailorExportService:
                                     horizonal_reverse_spring_constant_rot_zs,
                                     ratio,
                                 )
-                                created_joints[joint_key] = joint
+                                if joint.name not in [j.name for j in created_joints.values()]:
+                                    created_joints[joint_key] = joint
 
                             if (
                                 param_option["joint_pos_type"] == logger.transtext("ボーン位置")
@@ -2090,7 +2097,8 @@ class PmxTailorExportService:
                                         ratio,
                                         override_joint_name=f"←|{a_bone.name}T|{b_bone.name}T",
                                     )
-                                    created_joints[joint_key] = joint
+                                    if joint.name not in [j.name for j in created_joints.values()]:
+                                        created_joints[joint_key] = joint
 
                     if param_option["diagonal_joint"] and next_connected and next_below_vv and not is_center:
                         # 斜めジョイント
@@ -2188,7 +2196,8 @@ class PmxTailorExportService:
                                 diagonal_spring_constant_rot_ys,
                                 diagonal_spring_constant_rot_zs,
                             )
-                            created_joints[joint_key] = joint
+                            if joint.name not in [j.name for j in created_joints.values()]:
+                                created_joints[joint_key] = joint
 
                     if (
                         param_option["diagonal_joint"]
@@ -2292,7 +2301,8 @@ class PmxTailorExportService:
                                 diagonal_spring_constant_rot_ys,
                                 diagonal_spring_constant_rot_zs,
                             )
-                            created_joints[joint_key] = joint
+                            if joint.name not in [j.name for j in created_joints.values()]:
+                                created_joints[joint_key] = joint
 
                     if len(created_joints) > 0 and len(created_joints) // 50 > prev_joint_cnt:
                         logger.info("-- -- 【No.%s】ジョイント: %s個目:終了", base_map_idx + 1, len(created_joints))
@@ -4576,23 +4586,6 @@ class PmxTailorExportService:
                     # 2枚目以降の場合、前マップの接続状況を追加
                     full_regist_bones[np.where(all_bone_connected[base_map_idx - 1][:, -1])[0], 0] = True
 
-                x_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=1) < 0)
-                if base_map_idx > 0:
-                    x_diffs = np.where(all_bone_connected[base_map_idx][:, :1])
-                if x_diffs[0].any():
-                    not_connected_xs = [(yi, xi + 1) for yi, xi in zip(x_diffs[0], x_diffs[1] + 1)]
-                else:
-                    not_connected_xs = []
-
-                y_diffs = np.where(np.diff(all_bone_connected[base_map_idx], axis=0) < 0)
-                if base_map_idx > 0:
-                    y_diffs = np.where(all_bone_connected[base_map_idx][:1, :])
-
-                if y_diffs[0].any():
-                    not_connected_ys = [(yi, xi) for yi, xi in zip(y_diffs[0], y_diffs[1])]
-                else:
-                    not_connected_ys = []
-
                 y_registers = np.zeros(vertex_map.shape[0], dtype=np.int)
                 x_registers = np.zeros(vertex_map.shape[1], dtype=np.int)
 
@@ -4652,20 +4645,64 @@ class PmxTailorExportService:
                     # X方向の末端がどこか繋がって無いとこがあったら末端にボーンを張る
                     x_registers[-1] = True
 
+                # 前と繋がっていない箇所のピックアップ
+                x_diffs = np.where(np.diff(all_bone_connected[base_map_idx][:, :-1], axis=1) < 0)
+                if base_map_idx > 0 and not x_diffs[0].any():
+                    min_y = min(
+                        all_bone_connected[base_map_idx].shape[0], all_bone_connected[base_map_idx - 1].shape[0]
+                    )
+                    x_diffs = np.where(
+                        (
+                            all_bone_connected[base_map_idx][: (min_y + 1), :1]
+                            - all_bone_connected[base_map_idx - 1][: (min_y + 1), -1:]
+                        )
+                        < 0
+                    )
+                if x_diffs[0].any():
+                    not_connected_xs = [(yi, xi + 1) for yi, xi in zip(x_diffs[0], x_diffs[1] + 1)]
+                else:
+                    not_connected_xs = []
+
+                y_diffs = np.where(np.diff(all_bone_connected[base_map_idx][:-1, :], axis=0) < 0)
+                if y_diffs[0].any():
+                    not_connected_ys = [(yi, xi) for yi, xi in zip(y_diffs[0], y_diffs[1])]
+                else:
+                    not_connected_ys = []
+
                 for v_yidx, y_regist in enumerate(y_registers):
                     for v_xidx, x_regist in enumerate(x_registers):
                         # XYの両方が距離条件を満たしていて、かつボーンが張れる状態なら登録対象
                         if full_regist_bones[v_yidx, v_xidx] and (
                             (y_regist and x_regist)
-                            or len(
-                                np.where(
-                                    full_regist_bones[
-                                        max(0, v_yidx - 1) : min(v_yidx + 2, vertex_map.shape[0]),
-                                        max(0, v_xidx - 1) : min(v_xidx + 2, vertex_map.shape[1]),
-                                    ]
-                                    == 0
-                                )[0]
+                            or (
+                                not y_regist
+                                and x_regist
+                                and full_regist_bones[max(0, v_yidx - 1), v_xidx] == 1
+                                and full_regist_bones[min(vertex_map.shape[0] - 1, v_yidx + 1), v_xidx] == 0
                             )
+                            or (
+                                not x_regist
+                                and y_regist
+                                and (
+                                    (
+                                        full_regist_bones[v_yidx, max(0, v_xidx - 1)] == 1
+                                        and full_regist_bones[v_yidx, min(vertex_map.shape[1] - 1, v_xidx + 1)] == 0
+                                    )
+                                    or (
+                                        full_regist_bones[v_yidx, max(0, v_xidx - 1)] == 0
+                                        and full_regist_bones[v_yidx, min(vertex_map.shape[1] - 1, v_xidx + 1)] == 1
+                                    )
+                                )
+                            )
+                            # or len(
+                            #     np.where(
+                            #         full_regist_bones[
+                            #             max(0, v_yidx - 1) : min(v_yidx + 2, vertex_map.shape[0]),
+                            #             max(0, v_xidx - 1) : min(v_xidx + 2, vertex_map.shape[1]),
+                            #         ]
+                            #         == 0
+                            #     )[0]
+                            # )
                             or (v_yidx, v_xidx) in not_connected_xs
                             or (v_yidx, v_xidx) in not_connected_ys
                         ):
