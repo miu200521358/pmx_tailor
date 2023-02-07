@@ -3564,6 +3564,7 @@ class PmxTailorExportService:
         # 離れた評価軸
         axis_root_val = base_vertical_axis.data()[np.where(np.abs(base_vertical_axis.data()))][0] * 100
 
+        weighted_grad_vkeys = []
         for v_key, vv in remaining_vertices.items():
             if not vv.vidxs():
                 continue
@@ -3572,17 +3573,21 @@ class PmxTailorExportService:
             vv_axis_val = vv.position().data()[np.where(np.abs(base_vertical_axis.data()))][0]
 
             # 頂点マップ上部との距離
-            top_vv_poses = np.linalg.norm((top_vv_poses - vv.position().data()), ord=2, axis=1)
-            nearest_top_pos = np.min(top_vv_poses)
+            top_distances = np.linalg.norm((top_vv_poses - vv.position().data()), ord=2, axis=1)
+            nearest_top_vidxs = virtual_vertices[horizonal_top_edge_keys[np.argmin(top_distances)]].vidxs()
+            nearest_top_pos = top_vv_poses[np.argmin(top_distances)]
             # 頂点マップ上部直近頂点の評価軸位置
             nearest_top_axis_val = nearest_top_pos[np.where(np.abs(base_vertical_axis.data()))][0]
 
-            if abs(axis_root_val - nearest_top_axis_val) < abs(axis_root_val - vv_axis_val):
+            if abs(axis_root_val - nearest_top_axis_val) <= abs(axis_root_val - vv_axis_val):
                 # 評価軸にTOPより遠い（スカートの場合、TOPより下）の場合、スルー
                 logger.debug(
-                    f"×グラデスルー: target [{vv.vidxs()}], axis_root_val [{round(axis_root_val, 3)}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv_axis_val[{round(vv_axis_val, 3)}]"
+                    f"×グラデスルー: target [{vv.vidxs()}], axis_root_val [{round(axis_root_val, 3)}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}]"
                 )
                 continue
+            logger.debug(
+                f"○グラデターゲット: target [{vv.vidxs()}], axis_root_val [{round(axis_root_val, 3)}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}]"
+            )
 
             # 各頂点の位置との差分から距離を測る
             vv_distances = np.linalg.norm(
@@ -3667,14 +3672,17 @@ class PmxTailorExportService:
             for rv in vv.real_vertices:
                 rv.deform = vv.deform
 
-            # 登録対象の場合、残対象から削除
-            if v_key in remaining_vertices:
-                del remaining_vertices[v_key]
+            weighted_grad_vkeys.append(v_key)
 
             weight_cnt += 1
             if weight_cnt > 0 and weight_cnt // 200 > prev_weight_cnt:
                 logger.info("-- グラデーション頂点ウェイト: %s個目:終了", weight_cnt)
                 prev_weight_cnt = weight_cnt // 200
+
+        for vkey in weighted_grad_vkeys:
+            # 登録対象の場合、残対象から削除
+            if v_key in remaining_vertices:
+                del remaining_vertices[v_key]
 
         logger.info("-- グラデーション頂点ウェイト: %s個目:終了", weight_cnt)
 
@@ -3728,11 +3736,11 @@ class PmxTailorExportService:
         prev_weight_cnt = 0
 
         # 残っている頂点
-        remaining_vidxs = [vidx for rv in remaining_vertices for vidx in rv.vidxs()]
+        remaining_vidxs = dict([(vidx, rv) for rv in remaining_vertices.values() for vidx in rv.vidxs()])
 
         # 処理対象材質頂点から残頂点と裏頂点を引いた頂点リストを裏ウェイトの対象とする
         front_vertices = {}
-        for vidx in list(set(target_vertices) - set(remaining_vidxs) - set(back_vertices)):
+        for vidx in list(set(target_vertices) - set(list(remaining_vidxs.keys())) - set(back_vertices)):
             v = model.vertex_dict[vidx]
             front_vertices[v.index] = v.position.data()
 
@@ -3761,7 +3769,7 @@ class PmxTailorExportService:
         logger.info("-- 裏頂点ウェイト: %s個目:終了", weight_cnt)
 
         # 残頂点から塗り終わった裏頂点を除外する
-        return list(set(remaining_vidxs) - set(back_weighted_vidxs))
+        return list(set(list(remaining_vidxs.keys())) - set(back_weighted_vidxs))
 
     def create_remaining_weight(
         self,
@@ -3825,13 +3833,13 @@ class PmxTailorExportService:
                 logger.warning("裾対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
 
         # 重複を除外
-        remaining_vidxs = list(set(remaining_vidxs))
+        remaining_vidx_dicts = dict([(vidx, vidx) for vidx in list(set(remaining_vidxs))])
 
-        remain_cnt = len(remaining_vidxs) * 2
-        while remaining_vidxs and remain_cnt > 0:
+        remain_cnt = len(remaining_vidx_dicts) * 2
+        while remaining_vidx_dicts and remain_cnt > 0:
             remain_cnt -= 1
             # ランダムで選ぶ
-            vidx = remaining_vidxs[random.randrange(len(remaining_vidxs))]
+            vidx = list(remaining_vidx_dicts.keys())[random.randrange(len(remaining_vidx_dicts))]
             rv = model.vertex_dict[vidx]
 
             # ウェイト済み頂点のうち、最も近いのを抽出
@@ -3848,7 +3856,7 @@ class PmxTailorExportService:
                 )
                 rv.deform = Bdef1(nearest_deform.index0)
 
-                del remaining_vidxs[vidx]
+                del remaining_vidx_dicts[vidx]
             elif type(nearest_deform) is Bdef2:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -3895,7 +3903,7 @@ class PmxTailorExportService:
                         weights[weight_idxs[-4]],
                     )
 
-                del remaining_vidxs[vidx]
+                del remaining_vidx_dicts[vidx]
             elif type(nearest_deform) is Bdef4:
                 weight_bone1 = model.bones[model.bone_indexes[nearest_deform.index0]]
                 weight_bone2 = model.bones[model.bone_indexes[nearest_deform.index1]]
@@ -3956,7 +3964,7 @@ class PmxTailorExportService:
                         weights[weight_idxs[-4]],
                     )
 
-                del remaining_vidxs[vidx]
+                del remaining_vidx_dicts[vidx]
 
             vertex_cnt += 1
 
