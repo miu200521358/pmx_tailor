@@ -3531,8 +3531,8 @@ class PmxTailorExportService:
         base_vertical_axis: MVector3D,
         horizonal_top_edge_keys: list,
     ):
-        # 残頂点がない場合、スルー
-        if not remaining_vertices:
+        # 残頂点がないもしくは根元頂点が指定されていない場合、スルー
+        if not remaining_vertices or not param_option["top_vertices_csv"]:
             return remaining_vertices
 
         logger.info(
@@ -3722,8 +3722,11 @@ class PmxTailorExportService:
 
                 logger.warning("裏面対象頂点CSVが正常に読み込めなかったため、処理をスキップします", decoration=MLogger.DECORATION_BOX)
 
+        # 残っている頂点
+        remaining_vidxs = dict([(vidx, rv) for rv in remaining_vertices.values() for vidx in rv.vidxs()])
+
         if not back_vertices:
-            return
+            return list(remaining_vidxs.keys())
 
         # 重複を除外
         back_vertices = list(set(back_vertices))
@@ -3737,9 +3740,6 @@ class PmxTailorExportService:
 
         weight_cnt = 0
         prev_weight_cnt = 0
-
-        # 残っている頂点
-        remaining_vidxs = dict([(vidx, rv) for rv in remaining_vertices.values() for vidx in rv.vidxs()])
 
         # 処理対象材質頂点から残頂点と裏頂点を引いた頂点リストを裏ウェイトの対象とする
         front_vertices = {}
@@ -4498,6 +4498,8 @@ class PmxTailorExportService:
                         prev_vertex_cnt = vertex_cnt // 1000
 
                 v_xidx += 1
+                # 最終行の縦距離は前頂点の距離を流用
+                bone_vertical_distances[v_yidx, v_xidx] = float(bone_vertical_distances[v_yidx, v_xidx - 1])
                 if (
                     not np.isnan(vertex_map[v_yidx, v_xidx]).any()
                     and not np.isnan(vertex_map[v_yidx, 0]).any()
@@ -4569,6 +4571,28 @@ class PmxTailorExportService:
         # 全体通してのX番号
         prev_xs = []
         all_regist_bones = {}
+        all_y_bone_registers = []
+
+        for base_map_idx, vertex_map in vertex_maps.items():
+            # Y軸は全体を通して同じ箇所にボーンを張るため、上と繋がっていない箇所のピックアップ
+            y_diffs = np.diff(all_bone_connected[base_map_idx], axis=0)
+            y_diff_xs = np.argmin(y_diffs, axis=0)
+            y_diff_xs_prev = []
+            if len(vertex_maps) > 1:
+                if base_map_idx == 0:
+                    if set(np.unique(all_bone_connected[list(vertex_maps.keys())[-1]][:, -1]).tolist()) == {0, 1}:
+                        # 最後のマップと最初のマップが繋がってる箇所と繋がってない箇所がある場合
+                        y_diff_xs_prev.append(
+                            np.max(np.where(all_bone_connected[list(vertex_maps.keys())[-1]][:, -1]))
+                        )
+                else:
+                    if set(np.unique(all_bone_connected[base_map_idx - 1][:, -1]).tolist()) == {0, 1}:
+                        # 現在のマップと前のマップが繋がってる箇所と繋がってない箇所がある場合
+                        y_diff_xs_prev.append(np.max(np.where(all_bone_connected[base_map_idx - 1][:, -1])))
+
+                all_y_bone_registers.extend(y_diff_xs_prev)
+                all_y_bone_registers.extend(y_diff_xs[np.where(np.diff(y_diff_xs))].tolist())
+
         for base_map_idx, vertex_map in vertex_maps.items():
 
             prev_bone_cnt = 0
@@ -4667,32 +4691,11 @@ class PmxTailorExportService:
                 # 横が繋がってない箇所をピックアップ
                 x_diff_ys = np.argmax(x_diffs, axis=0) | np.argmin(x_diffs, axis=0)
                 x_bone_registers = sorted(
-                    list(set(np.where(x_registers)[0].tolist()) | set(np.where(x_diff_ys)[0].tolist()))
+                    list(set(np.where(x_registers)[0].tolist()) | set(x_diff_ys[np.where(x_diff_ys)].tolist()))
                 )
 
-                # 上と繋がっていない箇所のピックアップ
-                y_diffs = np.diff(all_bone_connected[base_map_idx], axis=0)
-                y_diff_xs = np.argmin(y_diffs, axis=0)
-                y_diff_xs_prev = []
-                if len(vertex_maps) > 1:
-                    if base_map_idx == 0:
-                        if set(np.unique(all_bone_connected[list(vertex_maps.keys())[-1]][:, -1]).tolist()) == {0, 1}:
-                            # 最後のマップと最初のマップが繋がってる箇所と繋がってない箇所がある場合
-                            y_diff_xs_prev.append(
-                                np.max(np.where(all_bone_connected[list(vertex_maps.keys())[-1]][:, -1]))
-                            )
-                    else:
-                        if set(np.unique(all_bone_connected[base_map_idx - 1][:, -1]).tolist()) == {0, 1}:
-                            # 現在のマップと前のマップが繋がってる箇所と繋がってない箇所がある場合
-                            y_diff_xs_prev.append(np.max(np.where(all_bone_connected[base_map_idx - 1][:, -1])))
-
-                y_bone_registers = sorted(
-                    list(
-                        set(np.where(y_registers)[0].tolist())
-                        | set(y_diff_xs[np.where(np.diff(y_diff_xs))].tolist())
-                        | set(y_diff_xs_prev)
-                    )
-                )
+                # Y軸は全体を通してボーンを張るべき箇所＋自身の登録対象位置を登録対象とする
+                y_bone_registers = sorted(list(set(np.where(y_registers)[0].tolist()) | set(all_y_bone_registers)))
 
                 # XY軸でボーンを登録する
                 # 一旦実際に頂点があるところのみ対象とする
@@ -4701,7 +4704,10 @@ class PmxTailorExportService:
                         np.array([y, x])
                         for y in y_bone_registers
                         for x in x_bone_registers
-                        if not np.isnan(vertex_map[y, x]).any() and virtual_vertices[tuple(vertex_map[y, x])].vidxs()
+                        if y < vertex_map.shape[0]
+                        and x < vertex_map.shape[1]
+                        and not np.isnan(vertex_map[y, x]).any()
+                        and virtual_vertices[tuple(vertex_map[y, x])].vidxs()
                     ]
                 )
                 regist_bones[registered_idxs[:, 0], registered_idxs[:, 1]] = True
@@ -4793,7 +4799,7 @@ class PmxTailorExportService:
 
                         # 末端ボーン追加登録
                         regist_bones[
-                            min(last_connected_v_yidx + 1, vertex_map.shape[0] - 1),
+                            last_connected_v_yidx : min(last_connected_v_yidx + 2, vertex_map.shape[0]),
                             v_xidx,
                         ] = True
 
@@ -4946,10 +4952,12 @@ class PmxTailorExportService:
                 and (
                     (
                         cbone.parent_index in tmp_all_bone_indexes
+                        and tmp_all_bone_indexes[cbone.parent_index] in tmp_all_bones
                         and tmp_all_bones[tmp_all_bone_indexes[cbone.parent_index]].position == bone.position
                     )
                     or (
                         cbone.parent_index in model.bone_indexes
+                        and model.bone_indexes[cbone.parent_index] in model.bones
                         and model.bones[model.bone_indexes[cbone.parent_index]].position == bone.position
                     )
                 )
@@ -6801,18 +6809,18 @@ class PmxTailorExportService:
             # prev_vkeys = None
             # prev_y_offset = 0
             for x, (vkeys, score) in enumerate(zip(all_vkeys, mean_scores)):
-                # is_regists = [True for y in vkeys]
-                # for px, pvkeys in enumerate(all_vkeys):
-                #     if x == px:
-                #         continue
-                #     for y, vkey in enumerate(vkeys):
-                #         if vkey in pvkeys or vkey in registed_vkeys:
-                #             # 他で登録されているキーがある場合は登録対象外
-                #             is_regists[y] = False
+                is_regists = [True for y in vkeys]
+                for px, pvkeys in enumerate(all_vkeys):
+                    if x == px:
+                        continue
+                    for y, vkey in enumerate(vkeys):
+                        if vkey in pvkeys or vkey in registed_vkeys:
+                            # 他で登録されているキーがある場合は登録対象外
+                            is_regists[y] = False
 
-                # if not np.count_nonzero(is_regists):
-                #     # 登録対象外の場合、スルー
-                #     continue
+                if not np.count_nonzero(is_regists):
+                    # すべてのキーが他のラインで登録されている場合、登録対象外の場合、スルー
+                    continue
 
                 # # 根元がTOPに来るようにオフセットを設定
                 # y_offset = len(yu) - len(vkeys)
@@ -7101,15 +7109,13 @@ class PmxTailorExportService:
                     if same_top_keys[1].any():
                         prev_v_xidx = 0
                         for v_xidx in same_top_keys[1]:
-                            if target_vertex_map[:, prev_v_xidx : (v_xidx + 1)].shape[1] > 1:
-                                separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx : (v_xidx + 1)])
-                                separated_vertex_display_maps.append(
-                                    target_vertex_display_map[:, prev_v_xidx : (v_xidx + 1)]
-                                )
+                            separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx : (v_xidx + 1)])
+                            separated_vertex_display_maps.append(
+                                target_vertex_display_map[:, prev_v_xidx : (v_xidx + 1)]
+                            )
                             prev_v_xidx = v_xidx + 1
-                        if target_vertex_map[:, prev_v_xidx:].shape[1] > 1:
-                            separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx:])
-                            separated_vertex_display_maps.append(target_vertex_display_map[:, prev_v_xidx:])
+                        separated_vertex_maps.append(target_vertex_map[:, prev_v_xidx:])
+                        separated_vertex_display_maps.append(target_vertex_display_map[:, prev_v_xidx:])
                     else:
                         separated_vertex_maps.append(target_vertex_map)
                         separated_vertex_display_maps.append(target_vertex_display_map)
@@ -7356,17 +7362,17 @@ class PmxTailorExportService:
 
         if not start_vkey:
             if param_option["direction"] == logger.transtext("上"):
-                # Y(昇順) - X(中央揃え) - Z(降順)
-                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (x[1], abs(x[0]), -x[2]))
+                # X(中央揃え) - Y(昇順) - Z(降順)
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (abs(x[0]), x[1], -x[2]))
             elif param_option["direction"] == logger.transtext("右"):
-                # X(降順) - Y(降順) - Z(降順)
-                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (-x[0], -x[1], -x[2]))
+                # Y(降順) - X(降順) - Z(降順)
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (-x[1], -x[0], -x[2]))
             elif param_option["direction"] == logger.transtext("左"):
-                # X(昇順) - Y(降順) - Z(降順)
-                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (x[0], -x[1], -x[2]))
+                # Y(降順) - X(昇順) - Z(降順)
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (-x[1], x[0], -x[2]))
             else:
-                # 下: Y(降順) - X(中央揃え) - Z(降順)
-                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (-x[1], abs(x[0]), -x[2]))
+                # 下: X(中央揃え) - Y(降順) - Z(降順)
+                sorted_edge_line_pairs = sorted(remain_start_vkeys, key=lambda x: (abs(x[0]), -x[1], -x[2]))
             start_vkey = sorted_edge_line_pairs[0]
             edge_lines.append([start_vkey])
 
