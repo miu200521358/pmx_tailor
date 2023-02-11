@@ -8,6 +8,10 @@ cd /d %~dp0
 
 cls
 
+del dist\*.lnk
+move /y dist\*.exe dist\past
+
 activate vmdsizing_np && cd src && python translate.py && cd .. && activate vmdsizing_cython && src\setup_install.bat && pyinstaller --clean pmx_tailor.spec && copy /y archive\Readme.txt dist\Readme.txt && copy /y archive\É¿î≈Readme.txt dist\É¿î≈Readme.txt && activate vmdsizing_np && cd src && python lnk.py && cd ..
 rem activate vmdsizing_cython && pyinstaller --clean pmx_tailor.spec
 
+rundll32 user32.dll,MessageBeep
