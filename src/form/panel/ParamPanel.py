@@ -4244,10 +4244,7 @@ class PhysicsParam:
 
     def set_mass(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸"):
-            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue() / 30)
-        else:
-            self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
+        self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
 
         if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
             self.rigidbody_coefficient_spin.SetValue(20 / self.simple_mass_slider.GetValue())
@@ -4377,7 +4374,7 @@ class PhysicsParam:
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(小)"):
             self.simple_mass_slider.SetValue(5.4)
-            self.simple_air_resistance_slider.SetValue(4.3)
+            self.simple_air_resistance_slider.SetValue(2.3)
             self.simple_shape_maintenance_slider.SetValue(3.7)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
@@ -4385,7 +4382,7 @@ class PhysicsParam:
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
             self.simple_mass_slider.SetValue(6.2)
-            self.simple_air_resistance_slider.SetValue(3.3)
+            self.simple_air_resistance_slider.SetValue(1.3)
             self.simple_shape_maintenance_slider.SetValue(3.0)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
@@ -4479,261 +4476,302 @@ class PhysicsParam:
 
     def set_shape_maintenance(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
+        mass_coefficient = max(1, self.simple_mass_slider.GetValue() * 0.5)
 
-        if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸"):
-            # 胸の場合、特殊ジョイント設定
-            air_resistance_ratio = (
-                self.simple_air_resistance_slider.GetMax() / self.simple_air_resistance_slider.GetValue()
+        # 柔らかさ
+        air_resistance_ratio = (
+            self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()
+        )
+        # 張り
+        shape_maintenance_ratio = (
+            self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()
+        )
+
+        # 縦ジョイント
+        self.advance_vertical_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
+
+        vertical_joint_ratio = 5 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
+
+        vertical_joint_rot = (
+            max(
+                0,
+                min(
+                    180,
+                    (
+                        180
+                        - air_resistance_ratio
+                        * 180
+                        * self.get_joint_coefficient(vertical_joint_ratio, is_reverse=True)
+                    ),
+                ),
             )
-            shape_maintenance_ratio = (
-                self.simple_shape_maintenance_slider.GetMax() / self.simple_shape_maintenance_slider.GetValue()
+            if air_resistance_ratio < 1
+            else 0
+        )
+        vertical_joint_y_rot = (
+            max(
+                0,
+                min(
+                    89,
+                    (
+                        89
+                        - air_resistance_ratio * 89 * self.get_joint_coefficient(vertical_joint_ratio, is_reverse=True)
+                    ),
+                ),
             )
+            if air_resistance_ratio < 1
+            else 0
+        )
 
-            self.vertical_joint_rot_x_min_spin.SetValue(-(air_resistance_ratio * 8))
-            self.vertical_joint_rot_x_max_spin.SetValue(air_resistance_ratio)
-            self.vertical_joint_rot_y_min_spin.SetValue(-(air_resistance_ratio))
-            self.vertical_joint_rot_y_max_spin.SetValue(air_resistance_ratio)
-            self.vertical_joint_rot_z_min_spin.SetValue(0)
-            self.vertical_joint_rot_z_max_spin.SetValue(0)
+        # 制限角度が0の場合、ちょっとだけ動かす
+        vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
+        vertical_joint_y_rot = 2 if not vertical_joint_y_rot else vertical_joint_y_rot
 
-            self.vertical_joint_spring_rot_x_spin.SetValue(shape_maintenance_ratio * 20)
-            self.vertical_joint_spring_rot_y_spin.SetValue(shape_maintenance_ratio * 40)
-            self.vertical_joint_spring_rot_z_spin.SetValue(0)
+        vertical_spring_rot_ratio = 20 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+        vertical_spring_y_rot_ratio = (
+            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 100
+        )
 
-            self.horizonal_joint_rot_x_min_spin.SetValue(-(air_resistance_ratio * 8))
-            self.horizonal_joint_rot_x_max_spin.SetValue(air_resistance_ratio * 8)
-            self.horizonal_joint_rot_y_min_spin.SetValue(0)
-            self.horizonal_joint_rot_y_max_spin.SetValue(0)
-            self.horizonal_joint_rot_z_min_spin.SetValue(0)
-            self.horizonal_joint_rot_z_max_spin.SetValue(0)
+        vertical_spring_rot = (
+            shape_maintenance_ratio * self.get_joint_coefficient(vertical_spring_rot_ratio) * mass_coefficient
+            if shape_maintenance_ratio < 1
+            else 0
+        )
+        vertical_spring_y_rot = (
+            shape_maintenance_ratio * self.get_joint_coefficient(vertical_spring_y_rot_ratio) * mass_coefficient
+            if shape_maintenance_ratio < 1
+            else 0
+        )
 
-            self.horizonal_joint_spring_rot_x_spin.SetValue(0)
-            self.horizonal_joint_spring_rot_y_spin.SetValue(0)
-            self.horizonal_joint_spring_rot_z_spin.SetValue(0)
+        if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
+            # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を小さめにしておく
+            vertical_joint_rot /= 1.2
+            vertical_spring_rot /= 2.5
+            vertical_spring_y_rot /= 2.5
 
-            self.diagonal_joint_rot_x_min_spin.SetValue(-(air_resistance_ratio * 10))
-            self.diagonal_joint_rot_x_max_spin.SetValue((air_resistance_ratio * 10))
-            self.diagonal_joint_rot_y_min_spin.SetValue(0)
-            self.diagonal_joint_rot_y_max_spin.SetValue(0)
-            self.diagonal_joint_rot_z_min_spin.SetValue(0)
-            self.diagonal_joint_rot_z_max_spin.SetValue(0)
+        self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
+        self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
+        self.vertical_joint_rot_y_min_spin.SetValue(-vertical_joint_y_rot)
+        self.vertical_joint_rot_y_max_spin.SetValue(vertical_joint_y_rot)
+        self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot)
+        self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot)
 
-            self.diagonal_joint_spring_rot_x_spin.SetValue(shape_maintenance_ratio * 40)
-            self.diagonal_joint_spring_rot_y_spin.SetValue(shape_maintenance_ratio * 20)
-            self.diagonal_joint_spring_rot_z_spin.SetValue(0)
+        self.vertical_joint_spring_rot_x_spin.SetValue(vertical_spring_rot)
+        self.vertical_joint_spring_rot_y_spin.SetValue(vertical_spring_y_rot)
+        self.vertical_joint_spring_rot_z_spin.SetValue(vertical_spring_rot)
 
+        # 横ジョイント
+        if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection():
+            self.horizonal_joint_mov_y_min_spin.SetValue(0)
+            self.horizonal_joint_mov_y_max_spin.SetValue(0)
         else:
-            mass_coefficient = max(1, self.simple_mass_slider.GetValue() * 0.5)
-
-            # 柔らかさ
-            air_resistance_ratio = (
-                self.simple_air_resistance_slider.GetValue() / self.simple_air_resistance_slider.GetMax()
-            )
-            # 張り
-            shape_maintenance_ratio = (
-                self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()
-            )
-
-            # 縦ジョイント
-            if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
-                self.advance_vertical_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
-
-            vertical_joint_rot = (
-                max(0, min(180, (180 - air_resistance_ratio * 180 * self.get_joint_coefficient(1, is_reverse=True))))
-                if air_resistance_ratio < 1
-                else 0
-            )
-            vertical_joint_y_rot = (
-                max(0, min(89, (89 - air_resistance_ratio * 89 * self.get_joint_coefficient(1, is_reverse=True))))
-                if air_resistance_ratio < 1
-                else 0
-            )
-
-            # 制限角度が0の場合、ちょっとだけ動かす
-            vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
-            vertical_joint_y_rot = 2 if not vertical_joint_y_rot else vertical_joint_y_rot
-
-            vertical_spring_rot = (
-                shape_maintenance_ratio * self.get_joint_coefficient(200) * mass_coefficient
-                if shape_maintenance_ratio < 1
-                else 0
-            )
-            vertical_spring_y_rot = (
-                shape_maintenance_ratio * self.get_joint_coefficient(100) * mass_coefficient
-                if shape_maintenance_ratio < 1
-                else 0
-            )
-
-            if self.physics_type_ctrl.GetStringSelection() == logger.transtext("髪"):
-                # 髪の毛の場合、ジョイントの制限はきつめに・ばね値を小さめにしておく
-                vertical_joint_rot /= 1.2
-                vertical_spring_rot /= 2.5
-                vertical_spring_y_rot /= 2.5
-
-            self.vertical_joint_rot_x_min_spin.SetValue(-vertical_joint_rot)
-            self.vertical_joint_rot_x_max_spin.SetValue(vertical_joint_rot)
-            self.vertical_joint_rot_y_min_spin.SetValue(-vertical_joint_y_rot)
-            self.vertical_joint_rot_y_max_spin.SetValue(vertical_joint_y_rot)
-            self.vertical_joint_rot_z_min_spin.SetValue(-vertical_joint_rot)
-            self.vertical_joint_rot_z_max_spin.SetValue(vertical_joint_rot)
-
-            self.vertical_joint_spring_rot_x_spin.SetValue(vertical_spring_rot)
-            self.vertical_joint_spring_rot_y_spin.SetValue(vertical_spring_y_rot)
-            self.vertical_joint_spring_rot_z_spin.SetValue(vertical_spring_rot)
-
-            # 横ジョイント
             horizonal_joint_mov = max(0, (1 - air_resistance_ratio * 1.5))
             self.horizonal_joint_mov_y_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov / 2)
 
-            if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
-                self.advance_horizonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 20)
+        self.advance_horizonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 20)
 
-            horizonal_joint_rot = (
-                max(
-                    0,
-                    min(180, (180 - air_resistance_ratio * 180 * self.get_joint_coefficient(1.2, is_reverse=True))),
-                )
-                if air_resistance_ratio < 1
-                else 0
+        horizonal_joint_ratio = 3 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.2
+
+        horizonal_joint_rot = (
+            max(
+                0,
+                min(
+                    180,
+                    (
+                        180
+                        - air_resistance_ratio
+                        * 180
+                        * self.get_joint_coefficient(horizonal_joint_ratio, is_reverse=True)
+                    ),
+                ),
             )
-            horizonal_joint_y_rot = (
-                max(0, min(89, (89 - air_resistance_ratio * 89 * self.get_joint_coefficient(1.2, is_reverse=True))))
-                if air_resistance_ratio < 1
-                else 0
+            if air_resistance_ratio < 1
+            else 0
+        )
+        horizonal_joint_y_rot = (
+            max(
+                0,
+                min(
+                    89,
+                    (
+                        89
+                        - air_resistance_ratio
+                        * 89
+                        * self.get_joint_coefficient(horizonal_joint_ratio, is_reverse=True)
+                    ),
+                ),
             )
+            if air_resistance_ratio < 1
+            else 0
+        )
 
-            # 制限角度が0の場合、ちょっとだけ動かす
-            horizonal_joint_rot = 2 if not horizonal_joint_rot else horizonal_joint_rot
-            horizonal_joint_y_rot = 2 if not horizonal_joint_y_rot else horizonal_joint_y_rot
+        # 制限角度が0の場合、ちょっとだけ動かす
+        horizonal_joint_rot = 2 if not horizonal_joint_rot else horizonal_joint_rot
+        horizonal_joint_y_rot = 2 if not horizonal_joint_y_rot else horizonal_joint_y_rot
 
-            horizonal_spring_rot = (
-                shape_maintenance_ratio * self.get_joint_coefficient(300) * mass_coefficient
-                if shape_maintenance_ratio < 1
-                else 0
-            )
-            horizonal_spring_y_rot = (
-                shape_maintenance_ratio * self.get_joint_coefficient(200) * mass_coefficient
-                if shape_maintenance_ratio < 1
-                else 0
-            )
+        horizonal_spring_rot_ratio = (
+            20 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
+        )
+        horizonal_spring_y_rot_ratio = (
+            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+        )
 
-            self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot)
-            self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot)
-            self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_y_rot)
-            self.horizonal_joint_rot_y_max_spin.SetValue(horizonal_joint_y_rot)
-            self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
-            self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
+        horizonal_spring_rot = (
+            shape_maintenance_ratio * self.get_joint_coefficient(horizonal_spring_rot_ratio) * mass_coefficient
+            if shape_maintenance_ratio < 1
+            else 0
+        )
+        horizonal_spring_y_rot = (
+            shape_maintenance_ratio * self.get_joint_coefficient(horizonal_spring_y_rot_ratio) * mass_coefficient
+            if shape_maintenance_ratio < 1
+            else 0
+        )
 
-            self.horizonal_joint_spring_rot_x_spin.SetValue(horizonal_spring_rot)
-            self.horizonal_joint_spring_rot_y_spin.SetValue(horizonal_spring_y_rot)
-            self.horizonal_joint_spring_rot_z_spin.SetValue(horizonal_spring_rot)
+        self.horizonal_joint_rot_x_min_spin.SetValue(-horizonal_joint_rot)
+        self.horizonal_joint_rot_x_max_spin.SetValue(horizonal_joint_rot)
+        self.horizonal_joint_rot_y_min_spin.SetValue(-horizonal_joint_y_rot)
+        self.horizonal_joint_rot_y_max_spin.SetValue(horizonal_joint_y_rot)
+        self.horizonal_joint_rot_z_min_spin.SetValue(-horizonal_joint_rot)
+        self.horizonal_joint_rot_z_max_spin.SetValue(horizonal_joint_rot)
 
-            # 斜めジョイント
+        self.horizonal_joint_spring_rot_x_spin.SetValue(horizonal_spring_rot)
+        self.horizonal_joint_spring_rot_y_spin.SetValue(horizonal_spring_y_rot)
+        self.horizonal_joint_spring_rot_z_spin.SetValue(horizonal_spring_rot)
+
+        # 斜めジョイント
+        if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection():
+            self.diagonal_joint_mov_y_min_spin.SetValue(0)
+            self.diagonal_joint_mov_y_max_spin.SetValue(0)
+        else:
             diagonal_joint_mov = max(0, (1 - air_resistance_ratio * 1.2))
             self.diagonal_joint_mov_y_min_spin.SetValue(-diagonal_joint_mov)
             self.diagonal_joint_mov_y_max_spin.SetValue(diagonal_joint_mov / 2)
 
-            if self.physics_type_ctrl.GetStringSelection() != logger.transtext("髪"):
-                self.advance_diagonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
+        self.advance_diagonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
 
-            diagonal_joint_rot = (
-                max(
-                    0,
-                    min(180, (180 - air_resistance_ratio * 180 * self.get_joint_coefficient(1.5, is_reverse=True))),
-                )
-                if air_resistance_ratio < 1
-                else 0
+        diagonal_joint_ratio = 4 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.5
+
+        diagonal_joint_rot = (
+            max(
+                0,
+                min(
+                    180,
+                    (
+                        180
+                        - air_resistance_ratio
+                        * 180
+                        * self.get_joint_coefficient(diagonal_joint_ratio, is_reverse=True)
+                    ),
+                ),
             )
-            diagonal_joint_y_rot = (
-                max(0, min(89, (89 - air_resistance_ratio * 89 * self.get_joint_coefficient(1.5, is_reverse=True))))
-                if air_resistance_ratio < 1
-                else 0
+            if air_resistance_ratio < 1
+            else 0
+        )
+        diagonal_joint_y_rot = (
+            max(
+                0,
+                min(
+                    89,
+                    (
+                        89
+                        - air_resistance_ratio * 89 * self.get_joint_coefficient(diagonal_joint_ratio, is_reverse=True)
+                    ),
+                ),
             )
+            if air_resistance_ratio < 1
+            else 0
+        )
 
-            # 制限角度が0の場合、ちょっとだけ動かす
-            diagonal_joint_rot = 2 if not diagonal_joint_rot else diagonal_joint_rot
-            diagonal_joint_y_rot = 2 if not diagonal_joint_y_rot else diagonal_joint_y_rot
+        # 制限角度が0の場合、ちょっとだけ動かす
+        diagonal_joint_rot = 2 if not diagonal_joint_rot else diagonal_joint_rot
+        diagonal_joint_y_rot = 2 if not diagonal_joint_y_rot else diagonal_joint_y_rot
 
-            diagonal_spring_rot = (
-                shape_maintenance_ratio * self.get_joint_coefficient(300) * mass_coefficient
-                if shape_maintenance_ratio < 1
-                else 0
-            )
-            diagonal_spring_y_rot = (
-                shape_maintenance_ratio * self.get_joint_coefficient(200) * mass_coefficient
-                if shape_maintenance_ratio < 1
-                else 0
-            )
+        diagonal_spring_rot_ratio = 20 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
+        diagonal_spring_y_rot_ratio = (
+            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+        )
 
-            self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
-            self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
-            self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_y_rot)
-            self.diagonal_joint_rot_y_max_spin.SetValue(diagonal_joint_y_rot)
-            self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
-            self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
+        diagonal_spring_rot = (
+            shape_maintenance_ratio * self.get_joint_coefficient(diagonal_spring_rot_ratio) * mass_coefficient
+            if shape_maintenance_ratio < 1
+            else 0
+        )
+        diagonal_spring_y_rot = (
+            shape_maintenance_ratio * self.get_joint_coefficient(diagonal_spring_y_rot_ratio) * mass_coefficient
+            if shape_maintenance_ratio < 1
+            else 0
+        )
 
-            self.diagonal_joint_spring_rot_x_spin.SetValue(diagonal_spring_rot)
-            self.diagonal_joint_spring_rot_y_spin.SetValue(diagonal_spring_y_rot)
-            self.diagonal_joint_spring_rot_z_spin.SetValue(diagonal_spring_rot)
+        self.diagonal_joint_rot_x_min_spin.SetValue(-diagonal_joint_rot)
+        self.diagonal_joint_rot_x_max_spin.SetValue(diagonal_joint_rot)
+        self.diagonal_joint_rot_y_min_spin.SetValue(-diagonal_joint_y_rot)
+        self.diagonal_joint_rot_y_max_spin.SetValue(diagonal_joint_y_rot)
+        self.diagonal_joint_rot_z_min_spin.SetValue(-diagonal_joint_rot)
+        self.diagonal_joint_rot_z_max_spin.SetValue(diagonal_joint_rot)
 
-            # 縦逆ジョイント
-            self.advance_vertical_reverse_joint_coefficient_spin.SetValue(
-                self.advance_vertical_joint_coefficient_spin.GetValue()
-            )
+        self.diagonal_joint_spring_rot_x_spin.SetValue(diagonal_spring_rot)
+        self.diagonal_joint_spring_rot_y_spin.SetValue(diagonal_spring_y_rot)
+        self.diagonal_joint_spring_rot_z_spin.SetValue(diagonal_spring_rot)
 
-            self.vertical_reverse_joint_mov_y_max_spin.SetValue(self.vertical_joint_mov_y_max_spin.GetValue())
+        # 縦逆ジョイント
+        self.advance_vertical_reverse_joint_coefficient_spin.SetValue(
+            self.advance_vertical_joint_coefficient_spin.GetValue()
+        )
 
-            self.vertical_reverse_joint_rot_x_min_spin.SetValue(self.vertical_joint_rot_x_min_spin.GetValue())
-            self.vertical_reverse_joint_rot_x_max_spin.SetValue(self.vertical_joint_rot_x_max_spin.GetValue())
-            self.vertical_reverse_joint_rot_y_min_spin.SetValue(self.vertical_joint_rot_y_min_spin.GetValue())
-            self.vertical_reverse_joint_rot_y_max_spin.SetValue(self.vertical_joint_rot_y_max_spin.GetValue())
-            self.vertical_reverse_joint_rot_z_min_spin.SetValue(self.vertical_joint_rot_z_min_spin.GetValue())
-            self.vertical_reverse_joint_rot_z_max_spin.SetValue(self.vertical_joint_rot_z_max_spin.GetValue())
+        self.vertical_reverse_joint_mov_y_min_spin.SetValue(self.vertical_joint_mov_y_min_spin.GetValue())
+        self.vertical_reverse_joint_mov_y_max_spin.SetValue(self.vertical_joint_mov_y_max_spin.GetValue())
 
-            self.vertical_reverse_joint_spring_rot_x_spin.SetValue(self.vertical_joint_spring_rot_x_spin.GetValue())
-            self.vertical_reverse_joint_spring_rot_y_spin.SetValue(self.vertical_joint_spring_rot_y_spin.GetValue())
-            self.vertical_reverse_joint_spring_rot_z_spin.SetValue(self.vertical_joint_spring_rot_z_spin.GetValue())
+        self.vertical_reverse_joint_rot_x_min_spin.SetValue(self.vertical_joint_rot_x_min_spin.GetValue())
+        self.vertical_reverse_joint_rot_x_max_spin.SetValue(self.vertical_joint_rot_x_max_spin.GetValue())
+        self.vertical_reverse_joint_rot_y_min_spin.SetValue(self.vertical_joint_rot_y_min_spin.GetValue())
+        self.vertical_reverse_joint_rot_y_max_spin.SetValue(self.vertical_joint_rot_y_max_spin.GetValue())
+        self.vertical_reverse_joint_rot_z_min_spin.SetValue(self.vertical_joint_rot_z_min_spin.GetValue())
+        self.vertical_reverse_joint_rot_z_max_spin.SetValue(self.vertical_joint_rot_z_max_spin.GetValue())
 
-            # 横逆ジョイント
-            self.horizonal_reverse_joint_mov_x_min_spin.SetValue(self.horizonal_joint_mov_x_min_spin.GetValue())
-            self.horizonal_reverse_joint_mov_x_max_spin.SetValue(self.horizonal_joint_mov_x_max_spin.GetValue())
+        self.vertical_reverse_joint_spring_rot_x_spin.SetValue(self.vertical_joint_spring_rot_x_spin.GetValue())
+        self.vertical_reverse_joint_spring_rot_y_spin.SetValue(self.vertical_joint_spring_rot_y_spin.GetValue())
+        self.vertical_reverse_joint_spring_rot_z_spin.SetValue(self.vertical_joint_spring_rot_z_spin.GetValue())
 
-            self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(
-                self.advance_horizonal_joint_coefficient_spin.GetValue()
-            )
+        # 横逆ジョイント
+        self.horizonal_reverse_joint_mov_x_min_spin.SetValue(self.horizonal_joint_mov_x_min_spin.GetValue())
+        self.horizonal_reverse_joint_mov_x_max_spin.SetValue(self.horizonal_joint_mov_x_max_spin.GetValue())
 
-            self.horizonal_reverse_joint_mov_y_max_spin.SetValue(self.horizonal_joint_mov_y_max_spin.GetValue())
+        self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(
+            self.advance_horizonal_joint_coefficient_spin.GetValue()
+        )
 
-            self.horizonal_reverse_joint_rot_x_min_spin.SetValue(self.horizonal_joint_rot_x_min_spin.GetValue())
-            self.horizonal_reverse_joint_rot_x_max_spin.SetValue(self.horizonal_joint_rot_x_max_spin.GetValue())
-            self.horizonal_reverse_joint_rot_y_min_spin.SetValue(self.horizonal_joint_rot_y_min_spin.GetValue())
-            self.horizonal_reverse_joint_rot_y_max_spin.SetValue(self.horizonal_joint_rot_y_max_spin.GetValue())
-            self.horizonal_reverse_joint_rot_z_min_spin.SetValue(self.horizonal_joint_rot_z_min_spin.GetValue())
-            self.horizonal_reverse_joint_rot_z_max_spin.SetValue(self.horizonal_joint_rot_z_max_spin.GetValue())
+        self.horizonal_reverse_joint_mov_y_min_spin.SetValue(self.horizonal_joint_mov_y_min_spin.GetValue())
+        self.horizonal_reverse_joint_mov_y_max_spin.SetValue(self.horizonal_joint_mov_y_max_spin.GetValue())
 
-            self.horizonal_reverse_joint_spring_rot_x_spin.SetValue(self.horizonal_joint_spring_rot_x_spin.GetValue())
-            self.horizonal_reverse_joint_spring_rot_y_spin.SetValue(self.horizonal_joint_spring_rot_y_spin.GetValue())
-            self.horizonal_reverse_joint_spring_rot_z_spin.SetValue(self.horizonal_joint_spring_rot_z_spin.GetValue())
+        self.horizonal_reverse_joint_rot_x_min_spin.SetValue(self.horizonal_joint_rot_x_min_spin.GetValue())
+        self.horizonal_reverse_joint_rot_x_max_spin.SetValue(self.horizonal_joint_rot_x_max_spin.GetValue())
+        self.horizonal_reverse_joint_rot_y_min_spin.SetValue(self.horizonal_joint_rot_y_min_spin.GetValue())
+        self.horizonal_reverse_joint_rot_y_max_spin.SetValue(self.horizonal_joint_rot_y_max_spin.GetValue())
+        self.horizonal_reverse_joint_rot_z_min_spin.SetValue(self.horizonal_joint_rot_z_min_spin.GetValue())
+        self.horizonal_reverse_joint_rot_z_max_spin.SetValue(self.horizonal_joint_rot_z_max_spin.GetValue())
 
-            if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.7:
-                # 一定以上の維持感であれば斜めも張る
-                if logger.transtext("布") in self.simple_material_ctrl.GetStringSelection():
-                    # 斜めは布のみ
-                    self.advance_diagonal_joint_valid_check.SetValue(1)
-            # 一度張ったらチェックは自動で外さない
+        self.horizonal_reverse_joint_spring_rot_x_spin.SetValue(self.horizonal_joint_spring_rot_x_spin.GetValue())
+        self.horizonal_reverse_joint_spring_rot_y_spin.SetValue(self.horizonal_joint_spring_rot_y_spin.GetValue())
+        self.horizonal_reverse_joint_spring_rot_z_spin.SetValue(self.horizonal_joint_spring_rot_z_spin.GetValue())
 
-            if (
-                self.physics_type_ctrl.GetStringSelection() == logger.transtext("布")
-                and self.simple_shape_maintenance_slider.GetValue()
-                > self.simple_shape_maintenance_slider.GetMax() * 0.9
-            ):
-                # 一定以上の維持感であれば逆も張る
-                self.advance_vertical_reverse_joint_valid_check.SetValue(1)
-                self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
+        if self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.7:
+            # 一定以上の維持感であれば斜めも張る
+            if logger.transtext("布") in self.simple_material_ctrl.GetStringSelection():
+                # 斜めは布のみ
+                self.advance_diagonal_joint_valid_check.SetValue(1)
+        # 一度張ったらチェックは自動で外さない
 
-            self.on_diagonal_joint(event)
-            self.on_vertical_reverse_joint(event)
+        if (
+            self.physics_type_ctrl.GetStringSelection() == logger.transtext("布")
+            and self.simple_shape_maintenance_slider.GetValue() > self.simple_shape_maintenance_slider.GetMax() * 0.9
+        ):
+            # 一定以上の維持感であれば逆も張る
+            self.advance_vertical_reverse_joint_valid_check.SetValue(1)
+            self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
+
+        self.on_diagonal_joint(event)
+        self.on_vertical_reverse_joint(event)
 
     def get_joint_coefficient(self, val: float, is_reverse=False):
         if self.joint_pos_type_ctrl.GetStringSelection() == logger.transtext("ボーン位置"):
