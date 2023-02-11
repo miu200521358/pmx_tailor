@@ -3569,7 +3569,7 @@ class PhysicsParam:
         self.horizonal_joint_spring_rot_x_spin.SetValue(params["horizonal_joint_spring_rot_x"])
         self.horizonal_joint_spring_rot_y_spin.SetValue(params["horizonal_joint_spring_rot_y"])
         self.horizonal_joint_spring_rot_z_spin.SetValue(params["horizonal_joint_spring_rot_z"])
-        self.advance_horizonal_joint_restruct_check.SetValue(params.get("horizonal_joint_restruct", 1))
+        self.advance_horizonal_joint_restruct_check.SetValue(params.get("horizonal_joint_restruct", 0))
         self.advance_horizonal_joint_coefficient_spin.SetValue(params["horizonal_joint_coefficient"])
         self.on_horizonal_joint(wx.EVT_CHECKBOX)
 
@@ -4263,7 +4263,7 @@ class PhysicsParam:
     def set_simple_primitive(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_rigidbody_balancer_ctrl.SetValue(0)
-        self.advance_horizonal_joint_restruct_check.SetValue(1)
+        self.advance_horizonal_joint_restruct_check.SetValue(0)
         self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
