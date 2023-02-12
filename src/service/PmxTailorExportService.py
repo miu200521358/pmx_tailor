@@ -2576,7 +2576,7 @@ class PmxTailorExportService:
             if not override_joint_name
             else override_joint_name
         )
-        joint_key = (direction_idx, base_map_idx, a_xidx, a_yidx, b_xidx, b_yidx)
+        joint_key = (direction_idx, base_map_idx, a_yidx, a_xidx, b_yidx, b_xidx)
 
         joint_euler = joint_qq.toEulerAngles()
         joint_rotation_radians = MVector3D(
@@ -3072,8 +3072,8 @@ class PmxTailorExportService:
             )
             # rigidbody_size_ratios = np.linspace(1, 0.7, len(v_yidxs))
 
-            for v_xidx in range(vertex_map.shape[1]):
-                for v_yidx in range(vertex_map.shape[0] - 1):
+            for v_yidx in range(vertex_map.shape[0] - 1):
+                for v_xidx in range(vertex_map.shape[1]):
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any() or not regist_bones[v_yidx, v_xidx]:
                         continue
 
@@ -5239,8 +5239,8 @@ class PmxTailorExportService:
 
             all_regist_bones[base_map_idx] = regist_bones
 
-            for v_xidx in range(vertex_map.shape[1]):
-                for v_yidx in range(vertex_map.shape[0]):
+            for v_yidx in range(vertex_map.shape[0]):
+                for v_xidx in range(vertex_map.shape[1]):
                     if np.isnan(vertex_map[v_yidx, v_xidx]).any() or not regist_bones[v_yidx, v_xidx]:
                         # 登録対象ではない場合、スルー
                         continue
