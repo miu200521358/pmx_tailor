@@ -660,5 +660,7 @@
     "【%s:%s】胸物理生成": "[%s:%s] chest physical generation",
     "-- 胸物理: %s: 終了": "-- chest physics: %s: end",
     "親ボーンを見つけられなかった為、中心ボーンに紐付けます: 親【%s】子【%s】": "Since the parent bone could not be found, it will be linked to the center bone: Parent [%s] Child [%s]",
-    "布(ウール)": "cloth (wool)"
+    "布(ウール)": "cloth (wool)",
+    "材質の柔らかさ。剛体の減衰・ジョイントの移動回転制限に影響します。\n小さくなるほどよく変形し、すぐに元の形状に戻ります。（回転制限が大きく、減衰が高い）": "softness of the material. Affects rigid body damping and joint movement/rotation limits.\nThe smaller it is, the better it deforms and quickly returns to its original shape. (Large rotation limit, high damping)",
+    "材質の形状維持強度。ジョイントのバネの強さに影響します。\n大きいほど変形の振り幅が大きくなります（あんまり変形しないが、変形するときは大きく変形する）": "The shape retention strength of a material. Affects the spring strength of the joint.\nThe larger the value, the greater the amplitude of deformation (not much deformation, but large deformation when deformed)."
 }

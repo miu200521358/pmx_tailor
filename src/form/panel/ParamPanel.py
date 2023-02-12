@@ -719,7 +719,7 @@ class PhysicsParam:
             self.simple_window, wx.ID_ANY, logger.transtext("柔らかさ"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.simple_air_resistance_txt.SetToolTip(
-            logger.transtext("材質の柔らかさ。大きくなるほどすぐに元の形状に戻ります。（減衰が高い）\n剛体の減衰・ジョイントの強さ等に影響します。")
+            logger.transtext("材質の柔らかさ。剛体の減衰・ジョイントの移動回転制限に影響します。\n小さくなるほどよく変形し、すぐに元の形状に戻ります。（回転制限が大きく、減衰が高い）")
         )
         self.simple_air_resistance_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_air_resistance_txt, 0, wx.ALL, 5)
@@ -761,7 +761,9 @@ class PhysicsParam:
         self.simple_shape_maintenance_txt = wx.StaticText(
             self.simple_window, wx.ID_ANY, logger.transtext("張り"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.simple_shape_maintenance_txt.SetToolTip(logger.transtext("材質の形状維持強度。ジョイントの強さ等に影響します。"))
+        self.simple_shape_maintenance_txt.SetToolTip(
+            logger.transtext("材質の形状維持強度。ジョイントのバネの強さに影響します。\n大きいほど変形の振り幅が大きくなります（あんまり変形しないが、変形するときは大きく変形する）")
+        )
         self.simple_shape_maintenance_txt.Wrap(-1)
         self.simple_grid_sizer.Add(self.simple_shape_maintenance_txt, 0, wx.ALL, 5)
 
