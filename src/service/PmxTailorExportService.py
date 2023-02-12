@@ -2596,7 +2596,7 @@ class PmxTailorExportService:
             if not override_joint_name
             else override_joint_name
         )
-        joint_key = (direction_idx, base_map_idx, a_yidx, a_xidx, b_yidx, b_xidx)
+        joint_key = f"{direction_idx:02d}:{a_rigidbody.index:09d}:{b_rigidbody.index:09d}"
 
         joint_euler = joint_qq.toEulerAngles()
         joint_rotation_radians = MVector3D(
@@ -3894,7 +3894,7 @@ class PmxTailorExportService:
                         # 質量は子の1.5倍
                         rigidbody_mass = org_rigidbody.param.mass
 
-            for rigidbody_name in created_rigidbodies.keys():
+            for rigidbody_name in sorted(created_rigidbodies.keys()):
                 # ボーンを登録
                 bone = created_bones[rigidbody_name]
                 bone.index = len(model.bones)
@@ -4885,10 +4885,12 @@ class PmxTailorExportService:
 
             # 各頂点の距離（円周っぽい可能性があるため、頂点一個ずつで測る）
             for v_yidx in range(vertex_map.shape[0]):
-                v_xidx = -1
-                for v_xidx in range(0, vertex_map.shape[1] - 1):
+                # 一列しかない場合は縦方向を計れるようにオフセットをOFFにする
+                x_end_offset = 1 if vertex_map.shape[1] > 1 else 0
+                for v_xidx in range(0, vertex_map.shape[1] - x_end_offset):
                     if (
-                        not np.isnan(vertex_map[v_yidx, v_xidx]).any()
+                        v_xidx < vertex_map.shape[1] - 1
+                        and not np.isnan(vertex_map[v_yidx, v_xidx]).any()
                         and not np.isnan(vertex_map[v_yidx, v_xidx + 1]).any()
                     ):
                         now_v_vec = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])].position()
@@ -4916,7 +4918,8 @@ class PmxTailorExportService:
                         logger.info("-- --【No.%s】頂点距離算出: %s個目:終了", base_map_idx + 1, vertex_cnt)
                         prev_vertex_cnt = vertex_cnt // 1000
 
-                v_xidx += 1
+                if v_xidx > 0:
+                    v_xidx += 1
                 # 最終行の縦距離は前頂点の距離を流用
                 bone_vertical_distances[v_yidx, v_xidx] = float(bone_vertical_distances[v_yidx, v_xidx - 1])
                 if not np.isnan(vertex_map[v_yidx, v_xidx]).any():
@@ -5435,7 +5438,7 @@ class PmxTailorExportService:
 
         logger.info("-- ボーン配置")
 
-        for bi, bone_name in enumerate(tmp_all_bones.keys()):
+        for bi, bone_name in enumerate(sorted(tmp_all_bones.keys())):
             if bone_name not in tmp_all_bone_targets:
                 if bone_name in tmp_all_bone_vvs and tmp_all_bone_vvs[bone_name]["vv"].map_bones:
                     # 同じ箇所に既にボーン定義がある場合、それを流用
