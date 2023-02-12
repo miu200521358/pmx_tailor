@@ -560,6 +560,7 @@ class PhysicsParam:
             choices=[
                 logger.transtext("布(コットン)"),
                 logger.transtext("布(シルク)"),
+                logger.transtext("布(ウール)"),
                 logger.transtext("布(ベルベッド)"),
                 logger.transtext("布(レザー)"),
                 logger.transtext("布(デニム)"),
@@ -4308,6 +4309,13 @@ class PhysicsParam:
             self.simple_mass_slider.SetValue(3.2)
             self.simple_air_resistance_slider.SetValue(1.5)
             self.simple_shape_maintenance_slider.SetValue(1.5)
+
+            self.advance_horizonal_joint_valid_check.SetValue(1)
+
+        if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ウール)"):
+            self.simple_mass_slider.SetValue(6.2)
+            self.simple_air_resistance_slider.SetValue(3.5)
+            self.simple_shape_maintenance_slider.SetValue(0.6)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
 

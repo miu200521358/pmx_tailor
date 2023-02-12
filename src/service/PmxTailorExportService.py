@@ -3632,10 +3632,12 @@ class PmxTailorExportService:
                     next_not_connected_x_idx = (
                         np.min(next_not_connected_x_idxs + (prev_not_connected_x_idx + 1) + 1)
                         if next_not_connected_x_idxs.any()
-                        else registed_max_v_xidx
+                        else 0
                     )
-                    next_not_connected_prev_x_idx = np.max(
-                        np.where(regist_bones[v_yidx, :next_not_connected_x_idx])[0]
+                    next_not_connected_prev_x_idx = (
+                        np.max(np.where(regist_bones[v_yidx, :next_not_connected_x_idx])[0])
+                        if next_not_connected_x_idx
+                        else 0
                     )
 
                     # 実際に剛体を作ってる最後のY
@@ -3666,7 +3668,9 @@ class PmxTailorExportService:
                         is_center=is_center,
                     )
 
-                    is_folding = v_xidx in [next_not_connected_prev_x_idx, next_not_connected_x_idx]
+                    is_folding = v_xidx in [next_not_connected_prev_x_idx, next_not_connected_x_idx,] and param_option[
+                        "joint_pos_type"
+                    ] == logger.transtext("ボーン位置")
                     logger.debug(
                         "is_folding: base_map_idx[%s], v_xidx[%s], v_yidx[%s], is_folding[%s], next_not_connected_prev_x_idx[%s], next_not_connected_x_idx[%s], last_next_connected[%s]",
                         base_map_idx,
@@ -3679,10 +3683,10 @@ class PmxTailorExportService:
                     )
 
                     # 横端が自分の先が繋がって無い場合、折り返しは質量半分
-                    mass_ratio = 0.5 if is_folding else 1
+                    mass_ratio = 0.5 if next_not_connected_x_idx and is_folding else 1
                     mass = rigidbody_masses[v_yidx] * mass_ratio
 
-                    if v_xidx == next_not_connected_x_idx:
+                    if is_folding and next_not_connected_x_idx and v_xidx == next_not_connected_x_idx:
                         # 折り返しの場合、ひとつ前と揃える
                         next_not_connected_prev_x_key = tuple(vertex_map[v_yidx, next_not_connected_prev_x_idx])
                         prev_rigidbody = virtual_vertices[next_not_connected_prev_x_key].map_rigidbodies[base_map_idx]
