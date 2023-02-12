@@ -1481,6 +1481,8 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                             joint_key, joint = self.build_joint(
                                 "↓",
                                 10,
@@ -1494,12 +1496,12 @@ class PmxTailorExportService:
                                 a_yidx,
                                 b_xidx,
                                 b_yidx,
-                                vertical_limit_min_mov_xs,
-                                vertical_limit_min_mov_ys,
-                                vertical_limit_min_mov_zs,
-                                vertical_limit_max_mov_xs,
-                                vertical_limit_max_mov_ys,
-                                vertical_limit_max_mov_zs,
+                                vertical_limit_min_mov_xs * bone_distance,
+                                vertical_limit_min_mov_ys * bone_distance,
+                                vertical_limit_min_mov_zs * bone_distance,
+                                vertical_limit_max_mov_xs * bone_distance,
+                                vertical_limit_max_mov_ys * bone_distance,
+                                vertical_limit_max_mov_zs * bone_distance,
                                 vertical_limit_min_rot_xs,
                                 vertical_limit_min_rot_ys,
                                 vertical_limit_min_rot_zs,
@@ -1566,6 +1568,8 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                                 joint_key, joint = self.build_joint(
                                     "↑",
                                     11,
@@ -1579,12 +1583,12 @@ class PmxTailorExportService:
                                     a_yidx,
                                     b_xidx,
                                     b_yidx,
-                                    vertical_reverse_limit_min_mov_xs,
-                                    vertical_reverse_limit_min_mov_ys,
-                                    vertical_reverse_limit_min_mov_zs,
-                                    vertical_reverse_limit_max_mov_xs,
-                                    vertical_reverse_limit_max_mov_ys,
-                                    vertical_reverse_limit_max_mov_zs,
+                                    vertical_reverse_limit_min_mov_xs * bone_distance,
+                                    vertical_reverse_limit_min_mov_ys * bone_distance,
+                                    vertical_reverse_limit_min_mov_zs * bone_distance,
+                                    vertical_reverse_limit_max_mov_xs * bone_distance,
+                                    vertical_reverse_limit_max_mov_ys * bone_distance,
+                                    vertical_reverse_limit_max_mov_zs * bone_distance,
                                     vertical_reverse_limit_min_rot_xs,
                                     vertical_reverse_limit_min_rot_ys,
                                     vertical_reverse_limit_min_rot_zs,
@@ -1843,6 +1847,8 @@ class PmxTailorExportService:
                                         )
                                         break
 
+                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                             joint_key, joint = self.build_joint(
                                 "→",
                                 21,
@@ -1856,12 +1862,12 @@ class PmxTailorExportService:
                                 a_yidx,
                                 b_xidx,
                                 b_yidx,
-                                horizonal_limit_min_mov_xs,
-                                horizonal_limit_min_mov_ys,
-                                horizonal_limit_min_mov_zs,
-                                horizonal_limit_max_mov_xs,
-                                horizonal_limit_max_mov_ys,
-                                horizonal_limit_max_mov_zs,
+                                horizonal_limit_min_mov_xs * bone_distance,
+                                horizonal_limit_min_mov_ys * bone_distance,
+                                horizonal_limit_min_mov_zs * bone_distance,
+                                horizonal_limit_max_mov_xs * bone_distance,
+                                horizonal_limit_max_mov_ys * bone_distance,
+                                horizonal_limit_max_mov_zs * bone_distance,
                                 horizonal_limit_min_rot_xs,
                                 horizonal_limit_min_rot_ys,
                                 horizonal_limit_min_rot_zs,
@@ -1930,6 +1936,8 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                                 joint_key, joint = self.build_joint(
                                     "→",
                                     21,
@@ -1943,12 +1951,12 @@ class PmxTailorExportService:
                                     a_yidx + 1,
                                     b_xidx,
                                     b_yidx + 1,
-                                    horizonal_limit_min_mov_xs,
-                                    horizonal_limit_min_mov_ys,
-                                    horizonal_limit_min_mov_zs,
-                                    horizonal_limit_max_mov_xs,
-                                    horizonal_limit_max_mov_ys,
-                                    horizonal_limit_max_mov_zs,
+                                    horizonal_limit_min_mov_xs * bone_distance,
+                                    horizonal_limit_min_mov_ys * bone_distance,
+                                    horizonal_limit_min_mov_zs * bone_distance,
+                                    horizonal_limit_max_mov_xs * bone_distance,
+                                    horizonal_limit_max_mov_ys * bone_distance,
+                                    horizonal_limit_max_mov_zs * bone_distance,
                                     horizonal_limit_min_rot_xs,
                                     horizonal_limit_min_rot_ys,
                                     horizonal_limit_min_rot_zs,
@@ -2048,6 +2056,8 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                                 joint_key, joint = self.build_joint(
                                     "→",
                                     22,
@@ -2061,12 +2071,12 @@ class PmxTailorExportService:
                                     a_yidx + 1,
                                     b_xidx,
                                     b_yidx + 1,
-                                    horizonal_limit_min_mov_xs,
-                                    horizonal_limit_min_mov_ys,
-                                    horizonal_limit_min_mov_zs,
-                                    horizonal_limit_max_mov_xs,
-                                    horizonal_limit_max_mov_ys,
-                                    horizonal_limit_max_mov_zs,
+                                    horizonal_limit_min_mov_xs * bone_distance,
+                                    horizonal_limit_min_mov_ys * bone_distance,
+                                    horizonal_limit_min_mov_zs * bone_distance,
+                                    horizonal_limit_max_mov_xs * bone_distance,
+                                    horizonal_limit_max_mov_ys * bone_distance,
+                                    horizonal_limit_max_mov_zs * bone_distance,
                                     horizonal_limit_min_rot_xs,
                                     horizonal_limit_min_rot_ys,
                                     horizonal_limit_min_rot_zs,
@@ -2125,6 +2135,8 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                                 joint_key, joint = self.build_joint(
                                     "←",
                                     23,
@@ -2138,12 +2150,12 @@ class PmxTailorExportService:
                                     a_yidx + 1,
                                     b_xidx,
                                     b_yidx + 1,
-                                    horizonal_limit_min_mov_xs,
-                                    horizonal_limit_min_mov_ys,
-                                    horizonal_limit_min_mov_zs,
-                                    horizonal_limit_max_mov_xs,
-                                    horizonal_limit_max_mov_ys,
-                                    horizonal_limit_max_mov_zs,
+                                    horizonal_limit_min_mov_xs * bone_distance,
+                                    horizonal_limit_min_mov_ys * bone_distance,
+                                    horizonal_limit_min_mov_zs * bone_distance,
+                                    horizonal_limit_max_mov_xs * bone_distance,
+                                    horizonal_limit_max_mov_ys * bone_distance,
+                                    horizonal_limit_max_mov_zs * bone_distance,
                                     horizonal_limit_min_rot_xs * 0 + 1,
                                     horizonal_limit_min_rot_ys * 0 + 1,
                                     horizonal_limit_min_rot_zs * 0 + 1,
@@ -2204,6 +2216,8 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                                 joint_key, joint = self.build_joint(
                                     "←",
                                     23,
@@ -2217,12 +2231,12 @@ class PmxTailorExportService:
                                     a_yidx,
                                     b_xidx,
                                     b_yidx,
-                                    horizonal_reverse_limit_min_mov_xs,
-                                    horizonal_reverse_limit_min_mov_ys,
-                                    horizonal_reverse_limit_min_mov_zs,
-                                    horizonal_reverse_limit_max_mov_xs,
-                                    horizonal_reverse_limit_max_mov_ys,
-                                    horizonal_reverse_limit_max_mov_zs,
+                                    horizonal_reverse_limit_min_mov_xs * bone_distance,
+                                    horizonal_reverse_limit_min_mov_ys * bone_distance,
+                                    horizonal_reverse_limit_min_mov_zs * bone_distance,
+                                    horizonal_reverse_limit_max_mov_xs * bone_distance,
+                                    horizonal_reverse_limit_max_mov_ys * bone_distance,
+                                    horizonal_reverse_limit_max_mov_zs * bone_distance,
                                     horizonal_reverse_limit_min_rot_xs,
                                     horizonal_reverse_limit_min_rot_ys,
                                     horizonal_reverse_limit_min_rot_zs,
@@ -2277,6 +2291,8 @@ class PmxTailorExportService:
                                     joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                     joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                                    bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                                     joint_key, joint = self.build_joint(
                                         "←",
                                         23,
@@ -2290,12 +2306,12 @@ class PmxTailorExportService:
                                         a_yidx + 1,
                                         b_xidx,
                                         b_yidx + 1,
-                                        horizonal_limit_min_mov_xs,
-                                        horizonal_limit_min_mov_ys,
-                                        horizonal_limit_min_mov_zs,
-                                        horizonal_limit_max_mov_xs,
-                                        horizonal_limit_max_mov_ys,
-                                        horizonal_limit_max_mov_zs,
+                                        horizonal_limit_min_mov_xs * bone_distance,
+                                        horizonal_limit_min_mov_ys * bone_distance,
+                                        horizonal_limit_min_mov_zs * bone_distance,
+                                        horizonal_limit_max_mov_xs * bone_distance,
+                                        horizonal_limit_max_mov_ys * bone_distance,
+                                        horizonal_limit_max_mov_zs * bone_distance,
                                         horizonal_limit_min_rot_xs,
                                         horizonal_limit_min_rot_ys,
                                         horizonal_limit_min_rot_zs,
@@ -2378,6 +2394,8 @@ class PmxTailorExportService:
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                             joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                             joint_key, joint = self.build_joint(
                                 "＼",
                                 31,
@@ -2391,12 +2409,12 @@ class PmxTailorExportService:
                                 a_yidx,
                                 b_xidx,
                                 b_yidx,
-                                diagonal_limit_min_mov_xs,
-                                diagonal_limit_min_mov_ys,
-                                diagonal_limit_min_mov_zs,
-                                diagonal_limit_max_mov_xs,
-                                diagonal_limit_max_mov_ys,
-                                diagonal_limit_max_mov_zs,
+                                diagonal_limit_min_mov_xs * bone_distance,
+                                diagonal_limit_min_mov_ys * bone_distance,
+                                diagonal_limit_min_mov_zs * bone_distance,
+                                diagonal_limit_max_mov_xs * bone_distance,
+                                diagonal_limit_max_mov_ys * bone_distance,
+                                diagonal_limit_max_mov_zs * bone_distance,
                                 diagonal_limit_min_rot_xs,
                                 diagonal_limit_min_rot_ys,
                                 diagonal_limit_min_rot_zs,
@@ -2483,6 +2501,8 @@ class PmxTailorExportService:
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                             joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
+                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+
                             joint_key, joint = self.build_joint(
                                 "／",
                                 32,
@@ -2496,12 +2516,12 @@ class PmxTailorExportService:
                                 a_yidx,
                                 b_xidx,
                                 b_yidx,
-                                diagonal_limit_min_mov_xs,
-                                diagonal_limit_min_mov_ys,
-                                diagonal_limit_min_mov_zs,
-                                diagonal_limit_max_mov_xs,
-                                diagonal_limit_max_mov_ys,
-                                diagonal_limit_max_mov_zs,
+                                diagonal_limit_min_mov_xs * bone_distance,
+                                diagonal_limit_min_mov_ys * bone_distance,
+                                diagonal_limit_min_mov_zs * bone_distance,
+                                diagonal_limit_max_mov_xs * bone_distance,
+                                diagonal_limit_max_mov_ys * bone_distance,
+                                diagonal_limit_max_mov_zs * bone_distance,
                                 diagonal_limit_min_rot_xs,
                                 diagonal_limit_min_rot_ys,
                                 diagonal_limit_min_rot_zs,

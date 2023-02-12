@@ -1240,7 +1240,7 @@ class PhysicsParam:
         self.vertical_joint_mov_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動X(最小)"))
+        self.vertical_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動X(最小)\n1ミクセルあたりの許容移動量"))
         self.vertical_joint_mov_x_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -1256,7 +1256,7 @@ class PhysicsParam:
         self.vertical_joint_mov_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Y(最小)"))
+        self.vertical_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Y(最小)\n1ミクセルあたりの許容移動量"))
         self.vertical_joint_mov_y_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -1272,7 +1272,7 @@ class PhysicsParam:
         self.vertical_joint_mov_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Z(最小)"))
+        self.vertical_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Z(最小)\n1ミクセルあたりの許容移動量"))
         self.vertical_joint_mov_z_min_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -1288,7 +1288,7 @@ class PhysicsParam:
         self.vertical_joint_mov_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動X(最大)"))
+        self.vertical_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動X(最大)\n1ミクセルあたりの許容移動量"))
         self.vertical_joint_mov_x_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -1304,7 +1304,7 @@ class PhysicsParam:
         self.vertical_joint_mov_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Y(最大)"))
+        self.vertical_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Y(最大)\n1ミクセルあたりの許容移動量"))
         self.vertical_joint_mov_y_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -1320,7 +1320,7 @@ class PhysicsParam:
         self.vertical_joint_mov_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Z(最大)"))
+        self.vertical_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端縦ジョイントの移動Z(最大)\n1ミクセルあたりの許容移動量"))
         self.vertical_joint_mov_z_max_txt.Wrap(-1)
         self.advance_vertical_joint_grid_sizer.Add(self.vertical_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -1571,7 +1571,7 @@ class PhysicsParam:
         self.horizonal_joint_mov_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端横ジョイントの移動X(最小)"))
+        self.horizonal_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端横ジョイントの移動X(最小)\n1ミクセルあたりの許容移動量"))
         self.horizonal_joint_mov_x_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -1587,7 +1587,7 @@ class PhysicsParam:
         self.horizonal_joint_mov_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Y(最小)"))
+        self.horizonal_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Y(最小)\n1ミクセルあたりの許容移動量"))
         self.horizonal_joint_mov_y_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -1603,7 +1603,7 @@ class PhysicsParam:
         self.horizonal_joint_mov_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Z(最小)"))
+        self.horizonal_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Z(最小)\n1ミクセルあたりの許容移動量"))
         self.horizonal_joint_mov_z_min_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -1619,7 +1619,7 @@ class PhysicsParam:
         self.horizonal_joint_mov_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端横ジョイントの移動X(最大)"))
+        self.horizonal_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端横ジョイントの移動X(最大)\n1ミクセルあたりの許容移動量"))
         self.horizonal_joint_mov_x_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -1635,7 +1635,7 @@ class PhysicsParam:
         self.horizonal_joint_mov_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Y(最大)"))
+        self.horizonal_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Y(最大)\n1ミクセルあたりの許容移動量"))
         self.horizonal_joint_mov_y_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -1651,7 +1651,7 @@ class PhysicsParam:
         self.horizonal_joint_mov_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Z(最大)"))
+        self.horizonal_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端横ジョイントの移動Z(最大)\n1ミクセルあたりの許容移動量"))
         self.horizonal_joint_mov_z_max_txt.Wrap(-1)
         self.advance_horizonal_joint_grid_sizer.Add(self.horizonal_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -1896,7 +1896,7 @@ class PhysicsParam:
         self.diagonal_joint_mov_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.diagonal_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動X(最小)"))
+        self.diagonal_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動X(最小)\n1ミクセルあたりの許容移動量"))
         self.diagonal_joint_mov_x_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -1912,7 +1912,7 @@ class PhysicsParam:
         self.diagonal_joint_mov_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.diagonal_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Y(最小)"))
+        self.diagonal_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Y(最小)\n1ミクセルあたりの許容移動量"))
         self.diagonal_joint_mov_y_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -1928,7 +1928,7 @@ class PhysicsParam:
         self.diagonal_joint_mov_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.diagonal_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Z(最小)"))
+        self.diagonal_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Z(最小)\n1ミクセルあたりの許容移動量"))
         self.diagonal_joint_mov_z_min_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -1944,7 +1944,7 @@ class PhysicsParam:
         self.diagonal_joint_mov_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.diagonal_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動X(最大)"))
+        self.diagonal_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動X(最大)\n1ミクセルあたりの許容移動量"))
         self.diagonal_joint_mov_x_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -1960,7 +1960,7 @@ class PhysicsParam:
         self.diagonal_joint_mov_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.diagonal_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Y(最大)"))
+        self.diagonal_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Y(最大)\n1ミクセルあたりの許容移動量"))
         self.diagonal_joint_mov_y_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -1976,7 +1976,7 @@ class PhysicsParam:
         self.diagonal_joint_mov_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.diagonal_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Z(最大)"))
+        self.diagonal_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端斜めジョイントの移動Z(最大)\n1ミクセルあたりの許容移動量"))
         self.diagonal_joint_mov_z_max_txt.Wrap(-1)
         self.advance_diagonal_joint_grid_sizer.Add(self.diagonal_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -2229,7 +2229,7 @@ class PhysicsParam:
         self.vertical_reverse_joint_mov_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動X(最小)"))
+        self.vertical_reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動X(最小)\n1ミクセルあたりの許容移動量"))
         self.vertical_reverse_joint_mov_x_min_txt.Wrap(-1)
         self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -2245,7 +2245,7 @@ class PhysicsParam:
         self.vertical_reverse_joint_mov_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Y(最小)"))
+        self.vertical_reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Y(最小)\n1ミクセルあたりの許容移動量"))
         self.vertical_reverse_joint_mov_y_min_txt.Wrap(-1)
         self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -2261,7 +2261,7 @@ class PhysicsParam:
         self.vertical_reverse_joint_mov_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Z(最小)"))
+        self.vertical_reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Z(最小)\n1ミクセルあたりの許容移動量"))
         self.vertical_reverse_joint_mov_z_min_txt.Wrap(-1)
         self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -2277,7 +2277,7 @@ class PhysicsParam:
         self.vertical_reverse_joint_mov_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動X(最大)"))
+        self.vertical_reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動X(最大)\n1ミクセルあたりの許容移動量"))
         self.vertical_reverse_joint_mov_x_max_txt.Wrap(-1)
         self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -2293,7 +2293,7 @@ class PhysicsParam:
         self.vertical_reverse_joint_mov_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Y(最大)"))
+        self.vertical_reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Y(最大)\n1ミクセルあたりの許容移動量"))
         self.vertical_reverse_joint_mov_y_max_txt.Wrap(-1)
         self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -2309,7 +2309,7 @@ class PhysicsParam:
         self.vertical_reverse_joint_mov_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.vertical_reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Z(最大)"))
+        self.vertical_reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("末端縦逆ジョイントの移動Z(最大)\n1ミクセルあたりの許容移動量"))
         self.vertical_reverse_joint_mov_z_max_txt.Wrap(-1)
         self.advance_vertical_reverse_joint_grid_sizer.Add(self.vertical_reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -2564,7 +2564,7 @@ class PhysicsParam:
         self.horizonal_reverse_joint_mov_x_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("横逆ジョイントの移動X(最小)"))
+        self.horizonal_reverse_joint_mov_x_min_txt.SetToolTip(logger.transtext("横逆ジョイントの移動X(最小)\n1ミクセルあたりの許容移動量"))
         self.horizonal_reverse_joint_mov_x_min_txt.Wrap(-1)
         self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_x_min_txt, 0, wx.ALL, 5)
 
@@ -2580,7 +2580,7 @@ class PhysicsParam:
         self.horizonal_reverse_joint_mov_y_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Y(最小)"))
+        self.horizonal_reverse_joint_mov_y_min_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Y(最小)\n1ミクセルあたりの許容移動量"))
         self.horizonal_reverse_joint_mov_y_min_txt.Wrap(-1)
         self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_y_min_txt, 0, wx.ALL, 5)
 
@@ -2596,7 +2596,7 @@ class PhysicsParam:
         self.horizonal_reverse_joint_mov_z_min_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最小)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Z(最小)"))
+        self.horizonal_reverse_joint_mov_z_min_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Z(最小)\n1ミクセルあたりの許容移動量"))
         self.horizonal_reverse_joint_mov_z_min_txt.Wrap(-1)
         self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_z_min_txt, 0, wx.ALL, 5)
 
@@ -2612,7 +2612,7 @@ class PhysicsParam:
         self.horizonal_reverse_joint_mov_x_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動X(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("横逆ジョイントの移動X(最大)"))
+        self.horizonal_reverse_joint_mov_x_max_txt.SetToolTip(logger.transtext("横逆ジョイントの移動X(最大)\n1ミクセルあたりの許容移動量"))
         self.horizonal_reverse_joint_mov_x_max_txt.Wrap(-1)
         self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_x_max_txt, 0, wx.ALL, 5)
 
@@ -2628,7 +2628,7 @@ class PhysicsParam:
         self.horizonal_reverse_joint_mov_y_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Y(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Y(最大)"))
+        self.horizonal_reverse_joint_mov_y_max_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Y(最大)\n1ミクセルあたりの許容移動量"))
         self.horizonal_reverse_joint_mov_y_max_txt.Wrap(-1)
         self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_y_max_txt, 0, wx.ALL, 5)
 
@@ -2644,7 +2644,7 @@ class PhysicsParam:
         self.horizonal_reverse_joint_mov_z_max_txt = wx.StaticText(
             self.advance_window, wx.ID_ANY, logger.transtext("移動Z(最大)"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.horizonal_reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Z(最大)"))
+        self.horizonal_reverse_joint_mov_z_max_txt.SetToolTip(logger.transtext("横逆ジョイントの移動Z(最大)\n1ミクセルあたりの許容移動量"))
         self.horizonal_reverse_joint_mov_z_max_txt.Wrap(-1)
         self.advance_horizonal_reverse_joint_grid_sizer.Add(self.horizonal_reverse_joint_mov_z_max_txt, 0, wx.ALL, 5)
 
@@ -4589,7 +4589,7 @@ class PhysicsParam:
             self.horizonal_joint_mov_y_min_spin.SetValue(0)
             self.horizonal_joint_mov_y_max_spin.SetValue(0)
         else:
-            horizonal_joint_mov = max(0, (1 - air_resistance_ratio * 1.5))
+            horizonal_joint_mov = max(0, (1 - air_resistance_ratio) * 0.5)
             self.horizonal_joint_mov_y_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov / 2)
 
@@ -4668,7 +4668,7 @@ class PhysicsParam:
             self.diagonal_joint_mov_y_min_spin.SetValue(0)
             self.diagonal_joint_mov_y_max_spin.SetValue(0)
         else:
-            diagonal_joint_mov = max(0, (1 - air_resistance_ratio * 1.2))
+            diagonal_joint_mov = max(0, (1 - air_resistance_ratio) * 0.7)
             self.diagonal_joint_mov_y_min_spin.SetValue(-diagonal_joint_mov)
             self.diagonal_joint_mov_y_max_spin.SetValue(diagonal_joint_mov / 2)
 
