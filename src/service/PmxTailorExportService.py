@@ -3223,6 +3223,8 @@ class PmxTailorExportService:
                     next_now_bone = next_now_vv.map_bones.get(next_map_idx, None)
                     next_below_bone = next_below_vv.map_bones.get(next_map_idx, None)
 
+                    last_v_xidx = np.max(np.sort(np.where(regist_bones[v_yidx, :])[0])[-2:])
+
                     if not (now_now_bone and now_below_bone):
                         if now_now_bone.getVisibleFlag():
                             logger.warning(
@@ -3237,6 +3239,7 @@ class PmxTailorExportService:
                         # ウェイトを持ってないボーンは登録対象外（有り得るので警告なし）
                         continue
 
+                    x_ratio = 0.5
                     if is_center:
                         # 中央は全部を覆う
                         x_sizes = []
@@ -3250,16 +3253,13 @@ class PmxTailorExportService:
                     else:
                         # それ以外はとりあえず隣の仮想頂点から横幅を図る
                         if next_now_vv.position() != MVector3D() and (
-                            v_xidx < vertex_map.shape[1] - 1 or (v_xidx == vertex_map.shape[1] - 1 and next_connected)
+                            v_xidx < last_v_xidx or (v_xidx == last_v_xidx and next_connected)
                         ):
                             x_sizes = [now_now_bone.position.distanceToPoint(next_now_vv.position())]
                             x_sizes.append(now_below_vv.position().distanceToPoint(next_below_vv.position()))
                             x_size = np.mean(x_sizes)
                         elif (
-                            (
-                                v_xidx < vertex_map.shape[1] - 1
-                                or (v_xidx == vertex_map.shape[1] - 1 and next_connected)
-                            )
+                            (v_xidx < last_v_xidx or (v_xidx == last_v_xidx and next_connected))
                             and now_below_vv.position() != MVector3D()
                             and next_below_vv.position() != MVector3D()
                         ):
@@ -3314,8 +3314,8 @@ class PmxTailorExportService:
                     elif rigidbody_shape_type == 1:
                         # 箱剛体の場合
                         shape_size = MVector3D(
-                            max(0.2, x_size) * 0.5,
-                            max(0.2, y_size) * 0.5,
+                            max(0.5, x_size) * x_ratio,
+                            max(0.5, y_size) * 0.5,
                             rigidbody_limit_thicks[v_yidx],
                         )
                         shape_volume = shape_size.x() * shape_size.y() * shape_size.z()
@@ -3618,8 +3618,26 @@ class PmxTailorExportService:
                     # 根元は物理演算 + Bone位置合わせ、それ以降は物理剛体
                     mode = 2 if 0 == v_yidx else 1
 
-                    folding_v_xidx = np.min(np.sort(np.where(regist_bones[v_yidx, :])[0])[-2:])
-                    last_v_xidx = np.max(np.sort(np.where(regist_bones[v_yidx, :])[0])[-2:])
+                    # 前で繋がってないX
+                    prev_not_connected_x_idxs = np.where(
+                        np.diff(all_bone_connected[base_map_idx][v_yidx, :v_xidx]) == -1
+                    )[0]
+                    prev_not_connected_x_idx = (
+                        np.max(prev_not_connected_x_idxs + 1) if prev_not_connected_x_idxs.any() else 0
+                    )
+                    # 自分を含む後で繋がってないX
+                    next_not_connected_x_idxs = np.where(
+                        np.diff(all_bone_connected[base_map_idx][v_yidx, (prev_not_connected_x_idx + 1) :]) == -1
+                    )[0]
+                    next_not_connected_x_idx = (
+                        np.min(next_not_connected_x_idxs + (prev_not_connected_x_idx + 1) + 1)
+                        if next_not_connected_x_idxs.any()
+                        else registed_max_v_xidx
+                    )
+                    next_not_connected_prev_x_idx = np.max(
+                        np.where(regist_bones[v_yidx, :next_not_connected_x_idx])[0]
+                    )
+
                     # 実際に剛体を作ってる最後のY
                     actual_v_yidx = np.min(np.sort(np.where(regist_bones[:, v_xidx])[0])[-2:])
 
@@ -3648,26 +3666,39 @@ class PmxTailorExportService:
                         is_center=is_center,
                     )
 
-                    # 横端が自分の先が繋がって無い場合、折り返しは質量半分
-                    mass_ratio = (
-                        1
-                        if (
-                            v_xidx < folding_v_xidx
-                            or (last_next_connected and v_xidx == folding_v_xidx)
-                            or (next_connected and v_xidx > folding_v_xidx)
-                        )
-                        else 0.5
-                    )
+                    is_folding = v_xidx in [next_not_connected_prev_x_idx, next_not_connected_x_idx]
                     logger.debug(
-                        "mass_ratio: base_map_idx[%s], v_xidx[%s], v_yidx[%s], folding_v_xidx[%s], mass_ratio[%s], next_connected[%s], last_next_connected[%s]",
+                        "is_folding: base_map_idx[%s], v_xidx[%s], v_yidx[%s], is_folding[%s], next_not_connected_prev_x_idx[%s], next_not_connected_x_idx[%s], last_next_connected[%s]",
                         base_map_idx,
                         v_xidx,
                         v_yidx,
-                        folding_v_xidx,
-                        mass_ratio,
-                        next_connected,
+                        is_folding,
+                        next_not_connected_prev_x_idx,
+                        next_not_connected_x_idx,
                         last_next_connected,
                     )
+
+                    # 横端が自分の先が繋がって無い場合、折り返しは質量半分
+                    mass_ratio = 0.5 if is_folding else 1
+                    mass = rigidbody_masses[v_yidx] * mass_ratio
+
+                    if v_xidx == next_not_connected_x_idx:
+                        # 折り返しの場合、ひとつ前と揃える
+                        next_not_connected_prev_x_key = tuple(vertex_map[v_yidx, next_not_connected_prev_x_idx])
+                        prev_rigidbody = virtual_vertices[next_not_connected_prev_x_key].map_rigidbodies[base_map_idx]
+                        if prev_rigidbody:
+                            shape_size = prev_rigidbody.shape_size
+                            shape_position = prev_rigidbody.shape_position
+                            shape_rotation_radians = prev_rigidbody.shape_rotation
+                            mass = prev_rigidbody.param.mass
+
+                        logger.debug(
+                            "**folding copy: base_map_idx[%s], v_xidx[%s], v_yidx[%s], is_folding[%s]",
+                            base_map_idx,
+                            v_xidx,
+                            v_yidx,
+                            is_folding,
+                        )
 
                     vv.map_rigidbodies[base_map_idx] = RigidBody(
                         vv.map_bones[base_map_idx].name,
@@ -3679,7 +3710,7 @@ class PmxTailorExportService:
                         shape_size,
                         shape_position,
                         shape_rotation_radians,
-                        rigidbody_masses[v_yidx] * mass_ratio,
+                        mass,
                         linear_dampings[v_yidx],
                         angular_dampings[v_yidx],
                         param_rigidbody.param.restitution,
@@ -5063,7 +5094,7 @@ class PmxTailorExportService:
                 x_bone_registers = sorted(
                     list(
                         set(np.where(x_registers)[0].tolist())
-                        | set(np.where(x_diffs == 1)[1].tolist())
+                        | set((np.where(x_diffs == 1)[1] + 1).tolist())
                         | set((np.where(x_diffs == -1)[1] + 1).tolist())
                     )
                 )
@@ -6584,7 +6615,9 @@ class PmxTailorExportService:
 
                     # 頂点を繋げた辺がエッジペアに含まれてない場合、仮想面を追加する
                     for (vv0_key, vv1_key) in combinations(set([v0_key, v1_key, v2_key]), 2):
-                        if vv0_key in virtual_edge_keys and vv1_key in virtual_edge_keys:
+                        lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
+
+                        if vv0_key in virtual_edge_keys and vv1_key in virtual_edge_keys and lkey not in virtual_edges:
                             # 仮想エッジの場合、追加
                             if vv0_key not in edge_line_pairs:
                                 edge_line_pairs[vv0_key] = []
@@ -6594,7 +6627,6 @@ class PmxTailorExportService:
                             edge_line_pairs[vv0_key].append(vv1_key)
                             edge_line_pairs[vv1_key].append(vv0_key)
 
-                            lkey = (min(vv0_key, vv1_key), max(vv0_key, vv1_key))
                             virtual_edges.append(lkey)
                         else:
                             # 仮想エッジではない場合、エッジから除外
@@ -6640,8 +6672,17 @@ class PmxTailorExportService:
         remain_start_vkeys = list(edge_line_pairs.keys())
         remain_existed_edges = list(edge_line_pairs.keys())
         while remain_existed_edges:
-            _, tmp_edge_lines, edge_vkeys = self.get_edge_lines(
-                edge_line_pairs, None, tmp_edge_lines, edge_vkeys, virtual_vertices, param_option, 0, n
+            registered_edge_line_pairs = {}
+            _, tmp_edge_lines, edge_vkeys, registered_edge_line_pairs = self.get_edge_lines(
+                edge_line_pairs,
+                registered_edge_line_pairs,
+                None,
+                tmp_edge_lines,
+                edge_vkeys,
+                virtual_vertices,
+                param_option,
+                0,
+                n,
             )
             remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
             remain_existed_edges = set([vk for vk in remain_start_vkeys if vk in edge_line_pairs])
@@ -7760,6 +7801,7 @@ class PmxTailorExportService:
     def get_edge_lines(
         self,
         edge_line_pairs: dict,
+        registered_edge_line_pairs: dict,
         start_vkey: tuple,
         edge_lines: list,
         edge_vkeys: list,
@@ -7771,7 +7813,7 @@ class PmxTailorExportService:
         remain_start_vkeys = [elp for elp in edge_line_pairs.keys() if edge_line_pairs[elp]]
 
         if not remain_start_vkeys or loop > 500:
-            return start_vkey, edge_lines, edge_vkeys
+            return start_vkey, edge_lines, edge_vkeys, registered_edge_line_pairs
 
         if not start_vkey:
             if param_option["direction"] == logger.transtext("上"):
@@ -7801,9 +7843,15 @@ class PmxTailorExportService:
 
         if not remain_next_vkeys:
             if start_vkey and start_vkey in edge_line_pairs:
+                if start_vkey not in registered_edge_line_pairs:
+                    registered_edge_line_pairs[start_vkey] = []
+                for vk in registered_edge_line_pairs[start_vkey]:
+                    if vk not in registered_edge_line_pairs[start_vkey]:
+                        registered_edge_line_pairs[start_vkey].append(vk)
+
                 del edge_line_pairs[start_vkey]
 
-            return None, edge_lines, edge_vkeys
+            return None, edge_lines, edge_vkeys, registered_edge_line_pairs
 
         if len(edge_lines[-1]) == 1:
             # 初回はルールに沿って次を抽出する
@@ -7842,6 +7890,16 @@ class PmxTailorExportService:
                 edge_lines[-1].append(next_vkey)
                 edge_vkeys.append((start_vkey, next_vkey))
 
+            if start_vkey not in registered_edge_line_pairs:
+                registered_edge_line_pairs[start_vkey] = []
+            if next_vkey not in registered_edge_line_pairs[start_vkey]:
+                registered_edge_line_pairs[start_vkey].append(next_vkey)
+
+            if next_vkey not in registered_edge_line_pairs:
+                registered_edge_line_pairs[next_vkey] = []
+            if start_vkey not in registered_edge_line_pairs[next_vkey]:
+                registered_edge_line_pairs[next_vkey].append(start_vkey)
+
             for n, nk in enumerate(edge_line_pairs[start_vkey]):
                 if nk == next_vkey:
                     del edge_line_pairs[start_vkey][n]
@@ -7851,13 +7909,27 @@ class PmxTailorExportService:
                     del edge_line_pairs[next_vkey][n]
 
             if start_vkey in edge_line_pairs and not edge_line_pairs[start_vkey]:
+                if start_vkey not in registered_edge_line_pairs:
+                    registered_edge_line_pairs[start_vkey] = []
+                for vk in registered_edge_line_pairs[start_vkey]:
+                    if vk not in registered_edge_line_pairs[start_vkey]:
+                        registered_edge_line_pairs[start_vkey].append(vk)
+
                 del edge_line_pairs[start_vkey]
 
-            _, edge_lines, edge_vkeys = self.get_edge_lines(
-                edge_line_pairs, next_vkey, edge_lines, edge_vkeys, virtual_vertices, param_option, loop + 1, n
+            _, edge_lines, edge_vkeys, registered_edge_line_pairs = self.get_edge_lines(
+                edge_line_pairs,
+                registered_edge_line_pairs,
+                next_vkey,
+                edge_lines,
+                edge_vkeys,
+                virtual_vertices,
+                param_option,
+                loop + 1,
+                n,
             )
 
-        return None, edge_lines, edge_vkeys
+        return None, edge_lines, edge_vkeys, registered_edge_line_pairs
 
     def get_rigidbody(self, model: PmxModel, bone_name: str):
         if bone_name not in model.bones:
@@ -8021,7 +8093,7 @@ class PmxTailorExportService:
                     (
                         np.where(
                             all_bone_connected[base_map_idx][
-                                min(all_bone_connected[base_map_idx].shape[0] - 2, target_v_yidx), :
+                                min(all_bone_connected[base_map_idx].shape[0] - 2, target_v_yidx), (v_xidx + 1) :
                             ]
                             == 0
                         )[0]
