@@ -5626,12 +5626,11 @@ class PmxTailorExportService:
     ):
         joint_name = f"Bst|{a_rigidbody.name}|{b_rigidbody.name}"
 
-        # rotation_limit_min_radians = MVector3D(
-        #     math.radians(param_joint.rotation_limit_min.x()),
-        #     math.radians(param_joint.rotation_limit_min.y()),
-        #     math.radians(param_joint.rotation_limit_min.z()),
-        # )
-        rotation_limit_min_radians = MVector3D()
+        rotation_limit_min_radians = MVector3D(
+            math.radians(param_joint.rotation_limit_min.x()),
+            math.radians(param_joint.rotation_limit_min.y()),
+            math.radians(param_joint.rotation_limit_min.z()),
+        )
         rotation_limit_max_radians = MVector3D(
             math.radians(param_joint.rotation_limit_max.x()),
             math.radians(param_joint.rotation_limit_max.y()),

@@ -4273,6 +4273,12 @@ class PhysicsParam:
         self.advance_vertical_reverse_joint_valid_check.SetValue(0)
         self.advance_horizonal_reverse_joint_valid_check.SetValue(0)
 
+        self.advance_vertical_joint_coefficient_spin.SetValue(2.8)
+        self.advance_horizonal_joint_coefficient_spin.SetValue(4.2)
+        self.advance_diagonal_joint_coefficient_spin.SetValue(1)
+        self.advance_vertical_reverse_joint_coefficient_spin.SetValue(1)
+        self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(1)
+
         if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
@@ -4373,17 +4379,25 @@ class PhysicsParam:
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(小)"):
-            self.simple_mass_slider.SetValue(5.4)
-            self.simple_air_resistance_slider.SetValue(2.3)
-            self.simple_shape_maintenance_slider.SetValue(3.7)
+            self.simple_mass_slider.SetValue(4.0)
+            self.simple_air_resistance_slider.SetValue(1.5)
+            self.simple_shape_maintenance_slider.SetValue(3.0)
+
+            self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
+            self.advance_horizonal_joint_coefficient_spin.SetValue(1.0)
+            self.advance_diagonal_joint_coefficient_spin.SetValue(1.0)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
             self.simple_mass_slider.SetValue(6.2)
-            self.simple_air_resistance_slider.SetValue(1.3)
-            self.simple_shape_maintenance_slider.SetValue(3.0)
+            self.simple_air_resistance_slider.SetValue(1.2)
+            self.simple_shape_maintenance_slider.SetValue(2.6)
+
+            self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
+            self.advance_horizonal_joint_coefficient_spin.SetValue(1.0)
+            self.advance_diagonal_joint_coefficient_spin.SetValue(1.0)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
@@ -4490,7 +4504,7 @@ class PhysicsParam:
         # 縦ジョイント
         self.advance_vertical_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
 
-        vertical_joint_ratio = 5 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
+        vertical_joint_ratio = 5.5 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
 
         vertical_joint_rot = (
             max(
@@ -4527,9 +4541,9 @@ class PhysicsParam:
         vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
         vertical_joint_y_rot = 2 if not vertical_joint_y_rot else vertical_joint_y_rot
 
-        vertical_spring_rot_ratio = 20 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+        vertical_spring_rot_ratio = 10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
         vertical_spring_y_rot_ratio = (
-            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 100
+            5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 100
         )
 
         vertical_spring_rot = (
@@ -4571,7 +4585,7 @@ class PhysicsParam:
 
         self.advance_horizonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 20)
 
-        horizonal_joint_ratio = 3 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.2
+        horizonal_joint_ratio = 4 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.2
 
         horizonal_joint_rot = (
             max(
@@ -4611,10 +4625,10 @@ class PhysicsParam:
         horizonal_joint_y_rot = 2 if not horizonal_joint_y_rot else horizonal_joint_y_rot
 
         horizonal_spring_rot_ratio = (
-            20 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
+            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
         )
         horizonal_spring_y_rot_ratio = (
-            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+            5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
         )
 
         horizonal_spring_rot = (
@@ -4650,7 +4664,7 @@ class PhysicsParam:
 
         self.advance_diagonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
 
-        diagonal_joint_ratio = 4 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.5
+        diagonal_joint_ratio = 5 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.5
 
         diagonal_joint_rot = (
             max(
@@ -4687,9 +4701,9 @@ class PhysicsParam:
         diagonal_joint_rot = 2 if not diagonal_joint_rot else diagonal_joint_rot
         diagonal_joint_y_rot = 2 if not diagonal_joint_y_rot else diagonal_joint_y_rot
 
-        diagonal_spring_rot_ratio = 20 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
+        diagonal_spring_rot_ratio = 10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
         diagonal_spring_y_rot_ratio = (
-            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+            5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
         )
 
         diagonal_spring_rot = (
