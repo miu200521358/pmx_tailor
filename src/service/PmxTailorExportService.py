@@ -5896,7 +5896,8 @@ class PmxTailorExportService:
                             # ウェイトを共有するボーンの組み合わせであった場合、接続TRUE
                             bone_connected[v_yidx, v_xidx] = True
 
-                v_xidx += 1
+                if v_xidx > 0:
+                    v_xidx += 1
                 if not np.isnan(vertex_map[v_yidx, v_xidx]).any() and not np.isnan(vertex_map[v_yidx, 0]).any():
                     # 輪を描いたのも繋がっているかチェック
                     vv1 = virtual_vertices[tuple(vertex_map[v_yidx, v_xidx])]
