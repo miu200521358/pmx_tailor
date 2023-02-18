@@ -62,7 +62,7 @@ class Bdef2(Deform):
         return [self.weight0, 1 - self.weight0]
         
     def __str__(self):
-        return "<Bdef2 {0}, {1}, {2}>".format(self.index0, self.index1, self.weight0)
+        return "<Bdef2 {0}:{1}, {2}>".format(self.index0, self.weight0, self.index1)
 
     def copy(self):
         return Bdef2(self.index0, self.index1, self.weight0)
@@ -86,7 +86,7 @@ class Bdef4(Deform):
         return [self.weight0, self.weight1, self.weight2, self.weight3]
 
     def __str__(self):
-        return "<Bdef4 {0}:{1}, {2}:{3}, {4}:{5}, {6}:{7}>".format(self.index0, self.index1, self.index2, self.index3, self.weight0, self.weight1, self.weight2, self.weight3)
+        return "<Bdef4 {0}:{1}, {2}:{3}, {4}:{5}, {6}:{7}>".format(self.index0, self.weight0, self.index1, self.weight1, self.index2, self.weight2, self.index3, self.weight3)
 
     def copy(self):
         return Bdef4(self.index0, self.index1, self.index2, self.index3, self.weight0, self.weight1, self.weight2, self.weight3)

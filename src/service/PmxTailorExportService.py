@@ -4258,7 +4258,7 @@ class PmxTailorExportService:
 
             if type(nearest_deform) is Bdef1:
                 logger.debug(
-                    f"remaining1 nearest_vidx: {nearest_vidx}, weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
+                    f"remaining1 vidx[{vidx}], nearest_vidx[{nearest_vidx}] weight_names: [{model.bone_indexes[nearest_deform.index0]}], total_weights: [1]"
                 )
                 rv.deform = Bdef1(nearest_deform.index0)
 
@@ -4285,17 +4285,21 @@ class PmxTailorExportService:
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
 
-                logger.debug(
-                    f"remaining2 nearest_vidx: {nearest_vidx}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
-                )
-
                 if np.count_nonzero(weights) == 1:
                     rv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+
+                    logger.debug(
+                        f"remaining2->1 vidx[{vidx}], nearest_vidx[{nearest_vidx}], weight_names: [{weight_names}], total_weights: [{total_weights}]"
+                    )
                 elif np.count_nonzero(weights) == 2:
                     rv.deform = Bdef2(
                         model.bones[weight_names[weight_idxs[-1]]].index,
                         model.bones[weight_names[weight_idxs[-2]]].index,
                         weights[weight_idxs[-1]],
+                    )
+
+                    logger.debug(
+                        f"remaining2->2 vidx[{vidx}], nearest_vidx[{nearest_vidx}], weight_names: [{weight_names}], total_weights: [{total_weights}]"
                     )
                 else:
                     rv.deform = Bdef4(
@@ -4307,6 +4311,10 @@ class PmxTailorExportService:
                         weights[weight_idxs[-2]],
                         weights[weight_idxs[-3]],
                         weights[weight_idxs[-4]],
+                    )
+
+                    logger.debug(
+                        f"remaining2->4 vidx[{vidx}], nearest_vidx[{nearest_vidx}], weight_names: [{weight_names}], total_weights: [{total_weights}]"
                     )
 
                 del remaining_vidx_dicts[vidx]
@@ -4346,17 +4354,21 @@ class PmxTailorExportService:
                 weights = total_weights / total_weights.sum(axis=0, keepdims=1)
                 weight_idxs = np.argsort(weights)
 
-                logger.debug(
-                    f"remaining4 nearest_vidx: {nearest_vidx}, weight_names: [{weight_names}], total_weights: [{total_weights}]"
-                )
-
                 if np.count_nonzero(weights) == 1:
                     rv.deform = Bdef1(model.bones[weight_names[weight_idxs[-1]]].index)
+
+                    logger.debug(
+                        f"remaining4->1 vidx[{vidx}], nearest_vidx: [{nearest_vidx}], weight_names: [{weight_names}], total_weights: [{total_weights}]"
+                    )
                 elif np.count_nonzero(weights) == 2:
                     rv.deform = Bdef2(
                         model.bones[weight_names[weight_idxs[-1]]].index,
                         model.bones[weight_names[weight_idxs[-2]]].index,
                         weights[weight_idxs[-1]],
+                    )
+
+                    logger.debug(
+                        f"remaining4->2 vidx[{vidx}], nearest_vidx: [{nearest_vidx}], weight_names: [{weight_names}], total_weights: [{total_weights}]"
                     )
                 else:
                     rv.deform = Bdef4(
@@ -4368,6 +4380,10 @@ class PmxTailorExportService:
                         weights[weight_idxs[-2]],
                         weights[weight_idxs[-3]],
                         weights[weight_idxs[-4]],
+                    )
+
+                    logger.debug(
+                        f"remaining4->4 vidx[{vidx}], nearest_vidx: [{nearest_vidx}], weight_names: [{weight_names}], total_weights: [{total_weights}]"
                     )
 
                 del remaining_vidx_dicts[vidx]
