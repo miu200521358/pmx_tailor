@@ -800,7 +800,7 @@ PmxTailor_2.01.00_β08 (2023/02/13)　miumiu
 ・横優先の並び順が戻し切れてなかったので修正
 ・頂点マップが一列だった場合に縦方向の距離が取れておらず、ウェイトが塗れてなかったのを修正
 
-https://fire.st/skCxKUE
+https://fire.st/Rf4Vd9s
 PmxTailor_2.01.00_β09 (2023/02/13)　miumiu
 ・再利用で一列だけで布プリセットを使用した場合、横を強制的に参照しようとしてエラーになっていたのを修正
 
@@ -873,7 +873,7 @@ PmxTailor ver1.00.02 アップデートしました！
 
 
 
-https://fire.st/oIQ0EGA
+https://fire.st/Rf4Vd9s
 <br>
 <br>
 ・剛体とジョイントの張り方を変更<br>

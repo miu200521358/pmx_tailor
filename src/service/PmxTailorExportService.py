@@ -3709,7 +3709,7 @@ class PmxTailorExportService:
                     if is_folding and next_not_connected_x_idx and v_xidx == next_not_connected_x_idx:
                         # 折り返しの場合、ひとつ前と揃える
                         next_not_connected_prev_x_key = tuple(vertex_map[v_yidx, next_not_connected_prev_x_idx])
-                        prev_rigidbody = virtual_vertices[next_not_connected_prev_x_key].map_rigidbodies[base_map_idx]
+                        prev_rigidbody = virtual_vertices[next_not_connected_prev_x_key].map_rigidbodies.get(base_map_idx, None)
                         if prev_rigidbody:
                             shape_size = prev_rigidbody.shape_size
                             shape_position = prev_rigidbody.shape_position
