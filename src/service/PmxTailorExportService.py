@@ -1047,6 +1047,7 @@ class PmxTailorExportService:
                     all_bone_connected,
                     remaining_vertices,
                     threshold,
+                    root_bone,
                 )
 
                 # グラデウェイト
@@ -3709,7 +3710,9 @@ class PmxTailorExportService:
                     if is_folding and next_not_connected_x_idx and v_xidx == next_not_connected_x_idx:
                         # 折り返しの場合、ひとつ前と揃える
                         next_not_connected_prev_x_key = tuple(vertex_map[v_yidx, next_not_connected_prev_x_idx])
-                        prev_rigidbody = virtual_vertices[next_not_connected_prev_x_key].map_rigidbodies.get(base_map_idx, None)
+                        prev_rigidbody = virtual_vertices[next_not_connected_prev_x_key].map_rigidbodies.get(
+                            base_map_idx, None
+                        )
                         if prev_rigidbody:
                             shape_size = prev_rigidbody.shape_size
                             shape_position = prev_rigidbody.shape_position
@@ -4390,11 +4393,9 @@ class PmxTailorExportService:
         all_bone_connected: dict,
         remaining_vertices: dict,
         threshold: float,
+        root_bone: Bone,
     ):
         logger.info("【%s:%s】ウェイト生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
-
-        # 親ボーン
-        parent_bone = model.bones[param_option["parent_bone_name"]]
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ウェイト分布判定", base_map_idx + 1)
@@ -4458,16 +4459,18 @@ class PmxTailorExportService:
                             continue
                         elif np.count_nonzero(weight_bone_idxs) == 1:
                             vv.deform = Bdef1(weight_bone_idxs[0])
+                            logger.debug(f"ボーン位置 BDEF1 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
                         elif np.count_nonzero(weight_bone_idxs) == 2:
                             vv.deform = Bdef2(
                                 weight_bone_idxs[0],
                                 weight_bone_idxs[1],
                                 deform_weights[0],
                             )
+                            logger.debug(f"ボーン位置 BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
                         else:
                             # 3つの場合にうまくいかないので、後ろに追加しておく
                             deform_weights += [0 for _ in range(4)]
-                            weight_bone_idxs += [parent_bone.index for _ in range(4)]
+                            weight_bone_idxs += [root_bone.index for _ in range(4)]
 
                             vv.deform = Bdef4(
                                 weight_bone_idxs[0],
@@ -4480,6 +4483,8 @@ class PmxTailorExportService:
                                 deform_weights[3],
                             )
 
+                            logger.debug(f"ボーン位置 BDEF4 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
+
                         # 頂点位置にボーンが登録されている場合、BDEF1登録対象
                         for rv in vv.real_vertices:
                             rv.deform = vv.deform
@@ -4489,8 +4494,6 @@ class PmxTailorExportService:
                                 if weight_bone_idx not in model.vertices:
                                     model.vertices[weight_bone_idx] = []
                                 model.vertices[weight_bone_idx].append(rv)
-
-                        logger.debug(f"BDEF1 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                         # 登録対象の場合、残対象から削除
                         if vv.real_vertices and vkey in remaining_vertices:
@@ -4530,11 +4533,15 @@ class PmxTailorExportService:
                             and model.bones[model.bone_indexes[weight_bone_idx_0]].getVisibleFlag()
                         ):
                             vv.deform = Bdef1(weight_bone_idx_0)
+
+                            logger.debug(f"縦 BDEF1(0) vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
                         elif (
                             np.isclose(above_weight, 1)
                             and model.bones[model.bone_indexes[weight_bone_idx_1]].getVisibleFlag()
                         ):
                             vv.deform = Bdef1(weight_bone_idx_1)
+
+                            logger.debug(f"縦 BDEF1(1) vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
                         elif (
                             model.bones[model.bone_indexes[weight_bone_idx_0]].getVisibleFlag()
                             and model.bones[model.bone_indexes[weight_bone_idx_1]].getVisibleFlag()
@@ -4544,6 +4551,8 @@ class PmxTailorExportService:
                                 weight_bone_idx_1,
                                 1 - above_weight,
                             )
+
+                            logger.debug(f"縦 BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                         if vv.deform:
                             for rv in vv.real_vertices:
@@ -4556,8 +4565,6 @@ class PmxTailorExportService:
                                 if weight_bone_idx_1 not in model.vertices:
                                     model.vertices[weight_bone_idx_1] = []
                                 model.vertices[weight_bone_idx_1].append(rv)
-
-                            logger.debug(f"BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                             # 登録対象の場合、残対象から削除
                             if vv.real_vertices and vkey in remaining_vertices:
@@ -4612,11 +4619,14 @@ class PmxTailorExportService:
                             and model.bones[model.bone_indexes[weight_bone_idx_0]].getVisibleFlag()
                         ):
                             vv.deform = Bdef1(weight_bone_idx_0)
+
+                            logger.debug(f"横 BDEF1(0) vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
                         elif (
                             np.isclose(prev_weight, 1)
                             and model.bones[model.bone_indexes[weight_bone_idx_1]].getVisibleFlag()
                         ):
                             vv.deform = Bdef1(weight_bone_idx_1)
+                            logger.debug(f"横 BDEF1(1) vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
                         elif (
                             model.bones[model.bone_indexes[weight_bone_idx_0]].getVisibleFlag()
                             and model.bones[model.bone_indexes[weight_bone_idx_1]].getVisibleFlag()
@@ -4626,6 +4636,8 @@ class PmxTailorExportService:
                                 weight_bone_idx_1,
                                 1 - prev_weight,
                             )
+
+                            logger.debug(f"BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                         if vv.deform:
                             for rv in vv.real_vertices:
@@ -4638,8 +4650,6 @@ class PmxTailorExportService:
                                 if weight_bone_idx_1 not in model.vertices:
                                     model.vertices[weight_bone_idx_1] = []
                                 model.vertices[weight_bone_idx_1].append(rv)
-
-                            logger.debug(f"BDEF2 vkey[{vkey}], vidxs[{vv.vidxs()}], deform[{vv.deform}]")
 
                             # 登録対象の場合、残対象から削除
                             if vv.real_vertices and vkey in remaining_vertices:
@@ -4796,7 +4806,7 @@ class PmxTailorExportService:
                         logger.info("-- --【No.%s】頂点ウェイト: %s個目:終了", base_map_idx + 1, weight_cnt)
                         prev_weight_cnt = weight_cnt // 1000
 
-        logger.info("-- --【No.%s】頂点ウェイト: %s個目:終了", base_map_idx + 1, weight_cnt)
+            logger.info("-- --【No.%s】頂点ウェイト: %s個目:終了", base_map_idx + 1, weight_cnt)
 
         return remaining_vertices
 
