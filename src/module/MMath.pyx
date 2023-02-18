@@ -296,7 +296,7 @@ cdef class MVector2D:
 
 class MPoint:
 
-    def __init__(self, p=MVector3D()):
+    def __init__(self, p: MVector3D):
         self.point = p
 
     def get_point(self, f: float):
@@ -305,28 +305,38 @@ class MPoint:
 
 class MLine:
 
-    def __init__(self, p=MPoint(), v=MVector3D()):
+    def __init__(self, p: MPoint, v: MVector3D):
         self.point = p
         self.vector_start = v
+        self.vector_real = p.point - v
+        self.vector = (p.point - v).normalized()
+
+    def get_point(self, f: float):
+        return self.vector_start + (self.vector_real * f)
 
 
 class MSegment(MLine):
 
-    def __init__(self, p=MPoint(), sv=MVector3D(), ev=MVector3D()):
-        super().__init__(p, sv)
+    def __init__(self, sv: MVector3D, ev: MVector3D):
+        super().__init__(MPoint((sv + ev) / 2), sv)
         self.vector_end = ev
+        self.vector_real = ev - sv
+        self.vector = self.vector_real.normalized()
+
+    def get_point(self, f: float):
+        return self.vector_start + (self.vector_real * f)
 
 
 class MSphere:
 
-    def __init__(self, p=MPoint(), r=1.0):
+    def __init__(self, p: MPoint, r=1.0):
         self.point = p
         self.radius = r
 
 
 class MCapsule:
 
-    def __init__(self, s=MSegment(), r=0.0):
+    def __init__(self, s: MSegment, r=0.0):
         self.segment = s
         self.radius = r
 
@@ -1063,6 +1073,18 @@ cdef class MQuaternion:
         cdef MVector3D euler = self.toEulerAngles()
 
         return MVector3D(euler.x(), -euler.y(), -euler.z())
+
+    cpdef MVector3D separateEulerAngles(self):
+        # ZXYの回転順序でオイラー角度を分割する
+        # https://programming-surgeon.com/script/euler-python-script/
+        cdef MMatrix4x4 mat = self.normalized().toMatrix4x4()
+        cdef np.ndarray[DTYPE_FLOAT_t, ndim=2] m = mat.data()
+
+        cdef float z_radian = atan2(-m[0, 1], m[0, 0])
+        cdef float x_radian = atan2(m[2, 1] * cos(z_radian), m[1, 1])
+        cdef float y_radian = atan2(-m[2, 0], m[2, 2])
+
+        return MVector3D(degrees(x_radian), degrees(y_radian), degrees(z_radian))
 
     # http://www.j3d.org/matrix_faq/matrfaq_latest.html#Q37
     cpdef MVector3D toEulerAngles(self):
