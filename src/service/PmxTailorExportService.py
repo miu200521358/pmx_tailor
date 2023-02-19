@@ -206,7 +206,11 @@ class PmxTailorExportService:
 
             # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
             if param_option["vertices_csv"]:
-                target_vertices.extend(read_vertices_from_file(param_option["vertices_csv"], model, material_name))
+                target_vertices.extend(
+                    read_vertices_from_file(
+                        param_option["vertices_csv"], model, None if param_option["vertices_csv"] else material_name
+                    )
+                )
             else:
                 target_vertices.extend(list(model.material_vertices[material_name]))
 
@@ -914,9 +918,16 @@ class PmxTailorExportService:
 
         material_name = param_option["material_name"]
 
+        grad_vertices = []
         # 物理対象頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["vertices_csv"]:
+            # まずは物理対象材質だけでチェック
             target_vertices = read_vertices_from_file(param_option["vertices_csv"], model, material_name)
+            # 他材質をグラデーションウェイトに割り当てる事がありうるので、材質指定なしにチェック
+            grad_vertices = read_vertices_from_file(param_option["vertices_csv"], model, None)
+            # 物理材質の頂点は除外
+            grad_vertices = list(set(grad_vertices) - set(target_vertices))
+            logger.debug("grad_vertices: %s", grad_vertices)
             if not target_vertices:
                 logger.warning("物理対象頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
                 return False, None, None
@@ -1060,6 +1071,7 @@ class PmxTailorExportService:
                     threshold,
                     base_vertical_axis,
                     horizonal_top_edge_keys,
+                    grad_vertices,
                 )
 
                 # 裏ウェイト
@@ -3926,13 +3938,16 @@ class PmxTailorExportService:
         param_option: dict,
         target_vertices: list,
         virtual_vertices: dict,
-        remaining_vertices: list,
+        remaining_vertices: dict,
         threshold: float,
         base_vertical_axis: MVector3D,
         horizonal_top_edge_keys: list,
+        grad_vertices: list,
     ):
-        # 残頂点がないもしくは根元頂点が指定されていない場合、スルー
-        if not remaining_vertices or not param_option["top_vertices_csv"]:
+        remaining_vidxs = [vidx for vv in remaining_vertices.values() for vidx in vv.vidxs()]
+
+        # グラデ頂点＋残頂点がないもしくは根元頂点が指定されていない場合、スルー
+        if not (grad_vertices + remaining_vidxs) or not param_option["top_vertices_csv"]:
             return remaining_vertices
 
         logger.info(
@@ -3963,8 +3978,21 @@ class PmxTailorExportService:
 
         # 親ボーンの評価軸位置
         parent_axis_val = parent_bone.position.data()[np.where(np.abs(base_vertical_axis.data()))][0]
-        # 離れた評価軸
-        axis_root_val = base_vertical_axis.data()[np.where(np.abs(base_vertical_axis.data()))][0] * 100
+
+        for vidx in grad_vertices:
+            v = model.vertex_dict[vidx]
+
+            # 仮想頂点登録（該当頂点対象）
+            vkey = v.position.to_key(threshold)
+            if vkey not in virtual_vertices:
+                virtual_vertices[vkey] = VirtualVertex(vkey)
+            virtual_vertices[vkey].append([v], [], [])
+
+            if vkey not in remaining_vertices:
+                remaining_vertices[vkey] = VirtualVertex(vkey)
+            remaining_vertices[vkey].append([v], [], [])
+
+            logger.test("grad_vv: vidxs[%s]", remaining_vertices[vkey].vidxs())
 
         weighted_grad_vkeys = []
         for v_key, vv in remaining_vertices.items():
@@ -3981,7 +4009,7 @@ class PmxTailorExportService:
             # 頂点マップ上部直近頂点の評価軸位置
             nearest_top_axis_val = nearest_top_pos[np.where(np.abs(base_vertical_axis.data()))][0]
 
-            if nearest_top_axis_val > vv_axis_val:
+            if nearest_top_axis_val > vv_axis_val + 0.1:
                 # 評価軸にTOPより遠い（スカートの場合、TOPより下）の場合、スルー
                 logger.debug(
                     f"×グラデスルー: target [{vv.vidxs()}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}]"
@@ -6837,7 +6865,9 @@ class PmxTailorExportService:
 
         # 根元頂点CSVが指定されている場合、対象頂点リスト生成
         if param_option["top_vertices_csv"]:
-            top_target_vertices = read_vertices_from_file(param_option["top_vertices_csv"], model, material_name)
+            top_target_vertices = read_vertices_from_file(
+                param_option["top_vertices_csv"], model, None if param_option["top_vertices_csv"] else material_name
+            )
             if not top_target_vertices:
                 logger.warning("根元頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
                 return None, None, None, None, None, None, None
