@@ -2960,7 +2960,9 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("根元頂点推定"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.route_estimate_type_txt.SetToolTip(
-            logger.transtext("根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\n軸方向: 物理方向の逆方向を根元として推定")
+            logger.transtext(
+                "根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\nリング: 筒状メッシュの横方向の繋がりから推定\n軸方向: 物理方向の逆方向を根元として推定"
+            )
         )
         self.route_estimate_type_txt.Wrap(-1)
         self.advance_option_grid_sizer.Add(self.route_estimate_type_txt, 0, wx.ALL, 5)
@@ -2968,7 +2970,7 @@ class PhysicsParam:
         self.route_estimate_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("角度"), logger.transtext("縮尺"), logger.transtext("軸方向")],
+            choices=[logger.transtext("角度"), logger.transtext("縮尺"), logger.transtext("リング"), logger.transtext("軸方向")],
         )
         self.route_estimate_type_ctrl.SetToolTip(self.route_estimate_type_txt.GetToolTipText())
         self.route_estimate_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
