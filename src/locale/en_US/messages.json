@@ -694,5 +694,7 @@
     "横逆ジョイントの移動Y(最大)\n1ミクセルあたりの許容移動量": "Horizontal reverse joint movement Y (maximum)\nAllowable amount of movement per mixel",
     "横逆ジョイントの移動Z(最大)\n1ミクセルあたりの許容移動量": "Translation Z of lateral reverse joint (maximum)\nAllowable amount of movement per mixel",
     "根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\nリング: 筒状メッシュの横方向の繋がりから推定\n軸方向: 物理方向の逆方向を根元として推定": "method for estimating root vertices\nAngle: Estimate root vertex similar to terminal vertex angle\nScale: Estimate the scale of the terminal vertex circumference and the root vertex circumference\nRing: Estimated from the lateral connection of the tubular mesh\nAxial: Estimated with the opposite direction of the physical direction as the root",
-    "リング": "ring"
+    "リング": "ring",
+    "足ウェイト": "foot weights",
+    "足にウェイトを乗せ、剛体等を作成するか否か\n足の付け根より下から物理を始めたい場合にチェックしてください": "Whether to put weights on the feet and create a rigid body, etc.\nCheck this if you want to start physics from below the groin"
 }

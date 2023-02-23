@@ -1144,6 +1144,13 @@ class PhysicsParam:
         self.advance_rigidbody_balancer_ctrl.Bind(wx.EVT_CHECKBOX, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_balancer_ctrl, 0, wx.ALL, 5)
 
+        self.advance_rigidbody_leg_ctrl = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("足ウェイト"))
+        self.advance_rigidbody_leg_ctrl.SetToolTip(
+            logger.transtext("足にウェイトを乗せ、剛体等を作成するか否か\n足の付け根より下から物理を始めたい場合にチェックしてください")
+        )
+        self.advance_rigidbody_leg_ctrl.Bind(wx.EVT_CHECKBOX, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_leg_ctrl, 0, wx.ALL, 5)
+
         self.advance_rigidbody_sizer.Add(self.advance_rigidbody_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_rigidbody_sizer, 0, wx.ALL, 5)
 
@@ -3219,6 +3226,7 @@ class PhysicsParam:
             params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
             params["rigidbody_shape_type"] = self.advance_rigidbody_shape_type_ctrl.GetSelection()
             params["rigidbody_balancer"] = self.advance_rigidbody_balancer_ctrl.GetValue()
+            params["rigidbody_leg"] = self.advance_rigidbody_leg_ctrl.GetValue()
 
             params["rigidbody_root_thicks"] = self.rigidbody_root_thicks_spin.GetValue()
             params["rigidbody_end_thicks"] = self.rigidbody_end_thicks_spin.GetValue()
@@ -3526,9 +3534,10 @@ class PhysicsParam:
         self.rigidbody_restitution_spin.SetValue(params["rigidbody_restitution"])
         self.rigidbody_friction_spin.SetValue(params["rigidbody_friction"])
         self.rigidbody_coefficient_spin.SetValue(params["rigidbody_coefficient"])
-        self.advance_rigidbody_balancer_ctrl.SetValue(params["rigidbody_balancer"])
+        self.advance_rigidbody_balancer_ctrl.SetValue(params.get("rigidbody_balancer", 0))
+        self.advance_rigidbody_leg_ctrl.SetValue(params.get("rigidbody_leg", 0))
 
-        self.rigidbody_root_thicks_spin.SetValue(params.get("rigidbody_root_thicks", 0.1))
+        self.rigidbody_root_thicks_spin.SetValue(params.get("rigidbody_root_thicks", 0.07))
         self.rigidbody_end_thicks_spin.SetValue(params.get("rigidbody_end_thicks", 0.2))
 
         # 縦ジョイント -----------
@@ -3711,6 +3720,7 @@ class PhysicsParam:
         params["rigidbody_friction"] = self.rigidbody_friction_spin.GetValue()
         params["rigidbody_coefficient"] = self.rigidbody_coefficient_spin.GetValue()
         params["rigidbody_balancer"] = self.advance_rigidbody_balancer_ctrl.GetValue()
+        params["rigidbody_leg"] = self.advance_rigidbody_leg_ctrl.GetValue()
 
         params["rigidbody_root_thicks"] = self.rigidbody_root_thicks_spin.GetValue()
         params["rigidbody_end_thicks"] = self.rigidbody_end_thicks_spin.GetValue()
@@ -4265,6 +4275,7 @@ class PhysicsParam:
     def set_simple_primitive(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.advance_rigidbody_balancer_ctrl.SetValue(0)
+        self.advance_rigidbody_leg_ctrl.SetValue(0)
         self.advance_horizonal_joint_restruct_check.SetValue(0)
         self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
