@@ -1144,9 +1144,9 @@ class PhysicsParam:
         self.advance_rigidbody_balancer_ctrl.Bind(wx.EVT_CHECKBOX, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_balancer_ctrl, 0, wx.ALL, 5)
 
-        self.advance_rigidbody_leg_ctrl = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("足ウェイト"))
+        self.advance_rigidbody_leg_ctrl = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("足に繋げる"))
         self.advance_rigidbody_leg_ctrl.SetToolTip(
-            logger.transtext("足にウェイトを乗せ、剛体等を作成するか否か\n足の付け根より下から物理を始めたい場合にチェックしてください")
+            logger.transtext("物理中心剛体を足剛体の子どもとするか否か\n足の付け根より下から物理を始めたい場合にチェックしてください")
         )
         self.advance_rigidbody_leg_ctrl.Bind(wx.EVT_CHECKBOX, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_rigidbody_grid_sizer.Add(self.advance_rigidbody_leg_ctrl, 0, wx.ALL, 5)

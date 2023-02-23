@@ -1147,6 +1147,8 @@ class PmxTailorExportService:
 
         # 中央配置か否か
         is_center = param_option["density_type"] == logger.transtext("中央")
+        # 足ウェイトONか否か
+        is_rigidbody_leg = param_option["rigidbody_leg"]
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
@@ -3005,6 +3007,8 @@ class PmxTailorExportService:
         rigidbody_shape_type = param_option["rigidbody_shape_type"]
         # 中央配置か否か
         is_center = param_option["density_type"] == logger.transtext("中央")
+        # 足ウェイトONか否か
+        is_rigidbody_leg = param_option["rigidbody_leg"]
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         parent_bone = model.bones[param_option["parent_bone_name"]]
@@ -3949,6 +3953,8 @@ class PmxTailorExportService:
         root_bone: Bone,
     ):
         remaining_vidxs = [vidx for vv in remaining_vertices.values() for vidx in vv.vidxs()]
+        # 足ウェイトONか否か
+        is_rigidbody_leg = param_option["rigidbody_leg"]
 
         # グラデ頂点＋残頂点がないもしくは根元頂点が指定されていない場合、スルー
         if not (grad_vertices + remaining_vidxs) or not param_option["top_vertices_csv"]:
@@ -4929,6 +4935,8 @@ class PmxTailorExportService:
         material_name: str,
         root_pos: MVector3D,
         base_vertical_axis: MVector3D,
+        parent_bone_name: str,
+        axis: str = ""
     ):
         # 略称
         abb_name = param_option["abb_name"]
@@ -4939,8 +4947,8 @@ class PmxTailorExportService:
 
         # 中心ボーン
         root_bone = Bone(
-            f"{abb_name}中心",
-            f"{abb_name}Root",
+            f"{abb_name}{axis}中心",
+            f"{abb_name}{axis}Root",
             root_pos,
             parent_bone.index,
             0,
@@ -4979,11 +4987,19 @@ class PmxTailorExportService:
         display_name = f"{abb_name}:{material_name}"
         # 親ボーン
         parent_bone = model.bones[param_option["parent_bone_name"]]
+        # 足ウェイトONか否か
+        is_rigidbody_leg = param_option["rigidbody_leg"]
 
         # 中心ボーン
         display_name, root_bone = self.create_root_bone(
-            model, param_option, material_name, parent_bone.position.copy(), base_vertical_axis
+            model, param_option, material_name, parent_bone.position.copy(), base_vertical_axis, param_option["parent_bone_name"]
         )
+
+        if is_rigidbody_leg:
+            # 足にウェイトを乗せる場合
+            display_name, left_root_bone = self.create_root_bone(
+                model, param_option, material_name, model.bones["左足"].position.copy(), base_vertical_axis, "左足", "左"
+            )
 
         tmp_all_bones = {root_bone.name: root_bone}
         tmp_all_bone_indexes = {root_bone.index: root_bone.name}
@@ -6097,7 +6113,7 @@ class PmxTailorExportService:
         root_bone = None
         if is_root_bone:
             display_name, root_bone = self.create_root_bone(
-                model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0)), base_vertical_axis
+                model, param_option, material_name, MVector3D(np.mean(top_bone_positions, axis=0)), base_vertical_axis, param_option["parent_bone_name"]
             )
 
             model.bones[root_bone.name] = root_bone
