@@ -3983,12 +3983,12 @@ class PmxTailorExportService:
         # 親ボーンの評価軸位置
         parent_axis_val = parent_bone.position.data()[np.where(np.abs(base_vertical_axis.data()))][0]
 
-        # 上半身評価軸位置
-        grad_upper_poses = np.zeros(3, dtype=np.float)
+        # 下半身評価軸位置
+        grad_lower_poses = np.zeros(3, dtype=np.float)
         grad_leg_indexes = [-1, -1]
         grad_leg_poses = [np.zeros(3, dtype=np.float), np.zeros(3, dtype=np.float)]
-        if parent_bone.name == "下半身":
-            grad_upper_poses = model.bones["上半身"].position.data()
+        if parent_bone.name == "上半身":
+            grad_lower_poses = model.bones["下半身"].position.data()
             grad_leg_indexes = [model.bones["左足"].index, model.bones["右足"].index]
             grad_leg_poses = [model.bones["左足"].position.data(), model.bones["右足"].position.data()]
 
@@ -4027,8 +4027,6 @@ class PmxTailorExportService:
                 logger.debug(
                     f"×グラデスルー: target [{vv.vidxs()}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}]"
                 )
-                # 残頂点ウェイトでも塗りたくないので、登録対象にして除外する
-                weighted_grad_vkeys.append(v_key)
                 continue
 
             logger.debug(
@@ -4045,45 +4043,54 @@ class PmxTailorExportService:
             copy_weighted_vertex_deform = model.vertex_dict[copy_weighted_vertex_idx].deform
 
             # ウェイト対象となるボーンINDEXリスト
-            grad_weight_bone_idxs = copy_weighted_vertex_deform.get_idx_list()
-            # ウェイト対象の評価軸の位置
-            grad_weight_axis_vals = (
-                vv_axis_val
-                - np.array(
-                    [
-                        model.bones[model.bone_indexes[bone_idx]].position.data()[
+            grad_weight_bone_idxs = []
+            grad_weight_axis_vals = []
+
+            for bone_idx, weight in zip(
+                copy_weighted_vertex_deform.get_idx_list(), copy_weighted_vertex_deform.get_weights()
+            ):
+                if weight > 0:
+                    grad_weight_bone_idxs.append(bone_idx)
+                    # ウェイト対象の評価軸の位置
+                    grad_weight_axis_vals.append(
+                        vv_axis_val
+                        - model.bones[model.bone_indexes[bone_idx]].position.data()[
                             np.where(np.abs(base_vertical_axis.data()))
                         ][0]
-                        for bone_idx in copy_weighted_vertex_deform.get_idx_list()
-                    ]
-                )
-            ).tolist()
+                    )
 
-            # 親ボーンとの距離
-            grad_weight_axis_vals.append(parent_axis_val - vv_axis_val)
-            grad_weight_bone_idxs.append(parent_bone.index)
+            if parent_bone.name == "上半身":
+                # 物理ウェイトは最も近いのひとつだけ残す
+                wb_idx = grad_weight_bone_idxs[np.argmin(grad_weight_axis_vals)]
+                wb = grad_weight_axis_vals[np.argmin(grad_weight_axis_vals)]
 
-            if parent_bone.name == "下半身":
+                grad_weight_bone_idxs = [wb_idx]
+                grad_weight_axis_vals = [wb]
+
                 # 足(近い方だけ)
                 leg_distances = np.linalg.norm(grad_leg_poses - vv.position().data(), ord=2, axis=1)
                 leg_axis_distance = (
                     grad_leg_poses[np.argmin(leg_distances)][np.where(np.abs(base_vertical_axis.data()))][0]
                     - vv_axis_val
                 )
-                if leg_axis_distance > -0.1:
+                if leg_axis_distance > -0.3:
                     # 足より下の頂点で、足を対象とする場合
-                    grad_weight_axis_vals.append(leg_axis_distance)
+                    grad_weight_axis_vals.append(abs(leg_axis_distance))
                     grad_weight_bone_idxs.append(grad_leg_indexes[np.argmin(leg_distances)])
-                else:
-                    # 足より上で足を対象としない場合、上半身
-                    grad_weight_axis_vals.append(
-                        grad_upper_poses[np.where(np.abs(base_vertical_axis.data()))][0] - vv_axis_val
-                    )
-                    grad_weight_bone_idxs.append(model.bones["上半身"].index)
+
+                # 下半身は常にウェイト対象とする
+                grad_weight_axis_vals.append(
+                    abs(grad_lower_poses[np.where(np.abs(base_vertical_axis.data()))][0] - vv_axis_val)
+                )
+                grad_weight_bone_idxs.append(model.bones["下半身"].index)
+
+            # 親ボーンとの距離
+            grad_weight_axis_vals.append(parent_axis_val - vv_axis_val)
+            grad_weight_bone_idxs.append(parent_bone.index)
 
             # 自分より下のだけ対象とする
-            grad_weight_bone_idxs = np.array(grad_weight_bone_idxs)[np.array(grad_weight_axis_vals) > -0.1]
-            grad_target_weights = np.array(grad_weight_axis_vals)[np.array(grad_weight_axis_vals) > -0.1]
+            grad_weight_bone_idxs = np.array(grad_weight_bone_idxs)[np.where(grad_weight_axis_vals)]
+            grad_target_weights = np.array(grad_weight_axis_vals)[np.where(grad_weight_axis_vals)]
             grad_weights = np.min(grad_target_weights) / grad_target_weights
 
             # # 直近頂点INDEXのウェイトを転写
