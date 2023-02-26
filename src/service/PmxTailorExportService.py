@@ -3907,6 +3907,7 @@ class PmxTailorExportService:
 
         # 塗り終わった仮想頂点キーリスト
         weighted_vkeys = list(set(virtual_vertices.keys()) - set(remaining_vertices.keys()))
+        axis_idx = np.where(np.abs(base_vertical_axis.data()))[0][0]
 
         # 塗り終わった頂点のリスト
         weighted_vertices = {}
@@ -3919,7 +3920,7 @@ class PmxTailorExportService:
         prev_weight_cnt = 0
 
         # 親ボーンの評価軸位置
-        parent_axis_val = parent_bone.position.data()[np.where(np.abs(base_vertical_axis.data()))][0]
+        parent_axis_val = parent_bone.position.data()[axis_idx]
 
         # 下半身評価軸位置
         grad_trunk_bone_name = parent_bone.name
@@ -3941,8 +3942,7 @@ class PmxTailorExportService:
             grad_tail_vec = model.bones[model.bone_indexes[model.bones[grad_tail_bone_name].tail_index]].position
         else:
             grad_tail_vec = model.bones[grad_tail_bone_name].position + model.bones[grad_tail_bone_name].tail_position
-        tail_axis_val = grad_tail_vec.data()[np.where(np.abs(base_vertical_axis.data()))][0]
-        axis_idx = [np.where(np.abs(base_vertical_axis.data()))][0]
+        tail_axis_val = grad_tail_vec.data()[axis_idx]
 
         for vidx in grad_vertices:
             v = model.vertex_dict[vidx]
@@ -3965,7 +3965,7 @@ class PmxTailorExportService:
                 continue
 
             # 仮想頂点の評価軸位置
-            vv_axis_val = vv.position().data()[np.where(np.abs(base_vertical_axis.data()))][0]
+            vv_axis_val = vv.position().data()[axis_idx]
 
             # # 頂点マップ上部との距離
             # top_distances = np.linalg.norm((top_vv_poses - vv.position().data()), ord=2, axis=1)
@@ -3985,7 +3985,7 @@ class PmxTailorExportService:
             #     f"○グラデターゲット: target [{vv.vidxs()}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}], parent_axis_val[{round(parent_axis_val, 3)}]"
             # )
 
-            if vv_axis_val > tail_axis_val - 0.1:
+            if vv_axis_val > tail_axis_val + 0.1:
                 logger.debug(
                     f"×グラデスルー: vv [{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}], parent_axis_val[{round(parent_axis_val, 3)}]"
                 )
@@ -4012,8 +4012,8 @@ class PmxTailorExportService:
                     # ウェイト対象の評価軸の位置
                     grad_weight_axis_vals.append(
                         (
-                            model.bones[model.bone_indexes[bone_idx]].position.data()[axis_idx][0]
-                            - vv.position().data()[axis_idx][0]
+                            model.bones[model.bone_indexes[bone_idx]].position.data()[axis_idx]
+                            - vv.position().data()[axis_idx]
                         )
                         * 2
                     )
@@ -4076,15 +4076,14 @@ class PmxTailorExportService:
                 # 体幹のもう片方も常にウェイト対象とする
                 grad_weight_bone_idxs.append(model.bones[grad_other_bone_name].index)
                 grad_weight_axis_vals.append(
-                    model.bones[grad_other_bone_name].position.data()[axis_idx][0] - vv.position().data()[axis_idx][0]
+                    model.bones[grad_other_bone_name].position.data()[axis_idx] - vv.position().data()[axis_idx]
                 )
 
                 if grad_other2_bone_name:
                     # 上半身2がある場合、そのウェイトも割り当てる
                     grad_weight_bone_idxs.append(model.bones[grad_other2_bone_name].index)
                     grad_weight_axis_vals.append(
-                        model.bones[grad_other2_bone_name].position.data()[axis_idx][0]
-                        - vv.position().data()[axis_idx][0]
+                        model.bones[grad_other2_bone_name].position.data()[axis_idx] - vv.position().data()[axis_idx]
                     )
 
                 # 足の距離
@@ -4100,7 +4099,7 @@ class PmxTailorExportService:
 
             # 親ボーンとの距離
             grad_weight_axis_vals.append(
-                model.bones[grad_trunk_bone_name].position.data()[axis_idx][0] - vv.position().data()[axis_idx][0]
+                model.bones[grad_trunk_bone_name].position.data()[axis_idx] - vv.position().data()[axis_idx]
             )
             grad_weight_bone_idxs.append(model.bones[grad_trunk_bone_name].index)
 
@@ -6113,6 +6112,7 @@ class PmxTailorExportService:
         back_vertices = []
         # 残頂点リスト
         remaining_vertices = {}
+        axis_idx = np.where(np.abs(base_vertical_axis.data()))[0][0]
 
         parent_bone = model.bones[param_option["parent_bone_name"]]
         # 親ボーンの傾き
@@ -6913,7 +6913,7 @@ class PmxTailorExportService:
         top_vv_poses = np.array([virtual_vertices[tk].position().data() for tk in horizonal_top_edge_keys])
 
         # 離れた評価軸
-        axis_root_val = base_vertical_axis.data()[np.where(np.abs(base_vertical_axis.data()))][0] * 100
+        axis_root_val = base_vertical_axis.data()[axis_idx] * 100
 
         for n, edge_lines in enumerate(all_edge_lines):
             bottom_edge_lines = [el for el in edge_lines if el not in horizonal_top_edge_keys]
@@ -6930,14 +6930,14 @@ class PmxTailorExportService:
                 vv = virtual_vertices[v_key]
 
                 # 仮想頂点の評価軸位置
-                vv_axis_val = vv.position().data()[np.where(np.abs(base_vertical_axis.data()))][0]
+                vv_axis_val = vv.position().data()[axis_idx]
 
                 # 頂点マップ上部との距離
                 top_distances = np.linalg.norm((top_vv_poses - vv.position().data()), ord=2, axis=1)
                 nearest_top_vidxs = virtual_vertices[horizonal_top_edge_keys[np.argmin(top_distances)]].vidxs()
                 nearest_top_pos = top_vv_poses[np.argmin(top_distances)]
                 # 頂点マップ上部直近頂点の評価軸位置
-                nearest_top_axis_val = nearest_top_pos[np.where(np.abs(base_vertical_axis.data()))][0]
+                nearest_top_axis_val = nearest_top_pos[axis_idx]
 
                 if (axis_root_val - nearest_top_axis_val) <= (axis_root_val - vv_axis_val):
                     # 評価軸にTOPより遠い（スカートの場合、TOPより下）の場合、対象
@@ -7496,6 +7496,8 @@ class PmxTailorExportService:
         prev_rings: list,
         rings: list,
     ):
+        axis_idx = np.where(np.abs(base_vertical_axis.data()))[0][0]
+
         if not vkey:
             # vkey が決まってない場合、始点なのでprevから繋がってる頂点を選ぶ
             prev_start_vv: VirtualVertex = virtual_vertices[prev_rings[0]]
@@ -7533,9 +7535,7 @@ class PmxTailorExportService:
             ):
                 # 評価軸の絶対値
                 connected_vec = vv.position() - virtual_vertices[connected_vkey].position()
-                connected_vecs[connected_vkey] = np.abs(
-                    (connected_vec.data())[np.where(np.abs(base_vertical_axis.data()))][0]
-                )
+                connected_vecs[connected_vkey] = np.abs((connected_vec.data())[axis_idx])
                 if len(rings) > 1:
                     # 内積
                     connected_dots[connected_vkey] = MVector3D.dotProduct(
