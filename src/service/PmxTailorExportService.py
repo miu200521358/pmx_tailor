@@ -3940,8 +3940,12 @@ class PmxTailorExportService:
         # グラデ末端位置
         if model.bones[grad_tail_bone_name].tail_index >= 0:
             grad_tail_vec = model.bones[model.bone_indexes[model.bones[grad_tail_bone_name].tail_index]].position
+            grad_other_vec = (model.bones[grad_tail_bone_name].position + grad_tail_vec) / 2
         else:
             grad_tail_vec = model.bones[grad_tail_bone_name].position + model.bones[grad_tail_bone_name].tail_position
+            grad_other_vec = model.bones[grad_tail_bone_name].position + (
+                model.bones[grad_tail_bone_name].tail_position / 2
+            )
         tail_axis_val = grad_tail_vec.data()[axis_idx]
 
         for vidx in grad_vertices:
@@ -4015,7 +4019,6 @@ class PmxTailorExportService:
                             model.bones[model.bone_indexes[bone_idx]].position.data()[axis_idx]
                             - vv.position().data()[axis_idx]
                         )
-                        * 2
                     )
 
             # if parent_bone.name == "下半身" and is_rigidbody_leg:
@@ -4073,11 +4076,12 @@ class PmxTailorExportService:
                 # grad_weight_bone_idxs = [wb_idx]
                 # grad_weight_axis_vals = [wb]
 
+                # 物理ウェイトはちょっと判定を厳しくしておく
+                grad_weight_axis_vals = [wb * 1.5 for wb in grad_weight_axis_vals]
+
                 # 体幹のもう片方も常にウェイト対象とする
                 grad_weight_bone_idxs.append(model.bones[grad_other_bone_name].index)
-                grad_weight_axis_vals.append(
-                    model.bones[grad_other_bone_name].position.data()[axis_idx] - vv.position().data()[axis_idx]
-                )
+                grad_weight_axis_vals.append(grad_other_vec.data()[axis_idx] - vv.position().data()[axis_idx])
 
                 if grad_other2_bone_name:
                     # 上半身2がある場合、そのウェイトも割り当てる
@@ -4091,11 +4095,11 @@ class PmxTailorExportService:
 
                 # 左足
                 grad_weight_bone_idxs.append(grad_leg_indexes[0])
-                grad_weight_axis_vals.append(leg_distances[0] * (0.3 if vv.position().x() > 0 else 0.7))
+                grad_weight_axis_vals.append(leg_distances[0] * (0.3 if vv.position().x() > 0 else 0.5))
 
                 # 右足
                 grad_weight_bone_idxs.append(grad_leg_indexes[1])
-                grad_weight_axis_vals.append(leg_distances[1] * (0.3 if vv.position().x() <= 0 else 0.7))
+                grad_weight_axis_vals.append(leg_distances[1] * (0.3 if vv.position().x() <= 0 else 0.5))
 
             # 親ボーンとの距離
             grad_weight_axis_vals.append(
