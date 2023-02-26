@@ -1161,8 +1161,6 @@ class PmxTailorExportService:
 
         # 中央配置か否か
         is_center = param_option["density_type"] == logger.transtext("中央")
-        # 足に繋げるか否か
-        is_rigidbody_leg = param_option["rigidbody_leg"]
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
@@ -1435,7 +1433,9 @@ class PmxTailorExportService:
                                 a_rigidbody = root_rigidbody
                             else:
                                 a_rigidbody = (
-                                    left_root_rigidbody if now_now_vv.position().x() > 0 else right_root_rigidbody
+                                    left_root_rigidbody
+                                    if now_now_vv.position().x() > 0 and left_root_rigidbody
+                                    else right_root_rigidbody
                                 )
                             b_rigidbody = now_now_vv.map_rigidbodies.get(base_map_idx, None)
                             a_xidx = v_xidx
@@ -3030,8 +3030,6 @@ class PmxTailorExportService:
         rigidbody_shape_type = param_option["rigidbody_shape_type"]
         # 中央配置か否か
         is_center = param_option["density_type"] == logger.transtext("中央")
-        # 足に繋げるか否か
-        is_rigidbody_leg = param_option["rigidbody_leg"]
 
         # 親ボーンに紐付く剛体がある場合、それを利用
         parent_bone = model.bones[param_option["parent_bone_name"]]
@@ -3101,47 +3099,48 @@ class PmxTailorExportService:
                     model.rigidbodies[root_rigidbody.name] = root_rigidbody
             else:
                 # 左右に別れる場合、左右剛体を作成する
-                left_root_rigidbody = self.get_rigidbody(model, left_root_bone.name)
-                left_root_rigidbody = RigidBody(
-                    left_root_bone.name,
-                    left_root_bone.english_name,
-                    left_root_bone.index,
-                    param_rigidbody.collision_group,
-                    0,
-                    0,
-                    MVector3D(0.5, 0.5, 0.5),
-                    left_root_bone.position.copy(),
-                    MVector3D(),
-                    1,
-                    0.5,
-                    0.5,
-                    0,
-                    0,
-                    0,
-                )
-                left_root_rigidbody.index = len(model.rigidbodies)
-                model.rigidbodies[left_root_rigidbody.name] = left_root_rigidbody
-
-                right_root_rigidbody = self.get_rigidbody(model, right_root_bone.name)
-                right_root_rigidbody = RigidBody(
-                    right_root_bone.name,
-                    right_root_bone.english_name,
-                    right_root_bone.index,
-                    param_rigidbody.collision_group,
-                    0,
-                    0,
-                    MVector3D(0.5, 0.5, 0.5),
-                    right_root_bone.position.copy(),
-                    MVector3D(),
-                    1,
-                    0.5,
-                    0.5,
-                    0,
-                    0,
-                    0,
-                )
-                right_root_rigidbody.index = len(model.rigidbodies)
-                model.rigidbodies[right_root_rigidbody.name] = right_root_rigidbody
+                if left_root_bone:
+                    left_root_rigidbody = self.get_rigidbody(model, left_root_bone.name)
+                    left_root_rigidbody = RigidBody(
+                        left_root_bone.name,
+                        left_root_bone.english_name,
+                        left_root_bone.index,
+                        param_rigidbody.collision_group,
+                        0,
+                        0,
+                        MVector3D(0.5, 0.5, 0.5),
+                        left_root_bone.position.copy(),
+                        MVector3D(),
+                        1,
+                        0.5,
+                        0.5,
+                        0,
+                        0,
+                        0,
+                    )
+                    left_root_rigidbody.index = len(model.rigidbodies)
+                    model.rigidbodies[left_root_rigidbody.name] = left_root_rigidbody
+                if right_root_bone:
+                    right_root_rigidbody = self.get_rigidbody(model, right_root_bone.name)
+                    right_root_rigidbody = RigidBody(
+                        right_root_bone.name,
+                        right_root_bone.english_name,
+                        right_root_bone.index,
+                        param_rigidbody.collision_group,
+                        0,
+                        0,
+                        MVector3D(0.5, 0.5, 0.5),
+                        right_root_bone.position.copy(),
+                        MVector3D(),
+                        1,
+                        0.5,
+                        0.5,
+                        0,
+                        0,
+                        0,
+                    )
+                    right_root_rigidbody.index = len(model.rigidbodies)
+                    model.rigidbodies[right_root_rigidbody.name] = right_root_rigidbody
         else:
             # 中心剛体を作らない場合、ルートは親剛体
             root_rigidbody = parent_bone_rigidbody
@@ -4985,35 +4984,61 @@ class PmxTailorExportService:
         is_rigidbody_leg = param_option["rigidbody_leg"]
 
         # 中心ボーン
-        root_bone = left_root_bone = right_root_bone = None
+        root_bone = left_root_bone = right_root_bone = left_display_name = right_display_name = None
+        root_bone_indexes = []
         if is_rigidbody_leg:
+            # 全体のX位置を取得
+            vxs = [
+                virtual_vertices[tuple(vv)].position().x()
+                for v_map in vertex_maps.values()
+                for vvs in v_map
+                for vv in vvs
+            ]
             # 足に繋げる場合
-            left_display_name, left_root_bone = self.create_root_bone(
-                model,
-                param_option,
-                material_name,
-                model.bones["左足"].position.copy(),
-                base_vertical_axis,
-                "左足",
-                "左",
-            )
-            right_display_name, right_root_bone = self.create_root_bone(
-                model,
-                param_option,
-                material_name,
-                model.bones["右足"].position.copy(),
-                base_vertical_axis,
-                "右足",
-                "右",
-            )
-            # とりあえずひとつ加算しておく
-            right_root_bone.index += 1
+            if np.max(vxs) >= -0.1:
+                right_display_name, right_root_bone = self.create_root_bone(
+                    model,
+                    param_option,
+                    material_name,
+                    model.bones["右足"].position.copy(),
+                    base_vertical_axis,
+                    "右足",
+                    "右",
+                )
+            if np.min(vxs) <= 0.1:
+                left_display_name, left_root_bone = self.create_root_bone(
+                    model,
+                    param_option,
+                    material_name,
+                    model.bones["左足"].position.copy(),
+                    base_vertical_axis,
+                    "左足",
+                    "左",
+                )
 
-            tmp_all_bones = {left_root_bone.name: left_root_bone, right_root_bone.name: right_root_bone}
-            tmp_all_bone_indexes = {
-                left_root_bone.index: left_root_bone.name,
-                right_root_bone.index: right_root_bone.name,
-            }
+            if left_root_bone and right_root_bone:
+                # 両足あるならひとつ加算しておく
+                right_root_bone.index += 1
+
+                tmp_all_bones = {left_root_bone.name: left_root_bone, right_root_bone.name: right_root_bone}
+                tmp_all_bone_indexes = {
+                    left_root_bone.index: left_root_bone.name,
+                    right_root_bone.index: right_root_bone.name,
+                }
+                root_bone_indexes.append(left_root_bone.index)
+                root_bone_indexes.append(right_root_bone.index)
+            elif right_root_bone:
+                tmp_all_bones = {right_root_bone.name: right_root_bone}
+                tmp_all_bone_indexes = {
+                    right_root_bone.index: right_root_bone.name,
+                }
+                root_bone_indexes.append(right_root_bone.index)
+            elif left_root_bone:
+                tmp_all_bones = {left_root_bone.name: left_root_bone}
+                tmp_all_bone_indexes = {
+                    left_root_bone.index: left_root_bone.name,
+                }
+                root_bone_indexes.append(left_root_bone.index)
         else:
             display_name, root_bone = self.create_root_bone(
                 model, param_option, material_name, parent_bone.position.copy(), base_vertical_axis, parent_bone.name
@@ -5021,6 +5046,7 @@ class PmxTailorExportService:
 
             tmp_all_bones = {root_bone.name: root_bone}
             tmp_all_bone_indexes = {root_bone.index: root_bone.name}
+            root_bone_indexes.append(root_bone.index)
 
         tmp_all_bone_vvs = {}
 
@@ -5221,27 +5247,31 @@ class PmxTailorExportService:
                     )
 
                     # 間隔が距離タイプの場合、均等になるように間を空ける
-                    prev_y_regist = 1
+                    prev_y_registered = 1
                     for v_yidx in range(2, vertex_map.shape[0]):
                         if (
-                            np.sum(np.mean(all_bone_vertical_distances[base_map_idx][prev_y_regist:v_yidx, :], axis=1))
+                            np.sum(
+                                np.mean(all_bone_vertical_distances[base_map_idx][prev_y_registered:v_yidx, :], axis=1)
+                            )
                             > mean_vertical_distance * param_option["vertical_bone_density"]
                         ):
                             # 前の登録ボーンから一定距離離れたら登録対象
                             y_registers[v_yidx] = True
-                            prev_y_regist = v_yidx
+                            prev_y_registered = v_yidx
 
-                    prev_x_regist = 0
+                    prev_x_registered = 0
                     for v_xidx in range(vertex_map.shape[1]):
                         if (
                             np.sum(
-                                np.mean(all_bone_horizonal_distances[base_map_idx][:, prev_x_regist:v_xidx], axis=0)
+                                np.mean(
+                                    all_bone_horizonal_distances[base_map_idx][:, prev_x_registered:v_xidx], axis=0
+                                )
                             )
                             > mean_horizonal_distance * param_option["horizonal_bone_density"]
                         ):
                             # 前の登録ボーンから一定距離離れたら登録対象
                             x_registers[v_xidx] = True
-                            prev_x_regist = v_xidx
+                            prev_x_registered = v_xidx
 
                 elif param_option["density_type"] == logger.transtext("頂点"):
                     # 根元を一列だけ埋めるため、1余分に測る
@@ -5393,7 +5423,9 @@ class PmxTailorExportService:
                             # 最後まで登録されている親ボーンが見つからなければ、ルート
                             if is_rigidbody_leg:
                                 # 足に繋げるのであれば、左右に分ける
-                                parent_bone = left_root_bone if vv.position().x() > 0 else right_root_bone
+                                parent_bone = (
+                                    left_root_bone if vv.position().x() > 0 and left_root_bone else right_root_bone
+                                )
                             else:
                                 parent_bone = root_bone
 
@@ -5442,53 +5474,50 @@ class PmxTailorExportService:
             bone = tmp_all_bones[bone_name]
 
             # 自身と同じ位置のボーンを親に持つ子ボーン
-            cbones = [
-                cbone
-                for cbone in tmp_all_bones.values()
-                if not (
-                    (not is_rigidbody_leg and cbone.index == root_bone.index)
-                    or (is_rigidbody_leg and cbone.index in [left_root_bone.index, right_root_bone.index])
-                )
+            c_bones = [
+                c_bone
+                for c_bone in tmp_all_bones.values()
+                if c_bone.index not in root_bone_indexes
                 and (
                     (
-                        cbone.parent_index in tmp_all_bone_indexes
-                        and tmp_all_bone_indexes[cbone.parent_index] in tmp_all_bones
-                        and tmp_all_bones[tmp_all_bone_indexes[cbone.parent_index]].position == bone.position
+                        c_bone.parent_index in tmp_all_bone_indexes
+                        and tmp_all_bone_indexes[c_bone.parent_index] in tmp_all_bones
+                        and tmp_all_bones[tmp_all_bone_indexes[c_bone.parent_index]].position == bone.position
                     )
                     or (
-                        cbone.parent_index in model.bone_indexes
-                        and model.bone_indexes[cbone.parent_index] in model.bones
-                        and model.bones[model.bone_indexes[cbone.parent_index]].position == bone.position
+                        c_bone.parent_index in model.bone_indexes
+                        and model.bone_indexes[c_bone.parent_index] in model.bones
+                        and model.bones[model.bone_indexes[c_bone.parent_index]].position == bone.position
                     )
                 )
             ]
 
-            if not cbones:
+            if not c_bones:
                 # 子ボーンがない場合、そのまま登録
                 tmp_all_bone_parents[bone.name] = tmp_all_bone_indexes[bone.parent_index]
                 tmp_all_bone_targets.append(bone.name)
             else:
-                cbone_poses = {}
-                for cbone in cbones:
-                    pos = tuple(cbone.position.data().tolist())
-                    if pos not in cbone_poses:
-                        cbone_poses[pos] = []
-                    cbone_poses[pos].append(cbone)
+                c_bone_poses = {}
+                for c_bone in c_bones:
+                    pos = tuple(c_bone.position.data().tolist())
+                    if pos not in c_bone_poses:
+                        c_bone_poses[pos] = []
+                    c_bone_poses[pos].append(c_bone)
 
-                for in_cbones in cbone_poses.values():
-                    tmp_all_bone_targets.append(in_cbones[0].name)
-                    parent_bone_name = tmp_all_bone_indexes[in_cbones[0].parent_index]
-                    tmp_all_bone_parents[in_cbones[0].name] = parent_bone_name
-                    if len(in_cbones) > 1:
-                        for cbone in in_cbones[1:]:
+                for in_c_bones in c_bone_poses.values():
+                    tmp_all_bone_targets.append(in_c_bones[0].name)
+                    parent_bone_name = tmp_all_bone_indexes[in_c_bones[0].parent_index]
+                    tmp_all_bone_parents[in_c_bones[0].name] = parent_bone_name
+                    if len(in_c_bones) > 1:
+                        for c_bone in in_c_bones[1:]:
                             # 2つ以上ある場合、後のボーンは最初のボーンの親を代用する
-                            tmp_all_bone_parents[cbone.name] = parent_bone_name
-                            tmp_all_bone_targets.append(cbone.name)
+                            tmp_all_bone_parents[c_bone.name] = parent_bone_name
+                            tmp_all_bone_targets.append(c_bone.name)
 
                             # 自分の親は登録対象外とする
-                            if cbone.parent_index in tmp_all_bone_indexes:
-                                for n, pname in enumerate(tmp_all_bone_targets):
-                                    if pname == tmp_all_bone_indexes[cbone.parent_index]:
+                            if c_bone.parent_index in tmp_all_bone_indexes:
+                                for n, p_name in enumerate(tmp_all_bone_targets):
+                                    if p_name == tmp_all_bone_indexes[c_bone.parent_index]:
                                         del tmp_all_bone_targets[n]
                                         break
 
@@ -5499,13 +5528,15 @@ class PmxTailorExportService:
 
         # このタイミングで中心ボーン登録
         if is_rigidbody_leg:
-            model.bones[left_root_bone.name] = left_root_bone
-            model.bone_indexes[left_root_bone.index] = left_root_bone.name
-            model.display_slots[left_display_name].references.append((0, model.bones[left_root_bone.name].index))
+            if left_root_bone and left_display_name:
+                model.bones[left_root_bone.name] = left_root_bone
+                model.bone_indexes[left_root_bone.index] = left_root_bone.name
+                model.display_slots[left_display_name].references.append((0, model.bones[left_root_bone.name].index))
 
-            model.bones[right_root_bone.name] = right_root_bone
-            model.bone_indexes[right_root_bone.index] = right_root_bone.name
-            model.display_slots[right_display_name].references.append((0, model.bones[right_root_bone.name].index))
+            if right_root_bone and right_display_name:
+                model.bones[right_root_bone.name] = right_root_bone
+                model.bone_indexes[right_root_bone.index] = right_root_bone.name
+                model.display_slots[right_display_name].references.append((0, model.bones[right_root_bone.name].index))
         else:
             model.bones[root_bone.name] = root_bone
             model.bone_indexes[root_bone.index] = root_bone.name
@@ -5532,7 +5563,7 @@ class PmxTailorExportService:
             model.bone_indexes[bone.index] = bone_name
 
             if is_rigidbody_leg:
-                if bone.position.x() > 0:
+                if bone.position.x() > 0 and left_display_name:
                     model.display_slots[left_display_name].references.append((0, bone.index))
                 else:
                     model.display_slots[right_display_name].references.append((0, bone.index))
@@ -5551,7 +5582,7 @@ class PmxTailorExportService:
                         decoration=MLogger.DECORATION_BOX,
                     )
                     if is_rigidbody_leg:
-                        parent_bone = left_root_bone if bone.position.x() > 0 else right_root_bone
+                        parent_bone = left_root_bone if bone.position.x() > 0 and left_root_bone else right_root_bone
                     else:
                         parent_bone = root_bone
                 else:
@@ -7789,6 +7820,7 @@ class PmxTailorExportService:
         virtual_vertices: dict,
         param_option: dict,
         loop: int,
+        is_reverse: bool = False,
     ):
         if not top_edge_keys or loop > 500:
             return edge_lines, loop
@@ -7820,7 +7852,16 @@ class PmxTailorExportService:
         ]
 
         if not remain_next_vkeys:
-            return edge_lines, loop
+            if not top_edge_keys:
+                return edge_lines, loop
+            # まだTOPキーが残っている場合、反対方向に進む
+            is_reverse = True
+            remain_next_vkeys = [
+                vkey for vkey in all_line_pairs[edge_lines[0]] if vkey not in edge_lines and vkey in top_edge_keys
+            ]
+            if not remain_next_vkeys:
+                # 前が繋がってない場合、無視する
+                return edge_lines, loop
 
         if len(edge_lines) == 1:
             # 初回はルールに沿って次を抽出する
@@ -7850,9 +7891,13 @@ class PmxTailorExportService:
                 )
             next_vkey = remain_next_vkeys[np.argmax(next_dots)]
 
-        edge_lines.append(next_vkey)
+        if is_reverse:
+            edge_lines.insert(0, next_vkey)
+        else:
+            edge_lines.append(next_vkey)
+
         return self.get_edge_lines_from_csv(
-            all_line_pairs, top_edge_keys, next_vkey, edge_lines, virtual_vertices, param_option, loop + 1
+            all_line_pairs, top_edge_keys, next_vkey, edge_lines, virtual_vertices, param_option, loop + 1, is_reverse
         )
 
     def get_edge_lines(
