@@ -699,5 +699,6 @@
     "足にウェイトを乗せ、剛体等を作成するか否か\n足の付け根より下から物理を始めたい場合にチェックしてください": "Whether to put weights on the feet and create a rigid body, etc.\nCheck this if you want to start physics from below the groin",
     "足に繋げる": "connect to feet",
     "物理中心剛体を足剛体の子どもとするか否か\n足の付け根より下から物理を始めたい場合にチェックしてください": "Whether or not the physical center rigid body is a child of the foot rigid body\nCheck this if you want to start physics from below the groin",
-    "物理中心剛体を足剛体の子どもとするか否か\n下半身と足の半分より下から物理を始めたい場合（足の動きに物理を合わせたい場合）にチェックしてください": "Whether or not the physical center rigid body is a child of the foot rigid body\nCheck this if you want to start physics from below half of your lower body and legs (if you want to match your physics to your leg movements)"
+    "物理中心剛体を足剛体の子どもとするか否か\n下半身と足の半分より下から物理を始めたい場合（足の動きに物理を合わせたい場合）にチェックしてください": "Whether or not the physical center rigid body is a child of the foot rigid body\nCheck this if you want to start physics from below half of your lower body and legs (if you want to match your physics to your leg movements)",
+    "足に繋げるオプションがONになっていますが、上半身・下半身・左足・右足のいずれかのボーンがないため、処理を終了します": "The option to connect to the leg is ON, but there is no bone for the upper body, lower body, left leg, or right leg, so processing will end."
 }

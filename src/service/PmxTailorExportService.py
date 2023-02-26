@@ -139,6 +139,15 @@ class PmxTailorExportService:
             model = self.options.pmx_model
             model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor"
 
+            # 足に繋げるか否か
+            if param_option["rigidbody_leg"] and not (
+                "下半身" in model.bones and "上半身" in model.bones and "左足" in model.bones and "右足" in model.bones
+            ):
+                logger.warning(
+                    "足に繋げるオプションがONになっていますが、上半身・下半身・左足・右足のいずれかのボーンがないため、処理を終了します", decoration=MLogger.DECORATION_BOX
+                )
+                return False
+
             # 既存物理を削除する
             is_overwrite = False
             is_reuse = False
