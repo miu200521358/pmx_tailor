@@ -4011,8 +4011,11 @@ class PmxTailorExportService:
                     grad_weight_bone_idxs.append(bone_idx)
                     # ウェイト対象の評価軸の位置
                     grad_weight_axis_vals.append(
-                        model.bones[model.bone_indexes[bone_idx]].position.data()[axis_idx][0]
-                        - vv.position().data()[axis_idx][0]
+                        (
+                            model.bones[model.bone_indexes[bone_idx]].position.data()[axis_idx][0]
+                            - vv.position().data()[axis_idx][0]
+                        )
+                        * 2
                     )
 
             # if parent_bone.name == "下半身" and is_rigidbody_leg:
@@ -4063,12 +4066,12 @@ class PmxTailorExportService:
             # weights = weights / weights.sum(axis=0, keepdims=1)
 
             if is_rigidbody_leg:
-                # 物理ウェイトは最も近いのひとつだけ残す
-                wb_idx = grad_weight_bone_idxs[np.argmin(grad_weight_axis_vals)]
-                wb = grad_weight_axis_vals[np.argmin(grad_weight_axis_vals)]
+                # # 物理ウェイトは最も近いのひとつだけ残す
+                # wb_idx = grad_weight_bone_idxs[np.argmin(grad_weight_axis_vals)]
+                # wb = grad_weight_axis_vals[np.argmin(grad_weight_axis_vals)]
 
-                grad_weight_bone_idxs = [wb_idx]
-                grad_weight_axis_vals = [wb]
+                # grad_weight_bone_idxs = [wb_idx]
+                # grad_weight_axis_vals = [wb]
 
                 # 体幹のもう片方も常にウェイト対象とする
                 grad_weight_bone_idxs.append(model.bones[grad_other_bone_name].index)
@@ -4080,7 +4083,8 @@ class PmxTailorExportService:
                     # 上半身2がある場合、そのウェイトも割り当てる
                     grad_weight_bone_idxs.append(model.bones[grad_other2_bone_name].index)
                     grad_weight_axis_vals.append(
-                        model.bones[grad_other2_bone_name].position.data()[axis_idx][0] - vv.position().data()[axis_idx][0]
+                        model.bones[grad_other2_bone_name].position.data()[axis_idx][0]
+                        - vv.position().data()[axis_idx][0]
                     )
 
                 # 足の距離
@@ -6313,7 +6317,7 @@ class PmxTailorExportService:
         for n, ((min_vkey, max_vkey), line_iidxs) in enumerate(edge_pair_lkeys.items()):
             surface_normals = index_surface_normals[(min_vkey, max_vkey)]
             is_pair = False
-            if len(line_iidxs) <= 1:
+            if len(line_iidxs) == 1:
                 is_pair = True
 
                 logger.test(
@@ -6791,6 +6795,7 @@ class PmxTailorExportService:
                 return None, None, None, None, None, None, None
 
             # 根元頂点キーリスト生成
+            top_edge_keys = {}
             for vidx in top_target_vertices:
                 v = model.vertex_dict[vidx]
 
@@ -6803,7 +6808,17 @@ class PmxTailorExportService:
                     virtual_vertices[vkey] = VirtualVertex(vkey)
                 virtual_vertices[vkey].append([v], [], [])
 
-                horizonal_top_edge_keys.append(vkey)
+                top_edge_keys[vkey] = vkey
+
+            horizonal_top_edge_keys, _ = self.get_edge_lines_from_csv(
+                all_line_pairs,
+                top_edge_keys,
+                None,
+                [],
+                virtual_vertices,
+                param_option,
+                0,
+            )
         else:
             # 根元頂点CSVが指定されていない場合
             # 最もキーが上の一点から大体水平に繋がっている辺を上部エッジとする
@@ -7041,10 +7056,17 @@ class PmxTailorExportService:
                 # リング取得
                 all_rings = []
 
+                # TOPキーの中央値を閾値とする
+                hky = np.median([hkey[1] for hkey in horizonal_top_edge_keys])
+
                 remaining_vkeys = dict(
                     list(
                         sorted(
-                            [(k, k) for k in virtual_vertices.keys() if k not in horizonal_top_edge_keys],
+                            [
+                                (k, k)
+                                for k in virtual_vertices.keys()
+                                if k not in horizonal_top_edge_keys and k[1] < hky
+                            ],
                             key=lambda x: (abs(x[0][0]), -x[0][2], -x[0][1]),
                         )
                     )
@@ -7490,6 +7512,7 @@ class PmxTailorExportService:
                         MVector3D(1, 0, 0),
                         (virtual_vertices[connected_vkey].position() - prev_start_vv.position()).normalized(),
                     )
+
             dots = np.array(list(connected_dots.values()))
             logger.debug("*** dots: %s", np.round(dots, decimals=3))
             # 内積が一番小さいものを縦方向とみなす
@@ -7752,6 +7775,81 @@ class PmxTailorExportService:
             degree = 180
 
         return degree, degree + 360
+
+    def get_edge_lines_from_csv(
+        self,
+        all_line_pairs: dict,
+        top_edge_keys: dict,
+        start_vkey: tuple,
+        edge_lines: list,
+        virtual_vertices: dict,
+        param_option: dict,
+        loop: int,
+    ):
+        if not top_edge_keys or loop > 500:
+            return edge_lines, loop
+
+        if not start_vkey:
+            if param_option["direction"] == logger.transtext("上"):
+                # X(中央揃え) - Y(昇順) - Z(降順)
+                sorted_edge_line_pairs = sorted(list(top_edge_keys.keys()), key=lambda x: (abs(x[0]), x[1], -x[2]))
+            elif param_option["direction"] == logger.transtext("右"):
+                # Y(降順) - X(降順) - Z(降順)
+                sorted_edge_line_pairs = sorted(list(top_edge_keys.keys()), key=lambda x: (-x[1], -x[0], -x[2]))
+            elif param_option["direction"] == logger.transtext("左"):
+                # Y(降順) - X(昇順) - Z(降順)
+                sorted_edge_line_pairs = sorted(list(top_edge_keys.keys()), key=lambda x: (-x[1], x[0], -x[2]))
+            else:
+                # 下: X(中央揃え) - Y(降順) - Z(降順)
+                sorted_edge_line_pairs = sorted(list(top_edge_keys.keys()), key=lambda x: (abs(x[0]), -x[1], -x[2]))
+            start_vkey = sorted_edge_line_pairs[0]
+            edge_lines.append(start_vkey)
+
+        if start_vkey not in all_line_pairs:
+            return edge_lines, loop
+
+        if start_vkey in top_edge_keys:
+            del top_edge_keys[start_vkey]
+
+        remain_next_vkeys = [
+            vkey for vkey in all_line_pairs[start_vkey] if vkey not in edge_lines and vkey in top_edge_keys
+        ]
+
+        if not remain_next_vkeys:
+            return edge_lines, loop
+
+        if len(edge_lines) == 1:
+            # 初回はルールに沿って次を抽出する
+            if param_option["direction"] == logger.transtext("上"):
+                # X(中央揃え) - Z(降順) - Y(昇順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], x[1]))[0]
+            elif param_option["direction"] == logger.transtext("右"):
+                # Y(降順) - Z(降順) - X(降順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], -x[0]))[0]
+            elif param_option["direction"] == logger.transtext("左"):
+                # Y(降順) - Z(降順) - X(昇順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (-x[1], -x[2], x[0]))[0]
+            else:
+                # 下: X(中央揃え) - Z(降順) - Y(降順)
+                next_vkey = sorted(remain_next_vkeys, key=lambda x: (abs(x[0]), -x[2], -x[1]))[0]
+        else:
+            # 2回目以降は出来るだけ内積が大きいのを選ぶ
+            next_dots = []
+            for vkey in remain_next_vkeys:
+                next_dots.append(
+                    MVector3D.dotProduct(
+                        (
+                            virtual_vertices[edge_lines[-1]].position() - virtual_vertices[edge_lines[-2]].position()
+                        ).normalized(),
+                        (virtual_vertices[vkey].position() - virtual_vertices[edge_lines[-1]].position()).normalized(),
+                    )
+                )
+            next_vkey = remain_next_vkeys[np.argmax(next_dots)]
+
+        edge_lines.append(next_vkey)
+        return self.get_edge_lines_from_csv(
+            all_line_pairs, top_edge_keys, next_vkey, edge_lines, virtual_vertices, param_option, loop + 1
+        )
 
     def get_edge_lines(
         self,
