@@ -4115,6 +4115,9 @@ class PmxTailorExportService:
             )
             grad_weight_bone_idxs.append(model.bones[grad_trunk_bone_name].index)
 
+            if not np.where(grad_weight_axis_vals):
+                continue
+
             grad_weight_bone_idxs = np.array(grad_weight_bone_idxs)[np.where(grad_weight_axis_vals)]
             grad_target_weights = np.abs(grad_weight_axis_vals)[np.where(grad_weight_axis_vals)]
             grad_weights = np.min(grad_target_weights) / grad_target_weights
@@ -5284,9 +5287,12 @@ class PmxTailorExportService:
 
                 elif param_option["density_type"] == logger.transtext("頂点"):
                     # 根元を一列だけ埋めるため、1余分に測る
-                    y_registers = (
-                        np.array(list(range(1, vertex_map.shape[0]))) % param_option["vertical_bone_density"] == 1
-                    )
+                    if param_option["vertical_bone_density"] == 1:
+                        y_registers = np.array([True for _ in range(vertex_map.shape[0])])
+                    else:
+                        y_registers = (
+                            np.array(list(range(1, vertex_map.shape[0]))) % param_option["vertical_bone_density"] == 1
+                        )
                     x_registers = (
                         np.array(list(range(vertex_map.shape[1]))) % param_option["horizonal_bone_density"] == 0
                     )
