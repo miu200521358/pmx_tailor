@@ -7549,9 +7549,24 @@ class PmxTailorExportService:
         axis_idx = np.where(np.abs(base_vertical_axis.data()))[0][0]
 
         if not vkey:
+            if 2 > len(prev_rings):
+                return rings
+
             # vkey が決まってない場合、始点なのでprevから繋がってる頂点を選ぶ
             prev_start_vv: VirtualVertex = virtual_vertices[prev_rings[0]]
             prev_next_vv: VirtualVertex = virtual_vertices[prev_rings[1]]
+
+            # 進行方向(x)
+            x_direction_pos = (prev_next_vv.position() - prev_start_vv.position()).normalized()
+            # 進行方向に対しての縦軸(y)
+            y_direction_pos = MVector3D(0, -1, 0)
+            # ボーン進行方向に対しての縦軸(y)
+            if np.isclose(abs(x_direction_pos.y()), 1):
+                # ちょうど垂直で真下に向かってる場合、縦軸を別に設定する
+                y_direction_pos = MVector3D(1, 0, 0)
+            # 進行方向に対しての横軸(z)
+            z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos).normalized()
+
             connected_dots = {}
             for connected_vkey in prev_start_vv.connected_vvs:
                 # 内積
@@ -7561,14 +7576,19 @@ class PmxTailorExportService:
                 ):
                     # 自分と繋がってる頂点が隣とも繋がってる（＼）か、走査頂点と繋がってる頂点が自分と繋がっている（／）場合のみ対象
                     connected_dots[connected_vkey] = MVector3D.dotProduct(
-                        MVector3D(1, 0, 0),
+                        z_direction_pos,
                         (virtual_vertices[connected_vkey].position() - prev_start_vv.position()).normalized(),
                     )
 
-            dots = np.array(list(connected_dots.values()))
-            logger.debug("*** dots: %s", np.round(dots, decimals=3))
-            # 内積が一番小さいものを縦方向とみなす
-            vkey = list(connected_dots.keys())[np.argmin(np.abs(dots))]
+            if not connected_dots:
+                return rings
+
+            logger.debug(
+                "*** vertical-dots: %s",
+                [(k, virtual_vertices[k].vidxs(), round(v, 3)) for k, v in connected_dots.items()],
+            )
+            # 内積が一番大きいものを縦方向とみなす
+            vkey = list(connected_dots.keys())[np.argmax(list(connected_dots.values()))]
 
         # 登録
         rings.append(vkey)
@@ -7592,6 +7612,9 @@ class PmxTailorExportService:
                         (vv.position() - virtual_vertices[rings[-2]].position()).normalized(),
                         (virtual_vertices[connected_vkey].position() - vv.position()).normalized(),
                     )
+        logger.debug(
+            "*** next-dots: %s", [(k, virtual_vertices[k].vidxs(), round(v, 3)) for k, v in connected_dots.items()]
+        )
 
         if not connected_vecs:
             return rings
