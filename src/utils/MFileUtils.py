@@ -34,6 +34,7 @@ def read_history(mydir_path):
         "vertices_back_csv": [],
         "top_vertices_csv": [],
         "abb_setting": {},
+        "advance_comment": 0,
         "max": 50,
     }
     file_hitories = cPickle.loads(cPickle.dumps(base_file_hitories, -1))

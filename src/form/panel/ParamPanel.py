@@ -836,7 +836,7 @@ class PhysicsParam:
             ("csv"),
             wx.FLP_DEFAULT_STYLE,
             logger.transtext(
-                "（自動判定で根元がうまく抽出できなかったなどで）根元頂点を指定したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
+                "（自動判定で根元がうまく抽出できなかったなどで）根元頂点を指定したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\n根元頂点は物理対象頂点にも含まれている必要があります。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。"
             ),
             file_model_spacer=0,
             title_parts_ctrl=None,
@@ -2999,6 +2999,13 @@ class PhysicsParam:
         self.physics_parent_spin.Bind(wx.EVT_SPINCTRL, self.main_frame.file_panel_ctrl.on_change_file)
         self.advance_option_grid_sizer.Add(self.physics_parent_spin, 0, wx.ALL, 5)
 
+        # 詳細コメント
+        self.advance_comment_ctrl = wx.CheckBox(self.advance_window, wx.ID_ANY, logger.transtext("詳細コメント"))
+        self.advance_comment_ctrl.SetToolTip(logger.transtext("物理の詳細な挙動をコメントに出力したい場合にチェックしてください"))
+        self.advance_comment_ctrl.Bind(wx.EVT_CHECKBOX, self.main_frame.file_panel_ctrl.on_change_file)
+        self.advance_option_grid_sizer.Add(self.advance_comment_ctrl, 0, wx.ALL, 5)
+
+        # グリッドを登録
         self.advance_option_sizer.Add(self.advance_option_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_option_sizer, 0, wx.ALL, 5)
 
@@ -3157,6 +3164,7 @@ class PhysicsParam:
                 "route_estimate_type": self.route_estimate_type_ctrl.GetStringSelection(),
                 "params": self.get_param_export_data(),
             }
+            self.main_frame.file_hitories["advance_comment"] = self.advance_comment_ctrl.GetValue()
             MFileUtils.save_history(self.main_frame.mydir_path, self.main_frame.file_hitories)
 
             # 簡易版オプションデータ -------------
@@ -3197,6 +3205,7 @@ class PhysicsParam:
             params["joint_pos_type"] = self.joint_pos_type_ctrl.GetStringSelection()
             params["route_search_type"] = self.route_search_type_ctrl.GetStringSelection()
             params["route_estimate_type"] = self.route_estimate_type_ctrl.GetStringSelection()
+            params["advance_comment"] = self.advance_comment_ctrl.GetValue()
 
             # 自身を非衝突対象
             no_collision_group = 0
@@ -4834,6 +4843,7 @@ class PhysicsParam:
         self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
         self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
         self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
+        self.advance_comment_ctrl.SetValue(self.main_frame.file_hitories.get("advance_comment", 0))
 
         self.set_material_name(event)
         # self.set_fineness(event)

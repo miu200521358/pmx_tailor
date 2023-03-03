@@ -137,7 +137,7 @@ class PmxTailorExportService:
             logger.info(service_data_txt, translate=False, decoration=MLogger.DECORATION_BOX)
 
             model = self.options.pmx_model
-            model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor"
+            model.comment += f"\r\n\r\n{logger.transtext('物理')}: PmxTailor {self.options.version_name}"
 
             # 足に繋げるか否か
             if param_option["rigidbody_leg"] and not (
@@ -751,179 +751,158 @@ class PmxTailorExportService:
     def create_physics(self, model: PmxModel, param_option: dict):
         model.comment += f"\r\n{logger.transtext('材質')}: {param_option['material_name']} --------------"
         model.comment += f"\r\n　　{logger.transtext('略称')}: {param_option['abb_name']}"
-        model.comment += f", {logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
-        # model.comment += f", {logger.transtext('細かさ')}: {param_option['fineness']}"
-        model.comment += f", {logger.transtext('質量')}: {round(param_option['mass'], 3)}"
-        model.comment += f", {logger.transtext('柔らかさ')}: {round(param_option['air_resistance'], 3)}"
-        model.comment += f", {logger.transtext('張り')}: {round(param_option['shape_maintenance'], 3)}"
-        model.comment += f", {logger.transtext('特殊形状')}: {param_option['special_shape']}"
-        model.comment += f"\r\n　　{logger.transtext('ボーン密度')}"
-        model.comment += f", {logger.transtext('縦密度')}: {param_option['vertical_bone_density']}"
-        model.comment += f", {logger.transtext('横密度')}: {param_option['horizonal_bone_density']}"
-        model.comment += f", {logger.transtext('オフセット')}: {param_option['horizonal_bone_offset']}"
-        model.comment += f", {logger.transtext('密度基準')}: {param_option['density_type']}"
-        model.comment += f"\r\n　　{logger.transtext('根元剛体')}"
-        model.comment += f", {logger.transtext('質量')}: {round(param_option['rigidbody'].param.mass, 3)}"
-        model.comment += f", {logger.transtext('移動減衰')}: {round(param_option['rigidbody'].param.linear_damping, 3)}"
-        model.comment += f", {logger.transtext('回転減衰')}: {round(param_option['rigidbody'].param.angular_damping, 3)}"
-        model.comment += f", {logger.transtext('反発力')}: {round(param_option['rigidbody'].param.restitution, 3)}"
-        model.comment += f", {logger.transtext('摩擦力')}: {round(param_option['rigidbody'].param.friction, 3)}"
-        model.comment += f", {logger.transtext('係数')}: {round(param_option['rigidbody_coefficient'], 3)}"
-        model.comment += f"\r\n　　{logger.transtext('剛体の厚み')}"
-        model.comment += f", {logger.transtext('根元厚み')}: {round(param_option['rigidbody_root_thicks'], 3)}"
-        model.comment += f", {logger.transtext('末端厚み')}: {round(param_option['rigidbody_end_thicks'], 3)}"
-        model.comment += f"\r\n　　{logger.transtext('詳細オプション')}"
-        model.comment += f", {logger.transtext('物理接続')}: {param_option['parent_type']}"
-        model.comment += f", {logger.transtext('物理タイプ')}: {param_option['physics_type']}"
-        model.comment += f", {logger.transtext('ジョイント位置')}: {param_option['joint_pos_type']}"
-        model.comment += f", {logger.transtext('ルート探索')}: {param_option['route_search_type']}"
-        model.comment += f", {logger.transtext('根元頂点推定')}: {param_option['route_estimate_type']}"
-        model.comment += f", {logger.transtext('物理親')}: {param_option['physics_parent']}"
 
-        if param_option["vertical_joint"]:
-            model.comment += f"\r\n　　{logger.transtext('縦ジョイント')}"
-            model.comment += f", {logger.transtext('制限係数')}: {round(param_option['vertical_joint_coefficient'], 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.x(), 3)}"
+        if param_option["advance_comment"]:
+            model.comment += f", {logger.transtext('剛体グループ')}: {param_option['rigidbody'].collision_group + 1}"
+            model.comment += f", {logger.transtext('質量')}: {round(param_option['mass'], 3)}"
+            model.comment += f", {logger.transtext('柔らかさ')}: {round(param_option['air_resistance'], 3)}"
+            model.comment += f", {logger.transtext('張り')}: {round(param_option['shape_maintenance'], 3)}"
+            model.comment += f", {logger.transtext('特殊形状')}: {param_option['special_shape']}"
+            model.comment += f"\r\n　　{logger.transtext('ボーン密度')}"
+            model.comment += f", {logger.transtext('縦密度')}: {param_option['vertical_bone_density']}"
+            model.comment += f", {logger.transtext('横密度')}: {param_option['horizonal_bone_density']}"
+            model.comment += f", {logger.transtext('オフセット')}: {param_option['horizonal_bone_offset']}"
+            model.comment += f", {logger.transtext('密度基準')}: {param_option['density_type']}"
+            model.comment += f"\r\n　　{logger.transtext('根元剛体')}"
+            model.comment += f", {logger.transtext('質量')}: {round(param_option['rigidbody'].param.mass, 3)}"
             model.comment += (
-                f", {logger.transtext('回転Y(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.y(), 3)}"
+                f", {logger.transtext('移動減衰')}: {round(param_option['rigidbody'].param.linear_damping, 3)}"
             )
             model.comment += (
-                f", {logger.transtext('回転Z(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.z(), 3)}"
+                f", {logger.transtext('回転減衰')}: {round(param_option['rigidbody'].param.angular_damping, 3)}"
             )
-            model.comment += (
-                f", {logger.transtext('回転X(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.x(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Y(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.y(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Z(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.z(), 3)}"
-            )
-            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['vertical_joint'].spring_constant_translation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['vertical_joint'].spring_constant_translation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['vertical_joint'].spring_constant_translation.z(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['vertical_joint'].spring_constant_rotation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['vertical_joint'].spring_constant_rotation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['vertical_joint'].spring_constant_rotation.z(), 3)}"
+            model.comment += f", {logger.transtext('反発力')}: {round(param_option['rigidbody'].param.restitution, 3)}"
+            model.comment += f", {logger.transtext('摩擦力')}: {round(param_option['rigidbody'].param.friction, 3)}"
+            model.comment += f", {logger.transtext('係数')}: {round(param_option['rigidbody_coefficient'], 3)}"
+            model.comment += f"\r\n　　{logger.transtext('剛体の厚み')}"
+            model.comment += f", {logger.transtext('根元厚み')}: {round(param_option['rigidbody_root_thicks'], 3)}"
+            model.comment += f", {logger.transtext('末端厚み')}: {round(param_option['rigidbody_end_thicks'], 3)}"
+            model.comment += f"\r\n　　{logger.transtext('詳細オプション')}"
+            model.comment += f", {logger.transtext('物理接続')}: {param_option['parent_type']}"
+            model.comment += f", {logger.transtext('物理タイプ')}: {param_option['physics_type']}"
+            model.comment += f", {logger.transtext('ジョイント位置')}: {param_option['joint_pos_type']}"
+            model.comment += f", {logger.transtext('ルート探索')}: {param_option['route_search_type']}"
+            model.comment += f", {logger.transtext('根元頂点推定')}: {param_option['route_estimate_type']}"
+            model.comment += f", {logger.transtext('物理親')}: {param_option['physics_parent']}"
 
-        if param_option["horizonal_joint"]:
-            model.comment += f"\r\n　　{logger.transtext('横ジョイント')}"
-            model.comment += f", {logger.transtext('制限係数')}: {param_option['horizonal_joint_coefficient']}"
-            model.comment += f", {logger.transtext('親剛体距離制限')}: {param_option['horizonal_joint_restruct']}"
-            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.x(), 3)}"
-            model.comment += (
-                f", {logger.transtext('回転Y(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.y(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Z(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.z(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転X(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.x(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Y(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.y(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Z(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.z(), 3)}"
-            )
-            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['horizonal_joint'].spring_constant_translation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['horizonal_joint'].spring_constant_translation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['horizonal_joint'].spring_constant_translation.z(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.z(), 3)}"
+            if param_option["vertical_joint"]:
+                model.comment += f"\r\n　　{logger.transtext('縦ジョイント')}"
+                model.comment += (
+                    f", {logger.transtext('制限係数')}: {round(param_option['vertical_joint_coefficient'], 3)}"
+                )
+                model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['vertical_joint'].translation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['vertical_joint'].translation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['vertical_joint'].rotation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['vertical_joint'].rotation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['vertical_joint'].spring_constant_translation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['vertical_joint'].spring_constant_translation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['vertical_joint'].spring_constant_translation.z(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['vertical_joint'].spring_constant_rotation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['vertical_joint'].spring_constant_rotation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['vertical_joint'].spring_constant_rotation.z(), 3)}"
 
-        if param_option["diagonal_joint"]:
-            model.comment += f"\r\n　　{logger.transtext('斜めジョイント')}"
-            model.comment += f", {logger.transtext('制限係数')}: {round(param_option['diagonal_joint_coefficient'], 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.x(), 3)}"
-            model.comment += (
-                f", {logger.transtext('回転Y(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.y(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Z(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.z(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転X(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.x(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Y(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.y(), 3)}"
-            )
-            model.comment += (
-                f", {logger.transtext('回転Z(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.z(), 3)}"
-            )
-            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['diagonal_joint'].spring_constant_translation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['diagonal_joint'].spring_constant_translation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['diagonal_joint'].spring_constant_translation.z(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.z(), 3)}"
+            if param_option["horizonal_joint"]:
+                model.comment += f"\r\n　　{logger.transtext('横ジョイント')}"
+                model.comment += f", {logger.transtext('制限係数')}: {param_option['horizonal_joint_coefficient']}"
+                model.comment += f", {logger.transtext('親剛体距離制限')}: {param_option['horizonal_joint_restruct']}"
+                model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['horizonal_joint'].translation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['horizonal_joint'].translation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['horizonal_joint'].rotation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['horizonal_joint'].rotation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['horizonal_joint'].spring_constant_translation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['horizonal_joint'].spring_constant_translation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['horizonal_joint'].spring_constant_translation.z(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['horizonal_joint'].spring_constant_rotation.z(), 3)}"
 
-        if param_option["vertical_reverse_joint"]:
-            model.comment += f"\r\n　　{logger.transtext('縦逆ジョイント')}"
-            model.comment += (
-                f", {logger.transtext('制限係数')}: {round(param_option['vertical_reverse_joint_coefficient'], 3)}"
-            )
-            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.z(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.z(), 3)}"
+            if param_option["diagonal_joint"]:
+                model.comment += f"\r\n　　{logger.transtext('斜めジョイント')}"
+                model.comment += (
+                    f", {logger.transtext('制限係数')}: {round(param_option['diagonal_joint_coefficient'], 3)}"
+                )
+                model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['diagonal_joint'].translation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['diagonal_joint'].translation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['diagonal_joint'].rotation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['diagonal_joint'].rotation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['diagonal_joint'].spring_constant_translation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['diagonal_joint'].spring_constant_translation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['diagonal_joint'].spring_constant_translation.z(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['diagonal_joint'].spring_constant_rotation.z(), 3)}"
 
-        if param_option["horizonal_reverse_joint"]:
-            model.comment += f"\r\n　　{logger.transtext('横逆ジョイント')}"
-            model.comment += (
-                f", {logger.transtext('制限係数')}: {round(param_option['horizonal_reverse_joint_coefficient'], 3)}"
-            )
-            model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.x(), 3)}"
-            model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.y(), 3)}"
-            model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.z(), 3)}"
-            model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.x(), 3)}"
-            model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.y(), 3)}"
-            model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.z(), 3)}"
-            model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.z(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.x(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.y(), 3)}"
-            model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.z(), 3)}"
+            if param_option["vertical_reverse_joint"]:
+                model.comment += f"\r\n　　{logger.transtext('縦逆ジョイント')}"
+                model.comment += (
+                    f", {logger.transtext('制限係数')}: {round(param_option['vertical_reverse_joint_coefficient'], 3)}"
+                )
+                model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['vertical_reverse_joint'].translation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['vertical_reverse_joint'].translation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['vertical_reverse_joint'].rotation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['vertical_reverse_joint'].spring_constant_translation.z(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['vertical_reverse_joint'].spring_constant_rotation.z(), 3)}"
+
+            if param_option["horizonal_reverse_joint"]:
+                model.comment += f"\r\n　　{logger.transtext('横逆ジョイント')}"
+                model.comment += (
+                    f", {logger.transtext('制限係数')}: {round(param_option['horizonal_reverse_joint_coefficient'], 3)}"
+                )
+                model.comment += f"\r\n　　　　{logger.transtext('移動X(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最小)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('移動X(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('移動Y(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('移動Z(最大)')}: {round(param_option['horizonal_reverse_joint'].translation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('回転X(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最小)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_min.z(), 3)}"
+                model.comment += f", {logger.transtext('回転X(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.x(), 3)}"
+                model.comment += f", {logger.transtext('回転Y(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.y(), 3)}"
+                model.comment += f", {logger.transtext('回転Z(最大)')}: {round(param_option['horizonal_reverse_joint'].rotation_limit_max.z(), 3)}"
+                model.comment += f"\r\n　　　　{logger.transtext('ばね(移動X)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Y)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(移動Z)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_translation.z(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転X)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.x(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Y)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.y(), 3)}"
+                model.comment += f", {logger.transtext('ばね(回転Z)')}: {round(param_option['horizonal_reverse_joint'].spring_constant_rotation.z(), 3)}"
 
         material_name = param_option["material_name"]
 
@@ -6869,6 +6848,13 @@ class PmxTailorExportService:
                 param_option,
                 0,
             )
+
+            if not horizonal_top_edge_keys:
+                logger.warning(
+                    "根元頂点CSVに指定された頂点が物理材質もしくは物理頂点に含まれていなかった為、処理を終了します。\n物理対象頂点CSVは根元頂点も含めて指定してください。",
+                    decoration=MLogger.DECORATION_BOX,
+                )
+                return None, None, None, None, None, None, None
         else:
             # 根元頂点CSVが指定されていない場合
             # 最もキーが上の一点から大体水平に繋がっている辺を上部エッジとする
