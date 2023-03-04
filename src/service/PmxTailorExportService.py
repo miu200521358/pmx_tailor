@@ -7101,7 +7101,7 @@ class PmxTailorExportService:
                             [
                                 (k, k)
                                 for k in virtual_vertices.keys()
-                                if k not in horizonal_top_edge_keys and k[1] < hky
+                                if k not in horizonal_top_edge_keys
                             ],
                             key=lambda x: (abs(x[0][0]), -x[0][2], -x[0][1]),
                         )
