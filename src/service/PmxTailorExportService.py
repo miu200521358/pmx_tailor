@@ -917,7 +917,10 @@ class PmxTailorExportService:
             grad_vertices = list(set(grad_vertices) - set(target_vertices))
             logger.debug("grad_vertices: %s", grad_vertices)
             if not target_vertices:
-                logger.warning("物理対象頂点CSVが正常に読み込めなかったため、処理を終了します", decoration=MLogger.DECORATION_BOX)
+                logger.warning(
+                    "物理対象頂点CSVが正常に読み込めなかったため、処理を終了します\n物理材質の中に物理対象CSVで指定した頂点が含まれている事を確認してください。",
+                    decoration=MLogger.DECORATION_BOX,
+                )
                 return False, None, None
         else:
             target_vertices = list(model.material_vertices[material_name])
@@ -7149,7 +7152,7 @@ class PmxTailorExportService:
 
         if not all_bottom_edge_keys:
             logger.warning(
-                "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\nVRoid製スカートの場合、上部のベルト部分が含まれていないかご確認ください。",
+                "物理方向に対して下部エッジが見つけられなかった為、処理を終了します。\n根元頂点CSVで物理の開始位置を指定すると下部エッジが見つけられるようになります。",
                 decoration=MLogger.DECORATION_BOX,
             )
             return None, None, None, None, None, None, None

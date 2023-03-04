@@ -3073,8 +3073,15 @@ class PhysicsParam:
                 logger.error("頂点のない材質が指定されています。", decoration=MLogger.DECORATION_BOX)
                 return params, False
 
-            if self.simple_material_ctrl.GetStringSelection() == self.simple_back_material_ctrl.GetStringSelection():
-                logger.error("物理材質と同じ材質が裏面に指定されています。", decoration=MLogger.DECORATION_BOX)
+            if (
+                not self.vertices_csv_file_ctrl.path()
+                and self.simple_material_ctrl.GetStringSelection()
+                == self.simple_back_material_ctrl.GetStringSelection()
+            ):
+                logger.error(
+                    "物理材質と同じ材質が裏面に指定されています。\n物理頂点CSVが指定されていない場合、物理材質と裏面材質は同じ材質を指定する事ができません。",
+                    decoration=MLogger.DECORATION_BOX,
+                )
                 return params, False
 
             if self.physics_type_ctrl.GetStringSelection() == logger.transtext(
