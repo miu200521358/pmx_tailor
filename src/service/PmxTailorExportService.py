@@ -1077,6 +1077,7 @@ class PmxTailorExportService:
                     model,
                     param_option,
                     target_vertices,
+                    grad_vertices,
                     virtual_vertices,
                     back_vertices,
                     remaining_vertices,
@@ -1347,6 +1348,7 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and above_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[prev_map_idx][above_yidx, prev_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1355,6 +1357,7 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and v_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[prev_map_idx][v_yidx, prev_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1363,6 +1366,7 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and below_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[prev_map_idx][below_yidx, prev_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1371,6 +1375,7 @@ class PmxTailorExportService:
                         if base_map_idx in vertex_maps
                         and above_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[base_map_idx][above_yidx, v_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1379,6 +1384,7 @@ class PmxTailorExportService:
                         if base_map_idx in vertex_maps
                         and v_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[base_map_idx][v_yidx, v_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1387,6 +1393,7 @@ class PmxTailorExportService:
                         if base_map_idx in vertex_maps
                         and below_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[base_map_idx][below_yidx, v_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1395,6 +1402,7 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and above_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[next_map_idx][above_yidx, next_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1403,6 +1411,7 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and v_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[next_map_idx][v_yidx, next_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1411,6 +1420,7 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and below_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[next_map_idx][below_yidx, next_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -1467,8 +1477,8 @@ class PmxTailorExportService:
                                         else vv.vidxs(),
                                     )
                         else:
-                            a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
-                            b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
+                            a_pos = model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                            b_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                             if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                                 # 剛体が重なる箇所の交点
                                 above_mat = MMatrix4x4()
@@ -1490,13 +1500,13 @@ class PmxTailorExportService:
                                 else:
                                     joint_pos = (above_point + now_point) / 2
                             else:
-                                joint_pos = b_bone.position
+                                joint_pos = b_pos
 
                             if v_yidx == 0:
                                 joint_qq = b_rigidbody.shape_qq
                             else:
                                 # ボーン進行方向(x)
-                                x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                                x_direction_pos = (b_pos - a_pos).normalized()
                                 # ボーン進行方向に対しての縦軸(z)
                                 if v_yidx == 0:
                                     z_direction_pos = b_rigidbody.z_direction.normalized()
@@ -1507,7 +1517,7 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                            bone_distance = a_pos.distanceToPoint(b_pos)
 
                             joint_key, joint = self.build_joint(
                                 "↓",
@@ -1557,8 +1567,8 @@ class PmxTailorExportService:
                                 b_xidx = v_xidx
                                 b_yidx = above_yidx
 
-                                a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
-                                b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
+                                a_pos = model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                                b_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                                 if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                                     # 剛体が重なる箇所の交点
                                     above_mat = MMatrix4x4()
@@ -1580,10 +1590,10 @@ class PmxTailorExportService:
                                     else:
                                         joint_pos = (above_point + now_point) / 2
                                 else:
-                                    joint_pos = b_bone.position
+                                    joint_pos = b_pos
 
                                 # ボーン進行方向(x)
-                                x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                                x_direction_pos = (b_pos - a_pos).normalized()
                                 # ボーン進行方向に対しての縦軸(z)
                                 if v_yidx == 0:
                                     z_direction_pos = b_rigidbody.z_direction.normalized()
@@ -1594,7 +1604,7 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                                bone_distance = a_pos.distanceToPoint(b_pos)
 
                                 joint_key, joint = self.build_joint(
                                     "↑",
@@ -1791,8 +1801,8 @@ class PmxTailorExportService:
                             # 同じ剛体なのは同一頂点からボーンが出る場合に有り得るので、警告は出さない
                             pass
                         elif v_yidx < registered_max_v_yidx:
-                            a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
-                            b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
+                            a_pos = model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                            b_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                             if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                                 # 剛体が重なる箇所の交点
                                 above_mat = MMatrix4x4()
@@ -1811,10 +1821,10 @@ class PmxTailorExportService:
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
-                                joint_pos = b_bone.position
+                                joint_pos = b_pos
 
                             # ボーン進行方向(x)
-                            x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                            x_direction_pos = (b_pos - a_pos).normalized()
                             # ボーン進行方向に対しての縦軸(z)
                             z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
@@ -1873,7 +1883,7 @@ class PmxTailorExportService:
                                         )
                                         break
 
-                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                            bone_distance = a_pos.distanceToPoint(b_pos)
 
                             joint_key, joint = self.build_joint(
                                 "→",
@@ -1962,7 +1972,7 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                                bone_distance = a_pos.distanceToPoint(b_pos)
 
                                 joint_key, joint = self.build_joint(
                                     "→",
@@ -1996,7 +2006,7 @@ class PmxTailorExportService:
                                     horizonal_spring_constant_rot_ys,
                                     horizonal_spring_constant_rot_zs,
                                     ratio,
-                                    override_joint_name=f"→|{a_bone.name}T|{b_bone.name}T",
+                                    override_joint_name=f"→|{a_rigidbody.name}T|{b_rigidbody.name}T",
                                 )
                                 if joint.name not in [j.name for j in created_joints.values()]:
                                     created_joints[joint_key] = joint
@@ -2082,7 +2092,7 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                                bone_distance = a_pos.distanceToPoint(b_pos)
 
                                 joint_key, joint = self.build_joint(
                                     "→",
@@ -2116,7 +2126,7 @@ class PmxTailorExportService:
                                     horizonal_spring_constant_rot_ys,
                                     horizonal_spring_constant_rot_zs,
                                     ratio,
-                                    override_joint_name=f"→|{a_bone.name}T|{b_bone.name}T",
+                                    override_joint_name=f"→|{a_rigidbody.name}T|{b_rigidbody.name}T",
                                 )
                                 if joint.name not in [j.name for j in created_joints.values()]:
                                     created_joints[joint_key] = joint
@@ -2140,20 +2150,32 @@ class PmxTailorExportService:
                                 and b_rigidbody.index >= 0
                             ):
                                 # 末端横逆ジョイント
-                                a_bone = model.bones[
-                                    model.bone_indexes[
-                                        model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index
-                                    ]
-                                ]
-                                b_bone = model.bones[
-                                    model.bone_indexes[
-                                        model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index
-                                    ]
-                                ]
-                                joint_pos = b_bone.position
+                                a_pos = (
+                                    model.bones[
+                                        model.bone_indexes[
+                                            model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index
+                                        ]
+                                    ].position
+                                    if model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index >= 0
+                                    else model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                                    + model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_position
+                                )
+
+                                b_pos = (
+                                    model.bones[
+                                        model.bone_indexes[
+                                            model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index
+                                        ]
+                                    ].position
+                                    if model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index >= 0
+                                    else model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
+                                    + model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_position
+                                )
+
+                                joint_pos = b_pos
 
                                 # ボーン進行方向(x)
-                                x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                                x_direction_pos = (b_pos - a_pos).normalized()
                                 # ボーン進行方向に対しての縦軸(z)
                                 z_direction_pos = (
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
@@ -2161,7 +2183,7 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                                bone_distance = a_pos.distanceToPoint(b_pos)
 
                                 joint_key, joint = self.build_joint(
                                     "←",
@@ -2211,8 +2233,8 @@ class PmxTailorExportService:
                             b_yidx = v_yidx
 
                             if a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0:
-                                a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
-                                b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
+                                a_pos = model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                                b_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                                 if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                                     # 剛体が重なる箇所の交点
                                     above_mat = MMatrix4x4()
@@ -2231,10 +2253,10 @@ class PmxTailorExportService:
 
                                     joint_pos = (above_point + now_point) / 2
                                 else:
-                                    joint_pos = b_bone.position
+                                    joint_pos = b_pos
 
                                 # ボーン進行方向(x)
-                                x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                                x_direction_pos = (b_pos - a_pos).normalized()
                                 # ボーン進行方向に対しての縦軸(z)
                                 z_direction_pos = (
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
@@ -2242,7 +2264,7 @@ class PmxTailorExportService:
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                 joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                                bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                                bone_distance = a_pos.distanceToPoint(b_pos)
 
                                 joint_key, joint = self.build_joint(
                                     "←",
@@ -2296,20 +2318,32 @@ class PmxTailorExportService:
 
                                 if a_rigidbody and b_rigidbody and a_rigidbody.index >= 0 and b_rigidbody.index >= 0:
                                     # 末端横逆ジョイント
-                                    a_bone = model.bones[
-                                        model.bone_indexes[
-                                            model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index
-                                        ]
-                                    ]
-                                    b_bone = model.bones[
-                                        model.bone_indexes[
-                                            model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index
-                                        ]
-                                    ]
-                                    joint_pos = b_bone.position
+                                    a_pos = (
+                                        model.bones[
+                                            model.bone_indexes[
+                                                model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index
+                                            ]
+                                        ].position
+                                        if model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_index >= 0
+                                        else model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                                        + model.bones[model.bone_indexes[a_rigidbody.bone_index]].tail_position
+                                    )
+
+                                    b_pos = (
+                                        model.bones[
+                                            model.bone_indexes[
+                                                model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index
+                                            ]
+                                        ].position
+                                        if model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index >= 0
+                                        else model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
+                                        + model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_position
+                                    )
+
+                                    joint_pos = b_pos
 
                                     # ボーン進行方向(x)
-                                    x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                                    x_direction_pos = (b_pos - a_pos).normalized()
                                     # ボーン進行方向に対しての縦軸(z)
                                     z_direction_pos = (
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
@@ -2317,7 +2351,7 @@ class PmxTailorExportService:
                                     joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                                     joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                                    bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                                    bone_distance = a_pos.distanceToPoint(b_pos)
 
                                     joint_key, joint = self.build_joint(
                                         "←",
@@ -2351,7 +2385,7 @@ class PmxTailorExportService:
                                         horizonal_spring_constant_rot_ys,
                                         horizonal_spring_constant_rot_zs,
                                         ratio,
-                                        override_joint_name=f"←|{a_bone.name}T|{b_bone.name}T",
+                                        override_joint_name=f"←|{a_rigidbody.name}T|{b_rigidbody.name}T",
                                     )
                                     if joint.name not in [j.name for j in created_joints.values()]:
                                         created_joints[joint_key] = joint
@@ -2386,8 +2420,8 @@ class PmxTailorExportService:
                                     else vv.vidxs(),
                                 )
                         else:
-                            a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
-                            b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
+                            a_pos = model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                            b_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                             if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                                 # 剛体が重なる箇所の交点
                                 above_mat = MMatrix4x4()
@@ -2406,10 +2440,10 @@ class PmxTailorExportService:
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
-                                joint_pos = b_bone.position
+                                joint_pos = b_pos
 
                             # ボーン進行方向(x)
-                            x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                            x_direction_pos = (b_pos - a_pos).normalized()
                             # ボーン進行方向に対しての縦軸(z)
                             if v_yidx == 0:
                                 z_direction_pos = b_rigidbody.z_direction.normalized()
@@ -2420,7 +2454,7 @@ class PmxTailorExportService:
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                             joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                            bone_distance = a_pos.distanceToPoint(b_pos)
 
                             joint_key, joint = self.build_joint(
                                 "＼",
@@ -2493,8 +2527,8 @@ class PmxTailorExportService:
                                     else vv.vidxs(),
                                 )
                         else:
-                            a_bone = model.bones[model.bone_indexes[a_rigidbody.bone_index]]
-                            b_bone = model.bones[model.bone_indexes[b_rigidbody.bone_index]]
+                            a_pos = model.bones[model.bone_indexes[a_rigidbody.bone_index]].position
+                            b_pos = model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
                             if param_option["joint_pos_type"] == logger.transtext("ボーン間"):
                                 # 剛体が重なる箇所の交点
                                 above_mat = MMatrix4x4()
@@ -2513,10 +2547,10 @@ class PmxTailorExportService:
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
-                                joint_pos = b_bone.position
+                                joint_pos = b_pos
 
                             # ボーン進行方向(x)
-                            x_direction_pos = (b_bone.position - a_bone.position).normalized()
+                            x_direction_pos = (b_pos - a_pos).normalized()
                             # ボーン進行方向に対しての縦軸(z)
                             if v_yidx == 0:
                                 z_direction_pos = b_rigidbody.z_direction.normalized()
@@ -2527,7 +2561,7 @@ class PmxTailorExportService:
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
                             joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
-                            bone_distance = a_bone.position.distanceToPoint(b_bone.position)
+                            bone_distance = a_pos.distanceToPoint(b_pos)
 
                             joint_key, joint = self.build_joint(
                                 "／",
@@ -3226,6 +3260,7 @@ class PmxTailorExportService:
                         and above_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
                         and above_yidx < v_yidx
+                        and not np.isnan(vertex_maps[prev_map_idx][above_yidx, prev_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3234,6 +3269,7 @@ class PmxTailorExportService:
                         if prev_map_idx in vertex_maps
                         and v_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[prev_map_idx][v_yidx, prev_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3243,6 +3279,7 @@ class PmxTailorExportService:
                         and below_yidx < vertex_maps[prev_map_idx].shape[0]
                         and prev_xidx < vertex_maps[prev_map_idx].shape[1]
                         and below_yidx > v_yidx
+                        and not np.isnan(vertex_maps[prev_map_idx][below_yidx, prev_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3252,6 +3289,7 @@ class PmxTailorExportService:
                         and above_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
                         and above_yidx < v_yidx
+                        and not np.isnan(vertex_maps[base_map_idx][above_yidx, v_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3260,6 +3298,7 @@ class PmxTailorExportService:
                         if base_map_idx in vertex_maps
                         and v_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[base_map_idx][v_yidx, v_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3269,6 +3308,7 @@ class PmxTailorExportService:
                         and below_yidx < vertex_maps[base_map_idx].shape[0]
                         and v_xidx < vertex_maps[base_map_idx].shape[1]
                         and below_yidx > v_yidx
+                        and not np.isnan(vertex_maps[base_map_idx][below_yidx, v_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3278,6 +3318,7 @@ class PmxTailorExportService:
                         and above_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
                         and above_yidx < v_yidx
+                        and not np.isnan(vertex_maps[next_map_idx][above_yidx, next_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3286,6 +3327,7 @@ class PmxTailorExportService:
                         if next_map_idx in vertex_maps
                         and v_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
+                        and not np.isnan(vertex_maps[next_map_idx][v_yidx, next_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3295,6 +3337,7 @@ class PmxTailorExportService:
                         and below_yidx < vertex_maps[next_map_idx].shape[0]
                         and next_xidx < vertex_maps[next_map_idx].shape[1]
                         and below_yidx > v_yidx
+                        and not np.isnan(vertex_maps[next_map_idx][below_yidx, next_xidx]).all()
                         else VirtualVertex("")
                     )
 
@@ -3320,7 +3363,7 @@ class PmxTailorExportService:
                     last_v_xidx = np.max(np.sort(np.where(registered_bones[v_yidx, :])[0])[-2:])
 
                     if not (now_now_bone and now_below_bone):
-                        if now_now_bone.getVisibleFlag():
+                        if now_now_bone and now_now_bone.getVisibleFlag():
                             logger.warning(
                                 "剛体生成に必要な情報(ボーン)が取得できなかった為、スルーします。 処理対象: %s",
                                 vv.map_bones[base_map_idx].name
@@ -4168,6 +4211,7 @@ class PmxTailorExportService:
         model: PmxModel,
         param_option: dict,
         target_vertices: list,
+        grad_vertices: list,
         virtual_vertices: dict,
         back_vertices: list,
         remaining_vertices: dict,
@@ -4213,9 +4257,16 @@ class PmxTailorExportService:
         weight_cnt = 0
         prev_weight_cnt = 0
 
-        # 処理対象材質頂点から残頂点と裏頂点を引いた頂点リストを裏ウェイトの対象とする
+        # 処理対象材質頂点＋グラデ頂点から裏頂点を引いた頂点リストを裏ウェイトの対象とする
         front_vertices = {}
-        for vidx in list(set(target_vertices) - set(list(remaining_vidxs.keys())) - set(back_vertices)):
+        for vidx in list(
+            (
+                set(list(model.material_vertices[param_option["material_name"]]))
+                | set(target_vertices)
+                | set(grad_vertices)
+            )
+            - set(back_vertices)
+        ):
             v = model.vertex_dict[vidx]
             front_vertices[v.index] = v.position.data()
 
@@ -5881,7 +5932,8 @@ class PmxTailorExportService:
     ):
         bone_grid = param_option["bone_grid"]
         bone_grid_cols = param_option["bone_grid_cols"]
-        bone_grid_rows = param_option["bone_grid_rows"]
+        # 末端ボーンを加味するのでインクリメント
+        bone_grid_rows = param_option["bone_grid_rows"] + 1
 
         logger.info("【%s:%s】ボーンマップ生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
@@ -5951,15 +6003,125 @@ class PmxTailorExportService:
         nearest_pos = MVector3D()
 
         if param_option["physics_type"] in [logger.transtext("布")]:
-            vertex_map = np.full((bone_grid_rows, bone_grid_cols, 3), (np.nan, np.nan, np.nan))
+            vertex_map = np.full((bone_grid_rows + 1, bone_grid_cols, 3), (np.nan, np.nan, np.nan))
             bone_connected = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
             registered_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
 
             for grid_col in range(bone_grid_cols):
                 for grid_row in range(bone_grid_rows):
-                    bone_name = bone_grid[grid_row][grid_col]
+                    bone_name = (
+                        bone_grid[grid_row][grid_col]
+                        if len(bone_grid) > grid_row and len(bone_grid[grid_row]) > grid_col
+                        else None
+                    )
                     bone = model.bones.get(bone_name, None)
                     if not bone_name or not bone:
+                        if grid_row > 0:
+                            # 末端ボーンを追加
+                            above_bone_name = bone_grid[min(len(bone_grid) - 1, grid_row - 1)][grid_col]
+                            above_bone = model.bones.get(above_bone_name, None)
+                            above_pos = above_bone.position
+                            above_tail_position = (
+                                model.bones[model.bone_indexes[above_bone.tail_index]].position
+                                if above_bone.tail_index >= 0
+                                else above_bone.position + above_bone.tail_position
+                            )
+                            above_tail_key = above_tail_position.to_key(threshold)
+
+                            above_tail_bone = Bone(
+                                f"{above_bone.name}先",
+                                f"{above_bone.english_name}_Tail",
+                                above_tail_position.copy(),
+                                above_bone.index,
+                                0,
+                                0x0000 | 0x0002 | 0x0008 | 0x0010 | 0x0001,
+                            )
+
+                            above_tail_bone.local_x_vector = (
+                                above_tail_bone.position - above_bone.position
+                            ).normalized()
+                            above_tail_bone.local_z_vector = MVector3D.crossProduct(
+                                above_tail_bone.local_x_vector, MVector3D(1, 0, 0)
+                            )
+                            above_tail_bone.index = len(model.bones)
+                            model.bones[above_tail_bone.name] = above_tail_bone
+                            model.bone_indexes[above_tail_bone.index] = above_tail_bone.name
+
+                            above_tail_key = above_tail_position.to_key(threshold)
+                            if above_tail_key not in virtual_vertices:
+                                virtual_vertices[above_tail_key] = VirtualVertex(above_tail_key)
+
+                            virtual_vertices[above_tail_key].positions.append(above_tail_position.data())
+                            virtual_vertices[above_tail_key].map_bones[0] = above_tail_bone
+
+                            vertex_map[grid_row, grid_col] = above_tail_key
+                            registered_bones[grid_row, grid_col] = True
+
+                            above_bone.tail_index = above_tail_bone.index
+                            above_bone.flag |= 0x0001 | 0x0008 | 0x0010
+
+                            logger.info("-- 仮想末端ボーン: %s: 追加", above_tail_bone.name)
+
+                            # -----------------------------
+                            # 末端非表示ボーン
+                            # 直近頂点の上下距離
+                            nearest_distance = above_tail_position.distanceToPoint(above_pos)
+
+                            # ボーン進行方向(x)
+                            x_direction_pos = (above_pos - above_tail_position).normalized()
+                            # ボーン進行方向に対しての横軸(y)
+                            y_direction_pos = (
+                                MVector3D(0, 0, -1) * x_direction_pos.x()
+                                if np.isclose(abs(x_direction_pos.x()), 1)
+                                else MVector3D(1, 0, 0)
+                            )
+                            # ボーン進行方向に対しての縦軸(z)
+                            z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos)
+                            above_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
+
+                            mat = MMatrix4x4()
+                            mat.setToIdentity()
+                            mat.translate(above_tail_position)
+                            mat.rotate(above_qq)
+
+                            # 仮想頂点の位置
+                            tail_position = mat * MVector3D(
+                                0,
+                                -nearest_distance,
+                                0,
+                            )
+
+                            tail_bone = Bone(
+                                f"{above_tail_bone.name}2",
+                                f"{above_tail_bone.english_name}2",
+                                tail_position.copy(),
+                                above_tail_bone.index,
+                                0,
+                                0x0000 | 0x0002,
+                            )
+
+                            tail_bone.local_x_vector = (tail_bone.position - above_tail_bone.position).normalized()
+                            tail_bone.local_z_vector = MVector3D.crossProduct(
+                                tail_bone.local_x_vector, MVector3D(1, 0, 0)
+                            )
+                            tail_bone.index = len(model.bones)
+                            model.bones[tail_bone.name] = tail_bone
+                            model.bone_indexes[tail_bone.index] = tail_bone.name
+
+                            tail_key = tail_position.to_key(threshold)
+                            if tail_key not in virtual_vertices:
+                                virtual_vertices[tail_key] = VirtualVertex(tail_key)
+
+                            virtual_vertices[tail_key].positions.append(tail_position.data())
+                            virtual_vertices[tail_key].map_bones[0] = tail_bone
+
+                            vertex_map[grid_row + 1, grid_col] = tail_key
+                            registered_bones[grid_row + 1, grid_col] = True
+
+                            above_tail_bone.tail_index = tail_bone.index
+                            above_tail_bone.flag |= 0x0001
+
+                            logger.info("-- 仮想末端ボーン: %s: 追加", tail_bone.name)
                         continue
 
                     if bone.index not in weighted_vertex_positions:
@@ -6074,9 +6236,9 @@ class PmxTailorExportService:
         for vertex_map in vertex_maps.values():
             for v_yidx in range(vertex_map.shape[0]):
                 for vkey in vertex_map[v_yidx, :]:
+                    if np.isnan(vkey).any() or tuple(vkey) not in virtual_vertices:
+                        continue
                     if v_yidx == 0:
-                        if np.isnan(vkey).any() or tuple(vkey) not in virtual_vertices:
-                            continue
                         top_bone_positions.append(virtual_vertices[tuple(vkey)].position().data())
                     vertex_positions[tuple(vkey)] = virtual_vertices[tuple(vkey)].position().data()
 
@@ -7098,11 +7260,7 @@ class PmxTailorExportService:
                 remaining_vkeys = dict(
                     list(
                         sorted(
-                            [
-                                (k, k)
-                                for k in virtual_vertices.keys()
-                                if k not in horizonal_top_edge_keys
-                            ],
+                            [(k, k) for k in virtual_vertices.keys() if k not in horizonal_top_edge_keys],
                             key=lambda x: (abs(x[0][0]), -x[0][2], -x[0][1]),
                         )
                     )

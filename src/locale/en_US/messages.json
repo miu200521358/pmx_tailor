@@ -704,5 +704,7 @@
     "根元頂点CSVに指定された頂点が物理材質もしくは物理頂点に含まれていなかった為、処理を終了します。\n物理対象頂点CSVは根元頂点も含めて指定してください。": "Processing will end because the vertex specified in the root vertex CSV is not included in the physical material or physical vertex.\nSpecify the physical target vertex CSV including the root vertex.",
     "（自動判定で根元がうまく抽出できなかったなどで）根元頂点を指定したい場合、PmxEditorで頂点リストを選択できるようにして保存した頂点CSVファイルを指定してください。\n根元頂点は物理対象頂点にも含まれている必要があります。\nD&Dでの指定、開くボタンからの指定、履歴からの選択ができます。": "If you want to specify the root vertices (because the root could not be extracted well by automatic judgment, etc.), specify the vertex CSV file that has been saved so that the vertex list can be selected in PmxEditor.\nThe root vertex must also be included in the physics target vertex.\nYou can specify by D&D, specify from the open button, or select from the history.",
     "詳細コメント": "Detailed comment",
-    "物理の詳細な挙動をコメントに出力したい場合にチェックしてください": "Please check if you want to output detailed behavior of physics in comments"
+    "物理の詳細な挙動をコメントに出力したい場合にチェックしてください": "Please check if you want to output detailed behavior of physics in comments",
+    "-- 仮想ボーン: %s: 追加": "-- virtual bone: %s: added",
+    "-- 仮想末端ボーン: %s: 追加": "-- virtual end bone: %s: added"
 }
