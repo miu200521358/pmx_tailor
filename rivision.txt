@@ -940,14 +940,14 @@ PmxTailor_2.01.01_β05 (2023/03/05) miumiu
 　※メッシュの縦横の数が合ってる事が条件なのは変わらず
 ・左右方向のリング検出が出来るよう機能追加
 
-https://fire.st/n3vDowR
+https://fire.st/X0OPscY
 PmxTailor_2.01.01_β06 (2023/03/06) miumiu
 ・メッシュ走査に失敗した場合、エラーメッセージと改善案を提示するよう文言追加
 
 
 
 
-https://fire.st/n3vDowR
+https://fire.st/X0OPscY
 <br>
 <br>
 ・密度基準「中央」の不具合修正<br>
