@@ -985,7 +985,7 @@ class PhysicsParam:
             choices=[logger.transtext("頂点"), logger.transtext("距離"), logger.transtext("中央")],
         )
         self.density_type_ctrl.SetToolTip(self.density_type_txt.GetToolTipText())
-        self.density_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
+        self.density_type_ctrl.Bind(wx.EVT_CHOICE, self.set_density_type)
         self.advance_bone_grid_sizer.Add(self.density_type_ctrl, 0, wx.ALL, 5)
 
         # # 間引きオプション
@@ -4095,6 +4095,12 @@ class PhysicsParam:
             self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
+    def set_density_type(self, event: wx.Event):
+        if self.density_type_ctrl.GetStringSelection() in [logger.transtext("中央")]:
+            # 中央の場合、ボーン間（余計な剛体を作る必要はない）
+            self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
+        self.main_frame.file_panel_ctrl.on_change_file(event)
+
     def set_material_name(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
         # setValueでそのままset_abb_nameを起動する
@@ -4295,9 +4301,9 @@ class PhysicsParam:
         self.advance_horizonal_joint_restruct_check.SetValue(0)
         self.rigidbody_root_thicks_spin.SetValue(0.07)
         self.rigidbody_end_thicks_spin.SetValue(0.2)
-        self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
-        self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
-        self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
+        # self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
+        # self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
+        # self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
 
         self.advance_vertical_joint_valid_check.SetValue(1)
         self.advance_horizonal_joint_valid_check.SetValue(0)
