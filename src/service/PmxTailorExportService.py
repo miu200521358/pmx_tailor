@@ -5080,21 +5080,25 @@ class PmxTailorExportService:
         # 親ボーン
         parent_bone = model.bones[parent_bone_name]
 
-        # 中心ボーン
-        root_bone = Bone(
-            f"{abb_name}{direction}中心",
-            f"{abb_name}{direction}Root",
-            root_pos,
-            parent_bone.index,
-            0,
-            0x0000 | 0x0002 | 0x0004 | 0x0008 | 0x0010,
-        )
-        if root_bone.name in model.bones:
-            logger.warning("同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s", root_bone.name)
-            root_bone.name += randomname(3)
+        if param_option["parent_type"] == logger.transtext("中心"):
+            # 中心ボーンを作る場合
+            root_bone = Bone(
+                f"{abb_name}{direction}中心",
+                f"{abb_name}{direction}Root",
+                root_pos,
+                parent_bone.index,
+                0,
+                0x0000 | 0x0002 | 0x0004 | 0x0008 | 0x0010,
+            )
+            if root_bone.name in model.bones:
+                logger.warning("同じボーン名が既に登録されているため、末尾に乱数を追加します。 既存ボーン名: %s", root_bone.name)
+                root_bone.name += randomname(3)
 
-        root_bone.index = len(model.bones)
-        root_bone.tail_position = base_vertical_axis * 2
+            root_bone.index = len(model.bones)
+            root_bone.tail_position = base_vertical_axis * 2
+        else:
+            # 親ボーンに直接接続する場合
+            root_bone = parent_bone
 
         # 表示枠
         model.display_slots[display_name] = DisplaySlot(display_name, display_name, 0, 0)
@@ -5674,17 +5678,20 @@ class PmxTailorExportService:
         # このタイミングで中心ボーン登録
         if is_rigidbody_leg:
             if left_root_bone and left_display_name:
-                model.bones[left_root_bone.name] = left_root_bone
-                model.bone_indexes[left_root_bone.index] = left_root_bone.name
+                if left_root_bone.name != "左足中心":
+                    model.bones[left_root_bone.name] = left_root_bone
+                    model.bone_indexes[left_root_bone.index] = left_root_bone.name
                 model.display_slots[left_display_name].references.append((0, model.bones[left_root_bone.name].index))
 
             if right_root_bone and right_display_name:
-                model.bones[right_root_bone.name] = right_root_bone
-                model.bone_indexes[right_root_bone.index] = right_root_bone.name
+                if right_root_bone.name != "右足中心":
+                    model.bones[right_root_bone.name] = right_root_bone
+                    model.bone_indexes[right_root_bone.index] = right_root_bone.name
                 model.display_slots[right_display_name].references.append((0, model.bones[right_root_bone.name].index))
         else:
-            model.bones[root_bone.name] = root_bone
-            model.bone_indexes[root_bone.index] = root_bone.name
+            if root_bone.name != parent_bone.name:
+                model.bones[root_bone.name] = root_bone
+                model.bone_indexes[root_bone.index] = root_bone.name
             model.display_slots[display_name].references.append((0, model.bones[root_bone.name].index))
 
         logger.info("-- ボーン配置")
@@ -6404,6 +6411,7 @@ class PmxTailorExportService:
         # 残頂点リスト
         remaining_vertices = {}
         axis_idx = np.where(np.abs(base_vertical_axis.data()))[0][0]
+        axis_flag = 1 if param_option["direction"] in [logger.transtext("右"), logger.transtext("下")] else -1
 
         parent_bone = model.bones[param_option["parent_bone_name"]]
         # 親ボーンの傾き
@@ -7237,7 +7245,7 @@ class PmxTailorExportService:
                 # 頂点マップ上部直近頂点の評価軸位置
                 nearest_top_axis_val = nearest_top_pos[axis_idx]
 
-                if (axis_root_val - nearest_top_axis_val) <= (axis_root_val - vv_axis_val):
+                if (axis_root_val - nearest_top_axis_val * axis_flag) <= (axis_root_val - vv_axis_val * axis_flag):
                     # 評価軸にTOPより遠い（スカートの場合、TOPより下）の場合、対象
                     logger.debug(
                         f"○下部エッジ対象: target [{vv.vidxs()}], axis_root_val [{round(axis_root_val, 3)}], nearest_top_vidxs[{nearest_top_vidxs}], nearest_top_axis_val[{round(nearest_top_axis_val, 3)}], vv[{vv.vidxs()}], vv_axis_val[{round(vv_axis_val, 3)}]"
@@ -7354,13 +7362,16 @@ class PmxTailorExportService:
                 # リング取得
                 all_rings = []
 
-                # TOPキーの中央値を閾値とする
-                hky = np.median([hkey[1] for hkey in horizonal_top_edge_keys])
+                hky = np.median([hkey[axis_idx] for hkey in horizonal_top_edge_keys])
 
                 remaining_vkeys = dict(
                     list(
                         sorted(
-                            [(k, k) for k in virtual_vertices.keys() if k not in horizonal_top_edge_keys],
+                            [
+                                (k, k)
+                                for k in virtual_vertices.keys()
+                                if k not in horizonal_top_edge_keys and k[axis_idx] * axis_flag < hky * axis_flag
+                            ],
                             key=lambda x: (abs(x[0][0]), -x[0][2], -x[0][1]),
                         )
                     )
@@ -7489,6 +7500,17 @@ class PmxTailorExportService:
                     )
                     if len(vkeys) > 1:
                         all_vkeys.append(vkeys)
+
+            if max([len(vkeys) for vkeys in all_vkeys]) <= 1:
+                logger.warning(
+                    "メッシュ走査に失敗しました。下記対応のいずれかで成功する可能性があります。\n"
+                    + "1. 根元頂点CSVをします。根元頂点は物理対象頂点にも含まれている必要があります。\n"
+                    + "2. 根元推定方式を変更します。\n"
+                    + "　　　凹凸があるメッシュ … 縦横の列数が等しい場合、表裏で材質を分けて、特殊形状「全て表面」を選んだ上で「リング」"
+                    + "　　　垂直に下がるメッシュ … 「角度」「縮尺」",
+                    decoration=MLogger.DECORATION_BOX,
+                )
+                return None, None, None, None, None, None, None
 
             logger.info("-----------")
             logger.info("%s: 頂点マップ[%s]: 登録対象チェック", material_name, f"{(bi + 1):03d}")
@@ -7786,28 +7808,29 @@ class PmxTailorExportService:
         virtual_vertices: dict,
         remaining_vkeys: list,
         base_vertical_axis: MVector3D,
-        vkey: tuple,
+        start_vkey: tuple,
         prev_rings: list,
         rings: list,
     ):
         axis_idx = np.where(np.abs(base_vertical_axis.data()))[0][0]
 
-        if not vkey:
+        if not start_vkey:
             if 2 > len(prev_rings):
                 return rings
 
             # vkey が決まってない場合、始点なのでprevから繋がってる頂点を選ぶ
             prev_start_vv: VirtualVertex = virtual_vertices[prev_rings[0]]
             prev_next_vv: VirtualVertex = virtual_vertices[prev_rings[1]]
+            logger.debug(
+                "*** prev_start_vv[%s], prev_next_vv[%s]",
+                prev_start_vv.vidxs(),
+                prev_next_vv.vidxs(),
+            )
 
             # 進行方向(x)
             x_direction_pos = (prev_next_vv.position() - prev_start_vv.position()).normalized()
             # 進行方向に対しての縦軸(y)
-            y_direction_pos = MVector3D(0, -1, 0)
-            # ボーン進行方向に対しての縦軸(y)
-            if np.isclose(abs(x_direction_pos.y()), 1):
-                # ちょうど垂直で真下に向かってる場合、縦軸を別に設定する
-                y_direction_pos = MVector3D(1, 0, 0)
+            y_direction_pos = base_vertical_axis
             # 進行方向に対しての横軸(z)
             z_direction_pos = MVector3D.crossProduct(x_direction_pos, y_direction_pos).normalized()
 
@@ -7816,78 +7839,153 @@ class PmxTailorExportService:
                 # 内積
                 if connected_vkey in remaining_vkeys and (
                     (connected_vkey in prev_next_vv.connected_vvs)
-                    or True in [prev_rings[0] in virtual_vertices[connected_vkey].connected_vvs]
+                    or (
+                        True
+                        in [
+                            prev_start_vv.key in virtual_vertices[connected_vkey].connected_vvs
+                            and prev_next_vv.key in virtual_vertices[connected_vkey].connected_vvs
+                        ]
+                    )
                 ):
                     # 自分と繋がってる頂点が隣とも繋がってる（＼）か、走査頂点と繋がってる頂点が自分と繋がっている（／）場合のみ対象
-                    connected_dots[connected_vkey] = MVector3D.dotProduct(
+                    dot = MVector3D.dotProduct(
                         z_direction_pos,
                         (virtual_vertices[connected_vkey].position() - prev_start_vv.position()).normalized(),
                     )
+                    connected_dots[connected_vkey] = dot
 
-            if not connected_dots:
+            if not connected_dots or np.max(np.abs(list(connected_dots.values()))) == 0:
                 return rings
 
+            # 内積が一番大きいものを縦方向とみなす
+            start_vkey = list(connected_dots.keys())[np.argmin(np.abs(list(connected_dots.values())))]
+            start_vv = virtual_vertices[start_vkey]
+
             logger.debug(
-                "*** vertical-dots: %s",
+                "**開始: vertical-key[%s], vertical-dots: %s",
+                start_vv.vidxs(),
                 [(k, virtual_vertices[k].vidxs(), round(v, 3)) for k, v in connected_dots.items()],
             )
-            # 内積が一番大きいものを縦方向とみなす
-            vkey = list(connected_dots.keys())[np.argmax(list(connected_dots.values()))]
 
         # 登録
-        rings.append(vkey)
+        if start_vkey not in rings:
+            rings.append(start_vkey)
 
-        vv: VirtualVertex = virtual_vertices[vkey]
-        connected_vecs = {}
-        connected_dots = {}
-        for connected_vkey in vv.connected_vvs:
-            # 残頂点に含まれていて、かつ上のリングと繋がっているキーのみ対象
-            if (
-                connected_vkey in remaining_vkeys
-                and len(rings) < len(prev_rings)
-                and connected_vkey in virtual_vertices[prev_rings[len(rings)]].connected_vvs
-            ):
-                # 評価軸の絶対値
-                connected_vec = vv.position() - virtual_vertices[connected_vkey].position()
-                connected_vecs[connected_vkey] = np.abs((connected_vec.data())[axis_idx])
-                if len(rings) > 1:
-                    # 内積
-                    connected_dots[connected_vkey] = MVector3D.dotProduct(
-                        (vv.position() - virtual_vertices[rings[-2]].position()).normalized(),
-                        (virtual_vertices[connected_vkey].position() - vv.position()).normalized(),
+        if len(rings) == 1:
+            for connected_vkey in start_vv.connected_vvs:
+                if (
+                    connected_vkey in prev_next_vv.connected_vvs
+                    and connected_vkey not in prev_start_vv.connected_vvs
+                    and connected_vkey not in prev_rings
+                ):
+                    # 開始頂点と繋がっている頂点が、上行の開始の次と繋がっている場合、start_vkey自身はprev_startと繋がっているので、
+                    # start_vkeyの後にprev_nextと繋がってる頂点をひとつ差し込む
+                    rings.append(connected_vkey)
+                    logger.debug(
+                        "***【差し込み】start_vv[%s] -> next[%s], [%s]",
+                        start_vv.vidxs(),
+                        virtual_vertices[connected_vkey].vidxs(),
+                        [virtual_vertices[vkey].vidxs() for vkey in rings],
                     )
-        logger.debug(
-            "*** next-dots: %s", [(k, virtual_vertices[k].vidxs(), round(v, 3)) for k, v in connected_dots.items()]
-        )
+                    break
 
-        if not connected_vecs:
+        if len(rings) + 1 > len(prev_rings):
             return rings
 
-        if len(rings) < 2:
-            # 評価軸が一番小さいものが横方向とみなす
-            next_vkey = list(connected_vecs.keys())[np.argmin(list(connected_vecs.values()))]
+        # 現在の頂点
+        start_vv: VirtualVertex = virtual_vertices[rings[-1]]
+        # 上段の頂点
+        prev_prev_vv: VirtualVertex = virtual_vertices[prev_rings[max(0, len(rings) - 2)]]
+        prev_start_vv: VirtualVertex = virtual_vertices[prev_rings[len(rings) - 1]]
+        prev_next_vv: VirtualVertex = virtual_vertices[prev_rings[len(rings)]]
 
-            logger.debug(
-                "** ring vkey[%s], next[%s], length[%s]",
-                vv.vidxs(),
-                virtual_vertices[next_vkey].vidxs(),
-                round(np.max(list(connected_vecs.values())), 3),
-            )
-        else:
-            dots = np.array(list(connected_dots.values()))
-            logger.debug("*** dots: %s", np.round(dots, decimals=3))
-            # 内積が一番大きいものを横方向とみなす
-            next_vkey = list(connected_dots.keys())[np.argmax(dots)]
+        next_vkey = None
+        for connected_vkey in start_vv.connected_vvs:
+            if (
+                connected_vkey in remaining_vkeys
+                and connected_vkey in prev_next_vv.connected_vvs
+                and connected_vkey not in rings
+                and connected_vkey not in prev_rings
+            ):
+                logger.debug(
+                    "***【正方向】start_vv[%s] -> next[%s], [%s]",
+                    start_vv.vidxs(),
+                    virtual_vertices[connected_vkey].vidxs(),
+                    [virtual_vertices[vkey].vidxs() for vkey in rings],
+                )
+                next_vkey = connected_vkey
+                break
 
-            logger.debug(
-                "** ring vkey[%s], next[%s], dot[%s]",
-                vv.vidxs(),
-                virtual_vertices[next_vkey].vidxs(),
-                round(np.max(dots), 3),
-            )
+        if not next_vkey:
+            start_vv = virtual_vertices[rings[0]]
+            prev_start_vv = virtual_vertices[prev_rings[0]]
+            prev_next_vv = virtual_vertices[prev_rings[1]]
 
-        if next_vkey in rings:
-            # 既に組み込まれてる方に進む場合、終了
+            for connected_vkey in start_vv.connected_vvs:
+                if (
+                    connected_vkey in remaining_vkeys
+                    and connected_vkey not in prev_next_vv.connected_vvs
+                    and connected_vkey in prev_start_vv.connected_vvs
+                    and connected_vkey not in rings
+                    and connected_vkey not in prev_rings
+                ):
+                    logger.debug(
+                        "***【先頭】start_vv[%s] -> next[%s], [%s]",
+                        start_vv.vidxs(),
+                        virtual_vertices[connected_vkey].vidxs(),
+                        [virtual_vertices[vkey].vidxs() for vkey in rings],
+                    )
+                    rings.insert(0, connected_vkey)
+                    next_vkey = rings[-1]
+                    break
+
+        if not next_vkey:
+            # 段が切り替わってる場合、向きを変えてチェック
+            start_vv: VirtualVertex = virtual_vertices[rings[-1]]
+            prev_start_vv: VirtualVertex = virtual_vertices[prev_rings[len(rings) - 2]]
+            prev_next_vv: VirtualVertex = virtual_vertices[prev_rings[len(rings) - 1]]
+
+            for connected_vkey in start_vv.connected_vvs:
+                if (
+                    connected_vkey in remaining_vkeys
+                    and connected_vkey in prev_next_vv.connected_vvs
+                    and connected_vkey not in prev_start_vv.connected_vvs
+                    and connected_vkey not in rings
+                    and connected_vkey not in prev_rings
+                ):
+                    logger.debug(
+                        "***【段切替】start_vv[%s] -> next[%s], [%s]",
+                        start_vv.vidxs(),
+                        virtual_vertices[connected_vkey].vidxs(),
+                        [virtual_vertices[vkey].vidxs() for vkey in rings],
+                    )
+                    rings.append(connected_vkey)
+                    next_vkey = rings[-1]
+                    break
+
+        if not next_vkey:
+            start_vv: VirtualVertex = virtual_vertices[rings[-1]]
+            prev_prev_vv: VirtualVertex = virtual_vertices[prev_rings[max(0, len(rings) - 2)]]
+            prev_start_vv: VirtualVertex = virtual_vertices[prev_rings[len(rings) - 1]]
+
+            for connected_vkey in start_vv.connected_vvs:
+                if (
+                    connected_vkey in remaining_vkeys
+                    and connected_vkey in prev_start_vv.connected_vvs
+                    and connected_vkey not in prev_prev_vv.connected_vvs
+                    and connected_vkey not in rings
+                    and connected_vkey not in prev_rings
+                ):
+                    logger.debug(
+                        "***【逆方向】start_vv[%s] -> next[%s], [%s]",
+                        start_vv.vidxs(),
+                        virtual_vertices[connected_vkey].vidxs(),
+                        [virtual_vertices[vkey].vidxs() for vkey in rings],
+                    )
+                    next_vkey = connected_vkey
+                    break
+
+        if not next_vkey:
             return rings
 
         return self.create_ring(virtual_vertices, remaining_vkeys, base_vertical_axis, next_vkey, prev_rings, rings)

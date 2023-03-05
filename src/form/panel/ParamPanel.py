@@ -3164,6 +3164,7 @@ class PhysicsParam:
                 "vertices_back_csv": self.vertices_back_csv_file_ctrl.path(),
                 "top_vertices_csv": self.top_vertices_csv_file_ctrl.path(),
                 "physics_parent": self.physics_parent_spin.GetValue(),
+                "parent_type": self.parent_type_ctrl.GetStringSelection(),
                 "physics_type": self.physics_type_ctrl.GetStringSelection(),
                 "density_type": self.density_type_ctrl.GetStringSelection(),
                 "joint_pos_type": self.joint_pos_type_ctrl.GetStringSelection(),
@@ -4186,6 +4187,8 @@ class PhysicsParam:
                 )
             if not self.physics_parent_spin.GetValue():
                 self.physics_parent_spin.SetValue(int(abb_setting.get("physics_parent", 0)))
+            if self.parent_type_ctrl.GetStringSelection() == logger.transtext("中心"):
+                self.parent_type_ctrl.SetStringSelection(abb_setting.get("parent_type", logger.transtext("中心")))
 
             # 物理パラメーターも設定する
             self.set_param_import_data(abb_setting["params"])
@@ -4340,7 +4343,7 @@ class PhysicsParam:
         else:
             self.physics_type_ctrl.SetStringSelection(logger.transtext("布"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("箱"))
-            self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
+            # self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
 
         if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(コットン)"):
             self.simple_mass_slider.SetValue(3.2)
@@ -4400,7 +4403,7 @@ class PhysicsParam:
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
 
             self.simple_mass_slider.SetValue(2)
-            self.simple_air_resistance_slider.SetValue(2)
+            self.simple_air_resistance_slider.SetValue(4.5)
             self.simple_shape_maintenance_slider.SetValue(1.6)
 
             self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
@@ -4410,7 +4413,7 @@ class PhysicsParam:
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
             self.simple_mass_slider.SetValue(1.2)
-            self.simple_air_resistance_slider.SetValue(2.8)
+            self.simple_air_resistance_slider.SetValue(3.8)
             self.simple_shape_maintenance_slider.SetValue(1.6)
 
             self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
