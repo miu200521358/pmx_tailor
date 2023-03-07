@@ -4100,6 +4100,7 @@ class PhysicsParam:
         if self.density_type_ctrl.GetStringSelection() in [logger.transtext("中央")]:
             # 中央の場合、ボーン間（余計な剛体を作る必要はない）
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン間"))
+            self.advance_horizonal_joint_valid_check.SetValue(0)
         self.main_frame.file_panel_ctrl.on_change_file(event)
 
     def set_material_name(self, event: wx.Event):
@@ -4286,14 +4287,9 @@ class PhysicsParam:
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
 
-        if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
-            self.rigidbody_coefficient_spin.SetValue(20 / self.simple_mass_slider.GetValue())
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
-            self.rigidbody_coefficient_spin.SetValue(10 / self.simple_mass_slider.GetValue())
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
-            self.rigidbody_coefficient_spin.SetValue(10 / self.simple_mass_slider.GetValue())
-        else:
-            self.rigidbody_coefficient_spin.SetValue(5 / self.simple_mass_slider.GetValue())
+        self.rigidbody_coefficient_spin.SetValue(
+            self.simple_mass_slider.GetMax() / self.simple_mass_slider.GetValue()
+        )
 
         self.set_air_resistance(event)
 
@@ -4368,8 +4364,8 @@ class PhysicsParam:
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ベルベッド)"):
             self.simple_mass_slider.SetValue(5.5)
-            self.simple_air_resistance_slider.SetValue(1.1)
-            self.simple_shape_maintenance_slider.SetValue(3.3)
+            self.simple_air_resistance_slider.SetValue(2.1)
+            self.simple_shape_maintenance_slider.SetValue(1.8)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
@@ -4589,6 +4585,13 @@ class PhysicsParam:
         vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
         vertical_joint_y_rot = 2 if not vertical_joint_y_rot else vertical_joint_y_rot
 
+        self.vertical_joint_mov_x_min_spin.SetValue(0)
+        self.vertical_joint_mov_x_max_spin.SetValue(0)
+        self.vertical_joint_mov_y_min_spin.SetValue(0)
+        self.vertical_joint_mov_y_max_spin.SetValue(0)
+        self.vertical_joint_mov_z_min_spin.SetValue(0)
+        self.vertical_joint_mov_z_max_spin.SetValue(0)
+
         vertical_spring_rot_ratio = 10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
         vertical_spring_y_rot_ratio = (
             5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 100
@@ -4630,6 +4633,10 @@ class PhysicsParam:
             horizonal_joint_mov = max(0, (1 - air_resistance_ratio) * 0.5)
             self.horizonal_joint_mov_y_min_spin.SetValue(-horizonal_joint_mov)
             self.horizonal_joint_mov_y_max_spin.SetValue(horizonal_joint_mov / 2)
+        self.horizonal_joint_mov_x_min_spin.SetValue(0)
+        self.horizonal_joint_mov_x_max_spin.SetValue(0)
+        self.horizonal_joint_mov_z_min_spin.SetValue(0)
+        self.horizonal_joint_mov_z_max_spin.SetValue(0)
 
         self.advance_horizonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 20)
 
@@ -4703,12 +4710,16 @@ class PhysicsParam:
 
         # 斜めジョイント
         if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection():
-            self.diagonal_joint_mov_y_min_spin.SetValue(0)
+            self.diagonal_joint_ov_y_min_spin.SetValue(0)
             self.diagonal_joint_mov_y_max_spin.SetValue(0)
         else:
             diagonal_joint_mov = max(0, (1 - air_resistance_ratio) * 0.7)
             self.diagonal_joint_mov_y_min_spin.SetValue(-diagonal_joint_mov)
             self.diagonal_joint_mov_y_max_spin.SetValue(diagonal_joint_mov / 2)
+        self.diagonal_joint_mov_x_min_spin.SetValue(0)
+        self.diagonal_joint_mov_x_max_spin.SetValue(0)
+        self.diagonal_joint_mov_z_min_spin.SetValue(0)
+        self.diagonal_joint_mov_z_max_spin.SetValue(0)
 
         self.advance_diagonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
 
@@ -4781,8 +4792,12 @@ class PhysicsParam:
             self.advance_vertical_joint_coefficient_spin.GetValue()
         )
 
+        self.vertical_reverse_joint_mov_x_min_spin.SetValue(self.vertical_joint_mov_x_min_spin.GetValue())
+        self.vertical_reverse_joint_mov_x_max_spin.SetValue(self.vertical_joint_mov_x_max_spin.GetValue())
         self.vertical_reverse_joint_mov_y_min_spin.SetValue(self.vertical_joint_mov_y_min_spin.GetValue())
         self.vertical_reverse_joint_mov_y_max_spin.SetValue(self.vertical_joint_mov_y_max_spin.GetValue())
+        self.vertical_reverse_joint_mov_z_min_spin.SetValue(self.vertical_joint_mov_z_min_spin.GetValue())
+        self.vertical_reverse_joint_mov_z_max_spin.SetValue(self.vertical_joint_mov_z_max_spin.GetValue())
 
         self.vertical_reverse_joint_rot_x_min_spin.SetValue(self.vertical_joint_rot_x_min_spin.GetValue())
         self.vertical_reverse_joint_rot_x_max_spin.SetValue(self.vertical_joint_rot_x_max_spin.GetValue())
@@ -4803,8 +4818,12 @@ class PhysicsParam:
             self.advance_horizonal_joint_coefficient_spin.GetValue()
         )
 
+        self.horizonal_reverse_joint_mov_x_min_spin.SetValue(self.horizonal_joint_mov_x_min_spin.GetValue())
+        self.horizonal_reverse_joint_mov_x_max_spin.SetValue(self.horizonal_joint_mov_x_max_spin.GetValue())
         self.horizonal_reverse_joint_mov_y_min_spin.SetValue(self.horizonal_joint_mov_y_min_spin.GetValue())
         self.horizonal_reverse_joint_mov_y_max_spin.SetValue(self.horizonal_joint_mov_y_max_spin.GetValue())
+        self.horizonal_reverse_joint_mov_z_min_spin.SetValue(self.horizonal_joint_mov_z_min_spin.GetValue())
+        self.horizonal_reverse_joint_mov_z_max_spin.SetValue(self.horizonal_joint_mov_z_max_spin.GetValue())
 
         self.horizonal_reverse_joint_rot_x_min_spin.SetValue(self.horizonal_joint_rot_x_min_spin.GetValue())
         self.horizonal_reverse_joint_rot_x_max_spin.SetValue(self.horizonal_joint_rot_x_max_spin.GetValue())
