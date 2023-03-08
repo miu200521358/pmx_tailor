@@ -553,7 +553,11 @@ class PhysicsParam:
         self.simple_primitive_txt = wx.StaticText(
             self.simple_window, wx.ID_ANY, logger.transtext("プリセット"), wx.DefaultPosition, wx.DefaultSize, 0
         )
-        self.simple_primitive_txt.SetToolTip(logger.transtext("物理の参考値プリセット\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"))
+        self.simple_primitive_txt.SetToolTip(
+            logger.transtext(
+                "物理の参考値プリセット\nコットン：軽くてサラッとした質感\nシルク：とても軽くて身体にまとわりくつ質感\nウール：重めでしっかりした質感\nベルベッド：重めで翻りやすい質感\nレザー：重めで弾力がある質感\nデニム：どっしりとした質感\n単一揺れ物：縦ジョイントのみで繋ぐ汎用プリセット"
+            )
+        )
         self.simple_primitive_txt.Wrap(-1)
         self.simple_header_grid_sizer.Add(self.simple_primitive_txt, 0, wx.ALL, 5)
 
@@ -1157,9 +1161,9 @@ class PhysicsParam:
         self.advance_rigidbody_sizer.Add(self.advance_rigidbody_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_rigidbody_sizer, 0, wx.ALL, 5)
 
-        # 剛体の厚みブロック -------------------------------
+        # 剛体サイズブロック -------------------------------
         self.advance_rigidbody_thicks_sizer = wx.StaticBoxSizer(
-            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("剛体の厚み")), orient=wx.VERTICAL
+            wx.StaticBox(self.advance_window, wx.ID_ANY, logger.transtext("剛体サイズ")), orient=wx.VERTICAL
         )
         self.advance_rigidbody_thicks_grid_sizer = wx.FlexGridSizer(0, 6, 0, 0)
 
@@ -2995,9 +2999,7 @@ class PhysicsParam:
             self.advance_window, wx.ID_ANY, logger.transtext("根元頂点推定"), wx.DefaultPosition, wx.DefaultSize, 0
         )
         self.route_estimate_type_txt.SetToolTip(
-            logger.transtext(
-                "根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\nリング: 筒状メッシュの横方向の繋がりから推定\n軸方向: 物理方向の逆方向を根元として推定"
-            )
+            logger.transtext("根元頂点を推定する際の手法\n角度: 末端頂点角度に類似した根元頂点を推定\n縮尺: 末端頂点円周と根元頂点円周の縮尺を推定\nリング: 筒状メッシュの横方向の繋がりから推定")
         )
         self.route_estimate_type_txt.Wrap(-1)
         self.advance_option_grid_sizer.Add(self.route_estimate_type_txt, 0, wx.ALL, 5)
@@ -3005,7 +3007,7 @@ class PhysicsParam:
         self.route_estimate_type_ctrl = wx.Choice(
             self.advance_window,
             id=wx.ID_ANY,
-            choices=[logger.transtext("角度"), logger.transtext("縮尺"), logger.transtext("リング"), logger.transtext("軸方向")],
+            choices=[logger.transtext("角度"), logger.transtext("縮尺"), logger.transtext("リング")],
         )
         self.route_estimate_type_ctrl.SetToolTip(self.route_estimate_type_txt.GetToolTipText())
         self.route_estimate_type_ctrl.Bind(wx.EVT_CHOICE, self.main_frame.file_panel_ctrl.on_change_file)
@@ -4564,7 +4566,7 @@ class PhysicsParam:
 
     def set_shape_maintenance(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        mass_coefficient = self.simple_mass_slider.GetValue() * 0.1
+        mass_coefficient = self.simple_mass_slider.GetValue()
 
         # 柔らかさ
         air_resistance_ratio = (
@@ -4575,41 +4577,36 @@ class PhysicsParam:
             self.simple_shape_maintenance_slider.GetValue() / self.simple_shape_maintenance_slider.GetMax()
         )
 
-        # 縦ジョイント
-        self.advance_vertical_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
-
-        vertical_joint_ratio = 5.5 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
-
-        vertical_joint_rot = (
+        base_joint_y_rot = (
             max(
                 0,
                 min(
                     180,
-                    (
-                        180
-                        - air_resistance_ratio
-                        * 180
-                        * self.get_joint_coefficient(vertical_joint_ratio, is_reverse=True)
-                    ),
+                    (180 - air_resistance_ratio * 180),
                 ),
             )
             if air_resistance_ratio < 1
             else 0
         )
-        vertical_joint_y_rot = (
+        base_joint_rot = (
             max(
                 0,
                 min(
                     89,
-                    (
-                        89
-                        - air_resistance_ratio * 89 * self.get_joint_coefficient(vertical_joint_ratio, is_reverse=True)
-                    ),
+                    (89 - air_resistance_ratio * 89),
                 ),
             )
             if air_resistance_ratio < 1
             else 0
         )
+
+        # 縦ジョイント
+        self.advance_vertical_joint_coefficient_spin.SetValue(2)
+
+        vertical_joint_ratio = 0.2 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 0.9
+
+        vertical_joint_rot = base_joint_rot * vertical_joint_ratio
+        vertical_joint_y_rot = base_joint_y_rot * vertical_joint_ratio
 
         # 制限角度が0の場合、ちょっとだけ動かす
         vertical_joint_rot = 2 if not vertical_joint_rot else vertical_joint_rot
@@ -4622,9 +4619,9 @@ class PhysicsParam:
         self.vertical_joint_mov_z_min_spin.SetValue(0)
         self.vertical_joint_mov_z_max_spin.SetValue(0)
 
-        vertical_spring_rot_ratio = 10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+        vertical_spring_rot_ratio = 60 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 40
         vertical_spring_y_rot_ratio = (
-            5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 100
+            60 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 30
         )
 
         vertical_spring_rot = (
@@ -4668,52 +4665,19 @@ class PhysicsParam:
         self.horizonal_joint_mov_z_min_spin.SetValue(0)
         self.horizonal_joint_mov_z_max_spin.SetValue(0)
 
-        self.advance_horizonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 20)
+        self.advance_horizonal_joint_coefficient_spin.SetValue(3)
+        horizonal_joint_ratio = 0.1 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 0.8
 
-        horizonal_joint_ratio = 4 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.2
-
-        horizonal_joint_rot = (
-            max(
-                0,
-                min(
-                    180,
-                    (
-                        180
-                        - air_resistance_ratio
-                        * 180
-                        * self.get_joint_coefficient(horizonal_joint_ratio, is_reverse=True)
-                    ),
-                ),
-            )
-            if air_resistance_ratio < 1
-            else 0
-        )
-        horizonal_joint_y_rot = (
-            max(
-                0,
-                min(
-                    89,
-                    (
-                        89
-                        - air_resistance_ratio
-                        * 89
-                        * self.get_joint_coefficient(horizonal_joint_ratio, is_reverse=True)
-                    ),
-                ),
-            )
-            if air_resistance_ratio < 1
-            else 0
-        )
+        horizonal_joint_rot = base_joint_rot * horizonal_joint_ratio
+        horizonal_joint_y_rot = base_joint_y_rot * horizonal_joint_ratio
 
         # 制限角度が0の場合、ちょっとだけ動かす
         horizonal_joint_rot = 2 if not horizonal_joint_rot else horizonal_joint_rot
         horizonal_joint_y_rot = 2 if not horizonal_joint_y_rot else horizonal_joint_y_rot
 
-        horizonal_spring_rot_ratio = (
-            10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
-        )
+        horizonal_spring_rot_ratio = 60 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 30
         horizonal_spring_y_rot_ratio = (
-            5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+            60 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 20
         )
 
         horizonal_spring_rot = (
@@ -4740,7 +4704,7 @@ class PhysicsParam:
 
         # 斜めジョイント
         if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection():
-            self.diagonal_joint_ov_y_min_spin.SetValue(0)
+            self.diagonal_joint_mov_y_min_spin.SetValue(0)
             self.diagonal_joint_mov_y_max_spin.SetValue(0)
         else:
             diagonal_joint_mov = max(0, (1 - air_resistance_ratio) * 0.7)
@@ -4751,48 +4715,20 @@ class PhysicsParam:
         self.diagonal_joint_mov_z_min_spin.SetValue(0)
         self.diagonal_joint_mov_z_max_spin.SetValue(0)
 
-        self.advance_diagonal_joint_coefficient_spin.SetValue(air_resistance_ratio * 10)
+        self.advance_diagonal_joint_coefficient_spin.SetValue(1.5)
 
-        diagonal_joint_ratio = 5 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1.5
+        diagonal_joint_ratio = 0.01 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
 
-        diagonal_joint_rot = (
-            max(
-                0,
-                min(
-                    180,
-                    (
-                        180
-                        - air_resistance_ratio
-                        * 180
-                        * self.get_joint_coefficient(diagonal_joint_ratio, is_reverse=True)
-                    ),
-                ),
-            )
-            if air_resistance_ratio < 1
-            else 0
-        )
-        diagonal_joint_y_rot = (
-            max(
-                0,
-                min(
-                    89,
-                    (
-                        89
-                        - air_resistance_ratio * 89 * self.get_joint_coefficient(diagonal_joint_ratio, is_reverse=True)
-                    ),
-                ),
-            )
-            if air_resistance_ratio < 1
-            else 0
-        )
+        diagonal_joint_rot = base_joint_rot * diagonal_joint_ratio
+        diagonal_joint_y_rot = base_joint_y_rot * diagonal_joint_ratio
 
         # 制限角度が0の場合、ちょっとだけ動かす
         diagonal_joint_rot = 2 if not diagonal_joint_rot else diagonal_joint_rot
         diagonal_joint_y_rot = 2 if not diagonal_joint_y_rot else diagonal_joint_y_rot
 
-        diagonal_spring_rot_ratio = 10 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 300
+        diagonal_spring_rot_ratio = 60 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 20
         diagonal_spring_y_rot_ratio = (
-            5 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 200
+            60 if self.physics_type_ctrl.GetStringSelection() == logger.transtext("胸") else 10
         )
 
         diagonal_spring_rot = (

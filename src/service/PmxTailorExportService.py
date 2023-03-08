@@ -1153,6 +1153,8 @@ class PmxTailorExportService:
 
         # 中央配置か否か
         is_center = param_option["density_type"] == logger.transtext("中央")
+        # 剛体カバー率
+        rigidbody_cover_coefficient = param_option["rigidbody_cover_coefficient"]
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
@@ -1518,7 +1520,6 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -1593,7 +1594,7 @@ class PmxTailorExportService:
                                     else:
                                         joint_pos = (above_point + now_point) / 2
                                 else:
-                                    joint_pos = b_pos
+                                    joint_pos = a_pos
 
                                 # ボーン進行方向(x)
                                 x_direction_pos = (b_pos - a_pos).normalized()
@@ -1886,6 +1887,7 @@ class PmxTailorExportService:
                                         )
                                         break
 
+                            # ボーン間の距離に応じてジョイントの可動域を最終決定する
                             bone_distance = a_pos.distanceToPoint(b_pos)
 
                             joint_key, joint = self.build_joint(
@@ -1923,6 +1925,21 @@ class PmxTailorExportService:
                             )
                             if joint.name not in [j.name for j in created_joints.values()]:
                                 created_joints[joint_key] = joint
+
+                                # ジョイントの可動域を元に横幅のカバー率を計算して加算する(2回加算される)
+                                cover_distance = max(
+                                    0,
+                                    (
+                                        (
+                                            abs(joint.translation_limit_min.y())
+                                            + abs(joint.translation_limit_max.y()) / 2
+                                        )
+                                        / 2
+                                    )
+                                    * (rigidbody_cover_coefficient - 1),
+                                )
+                                a_rigidbody.shape_size += MVector3D(cover_distance, cover_distance * 1.2, 0)
+                                b_rigidbody.shape_size += MVector3D(cover_distance, cover_distance * 1.2, 0)
 
                         if param_option["joint_pos_type"] == logger.transtext("ボーン位置") and v_yidx == actual_v_yidx:
                             # 裾横ジョイント
@@ -2256,7 +2273,7 @@ class PmxTailorExportService:
 
                                     joint_pos = (above_point + now_point) / 2
                                 else:
-                                    joint_pos = b_pos
+                                    joint_pos = a_pos
 
                                 # ボーン進行方向(x)
                                 x_direction_pos = (b_pos - a_pos).normalized()
@@ -2550,7 +2567,17 @@ class PmxTailorExportService:
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
-                                joint_pos = b_pos
+                                # B剛体が繋がっているボーンの接続先が交点となる
+                                joint_pos = (
+                                    model.bones[
+                                        model.bone_indexes[
+                                            model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index
+                                        ]
+                                    ].position
+                                    if model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_index >= 0
+                                    else model.bones[model.bone_indexes[b_rigidbody.bone_index]].position
+                                    + model.bones[model.bone_indexes[b_rigidbody.bone_index]].tail_position
+                                )
 
                             # ボーン進行方向(x)
                             x_direction_pos = (b_pos - a_pos).normalized()
@@ -2709,7 +2736,8 @@ class PmxTailorExportService:
 
     def create_joint_param(self, param_joint: Joint, vv_keys: np.ndarray, coefficient: float):
         max_vy = len(vv_keys)
-        middle_vy = max_vy * 0.3
+        middle_rot_vy = max_vy * 0.2
+        middle_vy = max_vy * 0.5
         min_vy = 0
         xs = np.arange(min_vy, max_vy, step=1)
 
@@ -2739,7 +2767,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.translation_limit_min.x() / coefficient,
+                                0,
                                 param_joint.translation_limit_min.x() / coefficient,
                                 param_joint.translation_limit_min.x(),
                             ],
@@ -2785,7 +2813,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.translation_limit_max.x() / coefficient,
+                                0,
                                 param_joint.translation_limit_max.x() / coefficient,
                                 param_joint.translation_limit_max.x(),
                             ],
@@ -2831,8 +2859,8 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.rotation_limit_min.x() / coefficient,
-                                param_joint.rotation_limit_min.x() / coefficient,
+                                0,
+                                param_joint.rotation_limit_min.x() / (coefficient * 0.5),
                                 param_joint.rotation_limit_min.x(),
                             ],
                         ]
@@ -2844,10 +2872,10 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, middle_vy, max_vy],
+                            [min_vy, middle_rot_vy, max_vy],
                             [
-                                0,
                                 param_joint.rotation_limit_min.y() / coefficient,
+                                param_joint.rotation_limit_min.y() / (coefficient * 0.5),
                                 param_joint.rotation_limit_min.y(),
                             ],
                         ]
@@ -2859,10 +2887,10 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, middle_vy, max_vy],
+                            [min_vy, middle_rot_vy, max_vy],
                             [
                                 0,
-                                param_joint.rotation_limit_min.z() / coefficient,
+                                param_joint.rotation_limit_min.z() / (coefficient * 0.5),
                                 param_joint.rotation_limit_min.z(),
                             ],
                         ]
@@ -2877,8 +2905,8 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.rotation_limit_max.x() / coefficient,
-                                param_joint.rotation_limit_max.x() / coefficient,
+                                0,
+                                param_joint.rotation_limit_max.x() / (coefficient * 0.5),
                                 param_joint.rotation_limit_max.x(),
                             ],
                         ]
@@ -2890,10 +2918,10 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, middle_vy, max_vy],
+                            [min_vy, middle_rot_vy, max_vy],
                             [
-                                0,
                                 param_joint.rotation_limit_max.y() / coefficient,
+                                param_joint.rotation_limit_max.y() / (coefficient * 0.5),
                                 param_joint.rotation_limit_max.y(),
                             ],
                         ]
@@ -2905,10 +2933,10 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, middle_vy, max_vy],
+                            [min_vy, middle_rot_vy, max_vy],
                             [
                                 0,
-                                param_joint.rotation_limit_max.z() / coefficient,
+                                param_joint.rotation_limit_max.z() / (coefficient * 0.5),
                                 param_joint.rotation_limit_max.z(),
                             ],
                         ]
@@ -2923,9 +2951,9 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.spring_constant_translation.x() / coefficient,
-                                param_joint.spring_constant_translation.x() / coefficient,
                                 param_joint.spring_constant_translation.x(),
+                                param_joint.spring_constant_translation.x() / (coefficient * 0.8),
+                                param_joint.spring_constant_translation.x() / coefficient,
                             ],
                         ]
                     )
@@ -2938,9 +2966,9 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.spring_constant_translation.y() / coefficient,
-                                param_joint.spring_constant_translation.y() / coefficient,
                                 param_joint.spring_constant_translation.y(),
+                                param_joint.spring_constant_translation.y() / (coefficient * 0.8),
+                                param_joint.spring_constant_translation.y() / coefficient,
                             ],
                         ]
                     )
@@ -2953,9 +2981,9 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.spring_constant_translation.z() / coefficient,
-                                param_joint.spring_constant_translation.z() / coefficient,
                                 param_joint.spring_constant_translation.z(),
+                                param_joint.spring_constant_translation.z() / (coefficient * 0.8),
+                                param_joint.spring_constant_translation.z() / coefficient,
                             ],
                         ]
                     )
@@ -2969,9 +2997,9 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.spring_constant_rotation.x() / coefficient,
-                                param_joint.spring_constant_rotation.x() / coefficient,
                                 param_joint.spring_constant_rotation.x(),
+                                param_joint.spring_constant_rotation.x() / (coefficient * 0.8),
+                                param_joint.spring_constant_rotation.x() / coefficient,
                             ],
                         ]
                     )
@@ -2984,9 +3012,9 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.spring_constant_rotation.y() / coefficient,
-                                param_joint.spring_constant_rotation.y() / coefficient,
                                 param_joint.spring_constant_rotation.y(),
+                                param_joint.spring_constant_rotation.y() / (coefficient * 0.8),
+                                param_joint.spring_constant_rotation.y() / coefficient,
                             ],
                         ]
                     )
@@ -2999,9 +3027,9 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.spring_constant_rotation.z() / coefficient,
-                                param_joint.spring_constant_rotation.z() / coefficient,
                                 param_joint.spring_constant_rotation.z(),
+                                param_joint.spring_constant_rotation.z() / (coefficient * 0.8),
+                                param_joint.spring_constant_rotation.z() / coefficient,
                             ],
                         ]
                     )
@@ -3180,9 +3208,6 @@ class PmxTailorExportService:
             logger.info("--【No.%s】剛体生成", base_map_idx + 1)
 
             registered_bones = all_registered_bones[base_map_idx]
-
-            # 剛体カバー率
-            rigidbody_cover_coefficient = param_option["rigidbody_cover_coefficient"]
 
             # 縦段INDEX
             v_yidxs = list(range(registered_bones.shape[0]))
@@ -3730,7 +3755,7 @@ class PmxTailorExportService:
                         param_rigidbody.collision_group,
                         (param_rigidbody.no_collision_group if v_yidx < actual_v_yidx else all_no_collision_group),
                         rigidbody_shape_type,
-                        shape_size * MVector3D(rigidbody_cover_coefficient, rigidbody_cover_coefficient * 1.4, 1),
+                        shape_size,
                         shape_position,
                         shape_rotation_radians,
                         mass,
