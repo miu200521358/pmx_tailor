@@ -225,10 +225,13 @@ class ParamPanel(BasePanel):
 
                         # 剛体の厚みを設定する
                         self.physics_list[-1].rigidbody_root_thicks_spin.SetValue(
-                            vroid2pmx_setting.get("rigidbody_root_thick", 0.5)
+                            vroid2pmx_setting.get("rigidbody_root_thick", 0.07)
                         )
                         self.physics_list[-1].rigidbody_end_thicks_spin.SetValue(
-                            vroid2pmx_setting.get("rigidbody_end_thick", 0.5)
+                            vroid2pmx_setting.get("rigidbody_end_thick", 0.3)
+                        )
+                        self.physics_list[-1].rigidbody_cover_coefficient_spin.SetValue(
+                            vroid2pmx_setting.get("rigidbody_cover_coefficient", 1.2)
                         )
 
                         if (
@@ -1195,16 +1198,41 @@ class PhysicsParam:
             self.advance_window,
             id=wx.ID_ANY,
             size=wx.Size(90, -1),
-            value="0.2",
+            value="0.3",
             min=0.01,
             max=10,
-            initial=0.2,
+            initial=0.3,
             inc=0.01,
         )
         self.rigidbody_end_thicks_spin.Bind(
             wx.EVT_MOUSEWHEEL, lambda event: self.on_wheel_double_spin_ctrl(event, 0.1)
         )
         self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_end_thicks_spin, 0, wx.ALL, 5)
+
+        # カバー率
+        self.rigidbody_cover_coefficient_txt = wx.StaticText(
+            self.advance_window, wx.ID_ANY, logger.transtext("カバー率"), wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        self.rigidbody_cover_coefficient_txt.SetToolTip(
+            logger.transtext("剛体のはみ出し具合。値が大きいほど剛体の縦横が大きくなり、足が貫通しにくくなります。\n大きすぎるとちょっと凸凹します。")
+        )
+        self.rigidbody_cover_coefficient_txt.Wrap(-1)
+        self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_cover_coefficient_txt, 0, wx.ALL, 5)
+
+        self.rigidbody_cover_coefficient_spin = wx.SpinCtrlDouble(
+            self.advance_window,
+            id=wx.ID_ANY,
+            size=wx.Size(90, -1),
+            value="1.2",
+            min=1,
+            max=2,
+            initial=1.2,
+            inc=0.01,
+        )
+        self.rigidbody_cover_coefficient_spin.Bind(
+            wx.EVT_MOUSEWHEEL, lambda event: self.on_wheel_double_spin_ctrl(event, 0.1)
+        )
+        self.advance_rigidbody_thicks_grid_sizer.Add(self.rigidbody_cover_coefficient_spin, 0, wx.ALL, 5)
 
         self.advance_rigidbody_thicks_sizer.Add(self.advance_rigidbody_thicks_grid_sizer, 1, wx.ALL | wx.EXPAND, 5)
         self.advance_param_sizer.Add(self.advance_rigidbody_thicks_sizer, 0, wx.ALL, 5)
@@ -3247,6 +3275,7 @@ class PhysicsParam:
 
             params["rigidbody_root_thicks"] = self.rigidbody_root_thicks_spin.GetValue()
             params["rigidbody_end_thicks"] = self.rigidbody_end_thicks_spin.GetValue()
+            params["rigidbody_cover_coefficient"] = self.rigidbody_cover_coefficient_spin.GetValue()
 
             params["vertical_joint"] = None
             if self.advance_vertical_joint_valid_check.GetValue():
@@ -3555,7 +3584,8 @@ class PhysicsParam:
         self.advance_rigidbody_leg_ctrl.SetValue(params.get("rigidbody_leg", 0))
 
         self.rigidbody_root_thicks_spin.SetValue(params.get("rigidbody_root_thicks", 0.07))
-        self.rigidbody_end_thicks_spin.SetValue(params.get("rigidbody_end_thicks", 0.2))
+        self.rigidbody_end_thicks_spin.SetValue(params.get("rigidbody_end_thicks", 0.3))
+        self.rigidbody_cover_coefficient_spin.SetValue(params.get("rigidbody_cover_coefficient", 1.2))
 
         # 縦ジョイント -----------
         self.advance_vertical_joint_valid_check.SetValue(params["vertical_joint_valid"])
@@ -3741,6 +3771,7 @@ class PhysicsParam:
 
         params["rigidbody_root_thicks"] = self.rigidbody_root_thicks_spin.GetValue()
         params["rigidbody_end_thicks"] = self.rigidbody_end_thicks_spin.GetValue()
+        params["rigidbody_cover_coefficient"] = self.rigidbody_cover_coefficient_spin.GetValue()
 
         # 縦ジョイント -----------
         params["vertical_joint_valid"] = self.advance_vertical_joint_valid_check.GetValue()
@@ -4287,9 +4318,7 @@ class PhysicsParam:
         self.main_frame.file_panel_ctrl.on_change_file(event)
         self.rigidbody_mass_spin.SetValue(self.simple_mass_slider.GetValue())
 
-        self.rigidbody_coefficient_spin.SetValue(
-            self.simple_mass_slider.GetMax() / self.simple_mass_slider.GetValue()
-        )
+        self.rigidbody_coefficient_spin.SetValue(self.simple_mass_slider.GetMax() / self.simple_mass_slider.GetValue())
 
         self.set_air_resistance(event)
 
@@ -4299,7 +4328,8 @@ class PhysicsParam:
         self.advance_rigidbody_leg_ctrl.SetValue(0)
         self.advance_horizonal_joint_restruct_check.SetValue(0)
         self.rigidbody_root_thicks_spin.SetValue(0.07)
-        self.rigidbody_end_thicks_spin.SetValue(0.2)
+        self.rigidbody_end_thicks_spin.SetValue(0.3)
+        self.rigidbody_cover_coefficient_spin.SetValue(1.2)
         # self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
         # self.route_search_type_ctrl.SetStringSelection(logger.transtext("前頂点優先"))
         # self.route_estimate_type_ctrl.SetStringSelection(logger.transtext("角度"))
@@ -4534,7 +4564,7 @@ class PhysicsParam:
 
     def set_shape_maintenance(self, event: wx.Event):
         self.main_frame.file_panel_ctrl.on_change_file(event)
-        mass_coefficient = max(1, self.simple_mass_slider.GetValue() * 0.5)
+        mass_coefficient = self.simple_mass_slider.GetValue() * 0.1
 
         # 柔らかさ
         air_resistance_ratio = (

@@ -1490,13 +1490,13 @@ class PmxTailorExportService:
                                     above_mat.setToIdentity()
                                     above_mat.translate(a_rigidbody.shape_position)
                                     above_mat.rotate(a_rigidbody.shape_qq)
-                                    above_point = above_mat * MVector3D(0, -a_rigidbody.shape_size.y(), 0)
+                                    above_point = above_mat * MVector3D(0, -a_rigidbody.real_shape_size.y(), 0)
 
                                 now_mat = MMatrix4x4()
                                 now_mat.setToIdentity()
                                 now_mat.translate(b_rigidbody.shape_position)
                                 now_mat.rotate(b_rigidbody.shape_qq)
-                                now_point = now_mat * MVector3D(0, b_rigidbody.shape_size.y(), 0)
+                                now_point = now_mat * MVector3D(0, b_rigidbody.real_shape_size.y(), 0)
 
                                 if v_yidx == 0:
                                     joint_pos = now_point
@@ -1518,7 +1518,7 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -1580,13 +1580,13 @@ class PmxTailorExportService:
                                         above_mat.setToIdentity()
                                         above_mat.translate(a_rigidbody.shape_position)
                                         above_mat.rotate(a_rigidbody.shape_qq)
-                                        above_point = above_mat * MVector3D(0, a_rigidbody.shape_size.y(), 0)
+                                        above_point = above_mat * MVector3D(0, a_rigidbody.real_shape_size.y(), 0)
 
                                     now_mat = MMatrix4x4()
                                     now_mat.setToIdentity()
                                     now_mat.translate(b_rigidbody.shape_position)
                                     now_mat.rotate(b_rigidbody.shape_qq)
-                                    now_point = now_mat * MVector3D(0, -b_rigidbody.shape_size.y(), 0)
+                                    now_point = now_mat * MVector3D(0, -b_rigidbody.real_shape_size.y(), 0)
 
                                     if v_yidx == 0:
                                         joint_pos = above_point
@@ -1605,7 +1605,7 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -1678,7 +1678,7 @@ class PmxTailorExportService:
                                     ).normalized()
                                     joint_axis_cross = MVector3D.crossProduct(joint_axis, joint_axis_up).normalized()
                                     joint_qq = MQuaternion.fromDirection(joint_axis, joint_axis_cross)
-                                    joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                    # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                     joint_key, joint = self.build_joint(
                                         "B",
@@ -1814,13 +1814,13 @@ class PmxTailorExportService:
                                     above_mat.setToIdentity()
                                     above_mat.translate(a_rigidbody.shape_position)
                                     above_mat.rotate(a_rigidbody.shape_qq)
-                                    above_point = above_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+                                    above_point = above_mat * MVector3D(a_rigidbody.real_shape_size.x(), 0, 0)
 
                                 now_mat = MMatrix4x4()
                                 now_mat.setToIdentity()
                                 now_mat.translate(b_rigidbody.shape_position)
                                 now_mat.rotate(b_rigidbody.shape_qq)
-                                now_point = now_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+                                now_point = now_mat * MVector3D(-b_rigidbody.real_shape_size.x(), 0, 0)
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
@@ -1831,7 +1831,7 @@ class PmxTailorExportService:
                             # ボーン進行方向に対しての縦軸(z)
                             z_direction_pos = ((a_rigidbody.z_direction + b_rigidbody.z_direction) / 2).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                            joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                            # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             ratio = 1
                             if param_option["horizonal_joint_restruct"]:
@@ -1844,7 +1844,7 @@ class PmxTailorExportService:
                                     a_mat.translate(a_rigidbody.shape_position)
                                     a_mat.rotate(a_rigidbody.shape_qq)
 
-                                    a_length = np.mean(a_rigidbody.shape_size.data()) * check_ratio
+                                    a_length = np.mean(a_rigidbody.real_shape_size.data()) * check_ratio
 
                                     a_capsule = MCapsule(
                                         MSegment(
@@ -1863,7 +1863,7 @@ class PmxTailorExportService:
                                         b_mat.translate(b_rigidbody.shape_position)
                                         b_mat.rotate(b_rigidbody.shape_qq)
 
-                                        b_length = np.mean(b_rigidbody.shape_size.data()) * check_ratio
+                                        b_length = np.mean(b_rigidbody.real_shape_size.data()) * check_ratio
 
                                         b_capsule = MCapsule(
                                             MSegment(
@@ -1973,7 +1973,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2093,7 +2093,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2184,7 +2184,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2246,13 +2246,13 @@ class PmxTailorExportService:
                                         above_mat.setToIdentity()
                                         above_mat.translate(a_rigidbody.shape_position)
                                         above_mat.rotate(a_rigidbody.shape_qq)
-                                        above_point = above_mat * MVector3D(-a_rigidbody.shape_size.x(), 0, 0)
+                                        above_point = above_mat * MVector3D(-a_rigidbody.real_shape_size.x(), 0, 0)
 
                                     now_mat = MMatrix4x4()
                                     now_mat.setToIdentity()
                                     now_mat.translate(b_rigidbody.shape_position)
                                     now_mat.rotate(b_rigidbody.shape_qq)
-                                    now_point = now_mat * MVector3D(b_rigidbody.shape_size.x(), 0, 0)
+                                    now_point = now_mat * MVector3D(b_rigidbody.real_shape_size.x(), 0, 0)
 
                                     joint_pos = (above_point + now_point) / 2
                                 else:
@@ -2265,7 +2265,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                                 joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                 bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2352,7 +2352,7 @@ class PmxTailorExportService:
                                         (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                     ).normalized()
                                     joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                                    joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                                    # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                                     bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2433,13 +2433,13 @@ class PmxTailorExportService:
                                     above_mat.setToIdentity()
                                     above_mat.translate(a_rigidbody.shape_position)
                                     above_mat.rotate(a_rigidbody.shape_qq)
-                                    above_point = above_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+                                    above_point = above_mat * MVector3D(a_rigidbody.real_shape_size.x(), 0, 0)
 
                                 now_mat = MMatrix4x4()
                                 now_mat.setToIdentity()
                                 now_mat.translate(b_rigidbody.shape_position)
                                 now_mat.rotate(b_rigidbody.shape_qq)
-                                now_point = now_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+                                now_point = now_mat * MVector3D(-b_rigidbody.real_shape_size.x(), 0, 0)
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
@@ -2455,7 +2455,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                            joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                            # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2540,13 +2540,13 @@ class PmxTailorExportService:
                                     above_mat.setToIdentity()
                                     above_mat.translate(a_rigidbody.shape_position)
                                     above_mat.rotate(a_rigidbody.shape_qq)
-                                    above_point = above_mat * MVector3D(a_rigidbody.shape_size.x(), 0, 0)
+                                    above_point = above_mat * MVector3D(a_rigidbody.real_shape_size.x(), 0, 0)
 
                                 now_mat = MMatrix4x4()
                                 now_mat.setToIdentity()
                                 now_mat.translate(b_rigidbody.shape_position)
                                 now_mat.rotate(b_rigidbody.shape_qq)
-                                now_point = now_mat * MVector3D(-b_rigidbody.shape_size.x(), 0, 0)
+                                now_point = now_mat * MVector3D(-b_rigidbody.real_shape_size.x(), 0, 0)
 
                                 joint_pos = (above_point + now_point) / 2
                             else:
@@ -2562,7 +2562,7 @@ class PmxTailorExportService:
                                     (a_rigidbody.z_direction + b_rigidbody.z_direction) / 2
                                 ).normalized()
                             joint_qq = MQuaternion.fromDirection(z_direction_pos, x_direction_pos)
-                            joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
+                            # joint_qq *= MQuaternion.fromEulerAngles(180, 0, 0)
 
                             bone_distance = a_pos.distanceToPoint(b_pos)
 
@@ -2737,8 +2737,9 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, max_vy],
+                            [min_vy, middle_vy, max_vy],
                             [
+                                param_joint.translation_limit_min.x() / coefficient,
                                 param_joint.translation_limit_min.x() / coefficient,
                                 param_joint.translation_limit_min.x(),
                             ],
@@ -2751,8 +2752,9 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, max_vy],
+                            [min_vy, middle_vy, max_vy],
                             [
+                                0,
                                 param_joint.translation_limit_min.y() / coefficient,
                                 param_joint.translation_limit_min.y(),
                             ],
@@ -2765,8 +2767,9 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, max_vy],
+                            [min_vy, middle_vy, max_vy],
                             [
+                                0,
                                 param_joint.translation_limit_min.z() / coefficient,
                                 param_joint.translation_limit_min.z(),
                             ],
@@ -2780,8 +2783,9 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, max_vy],
+                            [min_vy, middle_vy, max_vy],
                             [
+                                param_joint.translation_limit_max.x() / coefficient,
                                 param_joint.translation_limit_max.x() / coefficient,
                                 param_joint.translation_limit_max.x(),
                             ],
@@ -2794,8 +2798,9 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, max_vy],
+                            [min_vy, middle_vy, max_vy],
                             [
+                                0,
                                 param_joint.translation_limit_max.y() / coefficient,
                                 param_joint.translation_limit_max.y(),
                             ],
@@ -2808,8 +2813,9 @@ class PmxTailorExportService:
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
-                            [min_vy, max_vy],
+                            [min_vy, middle_vy, max_vy],
                             [
+                                0,
                                 param_joint.translation_limit_max.z() / coefficient,
                                 param_joint.translation_limit_max.z(),
                             ],
@@ -2840,7 +2846,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.rotation_limit_min.y() / coefficient,
+                                0,
                                 param_joint.rotation_limit_min.y() / coefficient,
                                 param_joint.rotation_limit_min.y(),
                             ],
@@ -2855,7 +2861,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.rotation_limit_min.z() / coefficient,
+                                0,
                                 param_joint.rotation_limit_min.z() / coefficient,
                                 param_joint.rotation_limit_min.z(),
                             ],
@@ -2886,7 +2892,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.rotation_limit_max.y() / coefficient,
+                                0,
                                 param_joint.rotation_limit_max.y() / coefficient,
                                 param_joint.rotation_limit_max.y(),
                             ],
@@ -2901,7 +2907,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                param_joint.rotation_limit_max.z() / coefficient,
+                                0,
                                 param_joint.rotation_limit_max.z() / coefficient,
                                 param_joint.rotation_limit_max.z(),
                             ],
@@ -3175,7 +3181,8 @@ class PmxTailorExportService:
 
             registered_bones = all_registered_bones[base_map_idx]
 
-            # 厚みの判定
+            # 剛体カバー率
+            rigidbody_cover_coefficient = param_option["rigidbody_cover_coefficient"]
 
             # 縦段INDEX
             v_yidxs = list(range(registered_bones.shape[0]))
@@ -3530,14 +3537,14 @@ class PmxTailorExportService:
                         shape_position = MVector3D(np.mean(shape_positions, axis=0))
 
                     is_y_direction_prev = False
-                    y_direction_from_pos = now_below_bone.position
+                    y_direction_to_pos = now_below_bone.position
 
                     if param_option["joint_pos_type"] == logger.transtext("ボーン位置") and next_connected:
                         # ボーン位置の場合、次ボーンとの間を進行方向とする
                         x_direction_from_pos = (now_below_vv.position() + next_below_vv.position()) / 2
                         x_direction_to_pos = (now_now_bone.position + next_now_vv.position()) / 2
                         # ボーン進行方向に対しての横軸(y)
-                        y_direction_to_pos = next_below_vv.position()
+                        y_direction_from_pos = next_below_vv.position()
                         y_direction_pos = (y_direction_to_pos - y_direction_from_pos).normalized()
 
                         # ボーン進行方向(x)
@@ -3547,7 +3554,7 @@ class PmxTailorExportService:
                         x_direction_from_pos = (now_below_vv.position() + prev_below_vv.position()) / 2
                         x_direction_to_pos = (now_now_bone.position + prev_now_vv.position()) / 2
                         # ボーン進行方向に対しての横軸(y)
-                        y_direction_to_pos = prev_below_vv.position()
+                        y_direction_from_pos = prev_below_vv.position()
                         y_direction_pos = (y_direction_to_pos - y_direction_from_pos).normalized()
                         is_y_direction_prev = True
 
@@ -3723,7 +3730,7 @@ class PmxTailorExportService:
                         param_rigidbody.collision_group,
                         (param_rigidbody.no_collision_group if v_yidx < actual_v_yidx else all_no_collision_group),
                         rigidbody_shape_type,
-                        shape_size,
+                        shape_size * MVector3D(rigidbody_cover_coefficient, rigidbody_cover_coefficient * 1.4, 1),
                         shape_position,
                         shape_rotation_radians,
                         mass,
@@ -3737,6 +3744,7 @@ class PmxTailorExportService:
                     vv.map_rigidbodies[base_map_idx].x_direction = x_direction_pos
                     vv.map_rigidbodies[base_map_idx].y_direction = y_direction_pos
                     vv.map_rigidbodies[base_map_idx].z_direction = z_direction_pos
+                    vv.map_rigidbodies[base_map_idx].real_shape_size = shape_size.copy()
 
                     # 別途保持しておく
                     if vv.map_rigidbodies[base_map_idx].name not in created_rigidbodies:

@@ -534,6 +534,7 @@ cdef class RigidBody:
         self.x_direction = MVector3D()
         self.y_direction = MVector3D()
         self.z_direction = MVector3D()
+        self.real_shape_size = MVector3D()
 
         self.SHAPE_SPHERE = 0
         self.SHAPE_BOX = 1
