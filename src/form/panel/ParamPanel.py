@@ -4431,7 +4431,7 @@ class PhysicsParam:
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
 
             self.simple_mass_slider.SetValue(2)
-            self.simple_air_resistance_slider.SetValue(4.5)
+            self.simple_air_resistance_slider.SetValue(3.5)
             self.simple_shape_maintenance_slider.SetValue(1.6)
 
             self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
@@ -4440,8 +4440,8 @@ class PhysicsParam:
             self.advance_vertical_reverse_joint_valid_check.SetValue(1)
 
         elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
-            self.simple_mass_slider.SetValue(1.2)
-            self.simple_air_resistance_slider.SetValue(3.8)
+            self.simple_mass_slider.SetValue(2.5)
+            self.simple_air_resistance_slider.SetValue(2.8)
             self.simple_shape_maintenance_slider.SetValue(1.6)
 
             self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
@@ -4717,7 +4717,7 @@ class PhysicsParam:
 
         self.advance_diagonal_joint_coefficient_spin.SetValue(1.5)
 
-        diagonal_joint_ratio = 0.01 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
+        diagonal_joint_ratio = 0.05 if logger.transtext("胸") in self.physics_type_ctrl.GetStringSelection() else 1
 
         diagonal_joint_rot = base_joint_rot * diagonal_joint_ratio
         diagonal_joint_y_rot = base_joint_y_rot * diagonal_joint_ratio

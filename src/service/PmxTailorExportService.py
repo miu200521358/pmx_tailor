@@ -1155,6 +1155,8 @@ class PmxTailorExportService:
         is_center = param_option["density_type"] == logger.transtext("中央")
         # 剛体カバー率
         rigidbody_cover_coefficient = param_option["rigidbody_cover_coefficient"]
+        # 布物理か
+        is_cloth = param_option["physics_type"] in [logger.transtext("布")]
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
@@ -1185,7 +1187,7 @@ class PmxTailorExportService:
                 vertical_spring_constant_rot_ys,
                 vertical_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["vertical_joint"], vv_keys, param_option["vertical_joint_coefficient"]
+                param_option["vertical_joint"], vv_keys, param_option["vertical_joint_coefficient"], is_cloth
             )
 
             # 横ジョイント情報
@@ -1209,7 +1211,7 @@ class PmxTailorExportService:
                 horizonal_spring_constant_rot_ys,
                 horizonal_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["horizonal_joint"], vv_keys, param_option["horizonal_joint_coefficient"]
+                param_option["horizonal_joint"], vv_keys, param_option["horizonal_joint_coefficient"], is_cloth
             )
 
             # 斜めジョイント情報
@@ -1233,7 +1235,7 @@ class PmxTailorExportService:
                 diagonal_spring_constant_rot_ys,
                 diagonal_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["diagonal_joint"], vv_keys, param_option["diagonal_joint_coefficient"]
+                param_option["diagonal_joint"], vv_keys, param_option["diagonal_joint_coefficient"], is_cloth
             )
 
             # 縦逆ジョイント情報
@@ -1257,7 +1259,10 @@ class PmxTailorExportService:
                 vertical_reverse_spring_constant_rot_ys,
                 vertical_reverse_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["vertical_reverse_joint"], vv_keys, param_option["vertical_reverse_joint_coefficient"]
+                param_option["vertical_reverse_joint"],
+                vv_keys,
+                param_option["vertical_reverse_joint_coefficient"],
+                is_cloth,
             )
 
             # 横逆ジョイント情報
@@ -1281,7 +1286,10 @@ class PmxTailorExportService:
                 horizonal_reverse_spring_constant_rot_ys,
                 horizonal_reverse_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["horizonal_reverse_joint"], vv_keys, param_option["horizonal_reverse_joint_coefficient"]
+                param_option["horizonal_reverse_joint"],
+                vv_keys,
+                param_option["horizonal_reverse_joint_coefficient"],
+                is_cloth,
             )
 
             for v_xidx in range(vertex_map.shape[1]):
@@ -2734,7 +2742,7 @@ class PmxTailorExportService:
         )
         return joint_key, joint
 
-    def create_joint_param(self, param_joint: Joint, vv_keys: np.ndarray, coefficient: float):
+    def create_joint_param(self, param_joint: Joint, vv_keys: np.ndarray, coefficient: float, is_cloth: bool):
         max_vy = len(vv_keys)
         middle_rot_vy = max_vy * 0.2
         middle_vy = max_vy * 0.5
@@ -2853,13 +2861,21 @@ class PmxTailorExportService:
                 xs,
             )
 
+            if is_cloth:
+                min_rot_x = min_rot_z = max_rot_x = max_rot_z = 0
+            else:
+                min_rot_x = param_joint.rotation_limit_min.x() / coefficient
+                min_rot_z = param_joint.rotation_limit_min.z() / coefficient
+                max_rot_x = param_joint.rotation_limit_max.x() / coefficient
+                max_rot_z = param_joint.rotation_limit_max.z() / coefficient
+
             limit_min_rot_xs = MBezierUtils.intersect_by_x(
                 bezier.Curve.from_nodes(
                     np.asfortranarray(
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                0,
+                                min_rot_x,
                                 param_joint.rotation_limit_min.x() / (coefficient * 0.5),
                                 param_joint.rotation_limit_min.x(),
                             ],
@@ -2889,7 +2905,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_rot_vy, max_vy],
                             [
-                                0,
+                                min_rot_z,
                                 param_joint.rotation_limit_min.z() / (coefficient * 0.5),
                                 param_joint.rotation_limit_min.z(),
                             ],
@@ -2905,7 +2921,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_vy, max_vy],
                             [
-                                0,
+                                max_rot_x,
                                 param_joint.rotation_limit_max.x() / (coefficient * 0.5),
                                 param_joint.rotation_limit_max.x(),
                             ],
@@ -2935,7 +2951,7 @@ class PmxTailorExportService:
                         [
                             [min_vy, middle_rot_vy, max_vy],
                             [
-                                0,
+                                max_rot_z,
                                 param_joint.rotation_limit_max.z() / (coefficient * 0.5),
                                 param_joint.rotation_limit_max.z(),
                             ],
