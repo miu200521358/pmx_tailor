@@ -6088,8 +6088,7 @@ class PmxTailorExportService:
     ):
         bone_grid = param_option["bone_grid"]
         bone_grid_cols = param_option["bone_grid_cols"]
-        # 末端ボーンを加味するのでインクリメント
-        bone_grid_rows = param_option["bone_grid_rows"] + 1
+        bone_grid_rows = param_option["bone_grid_rows"]
 
         logger.info("【%s:%s】ボーンマップ生成", material_name, param_option["abb_name"], decoration=MLogger.DECORATION_LINE)
 
@@ -6159,6 +6158,9 @@ class PmxTailorExportService:
         nearest_pos = MVector3D()
 
         if param_option["physics_type"] in [logger.transtext("布")]:
+            # 末端ボーンを加味するのでインクリメント
+            bone_grid_rows += 1
+
             vertex_map = np.full((bone_grid_rows + 1, bone_grid_cols, 3), (np.nan, np.nan, np.nan))
             bone_connected = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
             registered_bones = np.zeros((vertex_map.shape[0], vertex_map.shape[1]), dtype=np.int)
@@ -6346,7 +6348,7 @@ class PmxTailorExportService:
         else:
             # 布以外は一列ものとして別登録
             for grid_col in range(bone_grid_cols):
-                valid_bone_grid_rows = [n for n in range(bone_grid_rows) if bone_grid[n][grid_col]]
+                valid_bone_grid_rows = [n for n in range(bone_grid_rows) if n in bone_grid and bone_grid[n][grid_col]]
                 vertex_map = np.full((len(valid_bone_grid_rows), 1, 3), (np.nan, np.nan, np.nan))
                 # 横との接続は一切なし
                 bone_connected = np.zeros((len(valid_bone_grid_rows), 1), dtype=np.int)
