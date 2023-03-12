@@ -288,7 +288,7 @@ cdef class MQuaternion:
     cpdef double toDegree(self)
 
     cpdef double toDegreeSign(self, MVector3D local_axis)
-
+    
     cpdef double calcTheata(self, MQuaternion v)
 
     cpdef data(self)
