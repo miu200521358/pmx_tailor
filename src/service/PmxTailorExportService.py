@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-#
 import logging
 import os
 import traceback
@@ -1155,8 +1153,10 @@ class PmxTailorExportService:
         is_center = param_option["density_type"] == logger.transtext("中央")
         # 剛体カバー率
         rigidbody_cover_coefficient = param_option["rigidbody_cover_coefficient"]
-        # 布物理か
-        is_cloth = param_option["physics_type"] in [logger.transtext("布")]
+        # # 布物理の場合だけジョイント根元を0から始める
+        # is_start_zero = param_option["physics_type"] in [logger.transtext("布")]
+        # 単一物理の場合だけジョイント根元を0から始めない
+        is_start_zero = param_option["physics_type"] != logger.transtext("単一揺")
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)
@@ -1187,7 +1187,7 @@ class PmxTailorExportService:
                 vertical_spring_constant_rot_ys,
                 vertical_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["vertical_joint"], vv_keys, param_option["vertical_joint_coefficient"], is_cloth
+                param_option["vertical_joint"], vv_keys, param_option["vertical_joint_coefficient"], is_start_zero
             )
 
             # 横ジョイント情報
@@ -1211,7 +1211,7 @@ class PmxTailorExportService:
                 horizonal_spring_constant_rot_ys,
                 horizonal_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["horizonal_joint"], vv_keys, param_option["horizonal_joint_coefficient"], is_cloth
+                param_option["horizonal_joint"], vv_keys, param_option["horizonal_joint_coefficient"], is_start_zero
             )
 
             # 斜めジョイント情報
@@ -1235,7 +1235,7 @@ class PmxTailorExportService:
                 diagonal_spring_constant_rot_ys,
                 diagonal_spring_constant_rot_zs,
             ) = self.create_joint_param(
-                param_option["diagonal_joint"], vv_keys, param_option["diagonal_joint_coefficient"], is_cloth
+                param_option["diagonal_joint"], vv_keys, param_option["diagonal_joint_coefficient"], is_start_zero
             )
 
             # 縦逆ジョイント情報
@@ -1262,7 +1262,7 @@ class PmxTailorExportService:
                 param_option["vertical_reverse_joint"],
                 vv_keys,
                 param_option["vertical_reverse_joint_coefficient"],
-                is_cloth,
+                is_start_zero,
             )
 
             # 横逆ジョイント情報
@@ -1289,7 +1289,7 @@ class PmxTailorExportService:
                 param_option["horizonal_reverse_joint"],
                 vv_keys,
                 param_option["horizonal_reverse_joint_coefficient"],
-                is_cloth,
+                is_start_zero,
             )
 
             for v_xidx in range(vertex_map.shape[1]):
@@ -2742,7 +2742,7 @@ class PmxTailorExportService:
         )
         return joint_key, joint
 
-    def create_joint_param(self, param_joint: Joint, vv_keys: np.ndarray, coefficient: float, is_cloth: bool):
+    def create_joint_param(self, param_joint: Joint, vv_keys: np.ndarray, coefficient: float, is_start_zero: bool):
         max_vy = len(vv_keys)
         middle_rot_vy = max_vy * 0.2
         middle_vy = max_vy * 0.5
@@ -2861,7 +2861,7 @@ class PmxTailorExportService:
                 xs,
             )
 
-            if is_cloth:
+            if is_start_zero:
                 min_rot_x = min_rot_z = max_rot_x = max_rot_z = 0
             else:
                 min_rot_x = param_joint.rotation_limit_min.x() / coefficient
