@@ -1153,10 +1153,10 @@ class PmxTailorExportService:
         is_center = param_option["density_type"] == logger.transtext("中央")
         # 剛体カバー率
         rigidbody_cover_coefficient = param_option["rigidbody_cover_coefficient"]
-        # # 布物理の場合だけジョイント根元を0から始める
-        # is_start_zero = param_option["physics_type"] in [logger.transtext("布")]
-        # 単一物理の場合だけジョイント根元を0から始めない
-        is_start_zero = param_option["physics_type"] != logger.transtext("単一揺")
+        # 布物理の場合だけジョイント根元を0から始める
+        is_start_zero = param_option["physics_type"] in [logger.transtext("布")]
+        # # 単一物理の場合だけジョイント根元を0から始めない
+        # is_start_zero = param_option["physics_type"] != logger.transtext("単一揺")
 
         for base_map_idx, vertex_map in vertex_maps.items():
             logger.info("--【No.%s】ジョイント生成", base_map_idx + 1)

@@ -3539,7 +3539,7 @@ class PhysicsParam:
             # Proceed loading the file chosen by the user
             target_physics_path = fileDialog.GetPath()
             try:
-                with open(target_physics_path, "r") as f:
+                with open(target_physics_path, "r", encoding="utf-8") as f:
                     params = json.load(f)
                     self.set_param_import_data(params)
 
@@ -4348,19 +4348,17 @@ class PhysicsParam:
         self.advance_vertical_reverse_joint_coefficient_spin.SetValue(1)
         self.advance_horizonal_reverse_joint_coefficient_spin.SetValue(1)
 
-        if logger.transtext("単一揺れ物") in self.simple_primitive_ctrl.GetStringSelection():
+        if logger.transtext("単一揺れ物").lower() in self.simple_primitive_ctrl.GetStringSelection().lower():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("単一揺"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
             self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext(
-            "胸(小)"
-        ) or self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
+        elif logger.transtext("胸").lower() in self.simple_primitive_ctrl.GetStringSelection().lower():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("胸"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("球"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
             self.parent_type_ctrl.SetStringSelection(logger.transtext("親"))
-        elif logger.transtext("髪") in self.simple_primitive_ctrl.GetStringSelection():
+        elif logger.transtext("髪").lower() in self.simple_primitive_ctrl.GetStringSelection().lower():
             self.physics_type_ctrl.SetStringSelection(logger.transtext("髪"))
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("カプセル"))
             self.simple_exist_physics_clear_ctrl.SetStringSelection(logger.transtext("再利用"))
@@ -4373,28 +4371,28 @@ class PhysicsParam:
             self.advance_rigidbody_shape_type_ctrl.SetStringSelection(logger.transtext("箱"))
             # self.parent_type_ctrl.SetStringSelection(logger.transtext("中心"))
 
-        if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(コットン)"):
+        if self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("布(コットン)").lower():
             self.simple_mass_slider.SetValue(3.2)
             self.simple_air_resistance_slider.SetValue(1.5)
             self.simple_shape_maintenance_slider.SetValue(1.5)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
 
-        if self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ウール)"):
+        if self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("布(ウール)").lower():
             self.simple_mass_slider.SetValue(6.2)
             self.simple_air_resistance_slider.SetValue(3.5)
             self.simple_shape_maintenance_slider.SetValue(0.6)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(シルク)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("布(シルク)").lower():
             self.simple_mass_slider.SetValue(1.8)
             self.simple_air_resistance_slider.SetValue(0.9)
             self.simple_shape_maintenance_slider.SetValue(0.2)
 
             self.advance_horizonal_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(ベルベッド)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("布(ベルベッド)").lower():
             self.simple_mass_slider.SetValue(5.5)
             self.simple_air_resistance_slider.SetValue(2.1)
             self.simple_shape_maintenance_slider.SetValue(1.8)
@@ -4402,7 +4400,7 @@ class PhysicsParam:
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(レザー)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("布(レザー)").lower():
             self.simple_mass_slider.SetValue(6)
             self.simple_air_resistance_slider.SetValue(1.5)
             self.simple_shape_maintenance_slider.SetValue(2.5)
@@ -4412,7 +4410,7 @@ class PhysicsParam:
             # self.advance_vertical_reverse_joint_valid_check.SetValue(1)
             # self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("布(デニム)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("布(デニム)").lower():
             self.simple_mass_slider.SetValue(7)
             self.simple_air_resistance_slider.SetValue(3.5)
             self.simple_shape_maintenance_slider.SetValue(2.0)
@@ -4422,13 +4420,13 @@ class PhysicsParam:
             # self.advance_vertical_reverse_joint_valid_check.SetValue(1)
             # self.advance_horizonal_reverse_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("単一揺れ物"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("単一揺れ物").lower():
             self.simple_mass_slider.SetValue(3.3)
             self.simple_air_resistance_slider.SetValue(2.5)
             self.simple_shape_maintenance_slider.SetValue(2.8)
             self.joint_pos_type_ctrl.SetStringSelection(logger.transtext("ボーン位置"))
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ショート)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("髪(ショート)").lower():
 
             self.simple_mass_slider.SetValue(2)
             self.simple_air_resistance_slider.SetValue(4.5)
@@ -4439,14 +4437,14 @@ class PhysicsParam:
             self.advance_vertical_reverse_joint_coefficient_spin.SetValue(1.0)
             self.advance_vertical_reverse_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(ロング)"):
-            self.simple_mass_slider.SetValue(1.2)
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("髪(ロング)").lower():
+            self.simple_mass_slider.SetValue(2.5)
             self.simple_air_resistance_slider.SetValue(3.8)
             self.simple_shape_maintenance_slider.SetValue(1.6)
 
             self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("髪(アホ毛)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("髪(アホ毛)").lower():
             self.simple_mass_slider.SetValue(2.2)
             self.simple_air_resistance_slider.SetValue(0.2)
             self.simple_shape_maintenance_slider.SetValue(1.5)
@@ -4454,7 +4452,7 @@ class PhysicsParam:
             self.advance_vertical_joint_coefficient_spin.SetValue(1.0)
             self.advance_rigidbody_balancer_ctrl.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(小)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("胸(小)").lower():
             self.simple_mass_slider.SetValue(4.0)
             self.simple_air_resistance_slider.SetValue(1.5)
             self.simple_shape_maintenance_slider.SetValue(3.0)
@@ -4466,7 +4464,7 @@ class PhysicsParam:
             self.advance_horizonal_joint_valid_check.SetValue(1)
             self.advance_diagonal_joint_valid_check.SetValue(1)
 
-        elif self.simple_primitive_ctrl.GetStringSelection() == logger.transtext("胸(大)"):
+        elif self.simple_primitive_ctrl.GetStringSelection().lower() == logger.transtext("胸(大)").lower():
             self.simple_mass_slider.SetValue(6.2)
             self.simple_air_resistance_slider.SetValue(1.2)
             self.simple_shape_maintenance_slider.SetValue(2.6)
