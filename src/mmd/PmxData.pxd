@@ -100,6 +100,7 @@ cdef class RigidBody:
     cdef public MVector3D x_direction
     cdef public MVector3D y_direction
     cdef public MVector3D z_direction
+    cdef public MVector3D real_shape_size
     cdef public int SHAPE_SPHERE
     cdef public int SHAPE_BOX
     cdef public int SHAPE_CAPSULE
