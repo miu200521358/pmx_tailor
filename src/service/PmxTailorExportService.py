@@ -3769,7 +3769,7 @@ class PmxTailorExportService:
                         vv.map_bones[base_map_idx].name,
                         vv.map_bones[base_map_idx].index,
                         param_rigidbody.collision_group,
-                        (param_rigidbody.no_collision_group if v_yidx < actual_v_yidx else all_no_collision_group),
+                        (param_rigidbody.no_collision_group if v_yidx < actual_v_yidx or param_option["physics_type"] not in [logger.transtext("布")] else all_no_collision_group),
                         rigidbody_shape_type,
                         shape_size,
                         shape_position,
@@ -5833,7 +5833,7 @@ class PmxTailorExportService:
                 for v_yidx in range(vertex_map.shape[0]):
                     bone_key = tuple(vertex_map[v_yidx, v_xidx])
                     bone = virtual_vertices[bone_key].map_bones[base_map_idx]
-                    if model.vertices.get(bone.index, None):
+                    if model.vertices.get(bone.index, None) and bone.getVisibleFlag():
                         # 胸上ボーン
                         bust_top_pos = MVector3D(
                             np.average(
